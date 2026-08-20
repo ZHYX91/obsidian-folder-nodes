@@ -1,0 +1,10 @@
+{
+  "id": "folder-nodes",
+  "name": "Folder Nodes",
+  "version": "0.1.0",
+  "minAppVersion": "1.12.7",
+  "description": "Treat every folder as a same-named node with safe creation, migration, ordering, and visual tools.",
+  "author": "ZhengYX",
+  "authorUrl": "https://github.com/ZHYX91",
+  "isDesktopOnly": true
+}
