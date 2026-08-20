@@ -2,9 +2,19 @@ import { App, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
 
 import { createNodeDocument, patchFrontmatterScalar } from "../core/frontmatter";
 import { scanMigration, type VaultInventory } from "../core/migration";
-import { basename, dirname, isCanonicalNodeNote, isDescendantPath, nodeNotePath, sanitizeNodeName } from "../core/paths";
 import { compareChildren, materializeManualOrder, planReorder } from "../core/ordering";
+import { basename, dirname, isCanonicalNodeNote, isDescendantPath, nodeNotePath, sanitizeNodeName } from "../core/paths";
+import {
+  CHILDREN_SORT_PROPERTY,
+  SIBLING_RANK_PROPERTY,
+} from "../core/properties";
+import { renderNodeTemplate } from "../core/template";
 import type { ChildOrderRecord, FolderNodesSettings, MigrationScan } from "../core/types";
+
+const STRUCTURAL_PROPERTIES = new Set([
+  CHILDREN_SORT_PROPERTY,
+  SIBLING_RANK_PROPERTY,
+]);
 
 export class NodeService {
   private readonly suppressed = new Set<string>();
@@ -12,15 +22,11 @@ export class NodeService {
   public constructor(
     private readonly app: App,
     private readonly getSettings: () => FolderNodesSettings,
+    private readonly warn: (warning: { kind: "template-not-found"; path: string }) => void = () => undefined,
   ) {}
 
-  public rootNotePath(): string {
-    return `${sanitizeNodeName(this.app.vault.getName())}.md`;
-  }
-
-  public notePathForFolder(folderPath: string): string {
-    return folderPath === "" ? this.rootNotePath() : nodeNotePath(folderPath);
-  }
+  public rootNotePath(): string { return `${sanitizeNodeName(this.app.vault.getName())}.md`; }
+  public notePathForFolder(folderPath: string): string { return folderPath === "" ? this.rootNotePath() : nodeNotePath(folderPath); }
 
   public getFolder(path: string): TFolder | null {
     const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
@@ -32,16 +38,11 @@ export class NodeService {
     return file instanceof TFile ? file : null;
   }
 
-  public folderForFile(file: TFile | null): TFolder | null {
-    if (file === null) return null;
-    if (isCanonicalNodeNote(file.path)) return file.parent;
-    return file.parent;
-  }
+  public folderForFile(file: TFile | null): TFolder | null { return file?.parent ?? null; }
 
   public async openFolderNode(folderPath: string, newLeaf = false): Promise<void> {
     const note = this.getNote(this.notePathForFolder(folderPath));
-    if (note === null) return;
-    await this.app.workspace.getLeaf(newLeaf).openFile(note);
+    if (note !== null) await this.app.workspace.getLeaf(newLeaf).openFile(note);
   }
 
   public async initialize(): Promise<void> {
@@ -67,12 +68,20 @@ export class NodeService {
       let body = options.body ?? "";
       const templatePath = this.getSettings().defaultNodeTemplatePath.trim();
       const template = templatePath === "" ? null : this.getNote(templatePath);
-      if (template !== null && body === "") body = await this.app.vault.read(template);
-      const note = await this.app.vault.create(
-        notePath,
-        createNodeDocument(options.alias?.trim() || null, body),
-      );
-      await this.appendOrderIfManual(parentPath, note);
+      if (templatePath !== "" && template === null && body === "") {
+        this.warn({ kind: "template-not-found", path: templatePath });
+      }
+      if (template !== null && body === "") {
+        const source = await this.app.vault.read(template);
+        body = renderNodeTemplate(source, {
+          name,
+          path: folderPath,
+          parent: parentPath,
+          date: new Date().toISOString().slice(0, 10),
+        });
+      }
+      const note = await this.app.vault.create(notePath, createNodeDocument(options.alias?.trim() || null, body));
+      await this.appendRankIfManual(parentPath, note);
       return note;
     } finally {
       this.suppressed.delete(folderPath);
@@ -95,21 +104,61 @@ export class NodeService {
   }
 
   public async moveNode(folder: TFolder, targetParentPath: string): Promise<TFolder> {
+    return this.placeNode(folder, targetParentPath, this.children(targetParentPath).length);
+  }
+
+  public async placeNode(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder> {
     if (targetParentPath === folder.path || isDescendantPath(targetParentPath, folder.path)) {
       throw new Error("A node cannot be moved into itself or a descendant");
+    }
+    const oldParentPath = folder.parent?.path ?? "";
+    await this.ensureManualSort(targetParentPath);
+    if (oldParentPath === targetParentPath) {
+      await this.applyOrderPatches(planReorder(this.children(targetParentPath), folder.path, targetIndex).patches);
+      return folder;
     }
     const nextPath = normalizePath(targetParentPath === "" ? folder.name : `${targetParentPath}/${folder.name}`);
     if (this.app.vault.getAbstractFileByPath(nextPath) !== null) throw new Error(`Path already exists: ${nextPath}`);
     await this.app.vault.rename(folder, nextPath);
     const moved = this.getFolder(nextPath);
     if (moved === null) throw new Error("Moved folder was not found");
-    const note = this.getNote(nodeNotePath(nextPath));
-    if (note !== null) await this.appendOrderIfManual(targetParentPath, note);
+    await this.applyOrderPatches(planReorder(this.children(targetParentPath), moved.path, targetIndex).patches);
     return moved;
   }
 
-  public async deleteNode(folder: TFolder): Promise<void> {
-    await this.app.fileManager.trashFile(folder);
+  public async deleteNode(folder: TFolder): Promise<void> { await this.app.fileManager.trashFile(folder); }
+
+  public async mergeNode(source: TFolder, target: TFolder): Promise<void> {
+    if (source.path === target.path || isDescendantPath(target.path, source.path)) {
+      throw new Error("A node cannot be merged into itself or a descendant");
+    }
+    const sourceNote = this.getNote(this.notePathForFolder(source.path));
+    const targetNote = this.getNote(this.notePathForFolder(target.path));
+    if (sourceNote === null || targetNote === null) throw new Error("Both nodes must have canonical notes");
+    const movable = source.children.filter((entry) => entry.path !== sourceNote.path);
+    for (const entry of movable) {
+      const destination = normalizePath(`${target.path}/${entry.name}`);
+      if (this.app.vault.getAbstractFileByPath(destination) !== null) throw new Error(`Merge conflict: ${destination}`);
+    }
+    const sourceProperties = this.app.metadataCache.getFileCache(sourceNote)?.frontmatter ?? {};
+    const targetProperties = this.app.metadataCache.getFileCache(targetNote)?.frontmatter ?? {};
+    for (const [key, value] of Object.entries(sourceProperties)) {
+      if (key === "position" || STRUCTURAL_PROPERTIES.has(key)) continue;
+      if (key in targetProperties && JSON.stringify(targetProperties[key]) !== JSON.stringify(value)) {
+        throw new Error(`Merge property conflict: ${key}`);
+      }
+    }
+    await this.app.fileManager.processFrontMatter(targetNote, (frontmatter: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(sourceProperties)) {
+        if (key !== "position" && !STRUCTURAL_PROPERTIES.has(key) && !(key in frontmatter)) frontmatter[key] = value;
+      }
+    });
+    const sourceBody = stripFrontmatter(await this.app.vault.read(sourceNote)).trim();
+    if (sourceBody !== "") {
+      await this.app.vault.append(targetNote, `\n\n## Merged from ${source.name}\n\n${sourceBody}\n`);
+    }
+    for (const entry of movable) await this.app.vault.rename(entry, normalizePath(`${target.path}/${entry.name}`));
+    await this.app.fileManager.trashFile(source);
   }
 
   public inventory(): VaultInventory {
@@ -125,8 +174,7 @@ export class NodeService {
 
   public scan(): MigrationScan {
     const result = scanMigration(this.inventory());
-    const root = this.rootNotePath();
-    const rootExists = this.getNote(root) !== null;
+    const rootExists = this.getNote(this.rootNotePath()) !== null;
     return rootExists ? result : { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] };
   }
 
@@ -136,12 +184,13 @@ export class NodeService {
     let completed = 0;
     for (const path of scan.leafMarkdown) {
       const note = this.getNote(path);
-      if (note === null) continue;
-      const parent = dirname(path);
-      const name = basename(path).slice(0, -3);
-      const folderPath = normalizePath(parent === "" ? name : `${parent}/${name}`);
-      if (this.getFolder(folderPath) === null) await this.app.vault.createFolder(folderPath);
-      await this.app.fileManager.renameFile(note, `${folderPath}/${name}.md`);
+      if (note !== null) {
+        const parent = dirname(path);
+        const name = basename(path).slice(0, -3);
+        const folderPath = normalizePath(parent === "" ? name : `${parent}/${name}`);
+        if (this.getFolder(folderPath) === null) await this.app.vault.createFolder(folderPath);
+        await this.app.fileManager.renameFile(note, `${folderPath}/${name}.md`);
+      }
       onStep?.(++completed, total);
     }
     const folders = ["", ...this.inventory().folders];
@@ -157,19 +206,20 @@ export class NodeService {
     if (parent === null) return [];
     return parent.children.filter((child): child is TFolder => child instanceof TFolder).map((child) => {
       const note = this.getNote(nodeNotePath(child.path));
-      const cache = note === null ? null : this.app.metadataCache.getFileCache(note);
-      const rawOrder = cache?.frontmatter?.folderNodeOrder as unknown;
+      const frontmatter = note === null ? undefined : this.app.metadataCache.getFileCache(note)?.frontmatter;
+      const rawRank: unknown = frontmatter?.[SIBLING_RANK_PROPERTY] as unknown;
       return {
         basename: child.name,
         childPath: child.path,
-        order: typeof rawOrder === "number" && Number.isSafeInteger(rawOrder) ? rawOrder : null,
+        order: typeof rawRank === "number" && Number.isSafeInteger(rawRank) && rawRank > 0 ? rawRank : null,
       };
     }).sort(compareChildren);
   }
 
   public sortMode(parentPath: string): "natural" | "manual" {
     const note = this.getNote(this.notePathForFolder(parentPath));
-    const raw: unknown = note === null ? null : this.app.metadataCache.getFileCache(note)?.frontmatter?.folderNodeSort;
+    const frontmatter = note === null ? undefined : this.app.metadataCache.getFileCache(note)?.frontmatter;
+    const raw: unknown = frontmatter?.[CHILDREN_SORT_PROPERTY];
     return raw === "manual" ? "manual" : "natural";
   }
 
@@ -179,10 +229,7 @@ export class NodeService {
     const index = children.findIndex(({ childPath }) => childPath === folder.path);
     const target = index + delta;
     if (index < 0 || target < 0 || target >= children.length) return;
-    if (this.sortMode(parentPath) !== "manual") {
-      await this.patchScalar(this.getNote(this.notePathForFolder(parentPath)), "folderNodeSort", "manual");
-      await this.applyOrderPatches(materializeManualOrder(children).patches);
-    }
+    await this.ensureManualSort(parentPath);
     await this.applyOrderPatches(planReorder(this.children(parentPath), folder.path, target).patches);
   }
 
@@ -217,29 +264,39 @@ export class NodeService {
       const oldName = basename(oldPath);
       const staleNote = this.getNote(`${entry.path}/${oldName}.md`);
       const canonicalPath = nodeNotePath(entry.path);
-      if (staleNote !== null && this.getNote(canonicalPath) === null) {
-        await this.app.fileManager.renameFile(staleNote, canonicalPath);
-      }
+      if (staleNote !== null && this.getNote(canonicalPath) === null) await this.app.fileManager.renameFile(staleNote, canonicalPath);
       return;
     }
     if (entry instanceof TFile && isCanonicalNodeNote(oldPath) && entry.parent !== null && dirname(entry.path) === dirname(oldPath) && !isCanonicalNodeNote(entry.path)) {
       await this.renameNode(entry.parent, entry.basename);
     }
   }
-  private async appendOrderIfManual(parentPath: string, note: TFile): Promise<void> {
+
+  private async ensureManualSort(parentPath: string): Promise<void> {
+    if (this.sortMode(parentPath) === "manual") return;
+    await this.patchScalar(this.getNote(this.notePathForFolder(parentPath)), CHILDREN_SORT_PROPERTY, "manual");
+    await this.applyOrderPatches(materializeManualOrder(this.children(parentPath)).patches);
+  }
+
+  private async appendRankIfManual(parentPath: string, note: TFile): Promise<void> {
     if (this.sortMode(parentPath) !== "manual") return;
     const max = this.children(parentPath).reduce((value, child) => Math.max(value, child.order ?? 0), 0);
-    await this.patchScalar(note, "folderNodeOrder", Math.min(max + 1024, Number.MAX_SAFE_INTEGER));
+    await this.patchScalar(note, SIBLING_RANK_PROPERTY, Math.min(max + 1024, Number.MAX_SAFE_INTEGER));
   }
 
   private async applyOrderPatches(patches: readonly { childPath: string; nextOrder: number }[]): Promise<void> {
-    for (const patch of patches) {
-      await this.patchScalar(this.getNote(nodeNotePath(patch.childPath)), "folderNodeOrder", patch.nextOrder);
-    }
+    for (const patch of patches) await this.patchScalar(this.getNote(nodeNotePath(patch.childPath)), SIBLING_RANK_PROPERTY, patch.nextOrder);
   }
 
   private async patchScalar(file: TFile | null, key: string, value: string | number): Promise<void> {
     if (file === null) throw new Error(`Cannot update missing node note: ${key}`);
     await this.app.vault.process(file, (source) => patchFrontmatterScalar(source, key, value));
   }
+}
+
+function stripFrontmatter(source: string): string {
+  const normalized = source.replaceAll("\r\n", "\n");
+  if (!normalized.startsWith("---\n")) return normalized;
+  const end = normalized.indexOf("\n---\n", 4);
+  return end < 0 ? normalized : normalized.slice(end + 5);
 }

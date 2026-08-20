@@ -4,20 +4,24 @@ translation_of: release.zh-CN.md
 translation_status: synced
 ---
 
-# Folder Nodes release contract
+# Folder Nodes release procedure
 
-## Version and gates
+## Version and candidate
 
-Manifest, package, lockfile, versions, and the tag without a `v` prefix must agree. Use Node 24.18.0 and npm 11.16.0 and pass `npm run release:check`.
+`package.json`, `manifest.json`, `versions.json`, and CHANGELOG use one version. A candidate contains only `main.js`, `manifest.json`, `styles.css`, and the versioned zip produced by one production build. Record commit, tree, file sizes, and SHA-256 after the build; later stages do not rebuild or replace the candidate.
 
-## Assets
+## Release gates
 
-Public runtime files are exactly `main.js`, `manifest.json`, and `styles.css`; the archive is `folder-nodes-<version>.zip`.
+Before candidacy, run `npm ci`, `npm run check`, `npm run release:check`, and the large-directory benchmark. Isolated-Vault host acceptance binds to the exact candidate. Explorer, drag placement, selection context menus, Visuals, gallery, migration, and deletion are not claimed as host-verified in README or release notes without dated evidence.
 
-## CI and publication
+## Git and GitHub
 
-CI builds once and uploads a fixed candidate. Publication downloads by artifact ID and digest, validates SHA256, creates attestations, then publishes the verified tag and checks immutable assets.
+Local commit, push, tag, GitHub Release, Obsidian community submission, and production-Vault deployment are separate actions. Commits use normal Git identity and a Conventional Commit subject. Do not push, tag, publish a Release, or submit to the community directory without explicit user authorization.
 
-## Action boundaries
+## Production Vault
 
-Local commit, push, tag, GitHub Release, community submission, and production Vault deployment are separate actions and do not imply one another.
+Before deployment, confirm the exact Vault, plugin ID, and Obsidian process state. Preserve existing `data.json`. Copy only the exact candidate's three runtime files, recompute hashes after deployment, and confirm enabled state. A production Vault never receives migration fixtures or automated destructive acceptance.
+
+## Release content
+
+Release notes list only implemented and verified behavior, migration instructions, the property contract, compatibility, and known limitations. `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank` are the first public contract; unpublished prototypes receive no compatibility claim. Screenshots come from an accepted Obsidian host and contain no private Vault information.

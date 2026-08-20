@@ -1,4 +1,5 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Notice, Setting } from "obsidian";
+import { formatError, t } from "./i18n";
 
 export class PromptModal extends Modal {
   private value: string;
@@ -25,17 +26,20 @@ export class PromptModal extends Modal {
           if (event.key === "Enter") void this.submit();
         });
       });
-    new Setting(this.contentEl).addButton((button) => button
-      .setCta()
-      .setButtonText(this.submitText)
-      .onClick(() => void this.submit()));
+    new Setting(this.contentEl)
+      .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
+      .addButton((button) => button.setCta().setButtonText(this.submitText).onClick(() => void this.submit()));
   }
 
   private async submit(): Promise<void> {
     const value = this.value.trim();
     if (value === "") return;
-    await this.onSubmit(value);
-    this.close();
+    try {
+      await this.onSubmit(value);
+      this.close();
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    }
   }
 }
 
@@ -53,11 +57,15 @@ export class ConfirmModal extends Modal {
     this.setTitle(this.titleText);
     this.contentEl.createEl("p", { text: this.message });
     new Setting(this.contentEl)
-      .addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))
+      .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
       .addButton((button) => {
         button.setButtonText(this.confirmText).setCta().onClick(async () => {
-          await this.onConfirm();
-          this.close();
+          try {
+            await this.onConfirm();
+            this.close();
+          } catch (error) {
+            new Notice(formatError(error), 8000);
+          }
         });
         if (this.danger) button.buttonEl.addClass("mod-warning");
       });

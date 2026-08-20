@@ -6,7 +6,8 @@ local sibling repositories, personal Vaults, user profiles, or private acceptanc
 The structural identity of a node is `A/A.md` at its current normalized Vault path. Folder Nodes
 must never write `_pkwf.id`, another stable node ID, a PKWF manifest, or a parent-owned complete
 children list. Natural sorting writes no order metadata. Manual sorting uses child-owned sparse
-`folderNodeOrder` keys and the parent-only `folderNodeSort: manual` mode flag.
+`folderNodeSiblingRank` keys and the parent-only `folderNodeChildrenSort: manual` mode flag. These
+are the first public field names; do not add compatibility reads for unpublished prototypes.
 
 Migration is preview-first. Destructive or ambiguous changes fail closed. Tests and fixtures must
 use an isolated disposable Vault. A production deployment is separate from build, commit, push,

@@ -1,5 +1,6 @@
 export type AdoptionState = "unadopted" | "migrating" | "managed";
 export type SortMode = "natural" | "manual";
+export type InterfaceLanguage = "auto" | "zh-CN" | "en";
 
 export interface NamingPart {
   enabled: boolean;
@@ -10,6 +11,7 @@ export interface NamingPart {
 
 export interface FolderNodesSettings {
   adoptionState: AdoptionState;
+  language: InterfaceLanguage;
   iconInheritance: boolean;
   defaultNodeTemplatePath: string;
   addSelectionAlias: boolean;
@@ -53,4 +55,12 @@ export interface MigrationScan {
   leafMarkdown: string[];
   missingNodeNotes: string[];
   conflicts: MigrationConflict[];
+}
+
+export type VisualKind = "emoji" | "lucide" | "image" | "color" | "fallback";
+
+export interface NodeVisual {
+  kind: VisualKind;
+  value: string;
+  inheritedFrom: string | null;
 }

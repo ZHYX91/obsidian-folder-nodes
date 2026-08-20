@@ -2,6 +2,7 @@ import type { FolderNodesSettings } from "../core/types";
 
 export const DEFAULT_SETTINGS: FolderNodesSettings = {
   adoptionState: "unadopted",
+  language: "auto",
   iconInheritance: true,
   defaultNodeTemplatePath: "",
   addSelectionAlias: true,
@@ -22,9 +23,11 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = {
 
 export function normalizeSettings(value: unknown): FolderNodesSettings {
   const input = typeof value === "object" && value !== null ? value as Partial<FolderNodesSettings> : {};
+  const language = input.language === "zh-CN" || input.language === "en" ? input.language : "auto";
   return {
     ...DEFAULT_SETTINGS,
     ...input,
+    language,
     prefix: { ...DEFAULT_SETTINGS.prefix, ...input.prefix },
     suffix: { ...DEFAULT_SETTINGS.suffix, ...input.suffix },
   };

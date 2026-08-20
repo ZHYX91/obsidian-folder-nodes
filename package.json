@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Treat every folder in an Obsidian Vault as a same-named folder node.",
   "type": "module",
   "main": "dist/main.js",
@@ -23,11 +23,18 @@
     "check": "npm run check:runtime && npm run lint && npm run format:check && npm run check:readme-i18n && npm run check:docs-i18n && npm run typecheck && npm run test:coverage && npm run build:bundle && npm run check:release",
     "release:check": "node scripts/check-release-version.mjs && npm run check && npm run bench:ordering && npm run bench:ordering:large"
   },
-  "keywords": ["obsidian", "plugin", "folder-notes", "folder-nodes"],
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "folder-notes",
+    "folder-nodes"
+  ],
   "author": "ZhengYX",
   "license": "MIT",
   "packageManager": "npm@11.16.0",
-  "engines": { "node": "24.18.0" },
+  "engines": {
+    "node": "24.18.0"
+  },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "24.13.3",

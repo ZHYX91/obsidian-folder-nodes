@@ -1,9 +1,9 @@
 {
   "id": "folder-nodes",
   "name": "Folder Nodes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.12.7",
-  "description": "Treat every folder as a same-named node with safe creation, migration, ordering, and visual tools.",
+  "description": "Turn every folder into a same-named node with visual navigation, selection creation, and scalable ordering.",
   "author": "ZhengYX",
   "authorUrl": "https://github.com/ZHYX91",
   "isDesktopOnly": true
