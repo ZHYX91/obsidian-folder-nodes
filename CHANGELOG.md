@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed an Explorer icon MutationObserver feedback loop that could freeze Obsidian after assigning a Node Visual.
 - Fixed File Explorer disclosure-arrow clicks for current Obsidian collapse-icon markup while retaining legacy compatibility.
 - Added complete Node Contents menus through right-click, More actions, Shift+F10, and the Menu key, with third-party `file-menu` extension support.
 - Added before/into/after child-node placement and ordinary-file into moves onto nodes, the current-node header, and breadcrumbs without file-order metadata.

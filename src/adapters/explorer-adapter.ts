@@ -1,6 +1,6 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
-import { isFolderCollapseControl } from "./explorer-events";
+import { ensureExplorerIconPosition, isFolderCollapseControl } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeDropZone, NodeVisual } from "../core/types";
@@ -74,9 +74,7 @@ export class ExplorerAdapter extends Component {
       }
       if (icon === null) icon = createSpan({ cls: "folder-nodes-explorer-icon" });
       const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
-      if (position === "before") element.insertBefore(icon, title ?? element.firstChild);
-      else if (title === null) element.append(icon);
-      else title.insertAdjacentElement("afterend", icon);
+      ensureExplorerIconPosition(element, icon, title, position);
       if (force || icon.childElementCount === 0) renderVisual(icon, resolved, folder.name);
     }
     this.decorateNoteTitles(force);
