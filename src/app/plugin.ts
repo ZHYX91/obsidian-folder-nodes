@@ -28,7 +28,14 @@ export default class FolderNodesPlugin extends Plugin {
     setLanguage(this.settings.language);
     this.service = new NodeService(this.app, () => this.settings);
     this.visuals = new VisualService(this.app, this.service, () => this.settings.iconInheritance);
-    this.explorer = new ExplorerAdapter(this.app, this.service, this.visuals, () => this.settings, (error) => new Notice(formatError(error), 8000));
+    this.explorer = new ExplorerAdapter(
+      this.app,
+      this.service,
+      this.visuals,
+      () => this.settings,
+      () => ({ root: t("root"), missingNodeNote: t("missingNodeNote") }),
+      (error) => new Notice(formatError(error), 8000),
+    );
     this.addChild(this.explorer);
     this.registerView(CONTENTS_VIEW_TYPE, (leaf) => new FolderNodeContentsView(leaf, this.service, this.visuals, {
       createChild: (folder) => this.promptCreateChild(folder),

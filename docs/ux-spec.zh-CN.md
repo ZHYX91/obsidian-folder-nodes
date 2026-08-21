@@ -19,7 +19,7 @@ translation_status: source
 
 ## Explorer Node Tree
 
-点击 folder title 打开 Node Note，disclosure arrow 只展开或折叠。canonical Node Note 行隐藏。拖拽时必须显示 before line、into highlight 或 after line；drop 前不得修改 Vault。节点右键菜单复用创建、Contents、Visual、rename、move、merge、reorder 和 trash actions。
+File Explorer 顶部固定显示 Root 行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note，并使用独立的根节点标签和选中状态。点击普通 folder title 打开 Node Note，disclosure arrow 只展开或折叠。canonical Node Note 行隐藏。拖拽时必须显示 before line、into highlight 或 after line；drop 前不得修改 Vault。节点右键菜单复用创建、Contents、Visual、rename、move、merge、reorder 和 trash actions。
 
 ## Node Contents View
 
@@ -35,8 +35,8 @@ Node 卡片上方 25% 是 before line，中间 50% 是 into highlight，下方 2
 
 ## 迁移与健康
 
-未接管时，设置页和 Contents 顶部必须显著显示“尚未初始化”，并说明自动重命名同步和结构维护不可用；主按钮为“开始初始化”。预览逐项展开叶子 Markdown 的源/目标、缺失 Node Note、精确及前缀豁免和阻塞冲突，最终按钮为“确认初始化”。接管后入口改为“结构维护/检查结构”。Health 使用同一摘要但严格只读，只显示关闭按钮。进度条只在明确确认后推进，失败显示安全停止通知。Contents 的 Nodes 区显示正常节点、缺少 Node Note 的文件夹和缺少同名文件夹的非豁免 Markdown；异常项使用警告标识和显式修复菜单。
+未接管时，设置页和 Contents 顶部必须显著显示“尚未初始化”，并说明自动重命名同步和结构维护不可用；主按钮为“开始初始化”。预览逐项展开叶子 Markdown 的源/目标、缺失 Node Note、指定路径及名称前缀形式的不管理规则和阻塞冲突，最终按钮为“确认初始化”。接管后入口改为“结构维护/检查结构”。Health 使用同一摘要但严格只读，只显示关闭按钮。进度条只在明确确认后推进，失败显示安全停止通知。Contents 的 Nodes 区显示正常节点、缺少 Node Note 的文件夹和缺少同名文件夹的受管理 Markdown；异常项使用警告标识和显式修复或不管理规则菜单。
 
-## 结构豁免
+## 不管理的内容
 
-常规页分别显示“允许的叶子笔记”和“不管理的文件夹”列表。前者是精确 `.md` 路径，后者作用于完整子树。添加、删除和预览都明确显示 Vault 相对路径；豁免仅停止结构管理，不隐藏文件或文件夹。
+常规页只显示“不管理的 Markdown 文件”和“不管理的文件夹”两个规则组。每组都把指定路径和名称前缀合并到同一列表，用规则类型标签区分，并在一起提供“添加路径”“添加名称前缀”。两组的首发默认前缀都是 `.`、`_`。当前 Vault 配置目录、`.git`、`.trash` 由系统保护。不管理规则只停止结构管理，不隐藏文件或文件夹。

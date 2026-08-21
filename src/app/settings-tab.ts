@@ -156,10 +156,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       this.actionDefinition(t("health"), t("healthDesc"), (setting) => {
         setting.addButton((button) => { button.setButtonText(t("health")).onClick(() => { this.plugin.showHealth(); }); });
       }),
-      this.exemptionListDefinition("leaf"),
-      this.prefixListDefinition("leaf"),
-      this.exemptionListDefinition("folder"),
-      this.prefixListDefinition("folder"),
+      ...this.unmanagedRuleDefinitions("leaf"),
+      ...this.unmanagedRuleDefinitions("folder"),
     ];
   }
 
@@ -199,28 +197,27 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     ];
   }
 
-  private exemptionListDefinition(kind: ExemptionKind): SettingDefinitionItem {
+  private unmanagedRuleDefinitions(kind: ExemptionKind): SettingDefinitionItem[] {
     const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
-    return {
-      type: "list",
-      heading: kind === "leaf" ? t("leafExemptions") : t("folderExemptions"),
-      emptyState: t("noExemptions"),
-      items: paths.map((path) => ({ name: path, desc: kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc") })),
-      onDelete: (index) => void this.removeExemption(kind, index),
-      addItem: { name: t("addExemption"), action: () => this.promptExemption(kind) },
-    };
-  }
-
-  private prefixListDefinition(kind: ExemptionKind): SettingDefinitionItem {
     const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
-    return {
-      type: "list",
-      heading: kind === "leaf" ? t("leafPrefixRules") : t("folderPrefixRules"),
-      emptyState: t("noPrefixRules"),
-      items: prefixes.map((prefix) => ({ name: prefix, desc: kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc") })),
-      onDelete: (index) => void this.removePrefix(kind, index),
-      addItem: { name: t("addPrefixRule"), action: () => this.promptPrefix(kind) },
-    };
+    const heading = kind === "leaf" ? t("leafExemptions") : t("folderExemptions");
+    const items = [
+      ...paths.map((path) => ({ name: path, desc: t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")) })),
+      ...prefixes.map((prefix) => ({ name: prefix + "*", desc: t("namePrefixRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")) })),
+    ];
+    return [
+      {
+        type: "list",
+        heading,
+        emptyState: t("noUnmanagedRules"),
+        items,
+        onDelete: (index) => void this.removeUnmanagedRule(kind, index, paths.length),
+      },
+      this.actionDefinition(t("addRule"), t("addRuleDesc"), (setting) => {
+        setting.addButton((button) => button.setButtonText(t("addPathRule")).onClick(() => this.promptExemption(kind)));
+        setting.addButton((button) => button.setButtonText(t("addPrefixRule")).onClick(() => this.promptPrefix(kind)));
+      }),
+    ];
   }
 
   private actionDefinition(name: string, desc: string, render: (setting: Setting) => void): SettingDefinitionItem {
@@ -248,10 +245,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       .setDesc(initialized ? t("maintenanceManagedDesc") : t("initializationRequiredDesc"))
       .addButton((button) => button.setCta().setButtonText(initialized ? t("reviewStructure") : t("startInitialization")).onClick(() => this.plugin.openMaintenance()));
     new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
-    this.renderExemptionList(panel, "leaf");
-    this.renderPrefixList(panel, "leaf");
-    this.renderExemptionList(panel, "folder");
-    this.renderPrefixList(panel, "folder");
+    this.renderUnmanagedGroup(panel, "leaf");
+    this.renderUnmanagedGroup(panel, "folder");
   }
 
   private renderHomepage(panel: HTMLElement): void {
@@ -306,20 +301,27 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     }));
   }
 
-  private renderExemptionList(panel: HTMLElement, kind: ExemptionKind): void {
+  private renderUnmanagedGroup(panel: HTMLElement, kind: ExemptionKind): void {
     const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
-    new Setting(panel).setName(kind === "leaf" ? t("leafExemptions") : t("folderExemptions")).setDesc(kind === "leaf" ? t("leafExemptionsDesc") : t("folderExemptionsDesc")).setHeading();
-    for (const [index, path] of paths.entries()) new Setting(panel).setName(path).setDesc(kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")).addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removeExemption(kind, index)));
-    if (paths.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noExemptions") });
-    new Setting(panel).addButton((button) => button.setButtonText(t("addExemption")).onClick(() => this.promptExemption(kind)));
-  }
-
-  private renderPrefixList(panel: HTMLElement, kind: ExemptionKind): void {
     const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
-    new Setting(panel).setName(kind === "leaf" ? t("leafPrefixRules") : t("folderPrefixRules")).setDesc(kind === "leaf" ? t("leafPrefixRulesDesc") : t("folderPrefixRulesDesc")).setHeading();
-    for (const [index, prefix] of prefixes.entries()) new Setting(panel).setName(prefix).setDesc(kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")).addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removePrefix(kind, index)));
-    if (prefixes.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noPrefixRules") });
-    new Setting(panel).addButton((button) => button.setButtonText(t("addPrefixRule")).onClick(() => this.promptPrefix(kind)));
+    new Setting(panel)
+      .setName(kind === "leaf" ? t("leafExemptions") : t("folderExemptions"))
+      .setDesc(kind === "leaf" ? t("leafExemptionsDesc") : t("folderExemptionsDesc"))
+      .setHeading();
+    for (const [index, path] of paths.entries()) new Setting(panel)
+      .setName(path)
+      .setDesc(t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")))
+      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removeExemption(kind, index)));
+    for (const [index, prefix] of prefixes.entries()) new Setting(panel)
+      .setName(prefix + "*")
+      .setDesc(t("namePrefixRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")))
+      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removePrefix(kind, index)));
+    if (paths.length + prefixes.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noUnmanagedRules") });
+    new Setting(panel)
+      .setName(t("addRule"))
+      .setDesc(t("addRuleDesc"))
+      .addButton((button) => button.setButtonText(t("addPathRule")).onClick(() => this.promptExemption(kind)))
+      .addButton((button) => button.setButtonText(t("addPrefixRule")).onClick(() => this.promptPrefix(kind)));
   }
 
   private promptExemption(kind: ExemptionKind): void {
@@ -341,11 +343,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       if (prefix === "" || prefix.includes("/") || prefix.includes("\\")) return;
       const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
       if (!prefixes.includes(prefix)) prefixes.push(prefix);
-      prefixes.sort((a, b) => a.localeCompare(b));
+      prefixes.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
       await this.plugin.saveSettings();
       this.display();
       updateDeclarativeSettingTab(this);
     }).open();
+  }
+
+  private async removeUnmanagedRule(kind: ExemptionKind, index: number, pathCount: number): Promise<void> {
+    if (index < pathCount) await this.removeExemption(kind, index);
+    else await this.removePrefix(kind, index - pathCount);
   }
 
   private async removePrefix(kind: ExemptionKind, index: number): Promise<void> {

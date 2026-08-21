@@ -89,6 +89,32 @@
 .folder-nodes-visual-presets > button { min-width: 44px; min-height: 36px; }
 .folder-nodes-canonical-note { display: none !important; }
 
+.folder-nodes-explorer-root {
+  position: sticky;
+  z-index: 4;
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-3);
+  margin-block-end: var(--size-2-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.folder-nodes-explorer-root:hover { background: var(--nav-item-background-hover); }
+.folder-nodes-explorer-root.is-active { background: var(--nav-item-background-active); color: var(--nav-item-color-active); }
+.folder-nodes-explorer-root.is-missing { box-shadow: inset 3px 0 var(--color-orange); }
+.folder-nodes-explorer-root-icon { display: inline-flex; flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-muted); }
+.folder-nodes-explorer-root-icon > svg { width: 16px; height: 16px; }
+.folder-nodes-explorer-root-title { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-nodes-explorer-root-badge {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
 .folder-nodes-explorer-icon {
   display: inline-flex;
   flex: 0 0 16px;

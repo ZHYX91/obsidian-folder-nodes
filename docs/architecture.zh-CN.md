@@ -7,11 +7,11 @@ translation_status: source
 
 ## 身份与持久化
 
-Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态、主页偏好、图标位置、命名规则、精确路径豁免和名称前缀规则保存在插件 `data.json`。
+Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态、主页偏好、图标位置、命名规则、不管理的指定路径和名称前缀规则保存在插件 `data.json`。
 
 ## 分层
 
-Core 只处理路径、命名、豁免规则、迁移计划、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker 和 Contents View。公开仓库不依赖本地工作区或个人 Vault。
+Core 只处理路径、命名、不管理边界规则、迁移计划、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker 和 Contents View。公开仓库不依赖本地工作区或个人 Vault。
 
 ## 排序引擎
 
@@ -27,7 +27,7 @@ Visual Core 按声明顺序选择第一个有效候选：Emoji、已知 Lucide�
 
 ## Explorer 与 Contents
 
-ExplorerAdapter 仅封装 File Explorer 宿主边界：装饰可见 DOM、隐藏 canonical note、按设置在名称前/后渲染或隐藏 Node Visual、装饰可选的 Markdown inline title、执行受保护的 reveal、按当前 `.tree-item-icon.collapse-icon` 与旧 indicator 识别 disclosure control，并把 drag zone 映射到 before、into、after placement。Explorer 与 Contents 都把相对放置交给 NodeService，避免重复计算 parent/index。
+ExplorerAdapter 仅封装 File Explorer 宿主边界：插入一个幂等的置顶 Root 行、装饰可见 DOM、隐藏 canonical note、按设置在名称前/后渲染或隐藏 Node Visual、装饰可选的 Markdown inline title、执行受保护的 reveal、按当前 `.tree-item-icon.collapse-icon` 与旧 indicator 识别 disclosure control，并把 drag zone 映射到 before、into、after placement。Explorer 与 Contents 都把相对放置交给 NodeService，避免重复计算 parent/index。
 
 Contents View 只查询当前 Node 的 direct children 与 direct files；每批最多 200 项。纯 UI interaction helpers 定义内部 drag MIME、受支持 payload、三段 zone 和键盘菜单手势；View 只持有一次 drag session 与一个 drop marker。Node drop 调用 `placeNodeRelative`/`placeNode`；普通文件 drop 调用 FileManager-backed `moveFile`，只接受 into。菜单 action 由 App 层集中创建，并用独立 source 触发 `file-menu`，允许其他插件扩展而不重复 Folder Nodes 自己的 Node actions。相册图片通过 Vault resource URI 加载到非 DOM `Image`，再绘制一次到 canvas，因此包括 GIF 在内都保持静态且不读取 Vault binary。视频和音频从不创建播放元素。
 

@@ -10,8 +10,8 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = {
   showIconInNoteTitle: false,
   leafNoteExemptions: ["AGENTS.md", "CLAUDE.md"],
   ignoredFolders: [],
-  leafNotePrefixes: [],
-  ignoredFolderPrefixes: [],
+  leafNotePrefixes: [".", "_"],
+  ignoredFolderPrefixes: [".", "_"],
   addSelectionAlias: true,
   prefix: {
     enabled: false,
@@ -44,8 +44,8 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     showIconInNoteTitle: input.showIconInNoteTitle === true,
     leafNoteExemptions: normalizePaths(input.leafNoteExemptions, DEFAULT_SETTINGS.leafNoteExemptions),
     ignoredFolders: normalizePaths(input.ignoredFolders, DEFAULT_SETTINGS.ignoredFolders),
-    leafNotePrefixes: normalizePrefixes(input.leafNotePrefixes),
-    ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes),
+    leafNotePrefixes: normalizePrefixes(input.leafNotePrefixes, DEFAULT_SETTINGS.leafNotePrefixes),
+    ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes, DEFAULT_SETTINGS.ignoredFolderPrefixes),
     addSelectionAlias: input.addSelectionAlias !== false,
     prefix: { ...DEFAULT_SETTINGS.prefix, ...input.prefix },
     suffix: { ...DEFAULT_SETTINGS.suffix, ...input.suffix },
@@ -62,11 +62,13 @@ function normalizePaths(value: unknown, fallback: readonly string[]): string[] {
   }))].sort((a, b) => a.localeCompare(b));
 }
 
-function normalizePrefixes(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return [...new Set(value.flatMap((prefix) => {
+function compareText(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
+
+function normalizePrefixes(value: unknown, fallback: readonly string[]): string[] {
+  const input = Array.isArray(value) ? value : fallback;
+  return [...new Set(input.flatMap((prefix) => {
     if (typeof prefix !== "string") return [];
     const normalized = prefix.trim();
     return normalized === "" || normalized.includes("/") || normalized.includes("\\") ? [] : [normalized];
-  }))].sort((a, b) => a.localeCompare(b));
+  }))].sort(compareText);
 }

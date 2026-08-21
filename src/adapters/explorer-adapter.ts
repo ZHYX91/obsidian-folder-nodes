@@ -1,6 +1,6 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
-import { ensureExplorerIconPosition, isFolderCollapseControl } from "./explorer-events";
+import { ensureExplorerIconPosition, ensureExplorerRootRow, isFolderCollapseControl } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeDropZone, NodeVisual } from "../core/types";
@@ -15,6 +15,7 @@ export class ExplorerAdapter extends Component {
     private readonly service: NodeService,
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
+    private readonly getRootLabels: () => { root: string; missingNodeNote: string },
     private readonly reportError: (error: unknown) => void,
   ) { super(); }
 
@@ -23,6 +24,7 @@ export class ExplorerAdapter extends Component {
     this.observer = new MutationObserver(() => this.decorate());
     this.observer.observe(document.body, { childList: true, subtree: true });
     this.registerDomEvent(document, "click", (event) => this.onClick(event), true);
+    this.registerDomEvent(document, "keydown", (event) => this.onKeyDown(event), true);
     this.registerDomEvent(document, "dragstart", (event) => this.onDragStart(event), true);
     this.registerDomEvent(document, "dragover", (event) => this.onDragOver(event), true);
     this.registerDomEvent(document, "drop", (event) => this.onDrop(event), true);
@@ -50,6 +52,7 @@ export class ExplorerAdapter extends Component {
   public override onunload(): void { this.stop(); }
 
   private decorate(force = false): void {
+    this.decorateRoot();
     for (const element of document.querySelectorAll<HTMLElement>(".nav-file-title[data-path]")) {
       const path = element.dataset.path;
       if (path === undefined) continue;
@@ -80,6 +83,25 @@ export class ExplorerAdapter extends Component {
     this.decorateNoteTitles(force);
   }
 
+  private decorateRoot(): void {
+    const notePath = this.service.rootNotePath();
+    const missing = this.service.getNote(notePath) === null;
+    const active = this.app.workspace.getActiveFile()?.path === notePath;
+    const labels = this.getRootLabels();
+    for (const container of document.querySelectorAll<HTMLElement>(".nav-files-container")) {
+      const { row, icon, title, badge } = ensureExplorerRootRow(container);
+      const titleLabel = this.app.vault.getName();
+      const accessibleLabel = titleLabel + " · " + labels.root;
+      if (icon.childElementCount === 0) setIcon(icon, "home");
+      if (title.textContent !== titleLabel) title.setText(titleLabel);
+      if (badge.textContent !== labels.root) badge.setText(labels.root);
+      row.toggleClass("is-active", active);
+      row.toggleClass("is-missing", missing);
+      row.setAttr("aria-label", missing ? accessibleLabel + ": " + labels.missingNodeNote : accessibleLabel);
+      row.setAttr("title", missing ? labels.missingNodeNote : labels.root);
+    }
+  }
+
   private decorateNoteTitles(force: boolean): void {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       if (!(leaf.view instanceof MarkdownView)) continue;
@@ -103,13 +125,28 @@ export class ExplorerAdapter extends Component {
   }
 
   private onClick(event: MouseEvent): void {
-    if (!(event.target instanceof Element) || isFolderCollapseControl(event.target)) return;
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest(".folder-nodes-explorer-root") !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.service.openFolderNode("", event.ctrlKey || event.metaKey);
+      return;
+    }
+    if (isFolderCollapseControl(event.target)) return;
     const title = event.target.closest<HTMLElement>(".nav-folder-title[data-path]");
     const path = title?.dataset.path;
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getNote(this.service.notePathForFolder(path)) === null) return;
     event.preventDefault();
     event.stopPropagation();
     void this.service.openFolderNode(path, event.ctrlKey || event.metaKey);
+  }
+
+  private onKeyDown(event: KeyboardEvent): void {
+    if ((event.key !== "Enter" && event.key !== " ") || !(event.target instanceof Element) ||
+      event.target.closest(".folder-nodes-explorer-root") === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void this.service.openFolderNode("");
   }
 
   private onDragStart(event: DragEvent): void {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ensureExplorerIconPosition,
+  ensureExplorerRootRow,
   isFolderCollapseControl,
 } from "../../src/adapters/explorer-events";
 
@@ -61,5 +62,23 @@ describe("File Explorer visual placement", () => {
     expect(ensureExplorerIconPosition(row, icon, title, "before")).toBe(false);
     expect(ensureExplorerIconPosition(row, icon, title, "after")).toBe(true);
     expect(ensureExplorerIconPosition(row, icon, title, "after")).toBe(false);
+  });
+});
+
+describe("File Explorer root row", () => {
+  it("creates one stable, non-collapsible row at the top", () => {
+    const container = document.createElement("div");
+    const tree = document.createElement("div");
+    container.append(tree);
+
+    const first = ensureExplorerRootRow(container);
+    const second = ensureExplorerRootRow(container);
+
+    expect(first.row).toBe(second.row);
+    expect(container.firstElementChild).toBe(first.row);
+    expect(container.querySelectorAll(".folder-nodes-explorer-root")).toHaveLength(1);
+    expect(first.row.getAttribute("draggable")).toBe("false");
+    expect(first.row.querySelector(".collapse-icon")).toBeNull();
+    expect(isFolderCollapseControl(first.row)).toBe(false);
   });
 });

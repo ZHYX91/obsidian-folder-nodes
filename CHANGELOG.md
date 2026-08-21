@@ -4,8 +4,9 @@
 
 - Made initialization explicit before automatic synchronization, with distinct uninitialized and maintenance states.
 - Removed the partial built-in Node Note template feature; new nodes use blank notes or selection content.
-- Added protected system folders plus configurable Markdown and folder name-prefix exemption rules.
-- Added warning-marked incomplete nodes and explicit repair/exemption actions in Node Contents.
+- Added protected system folders plus two unified unmanaged-content rule groups, with exact paths and first-release `.`/`_` name-prefix defaults for both Markdown files and folders.
+- Added warning-marked incomplete nodes and explicit repair or unmanaged-rule actions in Node Contents.
+- Added a pinned, non-collapsible Root row to File Explorer with distinct active and missing-note states.
 - Normalized Vault root paths so root breadcrumbs do not render duplicate separators.
 - Fixed an Explorer icon MutationObserver feedback loop that could freeze Obsidian after assigning a Node Visual.
 - Fixed File Explorer disclosure-arrow clicks for current Obsidian collapse-icon markup while retaining legacy compatibility.

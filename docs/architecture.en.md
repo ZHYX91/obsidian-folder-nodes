@@ -8,11 +8,11 @@ translation_status: synced
 
 ## Identity and persistence
 
-A node's current identity is its normalized Vault folder path and `A/A.md` structure; no stable ID exists. Folder Nodes actively uses `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. `aliases` and `icon` are portable content properties; the two `folderNode` fields are plugin structural properties. Managed, Migrating, and Unadopted state, homepage preferences, icon placement, naming rules, exact exemptions, and name-prefix rules stay in plugin `data.json`.
+A node's current identity is its normalized Vault folder path and `A/A.md` structure; no stable ID exists. Folder Nodes actively uses `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. `aliases` and `icon` are portable content properties; the two `folderNode` fields are plugin structural properties. Managed, Migrating, and Unadopted state, homepage preferences, icon placement, naming rules, exact unmanaged paths and name-prefix rules stay in plugin `data.json`.
 
 ## Layers
 
-Core handles only paths, naming, exemption rules, migration plans, sparse ordering, minimal frontmatter patches, and Visual declaration parsing. Adapters encapsulate Vault, Metadata Cache, File Explorer, resource URIs, and Node operations. UI/App provides localization, settings, commands, menus, modals, Visual Picker, and Contents View. The public repository does not depend on the local workspace or a personal Vault.
+Core handles only paths, naming, unmanaged-boundary rules, migration plans, sparse ordering, minimal frontmatter patches, and Visual declaration parsing. Adapters encapsulate Vault, Metadata Cache, File Explorer, resource URIs, and Node operations. UI/App provides localization, settings, commands, menus, modals, Visual Picker, and Contents View. The public repository does not depend on the local workspace or a personal Vault.
 
 ## Ordering engine
 
@@ -28,7 +28,7 @@ Visual Core chooses the first valid declaration candidate in order: emoji, known
 
 ## Explorer and Contents
 
-ExplorerAdapter encapsulates the File Explorer host boundary: it decorates only visible DOM, hides canonical notes, places or hides Node Visuals before/after names, optionally decorates Markdown inline titles, performs guarded reveal, recognizes disclosure controls through the current `.tree-item-icon.collapse-icon` and legacy indicator, and maps drag zones to before, into, and after placement. Explorer and Contents both delegate relative placement to NodeService instead of duplicating parent/index calculation.
+ExplorerAdapter encapsulates the File Explorer host boundary: it inserts one idempotent pinned Root row, decorates only visible DOM, hides canonical notes, places or hides Node Visuals before/after names, optionally decorates Markdown inline titles, performs guarded reveal, recognizes disclosure controls through the current `.tree-item-icon.collapse-icon` and legacy indicator, and maps drag zones to before, into, and after placement. Explorer and Contents both delegate relative placement to NodeService instead of duplicating parent/index calculation.
 
 Contents View queries only direct children and files and renders at most 200 entries per batch. Pure UI interaction helpers define the internal drag MIME, supported payload, three-part zone, and keyboard-menu gestures; the View owns only one drag session and one drop marker. Node drops call `placeNodeRelative` or `placeNode`; ordinary-file drops call the FileManager-backed `moveFile` and accept only into placement. The App layer centrally builds menu actions and triggers `file-menu` with a distinct source, allowing other plugins to extend the menu without duplicating Folder Nodes' own Node actions. Album images load from Vault resource URIs into a non-DOM `Image` and draw once to canvas, so every format including GIF remains static without reading Vault binary. Video and audio never create playback elements.
 

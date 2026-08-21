@@ -20,7 +20,7 @@ Selected editor text exposes Create Folder Node from selection in both the conte
 
 ## Explorer Node Tree
 
-Clicking a folder title opens its Node Note; the disclosure arrow only expands or collapses. Canonical Node Note rows are hidden. Dragging must show a before line, into highlight, or after line, and the Vault is not changed before drop. Node context menus reuse create, Contents, Visual, rename, move, merge, reorder, and trash actions.
+File Explorer starts with a pinned Root row that has no disclosure control, cannot collapse or drag, opens the Root Node Note on click or keyboard activation, and uses a distinct Root badge and active state. Clicking an ordinary folder title opens its Node Note; the disclosure arrow only expands or collapses. Canonical Node Note rows are hidden. Dragging must show a before line, into highlight, or after line, and the Vault is not changed before drop. Node context menus reuse create, Contents, Visual, rename, move, merge, reorder, and trash actions.
 
 ## Node Contents View
 
@@ -36,8 +36,8 @@ Users may enter an emoji, Lucide name, CSS color, or Vault image wikilink and ma
 
 ## Migration and Health
 
-Before adoption, Settings and Contents prominently say Not initialized and explain that automatic rename synchronization and structural maintenance are unavailable; the primary action is Start initialization. The preview expands exact source/target leaf-note moves, missing Node Notes, exact and prefix exemptions, and blocking conflicts; its final action is Confirm initialization. After adoption, the entry becomes Structure maintenance / Check structure. Health uses the same summary but is strictly read-only and shows only a close button. Progress begins only after explicit confirmation, and failure displays a safe-stop notice. The Contents Nodes section includes healthy nodes, folders missing Node Notes, and non-exempt Markdown missing same-named folders; problem entries use warning marks and explicit repair menus.
+Before adoption, Settings and Contents prominently say Not initialized and explain that automatic rename synchronization and structural maintenance are unavailable; the primary action is Start initialization. The preview expands exact source/target leaf-note moves, missing Node Notes, exact-path and name-prefix unmanaged rules, and blocking conflicts; its final action is Confirm initialization. After adoption, the entry becomes Structure maintenance / Check structure. Health uses the same summary but is strictly read-only and shows only a close button. Progress begins only after explicit confirmation, and failure displays a safe-stop notice. The Contents Nodes section includes healthy nodes, folders missing Node Notes, and managed Markdown missing same-named folders; problem entries use warning marks and explicit repair or unmanaged-rule menus.
 
-## Structural exemptions
+## Unmanaged content
 
-General shows separate Allowed leaf notes and Unmanaged folders lists. The first stores exact `.md` paths and the second applies to complete subtrees. Add, remove, and preview show Vault-relative paths explicitly. Exemption stops structural management only; it does not hide a file or folder.
+General shows exactly two groups: Unmanaged Markdown files and Unmanaged folders. Each group combines exact paths and name prefixes in one list, labels each row by rule type, and offers Add path and Add name prefix actions together. `.` and `_` are the first-release defaults for both groups. The active Vault configuration directory, `.git`, and `.trash` are system-protected. Unmanaged rules stop structural management only; they do not hide files or folders.
