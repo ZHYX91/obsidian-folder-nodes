@@ -7,7 +7,7 @@ translation_status: source
 
 ## 身份与持久化
 
-Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态和界面设置保存在插件 `data.json`。
+Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态、主页偏好、图标位置、命名规则和两类结构豁免保存在插件 `data.json`。
 
 ## 分层
 
@@ -23,12 +23,12 @@ NodeService 把 create、rename、move、place、merge 和 trash 作为完整目
 
 ## Visual 解析
 
-Visual Core 按声明顺序选择第一个有效候选：Emoji、已知 Lucide、Vault image wikilink 或 CSS color。`lucide:` 与 `color:` 是可选消歧前缀。VisualService 解析 Metadata Cache、Vault image resource URI 和最近祖先继承；渲染层只消费已解析的 `NodeVisual`，无效值使用 folder fallback。
+Visual Core 按声明顺序选择第一个有效候选：Emoji、已知 Lucide、Vault image wikilink 或 CSS color。`lucide:` 与 `color:` 是可选消歧前缀。VisualService 解析 Metadata Cache、Vault image resource URI 和最近祖先继承；渲染层只消费已解析的 `NodeVisual`。Core 仍可返回 fallback 供语义判断，但 Explorer、标题与 Contents 不为未声明 visual 的节点增加大文件夹图标。
 
 ## Explorer 与 Contents
 
-ExplorerAdapter 仅装饰可见 File Explorer DOM，隐藏 canonical note，渲染 Node Visual，区分 folder title 点击与 disclosure arrow，并把 drag zone 映射到 before、into、after placement。Contents View 只查询当前 Node 的 direct children 与 direct files；每批最多 200 个 card，图片只使用 resource URI 与 lazy loading，宽窄布局由 container CSS 自动决定。
+ExplorerAdapter 仅装饰可见 File Explorer DOM，隐藏 canonical note，按设置在名称前/后渲染或隐藏 Node Visual，装饰可选的 Markdown inline title，区分 folder title 点击与 disclosure arrow，并把 drag zone 映射到 before、into、after placement。Contents View 只查询当前 Node 的 direct children 与 direct files；每批最多 200 项。相册图片通过 Vault resource URI 加载到非 DOM `Image`，再绘制一次到 canvas，因此包括 GIF 在内都保持静态且不读取 Vault binary。视频和音频从不创建播放元素。
 
 ## 一致性与失败关闭
 
-Managed 状态把同目录事件合并后局部处理。内部操作使用 suppression 避免回声；唯一且无损的缺失 Node Note 可以重建，路径碰撞、循环、selection 变化和 merge property 冲突停止操作。迁移先扫描再提交，正式 Vault 部署、源码测试、打包候选和主机验收是独立证据。
+Managed 状态把同目录事件合并后局部处理。内部操作使用 suppression 避免回声；叶子笔记精确路径和忽略文件夹完整子树在扫描与事件调和中共同生效。唯一且无损的缺失 Node Note 可以重建，路径碰撞、循环、selection 变化和 merge property 冲突停止操作。初始化与迁移先扫描再提交，Health 不持有提交动作；正式 Vault 部署、源码测试、打包候选和主机验收是独立证据。

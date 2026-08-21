@@ -50,11 +50,21 @@ export class NodeService {
     if (this.getNote(path) === null) await this.app.vault.create(path, "");
   }
 
+  public isIgnoredPath(path: string): boolean {
+    const normalized = normalizePath(path);
+    return this.getSettings().ignoredFolders.some((folder) => normalized === folder || normalized.startsWith(`${folder}/`));
+  }
+
+  public isLeafNoteExempt(path: string): boolean {
+    return this.getSettings().leafNoteExemptions.includes(normalizePath(path));
+  }
+
   public async createNode(
     parentPath: string,
     rawName: string,
     options: { alias?: string; body?: string } = {},
   ): Promise<TFile> {
+    if (this.isIgnoredPath(parentPath)) throw new Error(`Folder is unmanaged: ${parentPath}`);
     const name = sanitizeNodeName(rawName);
     const folderPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
     const notePath = `${folderPath}/${name}.md`;
@@ -90,6 +100,7 @@ export class NodeService {
   }
 
   public async renameNode(folder: TFolder, rawName: string): Promise<TFolder> {
+    if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
     const name = sanitizeNodeName(rawName);
     const oldName = folder.name;
     const parentPath = folder.parent?.path ?? "";
@@ -108,6 +119,7 @@ export class NodeService {
   }
 
   public async placeNode(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder> {
+    if (this.isIgnoredPath(folder.path) || this.isIgnoredPath(targetParentPath)) throw new Error("An unmanaged folder cannot be placed as a Folder Node");
     if (targetParentPath === folder.path || isDescendantPath(targetParentPath, folder.path)) {
       throw new Error("A node cannot be moved into itself or a descendant");
     }
@@ -126,9 +138,13 @@ export class NodeService {
     return moved;
   }
 
-  public async deleteNode(folder: TFolder): Promise<void> { await this.app.fileManager.trashFile(folder); }
+  public async deleteNode(folder: TFolder): Promise<void> {
+    if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
+    await this.app.fileManager.trashFile(folder);
+  }
 
   public async mergeNode(source: TFolder, target: TFolder): Promise<void> {
+    if (this.isIgnoredPath(source.path) || this.isIgnoredPath(target.path)) throw new Error("An unmanaged folder cannot be merged as a Folder Node");
     if (source.path === target.path || isDescendantPath(target.path, source.path)) {
       throw new Error("A node cannot be merged into itself or a descendant");
     }
@@ -173,7 +189,10 @@ export class NodeService {
   }
 
   public scan(): MigrationScan {
-    const result = scanMigration(this.inventory());
+    const result = scanMigration(this.inventory(), {
+      folders: this.getSettings().ignoredFolders,
+      leafMarkdown: this.getSettings().leafNoteExemptions,
+    });
     const rootExists = this.getNote(this.rootNotePath()) !== null;
     return rootExists ? result : { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] };
   }
@@ -193,18 +212,17 @@ export class NodeService {
       }
       onStep?.(++completed, total);
     }
-    const folders = ["", ...this.inventory().folders];
-    for (const folderPath of folders) {
+    for (const folderPath of scan.missingNodeNotes) {
       const notePath = this.notePathForFolder(folderPath);
       if (this.getNote(notePath) === null) await this.app.vault.create(notePath, "");
-      if (scan.missingNodeNotes.includes(folderPath)) onStep?.(++completed, total);
+      onStep?.(++completed, total);
     }
   }
 
   public children(parentPath: string): ChildOrderRecord[] {
     const parent = parentPath === "" ? this.app.vault.getRoot() : this.getFolder(parentPath);
     if (parent === null) return [];
-    return parent.children.filter((child): child is TFolder => child instanceof TFolder).map((child) => {
+    return parent.children.filter((child): child is TFolder => child instanceof TFolder && !this.isIgnoredPath(child.path)).map((child) => {
       const note = this.getNote(nodeNotePath(child.path));
       const frontmatter = note === null ? undefined : this.app.metadataCache.getFileCache(note)?.frontmatter;
       const rawRank: unknown = frontmatter?.[SIBLING_RANK_PROPERTY] as unknown;
@@ -234,14 +252,14 @@ export class NodeService {
   }
 
   public async reconcileCreated(path: string): Promise<void> {
-    if (this.getSettings().adoptionState !== "managed" || this.suppressed.has(path)) return;
+    if (this.getSettings().adoptionState !== "managed" || this.suppressed.has(path) || this.isIgnoredPath(path)) return;
     const entry = this.app.vault.getAbstractFileByPath(path);
     if (entry instanceof TFolder) {
       const notePath = nodeNotePath(entry.path);
       if (this.getNote(notePath) === null) await this.app.vault.create(notePath, "");
       return;
     }
-    if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && !isCanonicalNodeNote(entry.path) && entry.path !== this.rootNotePath()) {
+    if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && !isCanonicalNodeNote(entry.path) && entry.path !== this.rootNotePath() && !this.isLeafNoteExempt(entry.path)) {
       const parent = dirname(entry.path);
       const name = entry.basename;
       const targetFolder = normalizePath(parent === "" ? name : `${parent}/${name}`);
@@ -253,13 +271,22 @@ export class NodeService {
   }
 
   public async reconcileDeleted(path: string): Promise<void> {
-    if (this.getSettings().adoptionState !== "managed" || !isCanonicalNodeNote(path)) return;
+    if (this.getSettings().adoptionState !== "managed" || this.isIgnoredPath(path) || !isCanonicalNodeNote(path)) return;
     const folderPath = dirname(path);
     if (this.getFolder(folderPath) !== null && this.getNote(path) === null) await this.app.vault.create(path, "");
   }
 
   public async reconcileRenamed(entry: TAbstractFile, oldPath: string): Promise<void> {
-    if (this.getSettings().adoptionState !== "managed") return;
+    if (this.getSettings().adoptionState !== "managed" || this.isIgnoredPath(entry.path)) return;
+    if (this.isIgnoredPath(oldPath)) {
+      if (entry instanceof TFolder) {
+        const notePath = nodeNotePath(entry.path);
+        if (this.getNote(notePath) === null) await this.app.vault.create(notePath, "");
+      } else {
+        await this.reconcileCreated(entry.path);
+      }
+      return;
+    }
     if (entry instanceof TFolder) {
       const oldName = basename(oldPath);
       const staleNote = this.getNote(`${entry.path}/${oldName}.md`);
@@ -269,6 +296,10 @@ export class NodeService {
     }
     if (entry instanceof TFile && isCanonicalNodeNote(oldPath) && entry.parent !== null && dirname(entry.path) === dirname(oldPath) && !isCanonicalNodeNote(entry.path)) {
       await this.renameNode(entry.parent, entry.basename);
+      return;
+    }
+    if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && !isCanonicalNodeNote(entry.path) && entry.path !== this.rootNotePath() && !this.isLeafNoteExempt(entry.path)) {
+      await this.reconcileCreated(entry.path);
     }
   }
 

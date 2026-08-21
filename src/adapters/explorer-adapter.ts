@@ -1,8 +1,8 @@
-import { App, Component, setIcon, TFile } from "obsidian";
+import { App, Component, MarkdownView, setIcon, TFile } from "obsidian";
 
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
-import type { NodeVisual } from "../core/types";
+import type { FolderNodesSettings, NodeVisual } from "../core/types";
 
 type DropZone = "before" | "into" | "after";
 
@@ -15,6 +15,7 @@ export class ExplorerAdapter extends Component {
     private readonly app: App,
     private readonly service: NodeService,
     private readonly visuals: VisualService,
+    private readonly getSettings: () => FolderNodesSettings,
     private readonly reportError: (error: unknown) => void,
   ) { super(); }
 
@@ -46,16 +47,52 @@ export class ExplorerAdapter extends Component {
       if (path === undefined) continue;
       const file = this.app.vault.getAbstractFileByPath(path);
       const parent = file instanceof TFile ? file.parent : null;
-      element.toggleClass("folder-nodes-canonical-note", parent !== null && this.service.notePathForFolder(parent.path) === path);
+      element.toggleClass("folder-nodes-canonical-note", parent !== null && !this.service.isIgnoredPath(parent.path) && this.service.notePathForFolder(parent.path) === path);
     }
     for (const element of document.querySelectorAll<HTMLElement>(".nav-folder-title[data-path]")) {
       const path = element.dataset.path;
       const folder = path === undefined ? null : this.service.getFolder(path);
-      if (folder === null || this.service.getNote(this.service.notePathForFolder(folder.path)) === null) continue;
+      if (folder === null || this.service.isIgnoredPath(folder.path) || this.service.getNote(this.service.notePathForFolder(folder.path)) === null) {
+        element.querySelector(":scope > .folder-nodes-explorer-icon")?.remove();
+        continue;
+      }
       element.setAttr("draggable", "true");
+      const position = this.getSettings().explorerIconPosition;
+      const resolved = this.visuals.resolve(folder);
       let icon = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-icon");
-      if (icon === null) icon = element.createSpan({ cls: "folder-nodes-explorer-icon" });
-      if (force || icon.childElementCount === 0) renderVisual(icon, this.visuals.resolve(folder), folder.name);
+      if (position === "hidden" || resolved.kind === "fallback") {
+        icon?.remove();
+        continue;
+      }
+      if (icon === null) icon = createSpan({ cls: "folder-nodes-explorer-icon" });
+      const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
+      if (position === "before") element.insertBefore(icon, title ?? element.firstChild);
+      else if (title === null) element.append(icon);
+      else title.insertAdjacentElement("afterend", icon);
+      if (force || icon.childElementCount === 0) renderVisual(icon, resolved, folder.name);
+    }
+    this.decorateNoteTitles(force);
+  }
+
+  private decorateNoteTitles(force: boolean): void {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      if (!(leaf.view instanceof MarkdownView)) continue;
+      const title = leaf.view.containerEl.querySelector<HTMLElement>(".inline-title");
+      if (title === null) continue;
+      let icon = title.querySelector<HTMLElement>(":scope > .folder-nodes-note-title-icon");
+      const file = leaf.view.file;
+      const folder = file?.parent ?? null;
+      const canonical = file !== null && folder !== null && this.service.notePathForFolder(folder.path) === file.path;
+      const resolved = folder === null ? null : this.visuals.resolve(folder);
+      if (!this.getSettings().showIconInNoteTitle || !canonical || resolved?.kind === "fallback") {
+        icon?.remove();
+        continue;
+      }
+      if (icon === null) {
+        icon = createSpan({ cls: "folder-nodes-note-title-icon" });
+        title.prepend(icon);
+      }
+      if ((force || icon.childElementCount === 0) && resolved !== null) renderVisual(icon, resolved, folder.name);
     }
   }
 
@@ -63,7 +100,7 @@ export class ExplorerAdapter extends Component {
     if (!(event.target instanceof Element) || event.target.closest(".nav-folder-collapse-indicator") !== null) return;
     const title = event.target.closest<HTMLElement>(".nav-folder-title[data-path]");
     const path = title?.dataset.path;
-    if (path === undefined || this.service.getNote(this.service.notePathForFolder(path)) === null) return;
+    if (path === undefined || this.service.isIgnoredPath(path) || this.service.getNote(this.service.notePathForFolder(path)) === null) return;
     event.preventDefault();
     event.stopPropagation();
     void this.service.openFolderNode(path, event.ctrlKey || event.metaKey);
@@ -73,7 +110,7 @@ export class ExplorerAdapter extends Component {
     if (!(event.target instanceof Element)) return;
     const title = event.target.closest<HTMLElement>(".nav-folder-title[data-path]");
     const path = title?.dataset.path;
-    if (path === undefined || this.service.getFolder(path) === null) return;
+    if (path === undefined || this.service.isIgnoredPath(path) || this.service.getFolder(path) === null || this.service.getNote(this.service.notePathForFolder(path)) === null) return;
     this.draggedPath = path;
     event.dataTransfer?.setData("application/x-folder-nodes-path", path);
     if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
@@ -82,7 +119,7 @@ export class ExplorerAdapter extends Component {
   private onDragOver(event: DragEvent): void {
     if (this.draggedPath === null || !(event.target instanceof Element)) return;
     const title = event.target.closest<HTMLElement>(".nav-folder-title[data-path]");
-    if (title?.dataset.path === undefined) return;
+    if (title?.dataset.path === undefined || this.service.isIgnoredPath(title.dataset.path)) return;
     event.preventDefault();
     event.stopPropagation();
     const zone = this.zone(title, event.clientY);
@@ -96,7 +133,7 @@ export class ExplorerAdapter extends Component {
     const targetPath = title?.dataset.path;
     const source = this.service.getFolder(this.draggedPath);
     const target = targetPath === undefined ? null : this.service.getFolder(targetPath);
-    if (title === null || source === null || target === null) return;
+    if (title === null || source === null || target === null || this.service.isIgnoredPath(target.path)) return;
     event.preventDefault();
     event.stopPropagation();
     const zone = this.zone(title, event.clientY);
@@ -133,10 +170,12 @@ export class ExplorerAdapter extends Component {
     if (clearSource) this.draggedPath = null;
   }
 }
+
 function renderVisual(container: HTMLElement, visual: NodeVisual, label: string): void {
   container.empty();
   container.addClass("folder-nodes-visual");
   container.setAttr("aria-label", label);
+  if (visual.inheritedFrom !== null) container.dataset.inheritedFrom = visual.inheritedFrom;
   if (visual.kind === "image") {
     container.createEl("img", { attr: { src: visual.value, alt: "", loading: "lazy" } });
   } else if (visual.kind === "emoji") {

@@ -7,7 +7,11 @@ translation_status: source
 
 ## Obsidian 一致性
 
-界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。设置分为“常规”和“选区与命名”两类；语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
+界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。设置分为“常规”“主页”“图标与外观”“选区与命名”四页，声明式设置与 fallback tabs 使用相同标签。语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
+
+## 主页
+
+启用后，Root Node Note 是唯一主页。命令面板与 Node Contents header 的 Home 按钮都打开该笔记；“启动时打开主页”在 Obsidian 完成 Vault 布局恢复后执行。未启用或 Root Note 缺失时显示明确提示，不静默创建文件。
 
 ## 选区创建
 
@@ -19,12 +23,16 @@ translation_status: source
 
 ## Node Contents View
 
-侧栏顶部显示 breadcrumb、当前 Node visual、标题和 New child node。Nodes 使用 visual cards；Files 使用图片 thumbnail cards 或 PDF、Audio、Video、generic typed cards。Sections 可折叠，宽侧栏使用 grid，窄侧栏自动使用 compact layout。每批最多渲染 200 项，图片使用 lazy loading。
+侧栏顶部显示 breadcrumb、可选的当前 Node visual、标题、Home、Edit visual 和 New child node。Nodes 仅在存在有效或继承 visual 时显示视觉标识；没有 visual 的节点使用紧凑文字卡，不显示大 fallback 文件夹。Album 使用接近相册的密集 4:3 缩略图：普通图片无 badge，GIF 显示 `GIF` badge 且转为静态帧，视频只显示静态类型 tile。HEIC/HEIF、音频与其他资源位于紧凑 Files 列表。插件不渲染 `<video>`/`<audio>` 控件、不自动播放，也不提供播放动作。Sections 可折叠，每批最多渲染 200 项。
 
 ## Visual Picker
 
-用户可输入 Emoji、Lucide 名称、CSS 颜色或 Vault image wikilink，并可使用稳定预设。留空删除当前 `icon`。无有效声明时显示 fallback；打开继承后使用最近祖先 visual，并在 DOM 中保留继承来源用于提示。
+用户可输入 Emoji、Lucide 名称、CSS 颜色或 Vault image wikilink，并可使用稳定预设。留空删除当前 `icon`。打开继承后使用最近祖先 visual，并在 DOM 中保留继承来源。文件列表图标可置于名称之前、之后或隐藏；笔记行内标题显示可单独开启。图标使用 Obsidian 尺寸、基线和间距，不提供任意大小滑杆。
 
 ## 迁移与健康
 
-迁移和 Health 使用同一个只读摘要模型：叶子 Markdown、缺失 Node Note 和阻塞冲突。零变更时提交按钮禁用；冲突存在时禁止提交。进度条只在明确提交后推进，失败显示安全停止通知。
+“初始化与维护”合并空 Vault 接管和已有 Vault 迁移，逐项展开叶子 Markdown 的源/目标、缺失 Node Note、叶子笔记豁免、文件夹豁免和阻塞冲突。零文件变更但尚未接管时允许“开始管理”；冲突存在时禁止提交。Health 使用同一摘要但严格只读，只显示关闭按钮。进度条只在明确应用后推进，失败显示安全停止通知。
+
+## 结构豁免
+
+常规页分别显示“允许的叶子笔记”和“不管理的文件夹”列表。前者是精确 `.md` 路径，后者作用于完整子树。添加、删除和预览都明确显示 Vault 相对路径；豁免仅停止结构管理，不隐藏文件或文件夹。

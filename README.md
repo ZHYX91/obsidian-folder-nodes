@@ -10,9 +10,11 @@ Folder Nodes turns every folder in a managed Obsidian Vault into one structural 
 - Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, and configure filename prefixes, suffixes, separators, and timestamps.
 - Apply built-in Node Note templates with `{{name}}`, `{{path}}`, `{{parent}}`, and `{{date}}` tokens.
 - Navigate the global Node Tree through File Explorer: click a folder name to open its Node Note, keep the disclosure arrow for expansion, hide duplicate canonical notes, and drag before, into, or after another node.
-- Browse the current node in a responsive sidebar with breadcrumbs, child-node visual cards, direct-file cards, lazy image thumbnails, and bounded 200-item paging.
-- Resolve one `icon` property as an emoji, Lucide icon, Vault image, or CSS color, with optional nearest-ancestor inheritance and a visual picker.
-- Adopt an existing Vault only after a read-only preview, block collisions, and expose health results before repair.
+- Browse the current node through separate Nodes, static Album, and compact Files sections with bounded 200-item paging. GIFs use still thumbnails; video and audio never receive playback controls.
+- Resolve one `icon` property as an emoji, Lucide icon, Vault image, or CSS color, with optional inheritance, before/after/hidden File Explorer placement, and optional note-title display.
+- Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
+- Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
+- Allow exact leaf-note exemptions and unmanaged folder subtrees without hiding them. Root `AGENTS.md` and `CLAUDE.md` are allowed by default.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
 - Follow Obsidian's language automatically or override the interface with English or Simplified Chinese.
 - Keep all processing local and write no permanent node ID, `_pkwf` metadata, manifest, path, parent, or complete child list.
@@ -20,8 +22,8 @@ Folder Nodes turns every folder in a managed Obsidian Vault into one structural 
 ## Requirements and compatibility
 
 - Obsidian 1.12.7 or later.
-- Version 0.2.0 is desktop-only while the File Explorer adapter and drag placement receive dated host acceptance.
-- The strict managed model requires every folder to have exactly one same-named Node Note and every Markdown document to be a Folder Node; ordinary non-Markdown files remain direct node resources.
+- Version 0.3.0 is desktop-only while the File Explorer adapter and drag placement receive dated host acceptance.
+- The managed model requires each managed folder to have one same-named Node Note and each non-exempt Markdown document to be a Folder Node. Exact leaf-note and folder-subtree exemptions are explicit boundaries.
 
 ## Installation
 
@@ -40,15 +42,17 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 ## Usage
 
 1. Back up the Vault and open **Settings → Folder Nodes → General**.
-2. For an existing ordinary Vault, open the migration preview. Resolve every blocking conflict, review leaf-note moves and missing Node Notes, then commit explicitly. Use **Initialize** only for an empty or already structured Vault.
+2. Open **Initialize & maintain**, review every exact create, move, skip, and conflict path, then apply explicitly. The same flow handles empty, structured, and ordinary Vaults.
 3. Use File Explorer, the ribbon, node context menus, or the command palette to create and navigate nodes.
 4. Select editor text and choose **Create Folder Node from selection** from the editor context menu or command palette. Confirm the name, alias, and wikilink preview before creation.
-5. Open **Node contents** for child cards and direct files. Click the current or child visual to edit the node's `icon` declaration.
+5. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Folder Nodes does not animate GIFs or provide video/audio playback controls.
 6. Drag a Folder Node before, into, or after another node to reorder or reparent it. The drop marker shows the resulting placement before the write.
 
 ## Settings
 
-- **General** controls interface language, icon inheritance, the default Node Note template, adoption, migration, and health.
+- **General** controls interface language, the default Node Note template, preview-first maintenance, read-only Health, allowed leaf notes, and unmanaged folders.
+- **Homepage** controls whether the root Node Note is a homepage and whether it opens after startup.
+- **Icons & appearance** controls inheritance, File Explorer placement, and note-title display. Icon size and alignment follow Obsidian rather than an arbitrary size setting.
 - **Selection & naming** controls the aliases switch, prefix and suffix sources, independent separators, custom text, timestamp format, and live filename preview.
 - **Follow Obsidian** uses Obsidian's current interface language. Manual English or Simplified Chinese selection overrides the plugin interface without changing filenames or Markdown properties.
 - Naming sources are current file, current Folder Node, nearest current heading, timestamp, and custom text. Prefixes and suffixes affect only the basename; `aliases` contains only selected visible text.
@@ -57,10 +61,10 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 
 - Structural identity is the current normalized Vault path, not a permanent ID. An external delete followed by an unrelated create is not guessed to be a rename.
 - File Explorer integration is a host compatibility boundary and keeps this version desktop-only.
-- Node visuals support Vault images but do not fetch remote images, recolor inline SVG, render PDF first pages, generate video posters, or provide an audio player.
+- Node visuals support Vault images but do not fetch remote images, recolor inline SVG, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
 - The Contents View does not drag or independently order ordinary files and is not a second complete Vault tree.
 - Merge fails closed on path or frontmatter conflicts instead of presenting a complex conflict-resolution UI.
-- Alternate canonical names such as `README.md`, `index.md`, or `_A.md`, partially managed subtrees, and arbitrary property inheritance are not supported.
+- Alternate canonical names such as `README.md`, `index.md`, or `_A.md` and arbitrary property inheritance are not supported. Unmanaged folders are explicit whole-subtree exemptions, not partially managed nodes.
 
 ## Privacy and security
 

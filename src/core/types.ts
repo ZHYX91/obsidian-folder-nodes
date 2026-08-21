@@ -1,6 +1,7 @@
 export type AdoptionState = "unadopted" | "migrating" | "managed";
 export type SortMode = "natural" | "manual";
 export type InterfaceLanguage = "auto" | "zh-CN" | "en";
+export type ExplorerIconPosition = "before" | "after" | "hidden";
 
 export interface NamingPart {
   enabled: boolean;
@@ -12,8 +13,14 @@ export interface NamingPart {
 export interface FolderNodesSettings {
   adoptionState: AdoptionState;
   language: InterfaceLanguage;
+  homepageEnabled: boolean;
+  openHomepageOnStartup: boolean;
   iconInheritance: boolean;
+  explorerIconPosition: ExplorerIconPosition;
+  showIconInNoteTitle: boolean;
   defaultNodeTemplatePath: string;
+  leafNoteExemptions: string[];
+  ignoredFolders: string[];
   addSelectionAlias: boolean;
   prefix: NamingPart;
   suffix: NamingPart;
@@ -54,6 +61,8 @@ export interface MigrationConflict {
 export interface MigrationScan {
   leafMarkdown: string[];
   missingNodeNotes: string[];
+  exemptLeafMarkdown: string[];
+  ignoredFolders: string[];
   conflicts: MigrationConflict[];
 }
 

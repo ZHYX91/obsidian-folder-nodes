@@ -8,19 +8,19 @@ translation_status: synced
 
 ## Automated gates
 
-`npm run check` pins Node/npm, then runs lint, formatting, bilingual-document contracts, strict TypeScript, coverage, production bundle, and release-layout checks. Core/Settings coverage thresholds are statements 80%, lines 80%, functions 75%, and branches 70%. Tests cover paths, selection naming, templates, Visual parsing, frontmatter patches, migration conflicts, the property contract, and sparse ordering.
+`npm run check` pins Node/npm, then runs lint, formatting, bilingual-document contracts, strict TypeScript, coverage, production bundle, and release-layout checks. Core/Settings coverage thresholds are statements 80%, lines 80%, functions 75%, and branches 70%. Tests cover paths, selection naming, templates, Visual parsing, frontmatter patches, migration conflicts, leaf/folder exemptions, settings normalization, the property contract, and sparse ordering.
 
 ## Performance
 
-A normal reorder plan among 10,000 direct Child Nodes must finish within two seconds and create one property patch. Local rebalance for crowded ranks is bounded to 64 nodes. Contents View creates at most 200 Node cards and 200 file cards per batch and does not read binary bodies.
+A normal reorder plan among 10,000 direct Child Nodes must finish within two seconds and create one property patch. Local rebalance for crowded ranks is bounded to 64 nodes. Contents View creates at most 200 entries per section per batch. Album images draw once from resource URIs to canvas, and ordinary files do not read binary bodies.
 
 ## Isolated-Vault host acceptance
 
-Only a disposable isolated Vault may validate plugin loading, both settings groups, Follow Obsidian/English/Chinese, migration preview, initialization, Explorer opening, canonical-note hiding, before/into/after drag, selection context preview, aliases and basename, template tokens, Visual Picker/inheritance, Node cards, image gallery, narrow sidebar, merge conflicts, Health, and system-trash deletion. Automated tests do not prove those host behaviors.
+Only a disposable isolated Vault may validate plugin loading, all four settings pages, Follow Obsidian/English/Chinese, detailed maintenance preview, strictly read-only Health, both exemptions, homepage command/button/restart, before/after/hidden Explorer icons and title icons, canonical-note hiding, before/into/after drag, selection context preview, aliases and basename, template tokens, Visual Picker/inheritance, nodes without visuals, static Album, GIF stills, video tiles, compact audio/HEIC files, narrow sidebar, merge conflicts, and system-trash deletion. Acceptance must confirm no `<video>`, `<audio>`, or autoplay. Automated tests do not prove those host behaviors.
 
 ## Themes and accessibility
 
-Check at least default light, default dark, and one third-party theme. Keyboard checks cover settings tabs, modal buttons, Contents cards, and breadcrumbs; coarse-pointer targets are 44px. English and Chinese must not truncate critical buttons. Follow Obsidian must match Obsidian's current interface language. Images use empty decorative alt text or filename alt text.
+Check at least default light, default dark, and one third-party theme. Keyboard checks cover all four settings tabs, modal buttons, Contents cards/rows, and breadcrumbs; coarse-pointer targets are 44px. English and Chinese must not truncate critical buttons or node titles. Follow Obsidian must match Obsidian's current interface language. Images use empty decorative alt text or filename alt text. Explorer icons are checked for size, horizontal baseline, and name spacing.
 
 ## Production deployment
 

@@ -29,18 +29,23 @@ export default class FolderNodesPlugin extends Plugin {
       if (warning.kind === "template-not-found") new Notice(t("templateNotFound", { path: warning.path }), 8000);
     });
     this.visuals = new VisualService(this.app, this.service, () => this.settings.iconInheritance);
-    this.explorer = new ExplorerAdapter(this.app, this.service, this.visuals, (error) => new Notice(formatError(error), 8000));
+    this.explorer = new ExplorerAdapter(this.app, this.service, this.visuals, () => this.settings, (error) => new Notice(formatError(error), 8000));
     this.addChild(this.explorer);
     this.registerView(CONTENTS_VIEW_TYPE, (leaf) => new FolderNodeContentsView(leaf, this.service, this.visuals, {
       createChild: (folder) => this.promptCreateChild(folder),
       nodeMenu: (event, folder) => this.openNodeMenu(event, folder),
       editVisual: (folder) => this.promptVisual(folder),
+      openHomepage: () => void this.openHomepage(),
+      homepageEnabled: () => this.settings.homepageEnabled,
     }));
     this.addSettingTab(new FolderNodesSettingTab(this.app, this));
     this.addRibbonIcon("layout-grid", t("contents"), () => void this.openContents());
     this.registerCommands();
     this.registerEvents();
-    this.app.workspace.onLayoutReady(() => this.explorer.start());
+    this.app.workspace.onLayoutReady(() => {
+      this.explorer.start();
+      if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) void this.openHomepage();
+    });
   }
 
   public override onunload(): void {
@@ -68,24 +73,21 @@ export default class FolderNodesPlugin extends Plugin {
     }
   }
 
-  public async initializeManagedVault(): Promise<void> {
-    const scan = this.service.scan();
-    if (scan.leafMarkdown.length > 0 || scan.conflicts.length > 0) {
-      new Notice(t("migrationDesc"), 8000);
+  public openMaintenance(): void { this.showScan(false); }
+  public showHealth(): void { this.showScan(true); }
+
+  public async openHomepage(): Promise<void> {
+    if (!this.settings.homepageEnabled) {
+      new Notice(t("homepageDisabled"));
       return;
     }
-    await this.service.initialize();
-    for (const folder of scan.missingNodeNotes.filter((path) => path !== "")) {
-      const notePath = this.service.notePathForFolder(folder);
-      if (this.service.getNote(notePath) === null) await this.app.vault.create(notePath, "");
+    const note = this.service.getNote(this.service.rootNotePath());
+    if (note === null) {
+      new Notice(t("homepageMissing"), 8000);
+      return;
     }
-    this.settings.adoptionState = "managed";
-    await this.saveSettings();
-    new Notice(t("managed"));
+    await this.app.workspace.getLeaf(false).openFile(note);
   }
-
-  public openMigration(): void { this.showScan(false); }
-  public showHealth(): void { this.showScan(true); }
 
   public promptCreateChild(parent = this.currentFolder()): void {
     const target = parent ?? this.app.vault.getRoot();
@@ -126,13 +128,13 @@ export default class FolderNodesPlugin extends Plugin {
         await this.saveSettings();
         throw error;
       }
-    }, healthMode).open();
+    }, healthMode, this.settings.adoptionState !== "managed").open();
   }
 
   private registerCommands(): void {
-    this.addCommand({ id: "initialize", name: t("initialize"), callback: () => void this.initializeManagedVault() });
-    this.addCommand({ id: "migration", name: t("migration"), callback: () => this.openMigration() });
+    this.addCommand({ id: "review-vault-changes", name: t("maintenance"), callback: () => this.openMaintenance() });
     this.addCommand({ id: "health", name: t("health"), callback: () => this.showHealth() });
+    this.addCommand({ id: "open-homepage", name: t("openHomepage"), callback: () => void this.openHomepage() });
     this.addCommand({ id: "create-child-node", name: t("createChild"), callback: () => this.promptCreateChild() });
     this.addCommand({
       id: "create-from-selection",
@@ -162,7 +164,10 @@ export default class FolderNodesPlugin extends Plugin {
       if (editor.getSelection().trim() === "" || info.file === null) return;
       menu.addItem((item) => item.setTitle(t("createSelection")).setIcon("folder-plus").onClick(() => this.previewSelectionCreation(editor, info.file)));
     }));
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.updateContentsView()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
+      this.updateContentsView();
+      this.explorer.refresh();
+    }));
     this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshVisuals()));
   }
 
@@ -188,7 +193,7 @@ export default class FolderNodesPlugin extends Plugin {
   private addContextMenu(menu: Menu, entry: TAbstractFile): void {
     if (!(entry instanceof TFile) && !(entry instanceof TFolder)) return;
     const folder = entry instanceof TFolder ? entry : this.service.folderForFile(entry);
-    if (folder === null) return;
+    if (folder === null || this.service.isIgnoredPath(folder.path)) return;
     menu.addSeparator();
     this.addNodeMenuItems(menu, folder, true);
   }

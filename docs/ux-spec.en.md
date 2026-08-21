@@ -8,7 +8,11 @@ translation_status: synced
 
 ## Obsidian consistency
 
-The interface uses native Obsidian Setting, Menu, Modal, Notice, theme variables, icons, and keyboard focus. Desktop targets are at least 36px and coarse-pointer targets are 44px. Settings use General and Selection & naming groups. The language dropdown contains `Follow Obsidian`, `简体中文`, and `English`; Follow Obsidian uses Obsidian's current interface language.
+The interface uses native Obsidian Setting, Menu, Modal, Notice, theme variables, icons, and keyboard focus. Desktop targets are at least 36px and coarse-pointer targets are 44px. Settings use four pages: General, Homepage, Icons & appearance, and Selection & naming. Declarative settings and fallback tabs use the same labels. The language dropdown contains `Follow Obsidian`, `简体中文`, and `English`; Follow Obsidian uses Obsidian's current interface language.
+
+## Homepage
+
+When enabled, the Root Node Note is the only homepage. The command palette and Home button in the Node Contents header open that note. Open homepage on startup runs after Obsidian restores the Vault layout. A disabled homepage or missing Root Note produces an explicit notice and never creates a file silently.
 
 ## Selection creation
 
@@ -20,12 +24,16 @@ Clicking a folder title opens its Node Note; the disclosure arrow only expands o
 
 ## Node Contents View
 
-The sidebar header contains breadcrumbs, current-node visual, title, and New child node. Nodes use visual cards. Files use image thumbnail cards or PDF, Audio, Video, and generic typed cards. Sections collapse, wide sidebars use a grid, and narrow sidebars switch automatically to a compact layout. At most 200 items render per batch and images load lazily.
+The sidebar header contains breadcrumbs, optional current-node visual, title, Home, Edit visual, and New child node. Nodes display artwork only for a valid or inherited visual; nodes without one use compact text cards and no large fallback folder. Album uses dense 4:3 thumbnails: ordinary images have no badge, GIFs have a `GIF` badge and are converted to a still frame, and videos use only a static type tile. HEIC/HEIF, audio, and other resources stay in the compact Files list. The plugin renders no `<video>` or `<audio>` controls, never autoplays, and exposes no playback action. Sections collapse and at most 200 items render per batch.
 
 ## Visual Picker
 
-Users may enter an emoji, Lucide name, CSS color, or Vault image wikilink and may choose stable presets. An empty value removes the current `icon`. Invalid declarations use a fallback. When inheritance is enabled, the nearest ancestor visual is used and its source remains available in the DOM for a tooltip.
+Users may enter an emoji, Lucide name, CSS color, or Vault image wikilink and may choose stable presets. An empty value removes the current `icon`. When inheritance is enabled, the nearest ancestor visual is used and its source remains available in the DOM. File Explorer icons may appear before or after the name or remain hidden; inline note-title display is a separate switch. Icons use Obsidian sizing, baseline, and spacing rather than an arbitrary size slider.
 
 ## Migration and Health
 
-Migration and Health use one read-only summary model: leaf Markdown, missing Node Notes, and blocking conflicts. Submit is disabled for zero changes and blocked by any conflict. Progress begins only after explicit commit, and failure displays a safe-stop notice.
+Initialize & maintain combines empty-Vault adoption and existing-Vault migration. It expands exact source/target leaf-note moves, missing Node Notes, leaf-note exemptions, folder exemptions, and blocking conflicts. With zero file changes an unadopted Vault may still Start managing. Conflicts block apply. Health uses the same summary but is strictly read-only and shows only a close button. Progress begins only after explicit apply, and failure displays a safe-stop notice.
+
+## Structural exemptions
+
+General shows separate Allowed leaf notes and Unmanaged folders lists. The first stores exact `.md` paths and the second applies to complete subtrees. Add, remove, and preview show Vault-relative paths explicitly. Exemption stops structural management only; it does not hide a file or folder.

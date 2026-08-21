@@ -8,7 +8,7 @@ translation_status: synced
 
 ## Identity and persistence
 
-A node's current identity is its normalized Vault folder path and `A/A.md` structure; no stable ID exists. Folder Nodes actively uses `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. `aliases` and `icon` are portable content properties; the two `folderNode` fields are plugin structural properties. Managed, Migrating, and Unadopted state and interface settings stay in plugin `data.json`.
+A node's current identity is its normalized Vault folder path and `A/A.md` structure; no stable ID exists. Folder Nodes actively uses `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. `aliases` and `icon` are portable content properties; the two `folderNode` fields are plugin structural properties. Managed, Migrating, and Unadopted state, homepage preferences, icon placement, naming rules, and both structural-exemption lists stay in plugin `data.json`.
 
 ## Layers
 
@@ -24,12 +24,12 @@ NodeService treats create, rename, move, place, merge, and trash as complete-dir
 
 ## Visual resolution
 
-Visual Core chooses the first valid declaration candidate in order: emoji, known Lucide icon, Vault image wikilink, or CSS color. `lucide:` and `color:` are optional disambiguation prefixes. VisualService resolves Metadata Cache, Vault image resource URIs, and nearest-ancestor inheritance. Renderers consume only resolved `NodeVisual` values and use a folder fallback for invalid declarations.
+Visual Core chooses the first valid declaration candidate in order: emoji, known Lucide icon, Vault image wikilink, or CSS color. `lucide:` and `color:` are optional disambiguation prefixes. VisualService resolves Metadata Cache, Vault image resource URIs, and nearest-ancestor inheritance. Renderers consume only resolved `NodeVisual` values. Core may still return fallback for semantic decisions, but Explorer, titles, and Contents add no large folder artwork for nodes without a declared visual.
 
 ## Explorer and Contents
 
-ExplorerAdapter decorates only visible File Explorer DOM, hides canonical notes, renders Node Visuals, distinguishes folder-title clicks from disclosure arrows, and maps drag zones to before, into, and after placement. Contents View queries only the current node's direct children and files. It renders at most 200 cards per batch, uses only resource URIs and lazy loading for images, and lets container CSS choose wide or narrow layout.
+ExplorerAdapter decorates only visible File Explorer DOM, hides canonical notes, places or hides Node Visuals before/after names, optionally decorates Markdown inline titles, distinguishes folder-title clicks from disclosure arrows, and maps drag zones to before, into, and after placement. Contents View queries only direct children and files and renders at most 200 entries per batch. Album images load from Vault resource URIs into a non-DOM `Image` and draw once to canvas, so every format including GIF remains static without reading Vault binary. Video and audio never create playback elements.
 
 ## Consistency and fail-closed behavior
 
-Managed state coalesces same-directory events before local handling. Internal operations use suppression to avoid echoes. Unique lossless missing Node Notes may be rebuilt; path collisions, cycles, changed selections, and merge property conflicts stop the operation. Migration scans before commit. Production deployment, source tests, packaged candidates, and host acceptance remain separate evidence.
+Managed state coalesces same-directory events before local handling. Internal operations use suppression to avoid echoes. Exact leaf-note paths and complete ignored-folder subtrees apply consistently to scans and event reconciliation. Unique lossless missing Node Notes may be rebuilt; path collisions, cycles, changed selections, and merge property conflicts stop the operation. Initialization and migration scan before apply, while Health owns no commit action. Production deployment, source tests, packaged candidates, and host acceptance remain separate evidence.

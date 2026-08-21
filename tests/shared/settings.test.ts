@@ -12,4 +12,15 @@ describe("settings", () => {
     expect(normalizeSettings({ language: "unknown" }).language).toBe("auto");
     expect(normalizeSettings({ language: "zh-CN" }).language).toBe("zh-CN");
   });
+  it("normalizes icon placement and exact exemption paths", () => {
+    const settings = normalizeSettings({
+      explorerIconPosition: "after",
+      leafNoteExemptions: ["/AGENTS.md", "AGENTS.md", 1],
+      ignoredFolders: ["\\Generated\\Cache\\"],
+    });
+    expect(settings.explorerIconPosition).toBe("after");
+    expect(settings.leafNoteExemptions).toEqual(["AGENTS.md"]);
+    expect(settings.ignoredFolders).toEqual(["Generated/Cache"]);
+    expect(normalizeSettings({ explorerIconPosition: "unknown" }).explorerIconPosition).toBe("before");
+  });
 });

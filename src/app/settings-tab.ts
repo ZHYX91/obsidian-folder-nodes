@@ -2,9 +2,13 @@ import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } fr
 
 import type FolderNodesPlugin from "./plugin";
 import type { NamingPart } from "../core/types";
+import { PromptModal } from "../ui/prompt-modal";
 import { setLanguage, t } from "../ui/i18n";
 
-type TabId = "general" | "naming";
+type TabId = "general" | "homepage" | "icons" | "naming";
+type ExemptionKind = "leaf" | "folder";
+
+const TABS: TabId[] = ["general", "homepage", "icons", "naming"];
 
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
@@ -14,6 +18,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   public override getSettingDefinitions(): SettingDefinitionItem[] {
     return [
       { type: "page", name: t("general"), items: this.generalDefinitions() },
+      { type: "page", name: t("homepage"), items: this.homepageDefinitions() },
+      { type: "page", name: t("icons"), items: this.iconDefinitions() },
       { type: "page", name: t("naming"), items: this.namingDefinitions() },
     ];
   }
@@ -22,7 +28,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const settings = this.plugin.settings;
     const values: Record<string, unknown> = {
       language: settings.language,
+      homepageEnabled: settings.homepageEnabled,
+      openHomepageOnStartup: settings.openHomepageOnStartup,
       iconInheritance: settings.iconInheritance,
+      explorerIconPosition: settings.explorerIconPosition,
+      showIconInNoteTitle: settings.showIconInNoteTitle,
       defaultNodeTemplatePath: settings.defaultNodeTemplatePath,
       addSelectionAlias: settings.addSelectionAlias,
       prefixEnabled: settings.prefix.enabled,
@@ -47,7 +57,15 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         setLanguage(value);
         new Notice(t("reloadLanguage"));
         break;
+      case "homepageEnabled": settings.homepageEnabled = Boolean(value); this.plugin.refreshVisuals(); break;
+      case "openHomepageOnStartup": settings.openHomepageOnStartup = Boolean(value); break;
       case "iconInheritance": settings.iconInheritance = Boolean(value); this.plugin.refreshVisuals(); break;
+      case "explorerIconPosition":
+        if (value !== "before" && value !== "after" && value !== "hidden") throw new Error("Unsupported icon position");
+        settings.explorerIconPosition = value;
+        this.plugin.refreshVisuals();
+        break;
+      case "showIconInNoteTitle": settings.showIconInNoteTitle = Boolean(value); this.plugin.refreshVisuals(); break;
       case "defaultNodeTemplatePath": settings.defaultNodeTemplatePath = String(value).trim(); break;
       case "addSelectionAlias": settings.addSelectionAlias = Boolean(value); break;
       case "prefixEnabled": settings.prefix.enabled = Boolean(value); break;
@@ -71,24 +89,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(this.containerEl).setName(t("settings")).setHeading();
     const tabs = this.containerEl.createDiv({
       cls: "folder-nodes-tabs",
-      attr: {
-        role: "tablist",
-        "aria-label": t("settings"),
-        "aria-orientation": "horizontal",
-      },
+      attr: { role: "tablist", "aria-label": t("settings"), "aria-orientation": "horizontal" },
     });
-    this.addTabButton(tabs, "general", t("general"));
-    this.addTabButton(tabs, "naming", t("naming"));
+    for (const id of TABS) this.addTabButton(tabs, id, this.tabLabel(id));
     const panel = this.containerEl.createDiv({
       cls: "folder-nodes-tab-panel",
-      attr: {
-        id: this.panelId(this.activeTab),
-        role: "tabpanel",
-        "aria-labelledby": this.tabId(this.activeTab),
-        tabindex: "0",
-      },
+      attr: { id: this.panelId(this.activeTab), role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },
     });
     if (this.activeTab === "general") this.renderGeneral(panel);
+    else if (this.activeTab === "homepage") this.renderHomepage(panel);
+    else if (this.activeTab === "icons") this.renderIcons(panel);
     else this.renderNaming(panel);
     this.revealActiveTab(tabs);
   }
@@ -98,78 +108,74 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const button = container.createEl("button", {
       text: label,
       cls: `folder-nodes-tab${isActive ? " is-active" : ""}`,
-      attr: {
-        id: this.tabId(id),
-        role: "tab",
-        "aria-selected": String(isActive),
-        "aria-controls": this.panelId(id),
-        tabindex: isActive ? "0" : "-1",
-      },
+      attr: { id: this.tabId(id), role: "tab", "aria-selected": String(isActive), "aria-controls": this.panelId(id), tabindex: isActive ? "0" : "-1" },
     });
     button.addEventListener("click", () => this.selectTab(id, false));
     button.addEventListener("keydown", (event) => {
-      const tabs: TabId[] = ["general", "naming"];
-      const currentIndex = tabs.indexOf(id);
+      const currentIndex = TABS.indexOf(id);
       let targetIndex: number | null = null;
-      if (event.key === "ArrowRight") targetIndex = (currentIndex + 1) % tabs.length;
-      else if (event.key === "ArrowLeft") targetIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      if (event.key === "ArrowRight") targetIndex = (currentIndex + 1) % TABS.length;
+      else if (event.key === "ArrowLeft") targetIndex = (currentIndex - 1 + TABS.length) % TABS.length;
       else if (event.key === "Home") targetIndex = 0;
-      else if (event.key === "End") targetIndex = tabs.length - 1;
+      else if (event.key === "End") targetIndex = TABS.length - 1;
       if (targetIndex === null) return;
       event.preventDefault();
-      const target = tabs[targetIndex];
+      const target = TABS[targetIndex];
       if (target !== undefined) this.selectTab(target, true);
     });
   }
 
   private selectTab(id: TabId, focus: boolean): void {
-    if (this.activeTab !== id) {
-      this.activeTab = id;
-      this.display();
-    }
+    if (this.activeTab !== id) { this.activeTab = id; this.display(); }
     if (focus) this.containerEl.querySelector<HTMLElement>(`#${this.tabId(id)}`)?.focus({ preventScroll: true });
   }
 
   private revealActiveTab(container: HTMLElement): void {
-    const activeTab = container.querySelector<HTMLElement>("[role=tab][aria-selected=true]");
-    activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    container.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
+  private tabLabel(id: TabId): string {
+    return id === "general" ? t("general") : id === "homepage" ? t("homepage") : id === "icons" ? t("icons") : t("naming");
+  }
   private tabId(id: TabId): string { return `folder-nodes-settings-tab-${id}`; }
   private panelId(id: TabId): string { return `folder-nodes-settings-panel-${id}`; }
 
   private generalDefinitions(): SettingDefinitionItem[] {
     return [
-      {
-        name: t("language"), desc: t("languageDesc"),
-        control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } },
-      },
-      {
-        name: t("iconInheritance"), desc: t("iconInheritanceDesc"),
-        control: { type: "toggle", key: "iconInheritance", defaultValue: true },
-      },
-      {
-        name: t("template"), desc: t("templateDesc"),
-        control: { type: "text", key: "defaultNodeTemplatePath", placeholder: "Templates/Folder Node.md" },
-      },
-      this.actionDefinition(t("initialize"), t("initializeDesc"), (setting) => {
-        setting.addButton((button) => button.setCta().setButtonText(t("initialize")).onClick(() => void this.plugin.initializeManagedVault()));
+      { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } } },
+      { name: t("template"), desc: t("templateDesc"), control: { type: "text", key: "defaultNodeTemplatePath", placeholder: "Templates/Folder Node.md" } },
+      this.actionDefinition(t("maintenance"), t("maintenanceDesc"), (setting) => {
+        setting.addButton((button) => { button.setCta().setButtonText(t("reviewChanges")).onClick(() => { this.plugin.openMaintenance(); }); });
       }),
-      this.actionDefinition(t("migration"), t("migrationDesc"), (setting) => {
-        setting.addButton((button) => button.setButtonText(t("migration")).onClick(() => this.plugin.openMigration()));
+      this.actionDefinition(t("health"), t("healthDesc"), (setting) => {
+        setting.addButton((button) => { button.setButtonText(t("health")).onClick(() => { this.plugin.showHealth(); }); });
       }),
-      this.actionDefinition(t("health"), "", (setting) => {
-        setting.addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
+      this.exemptionListDefinition("leaf"),
+      this.exemptionListDefinition("folder"),
+    ];
+  }
+
+  private homepageDefinitions(): SettingDefinitionItem[] {
+    return [
+      { name: t("enableHomepage"), desc: t("enableHomepageDesc"), control: { type: "toggle", key: "homepageEnabled", defaultValue: false } },
+      { name: t("openHomepageOnStartup"), desc: t("openHomepageOnStartupDesc"), visible: this.plugin.settings.homepageEnabled, control: { type: "toggle", key: "openHomepageOnStartup", defaultValue: false } },
+      this.actionDefinition(t("openHomepage"), t("openHomepageDesc"), (setting) => {
+        setting.addButton((button) => { button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()); });
       }),
+    ];
+  }
+
+  private iconDefinitions(): SettingDefinitionItem[] {
+    return [
+      { name: t("iconInheritance"), desc: t("iconInheritanceDesc"), control: { type: "toggle", key: "iconInheritance", defaultValue: true } },
+      { name: t("explorerIconPosition"), desc: t("explorerIconPositionDesc"), control: { type: "dropdown", key: "explorerIconPosition", defaultValue: "before", options: { before: t("beforeName"), after: t("afterName"), hidden: t("hidden") } } },
+      { name: t("showIconInNoteTitle"), desc: t("showIconInNoteTitleDesc"), control: { type: "toggle", key: "showIconInNoteTitle", defaultValue: false } },
     ];
   }
 
   private namingDefinitions(): SettingDefinitionItem[] {
     const settings = this.plugin.settings;
-    const sourceOptions = {
-      "current-file": t("currentFile"), "current-node": t("currentNode"), "current-heading": t("currentHeading"),
-      timestamp: t("timestamp"), custom: t("customText"),
-    };
+    const sourceOptions = { "current-file": t("currentFile"), "current-node": t("currentNode"), "current-heading": t("currentHeading"), timestamp: t("timestamp"), custom: t("customText") };
     return [
       { name: t("aliases"), desc: t("aliasesDesc"), control: { type: "toggle", key: "addSelectionAlias", defaultValue: true } },
       { name: `${t("prefix")}: ${t("enabled")}`, control: { type: "toggle", key: "prefixEnabled", defaultValue: false } },
@@ -185,11 +191,19 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     ];
   }
 
-  private actionDefinition(
-    name: string,
-    desc: string,
-    render: (setting: Setting) => void,
-  ): SettingDefinitionItem {
+  private exemptionListDefinition(kind: ExemptionKind): SettingDefinitionItem {
+    const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
+    return {
+      type: "list",
+      heading: kind === "leaf" ? t("leafExemptions") : t("folderExemptions"),
+      emptyState: t("noExemptions"),
+      items: paths.map((path) => ({ name: path, desc: kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc") })),
+      onDelete: (index) => void this.removeExemption(kind, index),
+      addItem: { name: t("addExemption"), action: () => this.promptExemption(kind) },
+    };
+  }
+
+  private actionDefinition(name: string, desc: string, render: (setting: Setting) => void): SettingDefinitionItem {
     return { name, desc, searchable: false, render };
   }
 
@@ -199,115 +213,107 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderGeneral(panel: HTMLElement): void {
-    new Setting(panel)
-      .setName(t("language"))
-      .setDesc(t("languageDesc"))
-      .addDropdown((dropdown) => dropdown
-        .addOptions({ auto: t("auto"), "zh-CN": t("chinese"), en: t("english") })
-        .setValue(this.plugin.settings.language)
-        .onChange(async (value) => {
-          this.plugin.settings.language = value as typeof this.plugin.settings.language;
-          setLanguage(this.plugin.settings.language);
-          await this.plugin.saveSettings();
-          new Notice(t("reloadLanguage"));
-          this.display();
-        }));
-    panel.createEl("p", { cls: "setting-item-description", text: this.plugin.settings.adoptionState === "managed" ? t("managed") : t("unadopted") });
-    new Setting(panel)
-      .setName(t("iconInheritance"))
-      .setDesc(t("iconInheritanceDesc"))
-      .addToggle((toggle) => toggle.setValue(this.plugin.settings.iconInheritance).onChange(async (value) => {
-        this.plugin.settings.iconInheritance = value;
+    new Setting(panel).setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
+      .addOptions({ auto: t("auto"), "zh-CN": t("chinese"), en: t("english") }).setValue(this.plugin.settings.language).onChange(async (value) => {
+        this.plugin.settings.language = value as typeof this.plugin.settings.language;
+        setLanguage(this.plugin.settings.language);
         await this.plugin.saveSettings();
-        this.plugin.refreshVisuals();
-      }));
-    new Setting(panel)
-      .setName(t("template"))
-      .setDesc(t("templateDesc"))
-      .addText((text) => text.setPlaceholder("Templates/Folder Node.md").setValue(this.plugin.settings.defaultNodeTemplatePath).onChange(async (value) => {
-        this.plugin.settings.defaultNodeTemplatePath = value.trim();
-        await this.plugin.saveSettings();
-      }));
-    new Setting(panel)
-      .setName(t("initialize"))
-      .setDesc(t("initializeDesc"))
-      .addButton((button) => button.setCta().setButtonText(t("initialize")).onClick(async () => {
-        await this.plugin.initializeManagedVault();
+        new Notice(t("reloadLanguage"));
         this.display();
       }));
-    new Setting(panel)
-      .setName(t("migration"))
-      .setDesc(t("migrationDesc"))
-      .addButton((button) => button.setButtonText(t("migration")).onClick(() => this.plugin.openMigration()));
-    new Setting(panel)
-      .setName(t("health"))
-      .addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
+    panel.createEl("p", { cls: "setting-item-description", text: this.plugin.settings.adoptionState === "managed" ? t("managed") : t("unadopted") });
+    new Setting(panel).setName(t("template")).setDesc(t("templateDesc")).addText((text) => text.setPlaceholder("Templates/Folder Node.md").setValue(this.plugin.settings.defaultNodeTemplatePath).onChange(async (value) => {
+      this.plugin.settings.defaultNodeTemplatePath = value.trim(); await this.plugin.saveSettings();
+    }));
+    new Setting(panel).setName(t("maintenance")).setDesc(t("maintenanceDesc")).addButton((button) => button.setCta().setButtonText(t("reviewChanges")).onClick(() => this.plugin.openMaintenance()));
+    new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
+    this.renderExemptionList(panel, "leaf");
+    this.renderExemptionList(panel, "folder");
+  }
+
+  private renderHomepage(panel: HTMLElement): void {
+    new Setting(panel).setName(t("enableHomepage")).setDesc(t("enableHomepageDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.homepageEnabled).onChange(async (value) => {
+      this.plugin.settings.homepageEnabled = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals(); this.display();
+    }));
+    if (this.plugin.settings.homepageEnabled) new Setting(panel).setName(t("openHomepageOnStartup")).setDesc(t("openHomepageOnStartupDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.openHomepageOnStartup).onChange(async (value) => {
+      this.plugin.settings.openHomepageOnStartup = value; await this.plugin.saveSettings();
+    }));
+    new Setting(panel).setName(t("openHomepage")).setDesc(t("openHomepageDesc")).addButton((button) => button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()));
+  }
+
+  private renderIcons(panel: HTMLElement): void {
+    new Setting(panel).setName(t("iconInheritance")).setDesc(t("iconInheritanceDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.iconInheritance).onChange(async (value) => {
+      this.plugin.settings.iconInheritance = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
+    }));
+    new Setting(panel).setName(t("explorerIconPosition")).setDesc(t("explorerIconPositionDesc")).addDropdown((dropdown) => dropdown.addOptions({ before: t("beforeName"), after: t("afterName"), hidden: t("hidden") }).setValue(this.plugin.settings.explorerIconPosition).onChange(async (value) => {
+      this.plugin.settings.explorerIconPosition = value as typeof this.plugin.settings.explorerIconPosition; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
+    }));
+    new Setting(panel).setName(t("showIconInNoteTitle")).setDesc(t("showIconInNoteTitleDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.showIconInNoteTitle).onChange(async (value) => {
+      this.plugin.settings.showIconInNoteTitle = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
+    }));
   }
 
   private renderNaming(panel: HTMLElement): void {
-    new Setting(panel)
-      .setName(t("aliases"))
-      .setDesc(t("aliasesDesc"))
-      .addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
-        this.plugin.settings.addSelectionAlias = value;
-        await this.plugin.saveSettings();
-      }));
+    new Setting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
+      this.plugin.settings.addSelectionAlias = value; await this.plugin.saveSettings();
+    }));
     this.renderNamingPart(panel, t("prefix"), this.plugin.settings.prefix);
     this.renderNamingPart(panel, t("suffix"), this.plugin.settings.suffix);
-    new Setting(panel)
-      .setName(t("timestampFormat"))
-      .setDesc(t("timestampFormatDesc"))
-      .addText((text) => text.setValue(this.plugin.settings.timestampFormat).onChange(async (value) => {
-        this.plugin.settings.timestampFormat = value;
-        await this.plugin.saveSettings();
-        this.updatePreview(panel);
-      }));
+    new Setting(panel).setName(t("timestampFormat")).setDesc(t("timestampFormatDesc")).addText((text) => text.setValue(this.plugin.settings.timestampFormat).onChange(async (value) => {
+      this.plugin.settings.timestampFormat = value; await this.plugin.saveSettings(); this.updatePreview(panel);
+    }));
     const preview = panel.createDiv({ cls: "folder-nodes-name-preview" });
     preview.createEl("strong", { text: `${t("preview")}: ` });
     preview.createSpan({ cls: "folder-nodes-name-preview-value", text: this.plugin.previewSelectionName(t("sampleSelection")) });
   }
 
   private renderNamingPart(panel: HTMLElement, label: string, part: NamingPart): void {
-    new Setting(panel)
-      .setName(`${label}: ${t("enabled")}`)
-      .addToggle((toggle) => toggle.setValue(part.enabled).onChange(async (value) => {
-        part.enabled = value;
-        await this.plugin.saveSettings();
-        this.display();
-      }));
+    new Setting(panel).setName(`${label}: ${t("enabled")}`).addToggle((toggle) => toggle.setValue(part.enabled).onChange(async (value) => {
+      part.enabled = value; await this.plugin.saveSettings(); this.display();
+    }));
     if (!part.enabled) return;
-    new Setting(panel)
-      .setName(`${label}: ${t("source")}`)
-      .addDropdown((dropdown) => dropdown
-        .addOptions({
-          "current-file": t("currentFile"), "current-node": t("currentNode"),
-          "current-heading": t("currentHeading"), timestamp: t("timestamp"), custom: t("customText"),
-        })
-        .setValue(part.source)
-        .onChange(async (value) => {
-          part.source = value as NamingPart["source"];
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-    new Setting(panel)
-      .setName(`${label}: ${t("separator")}`)
-      .addText((text) => text.setValue(part.separator).onChange(async (value) => {
-        part.separator = value;
-        await this.plugin.saveSettings();
-        this.updatePreview(panel);
-      }));
-    if (part.source === "custom") {
-      new Setting(panel).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange(async (value) => {
-        part.customText = value;
-        await this.plugin.saveSettings();
-        this.updatePreview(panel);
-      }));
-    }
+    new Setting(panel).setName(`${label}: ${t("source")}`).addDropdown((dropdown) => dropdown.addOptions({
+      "current-file": t("currentFile"), "current-node": t("currentNode"), "current-heading": t("currentHeading"), timestamp: t("timestamp"), custom: t("customText"),
+    }).setValue(part.source).onChange(async (value) => { part.source = value as NamingPart["source"]; await this.plugin.saveSettings(); this.display(); }));
+    new Setting(panel).setName(`${label}: ${t("separator")}`).addText((text) => text.setValue(part.separator).onChange(async (value) => {
+      part.separator = value; await this.plugin.saveSettings(); this.updatePreview(panel);
+    }));
+    if (part.source === "custom") new Setting(panel).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange(async (value) => {
+      part.customText = value; await this.plugin.saveSettings(); this.updatePreview(panel);
+    }));
+  }
+
+  private renderExemptionList(panel: HTMLElement, kind: ExemptionKind): void {
+    const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
+    new Setting(panel).setName(kind === "leaf" ? t("leafExemptions") : t("folderExemptions")).setDesc(kind === "leaf" ? t("leafExemptionsDesc") : t("folderExemptionsDesc")).setHeading();
+    for (const [index, path] of paths.entries()) new Setting(panel).setName(path).setDesc(kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")).addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removeExemption(kind, index)));
+    if (paths.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noExemptions") });
+    new Setting(panel).addButton((button) => button.setButtonText(t("addExemption")).onClick(() => this.promptExemption(kind)));
+  }
+
+  private promptExemption(kind: ExemptionKind): void {
+    new PromptModal(this.app, kind === "leaf" ? t("addLeafExemption") : t("addFolderExemption"), "", t("add"), async (value) => {
+      const path = value.trim().replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "");
+      if (path === "") return;
+      const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
+      if (!paths.includes(path)) paths.push(path);
+      paths.sort((a, b) => a.localeCompare(b));
+      await this.plugin.saveSettings();
+      this.display();
+      updateDeclarativeSettingTab(this);
+    }).open();
+  }
+
+  private async removeExemption(kind: ExemptionKind, index: number): Promise<void> {
+    const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
+    paths.splice(index, 1);
+    await this.plugin.saveSettings();
+    this.display();
+    updateDeclarativeSettingTab(this);
   }
 
   private updatePreview(panel: HTMLElement): void {
-    const value = panel.querySelector<HTMLElement>(".folder-nodes-name-preview-value");
-    if (value !== null) value.setText(this.plugin.previewSelectionName(t("sampleSelection")));
+    panel.querySelector<HTMLElement>(".folder-nodes-name-preview-value")?.setText(this.plugin.previewSelectionName(t("sampleSelection")));
   }
 }
 
