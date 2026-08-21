@@ -23,7 +23,11 @@ translation_status: source
 
 ## Node Contents View
 
-侧栏顶部显示 breadcrumb、可选的当前 Node visual、标题、Home、Edit visual 和 New child node。Nodes 仅在存在有效或继承 visual 时显示视觉标识；没有 visual 的节点使用紧凑文字卡，不显示大 fallback 文件夹。Album 使用接近相册的密集 4:3 缩略图：普通图片无 badge，GIF 显示 `GIF` badge 且转为静态帧，视频只显示静态类型 tile。HEIC/HEIF、音频与其他资源位于紧凑 Files 列表。插件不渲染 `<video>`/`<audio>` 控件、不自动播放，也不提供播放动作。Sections 可折叠，每批最多渲染 200 项。
+侧栏顶部显示 breadcrumb、可选的当前 Node visual、标题、Home、Edit visual 和 New child node。Nodes 仅在存在有效或继承 visual 时显示视觉标识；没有 visual 的节点使用紧凑文字卡，不显示大 fallback 文件夹。Album 使用接近相册的密集 4:3 缩略图：普通图片无 badge，GIF 显示 `GIF` badge 且转为静态帧，视频只显示静态类型 tile。HEIC/HEIF、音频与其他资源位于紧凑 Files 列表。插件不渲染 `<video>`/`<audio>` 控件且不自动播放；“打开”只导航到 Obsidian 的文件视图。Sections 可折叠，每批最多渲染 200 项。
+
+Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions 按钮以及 Shift+F10/菜单键打开同一个 Obsidian Menu。Node 菜单包含打开、在新标签打开、浏览内容、新建子节点、Visual、rename、move、merge、reorder 和 trash。普通文件菜单包含打开、在新标签打开、在 File Explorer 中显示、复制链接、rename、move 和 trash；支持的图片还可设为当前 Node visual。未管理文件夹只提供浏览内容、在 File Explorer 中显示和其他插件通过 `file-menu` 注入的安全动作。Trash 项使用 warning 样式，所有写入失败都显示失败关闭 Notice。
+
+Node 卡片上方 25% 是 before line，中间 50% 是 into highlight，下方 25% 是 after line；该语义与 Explorer 一致。普通文件与 Album 条目只有 into，不提供 before/after 或顺序元数据；可放到子 Node、当前 Node header 或 breadcrumb，drop 后通过 Obsidian FileManager 移动。节点不能放入自身或后代，文件重名冲突禁止写入。Escape、dragend、离开目标和失败都清理视觉状态；drop 前不得修改 Vault。菜单中的 move/reorder 是完整键盘等价操作。v1 的 Contents 拖拽只接受本视图单项来源，不提供多选或跨视图 drop。
 
 ## Visual Picker
 

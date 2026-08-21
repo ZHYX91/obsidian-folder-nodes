@@ -10,7 +10,7 @@ Folder Nodes turns every folder in a managed Obsidian Vault into one structural 
 - Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, and configure filename prefixes, suffixes, separators, and timestamps.
 - Apply built-in Node Note templates with `{{name}}`, `{{path}}`, `{{parent}}`, and `{{date}}` tokens.
 - Navigate the global Node Tree through File Explorer: click a folder name to open its Node Note, keep the disclosure arrow for expansion, hide duplicate canonical notes, and drag before, into, or after another node.
-- Browse the current node through separate Nodes, static Album, and compact Files sections with bounded 200-item paging. GIFs use still thumbnails; video and audio never receive playback controls.
+- Browse the current node through separate Nodes, static Album, and compact Files sections with bounded 200-item paging. Every entry has a context menu and keyboard menu access; child nodes support before/into/after placement, while ordinary files may move only into a node or breadcrumb folder. GIFs use still thumbnails; video and audio never receive inline playback controls.
 - Resolve one `icon` property as an emoji, Lucide icon, Vault image, or CSS color, with optional inheritance, before/after/hidden File Explorer placement, and optional note-title display.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
@@ -45,8 +45,8 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 2. Open **Initialize & maintain**, review every exact create, move, skip, and conflict path, then apply explicitly. The same flow handles empty, structured, and ordinary Vaults.
 3. Use File Explorer, the ribbon, node context menus, or the command palette to create and navigate nodes.
 4. Select editor text and choose **Create Folder Node from selection** from the editor context menu or command palette. Confirm the name, alias, and wikilink preview before creation.
-5. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Folder Nodes does not animate GIFs or provide video/audio playback controls.
-6. Drag a Folder Node before, into, or after another node to reorder or reparent it. The drop marker shows the resulting placement before the write.
+5. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Right-click an entry, use its More actions button, or press Shift+F10 for the same menu.
+6. Drag a Folder Node before, into, or after another node to reorder or reparent it. Drag an Album or Files item into a child node, the current-node header, or a breadcrumb to move the file. The drop marker shows the resulting placement before the write.
 
 ## Settings
 
@@ -62,7 +62,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 - Structural identity is the current normalized Vault path, not a permanent ID. An external delete followed by an unrelated create is not guessed to be a rename.
 - File Explorer integration is a host compatibility boundary and keeps this version desktop-only.
 - Node visuals support Vault images but do not fetch remote images, recolor inline SVG, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
-- The Contents View does not drag or independently order ordinary files and is not a second complete Vault tree.
+- The Contents View can move one ordinary file at a time into a displayed node or breadcrumb folder, but does not independently order files, provide multi-selection, accept cross-view drops, or become a second complete Vault tree.
 - Merge fails closed on path or frontmatter conflicts instead of presenting a complex conflict-resolution UI.
 - Alternate canonical names such as `README.md`, `index.md`, or `_A.md` and arbitrary property inheritance are not supported. Unmanaged folders are explicit whole-subtree exemptions, not partially managed nodes.
 

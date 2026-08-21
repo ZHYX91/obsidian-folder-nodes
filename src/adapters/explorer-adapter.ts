@@ -1,10 +1,9 @@
-import { App, Component, MarkdownView, setIcon, TFile } from "obsidian";
+import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
+import { isFolderCollapseControl } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
-import type { FolderNodesSettings, NodeVisual } from "../core/types";
-
-type DropZone = "before" | "into" | "after";
+import type { FolderNodesSettings, NodeDropZone, NodeVisual } from "../core/types";
 
 export class ExplorerAdapter extends Component {
   private observer: MutationObserver | null = null;
@@ -32,6 +31,15 @@ export class ExplorerAdapter extends Component {
   }
 
   public refresh(): void { this.decorate(true); }
+
+  public async reveal(entry: TAbstractFile): Promise<boolean> {
+    const leaf = this.app.workspace.getLeavesOfType("file-explorer")[0];
+    const view = leaf?.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void } | undefined;
+    if (leaf === undefined || view?.revealInFolder === undefined) return false;
+    await view.revealInFolder(entry);
+    await this.app.workspace.revealLeaf(leaf);
+    return true;
+  }
 
   public stop(): void {
     this.observer?.disconnect();
@@ -97,7 +105,7 @@ export class ExplorerAdapter extends Component {
   }
 
   private onClick(event: MouseEvent): void {
-    if (!(event.target instanceof Element) || event.target.closest(".nav-folder-collapse-indicator") !== null) return;
+    if (!(event.target instanceof Element) || isFolderCollapseControl(event.target)) return;
     const title = event.target.closest<HTMLElement>(".nav-folder-title[data-path]");
     const path = title?.dataset.path;
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getNote(this.service.notePathForFolder(path)) === null) return;
@@ -137,27 +145,19 @@ export class ExplorerAdapter extends Component {
     event.preventDefault();
     event.stopPropagation();
     const zone = this.zone(title, event.clientY);
-    let parentPath = target.path;
-    let index = this.service.children(parentPath).filter(({ childPath }) => childPath !== source.path).length;
-    if (zone !== "into") {
-      parentPath = target.parent?.path ?? "";
-      const siblings = this.service.children(parentPath).filter(({ childPath }) => childPath !== source.path);
-      const targetIndex = siblings.findIndex(({ childPath }) => childPath === target.path);
-      index = Math.max(0, targetIndex + (zone === "after" ? 1 : 0));
-    }
-    void this.service.placeNode(source, parentPath, index)
+    void this.service.placeNodeRelative(source, target, zone)
       .then(() => this.refresh())
       .catch((error) => this.reportError(error));
     this.clearDrop();
   }
 
-  private zone(element: HTMLElement, clientY: number): DropZone {
+  private zone(element: HTMLElement, clientY: number): NodeDropZone {
     const rect = element.getBoundingClientRect();
     const ratio = rect.height <= 0 ? 0.5 : (clientY - rect.top) / rect.height;
     return ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "into";
   }
 
-  private markDrop(element: HTMLElement, zone: DropZone): void {
+  private markDrop(element: HTMLElement, zone: NodeDropZone): void {
     if (this.dropTarget !== element) this.clearDrop(false);
     this.dropTarget = element;
     element.removeClass("folder-nodes-drop-before", "folder-nodes-drop-into", "folder-nodes-drop-after");

@@ -16,7 +16,7 @@ Natural name order writes no sort property. Manual order uses `folderNodeChildre
 
 ## Node operations
 
-Users can create, rename, move, merge, safely delete, and reorder complete nodes. Explorer drag placement means before, into, or after: same-parent placement reorders, and cross-parent placement reparents and reorders. Conflicts, cyclic moves, and ambiguous merges fail closed. Default templates support `{{name}}`, `{{path}}`, `{{parent}}`, and `{{date}}`.
+Users can create, rename, move, merge, safely delete, and reorder complete nodes. Explorer and Contents child-node drag placement mean before, into, or after: same-parent placement reorders, and cross-parent placement reparents and reorders. Conflicts, cyclic moves, and ambiguous merges fail closed. Default templates support `{{name}}`, `{{path}}`, `{{parent}}`, and `{{date}}`.
 
 ## Selection creation
 
@@ -28,7 +28,7 @@ Users may make the Root Node Note a homepage, open it by command or from Content
 
 ## Node Visual and Contents View
 
-`icon` is the only Node Visual property. Text and List values select the first valid emoji, Lucide icon, Vault image, or CSS color and may inherit from the nearest ancestor. File Explorer icons may appear before or after the name or remain hidden, and may also appear in a Node Note title; size and alignment follow Obsidian. File Explorer is the only global Node Tree. The sidebar browses only direct contents through Nodes, a static Album, and compact Files. Child nodes without a valid visual have no large fallback artwork. GIFs use a still frame, videos use a type tile, and audio stays in Files. The plugin provides no animation, video, or audio playback.
+`icon` is the only Node Visual property. Text and List values select the first valid emoji, Lucide icon, Vault image, or CSS color and may inherit from the nearest ancestor. File Explorer icons may appear before or after the name or remain hidden, and may also appear in a Node Note title; size and alignment follow Obsidian. File Explorer is the only global Node Tree. The sidebar browses only direct contents through Nodes, a static Album, and compact Files. All three entry types expose context-menu, More actions, and Shift+F10 access. Nodes reorder or reparent through before/into/after placement. One ordinary Album/Files item may move only into a node, the current node, or a breadcrumb folder and writes no file-order metadata. Child nodes without a valid visual have no large fallback artwork. GIFs use a still frame, videos use a type tile, and audio stays in Files. The plugin provides no inline animation, video, or audio playback in the sidebar.
 
 ## Adoption and safety
 
@@ -36,4 +36,4 @@ Initialization and migration share one read-only scan that lists every create, m
 
 ## v1 boundary
 
-v1 excludes remote image fetching, inline SVG recoloring, PDF first-page thumbnails, HEIC/HEIF preview, video frame extraction, animation/video/audio playback, ordinary-file drag or independent ordering in Contents View, a second complete directory tree, alternate Node Note naming, complex merge-conflict UI, and arbitrary property inheritance.
+v1 excludes remote image fetching, inline SVG recoloring, PDF first-page thumbnails, HEIC/HEIF preview, video frame extraction, inline animation/video/audio playback, ordinary-file independent ordering, multi-selection, or cross-view drag in Contents View, a second complete directory tree, alternate Node Note naming, complex merge-conflict UI, and arbitrary property inheritance.

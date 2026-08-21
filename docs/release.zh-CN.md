@@ -11,7 +11,7 @@ translation_status: source
 
 ## 发布门禁
 
-候选前运行 `npm ci`、`npm run check`、`npm run release:check` 和大目录 benchmark。隔离 Vault 主机验收必须绑定 exact candidate。四页设置、主页、Explorer/标题图标、拖拽、选区右键、Visual、静态相册、两类豁免、详细维护预览、只读 Health 和删除等主机能力没有日期证据时，不得在 README 或 release notes 中宣称已通过。必须单独确认 Folder Nodes 未创建 GIF、视频或音频播放控件。
+候选前运行 `npm ci`、`npm run check`、`npm run release:check` 和大目录 benchmark。隔离 Vault 主机验收必须绑定 exact candidate。四页设置、主页、Explorer/标题图标、disclosure arrow、Explorer/Contents Node 拖拽、Contents 三类菜单与键盘入口、普通文件 into 移动及冲突拒绝、选区右键、Visual、静态相册、两类豁免、详细维护预览、只读 Health 和删除等主机能力没有日期证据时，不得在 README 或 release notes 中宣称已通过。必须单独确认 Folder Nodes 未创建 GIF、视频或音频播放控件。
 
 ## Git 与 GitHub
 

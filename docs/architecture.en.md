@@ -28,7 +28,9 @@ Visual Core chooses the first valid declaration candidate in order: emoji, known
 
 ## Explorer and Contents
 
-ExplorerAdapter decorates only visible File Explorer DOM, hides canonical notes, places or hides Node Visuals before/after names, optionally decorates Markdown inline titles, distinguishes folder-title clicks from disclosure arrows, and maps drag zones to before, into, and after placement. Contents View queries only direct children and files and renders at most 200 entries per batch. Album images load from Vault resource URIs into a non-DOM `Image` and draw once to canvas, so every format including GIF remains static without reading Vault binary. Video and audio never create playback elements.
+ExplorerAdapter encapsulates the File Explorer host boundary: it decorates only visible DOM, hides canonical notes, places or hides Node Visuals before/after names, optionally decorates Markdown inline titles, performs guarded reveal, recognizes disclosure controls through the current `.tree-item-icon.collapse-icon` and legacy indicator, and maps drag zones to before, into, and after placement. Explorer and Contents both delegate relative placement to NodeService instead of duplicating parent/index calculation.
+
+Contents View queries only direct children and files and renders at most 200 entries per batch. Pure UI interaction helpers define the internal drag MIME, supported payload, three-part zone, and keyboard-menu gestures; the View owns only one drag session and one drop marker. Node drops call `placeNodeRelative` or `placeNode`; ordinary-file drops call the FileManager-backed `moveFile` and accept only into placement. The App layer centrally builds menu actions and triggers `file-menu` with a distinct source, allowing other plugins to extend the menu without duplicating Folder Nodes' own Node actions. Album images load from Vault resource URIs into a non-DOM `Image` and draw once to canvas, so every format including GIF remains static without reading Vault binary. Video and audio never create playback elements.
 
 ## Consistency and fail-closed behavior
 

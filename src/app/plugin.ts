@@ -7,7 +7,8 @@ import { buildNodeName } from "../core/naming";
 import { sanitizeNodeName } from "../core/paths";
 import type { FolderNodesSettings } from "../core/types";
 import { DEFAULT_SETTINGS, normalizeSettings } from "../shared/settings";
-import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
+import { FolderNodeContentsView, CONTENTS_VIEW_TYPE, type ContentsMenuAnchor } from "../ui/contents-view";
+import { CONTENTS_MENU_SOURCE } from "../ui/contents-interactions";
 import { MigrationModal } from "../ui/migration-modal";
 import { ConfirmModal, PromptModal } from "../ui/prompt-modal";
 import { SelectionCreateModal } from "../ui/selection-create-modal";
@@ -34,9 +35,11 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerView(CONTENTS_VIEW_TYPE, (leaf) => new FolderNodeContentsView(leaf, this.service, this.visuals, {
       createChild: (folder) => this.promptCreateChild(folder),
       nodeMenu: (event, folder) => this.openNodeMenu(event, folder),
+      entryMenu: (anchor, entry, sourceFolder) => this.openEntryMenu(anchor, entry, sourceFolder),
       editVisual: (folder) => this.promptVisual(folder),
       openHomepage: () => void this.openHomepage(),
       homepageEnabled: () => this.settings.homepageEnabled,
+      reportError: (error) => new Notice(formatError(error), 8000),
     }));
     this.addSettingTab(new FolderNodesSettingTab(this.app, this));
     this.addRibbonIcon("layout-grid", t("contents"), () => void this.openContents());
@@ -98,12 +101,15 @@ export default class FolderNodesPlugin extends Plugin {
     }).open();
   }
 
-  public openNodeMenu(event: MouseEvent, folder: TFolder): void {
-    event.preventDefault();
-    event.stopPropagation();
+  public openNodeMenu(anchor: ContentsMenuAnchor, folder: TFolder): void {
     const menu = new Menu();
+    menu.addItem((item) => item.setTitle(t("open")).setIcon("file-text").onClick(() => void this.service.openFolderNode(folder.path)));
+    menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => void this.service.openFolderNode(folder.path, true)));
+    menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(folder)));
+    menu.addSeparator();
     this.addNodeMenuItems(menu, folder, false);
-    menu.showAtMouseEvent(event);
+    this.app.workspace.trigger("file-menu", menu, folder, CONTENTS_MENU_SOURCE);
+    this.showMenu(menu, anchor);
   }
 
   public promptVisual(folder: TFolder): void {
@@ -159,7 +165,9 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
       void this.service.reconcileRenamed(entry, oldPath).catch((error) => new Notice(formatError(error), 8000));
     }));
-    this.registerEvent(this.app.workspace.on("file-menu", (menu, entry) => this.addContextMenu(menu, entry)));
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, entry, source) => {
+      if (source !== CONTENTS_MENU_SOURCE) this.addContextMenu(menu, entry);
+    }));
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, info) => {
       if (editor.getSelection().trim() === "" || info.file === null) return;
       menu.addItem((item) => item.setTitle(t("createSelection")).setIcon("folder-plus").onClick(() => this.previewSelectionCreation(editor, info.file)));
@@ -208,7 +216,94 @@ export default class FolderNodesPlugin extends Plugin {
     menu.addItem((item) => item.setTitle(t("merge")).setIcon("combine").onClick(() => this.promptMerge(folder)));
     menu.addItem((item) => item.setTitle(t("moveUp")).setIcon("arrow-up").onClick(() => void this.service.reorder(folder, -1)));
     menu.addItem((item) => item.setTitle(t("moveDown")).setIcon("arrow-down").onClick(() => void this.service.reorder(folder, 1)));
-    menu.addItem((item) => item.setTitle(t("delete")).setIcon("trash-2").onClick(() => this.confirmDelete(folder)));
+    menu.addItem((item) => item.setTitle(t("delete")).setIcon("trash-2").setWarning(true).onClick(() => this.confirmDelete(folder)));
+  }
+
+  private openEntryMenu(anchor: ContentsMenuAnchor, entry: TAbstractFile, sourceFolder: TFolder): void {
+    const menu = new Menu();
+    if (entry instanceof TFolder) {
+      menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(entry)));
+      menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(entry)));
+    } else if (entry instanceof TFile) {
+      menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => void this.app.workspace.getLeaf(false).openFile(entry)));
+      menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => void this.app.workspace.getLeaf(true).openFile(entry)));
+      menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(entry)));
+      menu.addItem((item) => item.setTitle(t("copyLink")).setIcon("copy").onClick(() => {
+        const sourcePath = this.service.getNote(this.service.notePathForFolder(sourceFolder.path))?.path ?? "";
+        void this.copyFileLink(entry, sourcePath);
+      }));
+      if (
+        !this.service.isIgnoredPath(sourceFolder.path) &&
+        this.service.getNote(this.service.notePathForFolder(sourceFolder.path)) !== null &&
+        ["avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp"].includes(entry.extension.toLocaleLowerCase())
+      ) {
+        menu.addItem((item) => item.setTitle(t("setAsVisual")).setIcon("image").onClick(() => void this.setFileAsVisual(entry, sourceFolder)));
+      }
+      menu.addSeparator();
+      menu.addItem((item) => item.setTitle(t("renameFile")).setIcon("pencil").onClick(() => this.promptRenameFile(entry)));
+      menu.addItem((item) => item.setTitle(t("moveFile")).setIcon("folder-input").onClick(() => this.promptMoveFile(entry)));
+      menu.addItem((item) => item.setTitle(t("deleteFile")).setIcon("trash-2").setWarning(true).onClick(() => this.confirmDeleteFile(entry)));
+    }
+    this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
+    this.showMenu(menu, anchor);
+  }
+
+  private showMenu(menu: Menu, anchor: ContentsMenuAnchor): void {
+    if (anchor instanceof MouseEvent) {
+      anchor.preventDefault();
+      anchor.stopPropagation();
+      menu.showAtMouseEvent(anchor);
+      return;
+    }
+    const rect = anchor.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom, width: rect.width }, anchor.ownerDocument);
+  }
+
+  private async revealEntry(entry: TAbstractFile): Promise<void> {
+    try {
+      if (!await this.explorer.reveal(entry)) new Notice(t("revealUnavailable"));
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    }
+  }
+
+  private async copyFileLink(file: TFile, sourcePath: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.app.fileManager.generateMarkdownLink(file, sourcePath));
+      new Notice(t("copiedLink"));
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    }
+  }
+
+  private async setFileAsVisual(file: TFile, folder: TFolder): Promise<void> {
+    try {
+      await this.visuals.set(folder, `[[${file.path}]]`);
+      this.refreshVisuals();
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    }
+  }
+
+  private promptRenameFile(file: TFile): void {
+    new PromptModal(this.app, t("renameFile"), file.name, t("renameFile"), async (name) => {
+      await this.service.renameFile(file, name);
+      this.refreshVisuals();
+    }).open();
+  }
+
+  private promptMoveFile(file: TFile): void {
+    new PromptModal(this.app, t("moveFile"), file.parent?.path ?? "", t("moveFile"), async (targetPath) => {
+      await this.service.moveFile(file, targetPath === "/" ? "" : targetPath);
+      this.refreshVisuals();
+    }).open();
+  }
+
+  private confirmDeleteFile(file: TFile): void {
+    new ConfirmModal(this.app, t("deleteFile"), `${t("moveToTrash")}: ${file.path}`, t("moveToTrash"), true, async () => {
+      await this.service.deleteFile(file);
+      this.refreshVisuals();
+    }).open();
   }
 
   private currentFolder(): TFolder | null { return this.service.folderForFile(this.app.workspace.getActiveFile()); }

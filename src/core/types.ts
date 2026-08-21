@@ -1,5 +1,6 @@
 export type AdoptionState = "unadopted" | "migrating" | "managed";
 export type SortMode = "natural" | "manual";
+export type NodeDropZone = "before" | "into" | "after";
 export type InterfaceLanguage = "auto" | "zh-CN" | "en";
 export type ExplorerIconPosition = "before" | "after" | "hidden";
 

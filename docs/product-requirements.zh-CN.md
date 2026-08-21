@@ -15,7 +15,7 @@ translation_status: source
 
 ## 节点操作
 
-用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。Explorer 拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder。冲突、循环移动和有歧义的 merge 必须失败关闭。默认模板支持 `{{name}}`、`{{path}}`、`{{parent}}` 和 `{{date}}`。
+用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。Explorer 与 Contents 子节点卡片的拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder。冲突、循环移动和有歧义的 merge 必须失败关闭。默认模板支持 `{{name}}`、`{{path}}`、`{{parent}}` 和 `{{date}}`。
 
 ## 选区创建
 
@@ -27,7 +27,7 @@ translation_status: source
 
 ## Node Visual 与 Contents View
 
-`icon` 是唯一 Node Visual 属性，可为 Text 或 List，按顺序选择第一个有效 Emoji、Lucide、Vault 图片或 CSS 颜色；可继承最近祖先。File Explorer 图标可位于名称前、名称后或隐藏，也可在 Node Note 标题中显示；尺寸与对齐跟随 Obsidian。File Explorer 是唯一全局 Node Tree。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files。无有效 visual 的子节点不绘制大 fallback 图标；GIF 只提取静态帧，视频只显示类型 tile，音频留在 Files。插件不提供动图、视频或音频播放。
+`icon` 是唯一 Node Visual 属性，可为 Text 或 List，按顺序选择第一个有效 Emoji、Lucide、Vault 图片或 CSS 颜色；可继承最近祖先。File Explorer 图标可位于名称前、名称后或隐藏，也可在 Node Note 标题中显示；尺寸与对齐跟随 Obsidian。File Explorer 是唯一全局 Node Tree。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files。三类条目都提供右键、More actions 与 Shift+F10 菜单入口。Node 可按 before/into/after 排序或换父级；Album/Files 中的单个普通文件只能拖入 Node、当前节点或 breadcrumb 目录并执行真实文件移动，不产生文件排序属性。无有效 visual 的子节点不绘制大 fallback 图标；GIF 只提取静态帧，视频只显示类型 tile，音频留在 Files。插件不在侧栏中提供动图、视频或音频播放。
 
 ## 接管与安全
 
@@ -35,4 +35,4 @@ translation_status: source
 
 ## v1 边界
 
-v1 不包含远程图片抓取、inline SVG 重着色、PDF 首页缩略图、HEIC/HEIF 预览、视频抽帧、动图/视频/音频播放、Contents View 普通文件拖拽或独立排序、第二棵完整目录树、替代 Node Note 命名、复杂 merge 冲突 UI 或任意属性继承。
+v1 不包含远程图片抓取、inline SVG 重着色、PDF 首页缩略图、HEIC/HEIF 预览、视频抽帧、侧栏内动图/视频/音频播放、Contents View 普通文件独立排序、多选或跨视图拖拽、第二棵完整目录树、替代 Node Note 命名、复杂 merge 冲突 UI 或任意属性继承。

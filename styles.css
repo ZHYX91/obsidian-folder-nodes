@@ -174,6 +174,36 @@
 .folder-nodes-section { margin-block: var(--size-4-3); }
 .folder-nodes-section > summary { cursor: pointer; font-weight: var(--font-semibold); }
 
+.folder-nodes-entry-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.folder-nodes-entry-menu {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  opacity: 0;
+  background: var(--background-primary-alt);
+  box-shadow: var(--shadow-s);
+}
+
+.folder-nodes-entry-shell:hover > .folder-nodes-entry-menu,
+.folder-nodes-entry-shell:focus-within > .folder-nodes-entry-menu,
+.folder-nodes-entry-menu:focus-visible { opacity: 1; }
+
+.folder-nodes-is-dragging { opacity: 0.45; }
+
+.folder-nodes-current.folder-nodes-drop-into,
+.folder-nodes-breadcrumb > button.folder-nodes-drop-into {
+  border-radius: var(--radius-s);
+  outline-offset: 3px;
+}
+
 .folder-nodes-node-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
@@ -185,6 +215,7 @@
   display: flex;
   height: auto;
   min-width: 0;
+  width: 100%;
   min-height: 72px;
   flex-direction: column;
   align-items: center;
@@ -245,6 +276,7 @@
   display: flex;
   height: auto;
   min-width: 0;
+  width: 100%;
   flex-direction: column;
   gap: 4px;
   padding: 4px;
@@ -307,6 +339,7 @@
 .folder-nodes-file-row {
   display: flex;
   min-width: 0;
+  width: 100%;
   min-height: 34px;
   align-items: center;
   gap: var(--size-4-2);
@@ -321,6 +354,13 @@
 .folder-nodes-file-icon { flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-muted); }
 .folder-nodes-file-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-nodes-file-extension { flex: 0 0 auto; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+
+.folder-nodes-file-shell > .folder-nodes-entry-menu {
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+}
+
+.folder-nodes-file-row { padding-inline-end: 44px; }
 
 .folder-nodes-more { width: 100%; margin-top: var(--size-4-2); }
 
@@ -340,4 +380,6 @@
   .folder-nodes-more { min-height: 44px; }
 
   .folder-nodes-tab { height: 44px; }
+  .folder-nodes-entry-menu { width: 44px; height: 44px; opacity: 1; }
+  .folder-nodes-file-row { padding-inline-end: 52px; }
 }

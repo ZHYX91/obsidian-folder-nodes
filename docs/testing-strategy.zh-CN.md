@@ -7,7 +7,7 @@ translation_status: source
 
 ## 自动化门禁
 
-`npm run check` 固定 Node/npm 版本，执行 lint、格式、双语文档契约、严格 TypeScript、覆盖率、生产 bundle 与发布布局检查。Core/Settings 覆盖率门禁为 statements 80%、lines 80%、functions 75%、branches 70%。测试覆盖路径、选区命名、模板、Visual parsing、frontmatter patch、迁移冲突、叶子/文件夹豁免、设置规范化、属性契约和稀疏排序。
+`npm run check` 固定 Node/npm 版本，执行 lint、格式、双语文档契约、严格 TypeScript、覆盖率、生产 bundle 与发布布局检查。Core/Settings 覆盖率门禁为 statements 80%、lines 80%、functions 75%、branches 70%。测试覆盖路径、选区命名、模板、Visual parsing、frontmatter patch、迁移冲突、叶子/文件夹豁免、设置规范化、属性契约和稀疏排序。UI 纯逻辑测试另行锁定当前与旧版 Explorer disclosure selector、before/into/after zone、内部 drag payload 拒绝和 Shift+F10/Menu 键识别。
 
 ## 性能
 
@@ -15,11 +15,11 @@ translation_status: source
 
 ## 隔离 Vault 主机验收
 
-只在一次性隔离 Vault 验收插件加载、四个设置页、“跟随 Obsidian”/中英文、详细维护预览、严格只读 Health、两类豁免、主页命令/按钮/重启、Explorer 图标前/后/隐藏与标题图标、canonical note 隐藏、before/into/after 拖拽、选区右键预览、aliases 与 basename、模板 token、Visual Picker/继承、无 visual 节点、静态相册、GIF 静态帧、视频 tile、紧凑音频/HEIC 文件、窄侧栏、merge 冲突和系统回收站删除。必须确认不存在 `<video>`、`<audio>` 或 autoplay。自动化测试不能代替这些主机行为。
+只在一次性隔离 Vault 验收插件加载、四个设置页、“跟随 Obsidian”/中英文、详细维护预览、严格只读 Health、两类豁免、主页命令/按钮/重启、Explorer 图标前/后/隐藏与标题图标、canonical note 隐藏、disclosure arrow 与 folder title 的点击边界、Explorer 和 Contents 的 before/into/after Node 拖拽、Contents 三类菜单及 Shift+F10/Menu 键、文件拖入 Node/header/breadcrumb、同名冲突与禁止后代放置、dragend/Escape 清理、选区右键预览、aliases 与 basename、模板 token、Visual Picker/继承、无 visual 节点、静态相册、GIF 静态帧、视频 tile、紧凑音频/HEIC 文件、窄侧栏、merge 冲突和系统回收站删除。必须确认不存在 `<video>`、`<audio>` 或 autoplay。自动化测试不能代替这些主机行为。
 
 ## 主题与可访问性
 
-至少检查默认浅色、默认深色和一个第三方主题。键盘检查四个设置 tabs、Modal buttons、Contents cards/rows 和 breadcrumb；粗指针目标为 44px。中英文不得截断关键按钮和节点标题，“跟随 Obsidian”必须与 Obsidian 当前的界面语言一致，图片应有空装饰 alt 或文件名 alt，Explorer 图标需检查尺寸、水平基线和名称间距。
+至少检查默认浅色、默认深色和一个第三方主题。键盘检查四个设置 tabs、Modal buttons、Contents cards/rows、More actions、context-menu keys 和 breadcrumb；拖拽必须有 menu move/reorder 等价操作，粗指针目标为 44px。中英文不得截断关键按钮和节点标题，“跟随 Obsidian”必须与 Obsidian 当前的界面语言一致，图片应有空装饰 alt 或文件名 alt，Explorer 图标需检查尺寸、水平基线和名称间距。
 
 ## 正式部署
 

@@ -9,7 +9,7 @@ import {
   SIBLING_RANK_PROPERTY,
 } from "../core/properties";
 import { renderNodeTemplate } from "../core/template";
-import type { ChildOrderRecord, FolderNodesSettings, MigrationScan } from "../core/types";
+import type { ChildOrderRecord, FolderNodesSettings, MigrationScan, NodeDropZone } from "../core/types";
 
 const STRUCTURAL_PROPERTIES = new Set([
   CHILDREN_SORT_PROPERTY,
@@ -118,6 +118,17 @@ export class NodeService {
     return this.placeNode(folder, targetParentPath, this.children(targetParentPath).length);
   }
 
+  public async placeNodeRelative(source: TFolder, target: TFolder, zone: NodeDropZone): Promise<TFolder> {
+    if (zone === "into") {
+      const index = this.children(target.path).filter(({ childPath }) => childPath !== source.path).length;
+      return this.placeNode(source, target.path, index);
+    }
+    const parentPath = target.parent?.path ?? "";
+    const siblings = this.children(parentPath).filter(({ childPath }) => childPath !== source.path);
+    const targetIndex = siblings.findIndex(({ childPath }) => childPath === target.path);
+    return this.placeNode(source, parentPath, Math.max(0, targetIndex + (zone === "after" ? 1 : 0)));
+  }
+
   public async placeNode(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder> {
     if (this.isIgnoredPath(folder.path) || this.isIgnoredPath(targetParentPath)) throw new Error("An unmanaged folder cannot be placed as a Folder Node");
     if (targetParentPath === folder.path || isDescendantPath(targetParentPath, folder.path)) {
@@ -141,6 +152,35 @@ export class NodeService {
   public async deleteNode(folder: TFolder): Promise<void> {
     if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
     await this.app.fileManager.trashFile(folder);
+  }
+
+  public async moveFile(file: TFile, targetFolderPath: string): Promise<void> {
+    const target = targetFolderPath === "" ? this.app.vault.getRoot() : this.getFolder(targetFolderPath);
+    if (target === null) throw new Error(`Unknown target folder: ${targetFolderPath}`);
+    if (file.parent !== null && this.notePathForFolder(file.parent.path) === file.path) {
+      throw new Error(`Cannot move canonical Node Note: ${file.path}`);
+    }
+    const nextPath = normalizePath(target.path === "" ? file.name : `${target.path}/${file.name}`);
+    if (nextPath === file.path) return;
+    if (this.app.vault.getAbstractFileByPath(nextPath) !== null) throw new Error(`Path already exists: ${nextPath}`);
+    await this.app.fileManager.renameFile(file, nextPath);
+  }
+
+  public async renameFile(file: TFile, rawName: string): Promise<void> {
+    const name = rawName.trim();
+    if (name === "" || name.includes("/") || name.includes("\\")) throw new Error(`Invalid file name: ${rawName}`);
+    const parentPath = file.parent?.path ?? "";
+    const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
+    if (nextPath === file.path) return;
+    if (this.app.vault.getAbstractFileByPath(nextPath) !== null) throw new Error(`Path already exists: ${nextPath}`);
+    await this.app.fileManager.renameFile(file, nextPath);
+  }
+
+  public async deleteFile(file: TFile): Promise<void> {
+    if (file.parent !== null && this.notePathForFolder(file.parent.path) === file.path) {
+      throw new Error(`Cannot delete canonical Node Note: ${file.path}`);
+    }
+    await this.app.fileManager.trashFile(file);
   }
 
   public async mergeNode(source: TFolder, target: TFolder): Promise<void> {

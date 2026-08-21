@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed File Explorer disclosure-arrow clicks for current Obsidian collapse-icon markup while retaining legacy compatibility.
+- Added complete Node Contents menus through right-click, More actions, Shift+F10, and the Menu key, with third-party `file-menu` extension support.
+- Added before/into/after child-node placement and ordinary-file into moves onto nodes, the current-node header, and breadcrumbs without file-order metadata.
+
 ## 0.3.0
 
 - Added an optional Vault-root homepage with a command, Node Contents button, and startup preference.
