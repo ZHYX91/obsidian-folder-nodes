@@ -69,28 +69,74 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
     new Setting(this.containerEl).setName(t("settings")).setHeading();
-    const tabs = this.containerEl.createDiv({ cls: "folder-nodes-tabs", attr: { role: "tablist", "aria-label": t("settings") } });
+    const tabs = this.containerEl.createDiv({
+      cls: "folder-nodes-tabs",
+      attr: {
+        role: "tablist",
+        "aria-label": t("settings"),
+        "aria-orientation": "horizontal",
+      },
+    });
     this.addTabButton(tabs, "general", t("general"));
     this.addTabButton(tabs, "naming", t("naming"));
-    const panel = this.containerEl.createDiv({ cls: "folder-nodes-tab-panel", attr: { role: "tabpanel" } });
+    const panel = this.containerEl.createDiv({
+      cls: "folder-nodes-tab-panel",
+      attr: {
+        id: this.panelId(this.activeTab),
+        role: "tabpanel",
+        "aria-labelledby": this.tabId(this.activeTab),
+        tabindex: "0",
+      },
+    });
     if (this.activeTab === "general") this.renderGeneral(panel);
     else this.renderNaming(panel);
+    this.revealActiveTab(tabs);
   }
 
   private addTabButton(container: HTMLElement, id: TabId, label: string): void {
+    const isActive = this.activeTab === id;
     const button = container.createEl("button", {
       text: label,
-      cls: this.activeTab === id ? "is-active" : "",
-      attr: { role: "tab", "aria-selected": String(this.activeTab === id), tabindex: this.activeTab === id ? "0" : "-1" },
+      cls: `folder-nodes-tab${isActive ? " is-active" : ""}`,
+      attr: {
+        id: this.tabId(id),
+        role: "tab",
+        "aria-selected": String(isActive),
+        "aria-controls": this.panelId(id),
+        tabindex: isActive ? "0" : "-1",
+      },
     });
-    button.addEventListener("click", () => { this.activeTab = id; this.display(); });
+    button.addEventListener("click", () => this.selectTab(id, false));
     button.addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      this.activeTab = this.activeTab === "general" ? "naming" : "general";
-      this.display();
-      this.containerEl.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.focus();
+      const tabs: TabId[] = ["general", "naming"];
+      const currentIndex = tabs.indexOf(id);
+      let targetIndex: number | null = null;
+      if (event.key === "ArrowRight") targetIndex = (currentIndex + 1) % tabs.length;
+      else if (event.key === "ArrowLeft") targetIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      else if (event.key === "Home") targetIndex = 0;
+      else if (event.key === "End") targetIndex = tabs.length - 1;
+      if (targetIndex === null) return;
+      event.preventDefault();
+      const target = tabs[targetIndex];
+      if (target !== undefined) this.selectTab(target, true);
     });
   }
+
+  private selectTab(id: TabId, focus: boolean): void {
+    if (this.activeTab !== id) {
+      this.activeTab = id;
+      this.display();
+    }
+    if (focus) this.containerEl.querySelector<HTMLElement>(`#${this.tabId(id)}`)?.focus({ preventScroll: true });
+  }
+
+  private revealActiveTab(container: HTMLElement): void {
+    const activeTab = container.querySelector<HTMLElement>("[role=tab][aria-selected=true]");
+    activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  private tabId(id: TabId): string { return `folder-nodes-settings-tab-${id}`; }
+  private panelId(id: TabId): string { return `folder-nodes-settings-panel-${id}`; }
 
   private generalDefinitions(): SettingDefinitionItem[] {
     return [
