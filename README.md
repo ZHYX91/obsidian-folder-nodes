@@ -8,13 +8,13 @@ Folder Nodes turns every folder in a managed Obsidian Vault into one structural 
 
 - Create, rename, move, merge, reorder, and safely trash complete Folder Nodes.
 - Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, and configure filename prefixes, suffixes, separators, and timestamps.
-- Apply built-in Node Note templates with `{{name}}`, `{{path}}`, `{{parent}}`, and `{{date}}` tokens.
 - Navigate the global Node Tree through File Explorer: click a folder name to open its Node Note, keep the disclosure arrow for expansion, hide duplicate canonical notes, and drag before, into, or after another node.
 - Browse the current node through separate Nodes, static Album, and compact Files sections with bounded 200-item paging. Every entry has a context menu and keyboard menu access; child nodes support before/into/after placement, while ordinary files may move only into a node or breadcrumb folder. GIFs use still thumbnails; video and audio never receive inline playback controls.
 - Resolve one `icon` property as an emoji, Lucide icon, Vault image, or CSS color, with optional inheritance, before/after/hidden File Explorer placement, and optional note-title display.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
-- Allow exact leaf-note exemptions and unmanaged folder subtrees without hiding them. Root `AGENTS.md` and `CLAUDE.md` are allowed by default.
+- Keep incomplete structures visible as warning-marked Nodes with explicit repair actions instead of misclassifying them as Files.
+- Allow exact and name-prefix leaf-note exemptions and unmanaged folder subtrees without hiding them. the active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are allowed by default.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
 - Follow Obsidian's language automatically or override the interface with English or Simplified Chinese.
 - Keep all processing local and write no permanent node ID, `_pkwf` metadata, manifest, path, parent, or complete child list.
@@ -42,7 +42,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 ## Usage
 
 1. Back up the Vault and open **Settings → Folder Nodes → General**.
-2. Open **Initialize & maintain**, review every exact create, move, skip, and conflict path, then apply explicitly. The same flow handles empty, structured, and ordinary Vaults.
+2. Open **Initialize Folder Nodes**, review every exact create, move, skip, and conflict path, then confirm initialization. Automatic rename synchronization and structural maintenance start only after initialization.
 3. Use File Explorer, the ribbon, node context menus, or the command palette to create and navigate nodes.
 4. Select editor text and choose **Create Folder Node from selection** from the editor context menu or command palette. Confirm the name, alias, and wikilink preview before creation.
 5. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Right-click an entry, use its More actions button, or press Shift+F10 for the same menu.
@@ -50,7 +50,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 
 ## Settings
 
-- **General** controls interface language, the default Node Note template, preview-first maintenance, read-only Health, allowed leaf notes, and unmanaged folders.
+- **General** controls initialization state, interface language, preview-first maintenance, read-only Health, exact exemptions, and Markdown/folder name-prefix rules.
 - **Homepage** controls whether the root Node Note is a homepage and whether it opens after startup.
 - **Icons & appearance** controls inheritance, File Explorer placement, and note-title display. Icon size and alignment follow Obsidian rather than an arbitrary size setting.
 - **Selection & naming** controls the aliases switch, prefix and suffix sources, independent separators, custom text, timestamp format, and live filename preview.

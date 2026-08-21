@@ -19,9 +19,10 @@ export interface FolderNodesSettings {
   iconInheritance: boolean;
   explorerIconPosition: ExplorerIconPosition;
   showIconInNoteTitle: boolean;
-  defaultNodeTemplatePath: string;
   leafNoteExemptions: string[];
   ignoredFolders: string[];
+  leafNotePrefixes: string[];
+  ignoredFolderPrefixes: string[];
   addSelectionAlias: boolean;
   prefix: NamingPart;
   suffix: NamingPart;

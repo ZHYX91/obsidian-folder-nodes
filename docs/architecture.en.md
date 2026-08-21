@@ -8,11 +8,11 @@ translation_status: synced
 
 ## Identity and persistence
 
-A node's current identity is its normalized Vault folder path and `A/A.md` structure; no stable ID exists. Folder Nodes actively uses `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. `aliases` and `icon` are portable content properties; the two `folderNode` fields are plugin structural properties. Managed, Migrating, and Unadopted state, homepage preferences, icon placement, naming rules, and both structural-exemption lists stay in plugin `data.json`.
+A node's current identity is its normalized Vault folder path and `A/A.md` structure; no stable ID exists. Folder Nodes actively uses `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. `aliases` and `icon` are portable content properties; the two `folderNode` fields are plugin structural properties. Managed, Migrating, and Unadopted state, homepage preferences, icon placement, naming rules, exact exemptions, and name-prefix rules stay in plugin `data.json`.
 
 ## Layers
 
-Core handles only paths, naming, template tokens, migration plans, sparse ordering, minimal frontmatter patches, and Visual declaration parsing. Adapters encapsulate Vault, Metadata Cache, File Explorer, resource URIs, and Node operations. UI/App provides localization, settings, commands, menus, modals, Visual Picker, and Contents View. The public repository does not depend on the local workspace or a personal Vault.
+Core handles only paths, naming, exemption rules, migration plans, sparse ordering, minimal frontmatter patches, and Visual declaration parsing. Adapters encapsulate Vault, Metadata Cache, File Explorer, resource URIs, and Node operations. UI/App provides localization, settings, commands, menus, modals, Visual Picker, and Contents View. The public repository does not depend on the local workspace or a personal Vault.
 
 ## Ordering engine
 
@@ -20,7 +20,7 @@ Natural mode uses Unicode-normalized, numeric-aware basename order and writes no
 
 ## Node operations
 
-NodeService treats create, rename, move, place, merge, and trash as complete-directory operations. Move and placement reject self and descendants. Merge preflights target-path and frontmatter conflicts; target properties win, non-conflicting source properties join the target, source body is appended, resources move, and the source is removed. Templates replace only fixed tokens before creation and execute no code.
+NodeService treats create, rename, move, place, merge, repair, and trash as directory operations. Move and placement reject self and descendants. Merge preflights target-path and frontmatter conflicts; target properties win, non-conflicting source properties join the target, source body is appended, resources move, and the source is removed. New Node Notes are blank; Folder Nodes does not execute content templates.
 
 ## Visual resolution
 

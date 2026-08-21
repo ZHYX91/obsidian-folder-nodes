@@ -15,7 +15,7 @@ translation_status: source
 
 ## 节点操作
 
-用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。Explorer 与 Contents 子节点卡片的拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder。冲突、循环移动和有歧义的 merge 必须失败关闭。默认模板支持 `{{name}}`、`{{path}}`、`{{parent}}` 和 `{{date}}`。
+用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。Explorer 与 Contents 子节点卡片的拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder。冲突、循环移动和有歧义的 merge 必须失败关闭。Folder Nodes 创建空白 Node Note；内容模板交给专用模板插件。
 
 ## 选区创建
 
@@ -23,7 +23,7 @@ translation_status: source
 
 ## 主页与结构豁免
 
-用户可选择将 Root Node Note 作为主页，通过命令或 Contents View 按钮打开，并可在 Vault 布局恢复后自动打开。叶子笔记豁免使用精确 Vault 相对 Markdown 路径；文件夹豁免作用于完整子树并停止初始化、迁移和结构修复。豁免不表示隐藏。根目录 `AGENTS.md` 和 `CLAUDE.md` 默认属于叶子笔记豁免。
+用户可选择将 Root Node Note 作为主页，通过命令或 Contents View 按钮打开，并可在 Vault 布局恢复后自动打开。叶子笔记豁免可使用精确 Vault 相对 Markdown 路径或文件名前缀；文件夹豁免可使用精确子树或任意路径段的名称前缀。豁免停止初始化、迁移和结构修复但不隐藏内容。当前 Vault 配置目录、`.git` 和 `.trash` 始终受保护；根目录 `AGENTS.md` 和 `CLAUDE.md` 默认属于叶子笔记豁免。
 
 ## Node Visual 与 Contents View
 
@@ -31,7 +31,7 @@ translation_status: source
 
 ## 接管与安全
 
-初始化与迁移共用一次只读扫描，逐路径显示将创建、移动、跳过和阻止的内容，再由用户显式应用。Health 复用同一摘要但严格只读，不显示写入按钮。冲突阻止提交。Managed 状态通过稳定、合并的 Vault 事件维持结构并尊重两类豁免；无损且唯一的问题可以修复。完整节点删除使用系统回收站。插件不联网。
+未初始化状态必须明确说明自动同步不可用。初始化与迁移共用一次只读扫描，逐路径显示将创建、移动、跳过和阻止的内容，再由用户确认初始化。Contents 将缺少 Node Note 的文件夹和缺少同名文件夹的非豁免 Markdown 显示为带警告的节点，并提供显式修复或豁免动作。Health 复用同一摘要但严格只读，不显示写入按钮。冲突阻止提交。Managed 状态通过稳定、合并的 Vault 事件维持结构并尊重两类豁免；无损且唯一的问题可以修复。完整节点删除使用系统回收站。插件不联网。
 
 ## v1 边界
 

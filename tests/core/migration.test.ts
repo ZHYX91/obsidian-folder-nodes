@@ -24,6 +24,21 @@ describe("migration scan", () => {
       missingNodeNotes: ["A"],
     });
   });
+  it("applies protected-folder and configurable prefix rules", () => {
+    expect(scanMigration({
+      folders: [".git", ".git/objects", "_views", "A"],
+      markdown: ["_draft.md", "Loose.md"],
+    }, {
+      folderPrefixes: ["_"],
+      leafMarkdownPrefixes: ["_"],
+    })).toEqual({
+      conflicts: [],
+      exemptLeafMarkdown: ["_draft.md"],
+      ignoredFolders: [".git", "_views"],
+      leafMarkdown: ["Loose.md"],
+      missingNodeNotes: ["A"],
+    });
+  });
   it("blocks collisions", () => {
     const scan = scanMigration({ folders: ["A"], markdown: ["A.md", "A/A.md"] });
     expect(scan.conflicts).toHaveLength(1);

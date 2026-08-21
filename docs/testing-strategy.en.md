@@ -8,7 +8,7 @@ translation_status: synced
 
 ## Automated gates
 
-`npm run check` pins Node/npm, then runs lint, formatting, bilingual-document contracts, strict TypeScript, coverage, production bundle, and release-layout checks. Core/Settings coverage thresholds are statements 80%, lines 80%, functions 75%, and branches 70%. Tests cover paths, selection naming, templates, Visual parsing, frontmatter patches, migration conflicts, leaf/folder exemptions, settings normalization, the property contract, and sparse ordering. Separate pure-UI tests lock the current and legacy Explorer disclosure selectors, before/into/after zones, internal drag-payload rejection, and Shift+F10/Menu-key recognition.
+`npm run check` pins Node/npm, then runs lint, formatting, bilingual-document contracts, strict TypeScript, coverage, production bundle, and release-layout checks. Core/Settings coverage thresholds are statements 80%, lines 80%, functions 75%, and branches 70%. Tests cover paths, selection naming, Visual parsing, frontmatter patches, migration conflicts, exact/prefix exemptions, protected system folders, settings normalization, the property contract, and sparse ordering. Separate pure-UI tests lock the current and legacy Explorer disclosure selectors, before/into/after zones, internal drag-payload rejection, and Shift+F10/Menu-key recognition.
 
 ## Performance
 
@@ -16,7 +16,7 @@ A normal reorder plan among 10,000 direct Child Nodes must finish within two sec
 
 ## Isolated-Vault host acceptance
 
-Only a disposable isolated Vault may validate plugin loading, all four settings pages, Follow Obsidian/English/Chinese, detailed maintenance preview, strictly read-only Health, both exemptions, homepage command/button/restart, before/after/hidden Explorer icons and title icons, canonical-note hiding, the disclosure-arrow/folder-title click boundary, Explorer and Contents before/into/after Node drag, all three Contents menus and Shift+F10/Menu keys, file drops onto a Node/header/breadcrumb, name collisions and descendant rejection, dragend/Escape cleanup, selection context preview, aliases and basename, template tokens, Visual Picker/inheritance, nodes without visuals, static Album, GIF stills, video tiles, compact audio/HEIC files, narrow sidebar, merge conflicts, and system-trash deletion. Acceptance must confirm no `<video>`, `<audio>`, or autoplay. Automated tests do not prove those host behaviors.
+Only a disposable isolated Vault may validate plugin loading, all four settings pages, Follow Obsidian/English/Chinese, initialization-state messaging, detailed maintenance preview, strictly read-only Health, exact and prefix exemptions, homepage command/button/restart, before/after/hidden Explorer icons and title icons, canonical-note hiding, the disclosure-arrow/folder-title click boundary, Explorer and Contents before/into/after Node drag, all three Contents menus and Shift+F10/Menu keys, file drops onto a Node/header/breadcrumb, name collisions and descendant rejection, dragend/Escape cleanup, selection context preview, aliases and basename, problem-node classification/repair, Visual Picker/inheritance, nodes without visuals, static Album, GIF stills, video tiles, compact audio/HEIC files, narrow sidebar, merge conflicts, and system-trash deletion. Acceptance must confirm no `<video>`, `<audio>`, or autoplay. Automated tests do not prove those host behaviors.
 
 ## Themes and accessibility
 

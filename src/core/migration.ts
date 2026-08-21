@@ -1,4 +1,5 @@
 import type { MigrationConflict, MigrationScan } from "./types";
+import { matchesFolderExemption, matchesLeafNoteExemption } from "./exemptions";
 import { basename, dirname, nodeNotePath, normalizeVaultPath } from "./paths";
 
 export interface VaultInventory {
@@ -9,18 +10,24 @@ export interface VaultInventory {
 export interface MigrationExemptions {
   leafMarkdown?: readonly string[];
   folders?: readonly string[];
+  leafMarkdownPrefixes?: readonly string[];
+  folderPrefixes?: readonly string[];
 }
 
 export function scanMigration(inventory: VaultInventory, exemptions: MigrationExemptions = {}): MigrationScan {
-  const configuredFolders = new Set((exemptions.folders ?? []).map(normalizeVaultPath).filter((path) => path !== ""));
-  const configuredLeafNotes = new Set((exemptions.leafMarkdown ?? []).map(normalizeVaultPath).filter((path) => path !== ""));
-  const allFolders = new Set(inventory.folders.map(normalizeVaultPath));
-  const allMarkdown = new Set(inventory.markdown.map(normalizeVaultPath));
-  const ignoredFolders = [...configuredFolders].filter((path) => allFolders.has(path)).sort();
-  const isIgnored = (path: string): boolean => [...configuredFolders].some((folder) => path === folder || path.startsWith(`${folder}/`));
+  const configuredFolders = (exemptions.folders ?? []).map(normalizeVaultPath).filter((path) => path !== "");
+  const configuredLeafNotes = (exemptions.leafMarkdown ?? []).map(normalizeVaultPath).filter((path) => path !== "");
+  const folderPrefixes = exemptions.folderPrefixes ?? [];
+  const leafMarkdownPrefixes = exemptions.leafMarkdownPrefixes ?? [];
+  const allFolders = new Set(inventory.folders.map(normalizeVaultPath).filter((path) => path !== ""));
+  const allMarkdown = new Set(inventory.markdown.map(normalizeVaultPath).filter((path) => path !== ""));
+  const isIgnored = (path: string): boolean => matchesFolderExemption(path, configuredFolders, folderPrefixes);
+  const ignoredFolders = [...allFolders].filter((path) => isIgnored(path) && !isIgnored(dirname(path))).sort();
   const folders = new Set([...allFolders].filter((path) => !isIgnored(path)));
-  const markdown = new Set([...allMarkdown].filter((path) => !isIgnored(path) && !configuredLeafNotes.has(path)));
-  const exemptLeafMarkdown = [...configuredLeafNotes].filter((path) => allMarkdown.has(path) && !isIgnored(path)).sort();
+  const markdown = new Set([...allMarkdown].filter((path) => !isIgnored(dirname(path)) && !matchesLeafNoteExemption(path, configuredLeafNotes, leafMarkdownPrefixes)));
+  const exemptLeafMarkdown = [...allMarkdown]
+    .filter((path) => !isIgnored(dirname(path)) && matchesLeafNoteExemption(path, configuredLeafNotes, leafMarkdownPrefixes))
+    .sort();
   const leafMarkdown: string[] = [];
   const missingNodeNotes: string[] = [];
   const conflicts: MigrationConflict[] = [];

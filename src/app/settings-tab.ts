@@ -33,7 +33,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       iconInheritance: settings.iconInheritance,
       explorerIconPosition: settings.explorerIconPosition,
       showIconInNoteTitle: settings.showIconInNoteTitle,
-      defaultNodeTemplatePath: settings.defaultNodeTemplatePath,
       addSelectionAlias: settings.addSelectionAlias,
       prefixEnabled: settings.prefix.enabled,
       prefixSource: settings.prefix.source,
@@ -66,7 +65,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         this.plugin.refreshVisuals();
         break;
       case "showIconInNoteTitle": settings.showIconInNoteTitle = Boolean(value); this.plugin.refreshVisuals(); break;
-      case "defaultNodeTemplatePath": settings.defaultNodeTemplatePath = String(value).trim(); break;
       case "addSelectionAlias": settings.addSelectionAlias = Boolean(value); break;
       case "prefixEnabled": settings.prefix.enabled = Boolean(value); break;
       case "prefixSource": settings.prefix.source = this.namingSource(value); break;
@@ -141,17 +139,19 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private panelId(id: TabId): string { return `folder-nodes-settings-panel-${id}`; }
 
   private generalDefinitions(): SettingDefinitionItem[] {
+    const initialized = this.plugin.settings.adoptionState === "managed";
     return [
       { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } } },
-      { name: t("template"), desc: t("templateDesc"), control: { type: "text", key: "defaultNodeTemplatePath", placeholder: "Templates/Folder Node.md" } },
-      this.actionDefinition(t("maintenance"), t("maintenanceDesc"), (setting) => {
-        setting.addButton((button) => { button.setCta().setButtonText(t("reviewChanges")).onClick(() => { this.plugin.openMaintenance(); }); });
+      this.actionDefinition(initialized ? t("maintenance") : t("initialize"), initialized ? t("maintenanceManagedDesc") : t("initializationRequiredDesc"), (setting) => {
+        setting.addButton((button) => { button.setCta().setButtonText(initialized ? t("reviewStructure") : t("startInitialization")).onClick(() => { this.plugin.openMaintenance(); }); });
       }),
       this.actionDefinition(t("health"), t("healthDesc"), (setting) => {
         setting.addButton((button) => { button.setButtonText(t("health")).onClick(() => { this.plugin.showHealth(); }); });
       }),
       this.exemptionListDefinition("leaf"),
+      this.prefixListDefinition("leaf"),
       this.exemptionListDefinition("folder"),
+      this.prefixListDefinition("folder"),
     ];
   }
 
@@ -203,6 +203,18 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     };
   }
 
+  private prefixListDefinition(kind: ExemptionKind): SettingDefinitionItem {
+    const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
+    return {
+      type: "list",
+      heading: kind === "leaf" ? t("leafPrefixRules") : t("folderPrefixRules"),
+      emptyState: t("noPrefixRules"),
+      items: prefixes.map((prefix) => ({ name: prefix, desc: kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc") })),
+      onDelete: (index) => void this.removePrefix(kind, index),
+      addItem: { name: t("addPrefixRule"), action: () => this.promptPrefix(kind) },
+    };
+  }
+
   private actionDefinition(name: string, desc: string, render: (setting: Setting) => void): SettingDefinitionItem {
     return { name, desc, searchable: false, render };
   }
@@ -221,14 +233,17 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         new Notice(t("reloadLanguage"));
         this.display();
       }));
-    panel.createEl("p", { cls: "setting-item-description", text: this.plugin.settings.adoptionState === "managed" ? t("managed") : t("unadopted") });
-    new Setting(panel).setName(t("template")).setDesc(t("templateDesc")).addText((text) => text.setPlaceholder("Templates/Folder Node.md").setValue(this.plugin.settings.defaultNodeTemplatePath).onChange(async (value) => {
-      this.plugin.settings.defaultNodeTemplatePath = value.trim(); await this.plugin.saveSettings();
-    }));
-    new Setting(panel).setName(t("maintenance")).setDesc(t("maintenanceDesc")).addButton((button) => button.setCta().setButtonText(t("reviewChanges")).onClick(() => this.plugin.openMaintenance()));
+    const initialized = this.plugin.settings.adoptionState === "managed";
+    panel.createEl("p", { cls: `folder-nodes-adoption-status ${initialized ? "is-managed" : "is-warning"}`, text: initialized ? t("managed") : t("unadopted") });
+    new Setting(panel)
+      .setName(initialized ? t("maintenance") : t("initialize"))
+      .setDesc(initialized ? t("maintenanceManagedDesc") : t("initializationRequiredDesc"))
+      .addButton((button) => button.setCta().setButtonText(initialized ? t("reviewStructure") : t("startInitialization")).onClick(() => this.plugin.openMaintenance()));
     new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
     this.renderExemptionList(panel, "leaf");
+    this.renderPrefixList(panel, "leaf");
     this.renderExemptionList(panel, "folder");
+    this.renderPrefixList(panel, "folder");
   }
 
   private renderHomepage(panel: HTMLElement): void {
@@ -291,6 +306,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(panel).addButton((button) => button.setButtonText(t("addExemption")).onClick(() => this.promptExemption(kind)));
   }
 
+  private renderPrefixList(panel: HTMLElement, kind: ExemptionKind): void {
+    const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
+    new Setting(panel).setName(kind === "leaf" ? t("leafPrefixRules") : t("folderPrefixRules")).setDesc(kind === "leaf" ? t("leafPrefixRulesDesc") : t("folderPrefixRulesDesc")).setHeading();
+    for (const [index, prefix] of prefixes.entries()) new Setting(panel).setName(prefix).setDesc(kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")).addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removePrefix(kind, index)));
+    if (prefixes.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noPrefixRules") });
+    new Setting(panel).addButton((button) => button.setButtonText(t("addPrefixRule")).onClick(() => this.promptPrefix(kind)));
+  }
+
   private promptExemption(kind: ExemptionKind): void {
     new PromptModal(this.app, kind === "leaf" ? t("addLeafExemption") : t("addFolderExemption"), "", t("add"), async (value) => {
       const path = value.trim().replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "");
@@ -302,6 +325,27 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       this.display();
       updateDeclarativeSettingTab(this);
     }).open();
+  }
+
+  private promptPrefix(kind: ExemptionKind): void {
+    new PromptModal(this.app, kind === "leaf" ? t("addLeafPrefix") : t("addFolderPrefix"), "", t("add"), async (value) => {
+      const prefix = value.trim();
+      if (prefix === "" || prefix.includes("/") || prefix.includes("\\")) return;
+      const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
+      if (!prefixes.includes(prefix)) prefixes.push(prefix);
+      prefixes.sort((a, b) => a.localeCompare(b));
+      await this.plugin.saveSettings();
+      this.display();
+      updateDeclarativeSettingTab(this);
+    }).open();
+  }
+
+  private async removePrefix(kind: ExemptionKind, index: number): Promise<void> {
+    const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
+    prefixes.splice(index, 1);
+    await this.plugin.saveSettings();
+    this.display();
+    updateDeclarativeSettingTab(this);
   }
 
   private async removeExemption(kind: ExemptionKind, index: number): Promise<void> {

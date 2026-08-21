@@ -8,9 +8,10 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = {
   iconInheritance: true,
   explorerIconPosition: "before",
   showIconInNoteTitle: false,
-  defaultNodeTemplatePath: "",
   leafNoteExemptions: ["AGENTS.md", "CLAUDE.md"],
   ignoredFolders: [],
+  leafNotePrefixes: [],
+  ignoredFolderPrefixes: [],
   addSelectionAlias: true,
   prefix: {
     enabled: false,
@@ -34,14 +35,21 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     ? input.explorerIconPosition
     : "before";
   return {
-    ...DEFAULT_SETTINGS,
-    ...input,
+    adoptionState: input.adoptionState === "managed" || input.adoptionState === "migrating" ? input.adoptionState : "unadopted",
     language,
+    homepageEnabled: input.homepageEnabled === true,
+    openHomepageOnStartup: input.openHomepageOnStartup === true,
+    iconInheritance: input.iconInheritance !== false,
     explorerIconPosition,
+    showIconInNoteTitle: input.showIconInNoteTitle === true,
     leafNoteExemptions: normalizePaths(input.leafNoteExemptions, DEFAULT_SETTINGS.leafNoteExemptions),
     ignoredFolders: normalizePaths(input.ignoredFolders, DEFAULT_SETTINGS.ignoredFolders),
+    leafNotePrefixes: normalizePrefixes(input.leafNotePrefixes),
+    ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes),
+    addSelectionAlias: input.addSelectionAlias !== false,
     prefix: { ...DEFAULT_SETTINGS.prefix, ...input.prefix },
     suffix: { ...DEFAULT_SETTINGS.suffix, ...input.suffix },
+    timestampFormat: typeof input.timestampFormat === "string" ? input.timestampFormat : DEFAULT_SETTINGS.timestampFormat,
   };
 }
 
@@ -51,5 +59,14 @@ function normalizePaths(value: unknown, fallback: readonly string[]): string[] {
     if (typeof path !== "string") return [];
     const normalized = path.trim().replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "");
     return normalized === "" ? [] : [normalized];
+  }))].sort((a, b) => a.localeCompare(b));
+}
+
+function normalizePrefixes(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.flatMap((prefix) => {
+    if (typeof prefix !== "string") return [];
+    const normalized = prefix.trim();
+    return normalized === "" || normalized.includes("/") || normalized.includes("\\") ? [] : [normalized];
   }))].sort((a, b) => a.localeCompare(b));
 }

@@ -7,11 +7,11 @@ translation_status: source
 
 ## 身份与持久化
 
-Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态、主页偏好、图标位置、命名规则和两类结构豁免保存在插件 `data.json`。
+Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态、主页偏好、图标位置、命名规则、精确路径豁免和名称前缀规则保存在插件 `data.json`。
 
 ## 分层
 
-Core 只处理路径、命名、模板 token、迁移计划、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker 和 Contents View。公开仓库不依赖本地工作区或个人 Vault。
+Core 只处理路径、命名、豁免规则、迁移计划、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker 和 Contents View。公开仓库不依赖本地工作区或个人 Vault。
 
 ## 排序引擎
 
@@ -19,7 +19,7 @@ Core 只处理路径、命名、模板 token、迁移计划、稀疏排序、fro
 
 ## Node 操作
 
-NodeService 把 create、rename、move、place、merge 和 trash 作为完整目录操作。Move/placement 拒绝自身和 descendant。Merge 预检查目标路径与 frontmatter 冲突；目标属性优先，非冲突来源属性合入目标，正文追加后移动资源并删除来源。模板在创建前仅替换固定 token，不执行代码。
+NodeService 把 create、rename、move、place、merge、repair 和 trash 作为目录操作。Move/placement 拒绝自身和 descendant。Merge 预检查目标路径与 frontmatter 冲突；目标属性优先，非冲突来源属性合入目标，正文追加后移动资源并删除来源。新 Node Note 默认为空白；Folder Nodes 不执行内容模板。
 
 ## Visual 解析
 

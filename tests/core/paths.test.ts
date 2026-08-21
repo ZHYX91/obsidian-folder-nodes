@@ -4,6 +4,7 @@ import { basename, dirname, isCanonicalNodeNote, isDescendantPath, nodeNotePath,
 describe("folder node paths", () => {
   it("normalizes and derives canonical paths", () => {
     expect(normalizeVaultPath("/A\\B//")).toBe("A/B");
+    expect(normalizeVaultPath("/")).toBe("");
     expect(basename("A/B")).toBe("B");
     expect(dirname("A/B.md")).toBe("A");
     expect(nodeNotePath("A/B")).toBe("A/B/B.md");

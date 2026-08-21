@@ -4,7 +4,7 @@ import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
 import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
-import { sanitizeNodeName } from "../core/paths";
+import { normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import type { FolderNodesSettings } from "../core/types";
 import { DEFAULT_SETTINGS, normalizeSettings } from "../shared/settings";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE, type ContentsMenuAnchor } from "../ui/contents-view";
@@ -26,9 +26,7 @@ export default class FolderNodesPlugin extends Plugin {
   public override async onload(): Promise<void> {
     this.settings = normalizeSettings(await this.loadData());
     setLanguage(this.settings.language);
-    this.service = new NodeService(this.app, () => this.settings, (warning) => {
-      if (warning.kind === "template-not-found") new Notice(t("templateNotFound", { path: warning.path }), 8000);
-    });
+    this.service = new NodeService(this.app, () => this.settings);
     this.visuals = new VisualService(this.app, this.service, () => this.settings.iconInheritance);
     this.explorer = new ExplorerAdapter(this.app, this.service, this.visuals, () => this.settings, (error) => new Notice(formatError(error), 8000));
     this.addChild(this.explorer);
@@ -36,9 +34,12 @@ export default class FolderNodesPlugin extends Plugin {
       createChild: (folder) => this.promptCreateChild(folder),
       nodeMenu: (event, folder) => this.openNodeMenu(event, folder),
       entryMenu: (anchor, entry, sourceFolder) => this.openEntryMenu(anchor, entry, sourceFolder),
+      problemMenu: (anchor, entry) => this.openProblemMenu(anchor, entry),
       editVisual: (folder) => this.promptVisual(folder),
       openHomepage: () => void this.openHomepage(),
       homepageEnabled: () => this.settings.homepageEnabled,
+      initialized: () => this.settings.adoptionState === "managed",
+      initialize: () => this.openMaintenance(),
       reportError: (error) => new Notice(formatError(error), 8000),
     }));
     this.addSettingTab(new FolderNodesSettingTab(this.app, this));
@@ -99,6 +100,36 @@ export default class FolderNodesPlugin extends Plugin {
       await this.app.workspace.getLeaf(false).openFile(note);
       this.refreshVisuals();
     }).open();
+  }
+
+  public openProblemMenu(anchor: ContentsMenuAnchor, entry: TFolder | TFile): void {
+    const menu = new Menu();
+    if (entry instanceof TFolder) {
+      menu.addItem((item) => item.setTitle(t("createMissingNodeNote")).setIcon("file-plus").onClick(() => {
+        void this.runRepair(async () => { await this.service.createMissingNodeNote(entry); });
+      }));
+      menu.addItem((item) => item.setTitle(t("renameFolderToMatch")).setIcon("pencil").onClick(() => this.promptRename(entry)));
+      menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(entry)));
+    } else {
+      menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => void this.app.workspace.getLeaf(false).openFile(entry)));
+      menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
+        void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
+      }));
+      const parent = entry.parent;
+      if (parent !== null && this.service.getNote(this.service.notePathForFolder(parent.path)) === null) {
+        menu.addItem((item) => item.setTitle(t("useAsNodeNote")).setIcon("file-check").onClick(() => {
+          void this.runRepair(async () => { await this.service.useAsNodeNote(parent, entry); });
+        }));
+        if (normalizeVaultPath(parent.path) !== "") menu.addItem((item) => item.setTitle(t("renameFolderToMatch")).setIcon("folder-cog").onClick(() => {
+          void this.runRepair(async () => { await this.service.renameNode(parent, entry.basename); });
+        }));
+      }
+      menu.addItem((item) => item.setTitle(t("keepAsLeafNote")).setIcon("shield-check").onClick(() => {
+        void this.addLeafExemption(entry.path);
+      }));
+    }
+    this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
+    this.showMenu(menu, anchor);
   }
 
   public openNodeMenu(anchor: ContentsMenuAnchor, folder: TFolder): void {
@@ -210,7 +241,7 @@ export default class FolderNodesPlugin extends Plugin {
     menu.addItem((item) => item.setTitle(t("createChild")).setIcon("folder-plus").onClick(() => this.promptCreateChild(folder)));
     if (includeContents) menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(folder)));
     menu.addItem((item) => item.setTitle(t("editVisual")).setIcon("palette").onClick(() => this.promptVisual(folder)));
-    if (folder.path === "") return;
+    if (normalizeVaultPath(folder.path) === "") return;
     menu.addItem((item) => item.setTitle(t("rename")).setIcon("pencil").onClick(() => this.promptRename(folder)));
     menu.addItem((item) => item.setTitle(t("move")).setIcon("folder-input").onClick(() => this.promptMove(folder)));
     menu.addItem((item) => item.setTitle(t("merge")).setIcon("combine").onClick(() => this.promptMerge(folder)));
@@ -246,6 +277,22 @@ export default class FolderNodesPlugin extends Plugin {
     }
     this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
     this.showMenu(menu, anchor);
+  }
+
+  private async runRepair(action: () => Promise<void>): Promise<void> {
+    try {
+      await action();
+      this.refreshVisuals();
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    }
+  }
+
+  private async addLeafExemption(path: string): Promise<void> {
+    if (!this.settings.leafNoteExemptions.includes(path)) this.settings.leafNoteExemptions.push(path);
+    this.settings.leafNoteExemptions.sort((a, b) => a.localeCompare(b));
+    await this.saveSettings();
+    this.refreshVisuals();
   }
 
   private showMenu(menu: Menu, anchor: ContentsMenuAnchor): void {
@@ -319,28 +366,29 @@ export default class FolderNodesPlugin extends Plugin {
     const name = sanitizeNodeName(buildNodeName({
       selection,
       currentFile: file.basename,
-      currentNode: folder.path === "" ? this.app.vault.getName() : folder.name,
+      currentNode: normalizeVaultPath(folder.path) === "" ? this.app.vault.getName() : folder.name,
       currentHeading: heading,
       now: new Date(),
     }, this.settings.prefix, this.settings.suffix, this.settings.timestampFormat));
-    const nodePath = folder.path === "" ? name : `${folder.path}/${name}`;
+    const parentPath = normalizeVaultPath(folder.path);
+    const nodePath = parentPath === "" ? name : `${parentPath}/${name}`;
     const notePath = `${nodePath}/${name}.md`;
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
     const linkLabel = selection.trim().replace(/\s+/gu, " ");
     const wikiLink = `[[${notePath.slice(0, -3)}|${linkLabel}]]`;
-    new SelectionCreateModal(this.app, { parentPath: folder.path, nodeName: name, notePath, alias, wikiLink }, async () => {
+    new SelectionCreateModal(this.app, { parentPath, nodeName: name, notePath, alias, wikiLink }, async () => {
       if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
       const options = alias === null ? { body: selection } : { alias, body: selection };
-      const note = await this.service.createNode(folder.path, name, options);
+      const note = await this.service.createNode(parentPath, name, options);
       editor.replaceSelection(wikiLink);
       await this.app.workspace.getLeaf(false).openFile(note);
       this.refreshVisuals();
     }).open();
   }
 
-  private promptRenameCurrent(): void { const folder = this.currentFolder(); if (folder !== null && folder.path !== "") this.promptRename(folder); }
-  private promptMoveCurrent(): void { const folder = this.currentFolder(); if (folder !== null && folder.path !== "") this.promptMove(folder); }
-  private promptMergeCurrent(): void { const folder = this.currentFolder(); if (folder !== null && folder.path !== "") this.promptMerge(folder); }
+  private promptRenameCurrent(): void { const folder = this.currentFolder(); if (folder !== null && normalizeVaultPath(folder.path) !== "") this.promptRename(folder); }
+  private promptMoveCurrent(): void { const folder = this.currentFolder(); if (folder !== null && normalizeVaultPath(folder.path) !== "") this.promptMove(folder); }
+  private promptMergeCurrent(): void { const folder = this.currentFolder(); if (folder !== null && normalizeVaultPath(folder.path) !== "") this.promptMerge(folder); }
 
   private promptRename(folder: TFolder): void {
     new PromptModal(this.app, t("rename"), folder.name, t("rename"), async (name) => {
@@ -374,7 +422,7 @@ export default class FolderNodesPlugin extends Plugin {
 
   private async reorderCurrent(delta: -1 | 1): Promise<void> {
     const folder = this.currentFolder();
-    if (folder !== null && folder.path !== "") {
+    if (folder !== null && normalizeVaultPath(folder.path) !== "") {
       await this.service.reorder(folder, delta);
       this.refreshVisuals();
     }

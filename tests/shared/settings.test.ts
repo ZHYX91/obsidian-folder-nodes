@@ -23,4 +23,14 @@ describe("settings", () => {
     expect(settings.ignoredFolders).toEqual(["Generated/Cache"]);
     expect(normalizeSettings({ explorerIconPosition: "unknown" }).explorerIconPosition).toBe("before");
   });
+  it("normalizes prefix rules and drops the removed template setting", () => {
+    const settings = normalizeSettings({
+      defaultNodeTemplatePath: "Templates/Node.md",
+      leafNotePrefixes: ["_", "_", "bad/path", 1],
+      ignoredFolderPrefixes: [".", " _ "],
+    });
+    expect(settings.leafNotePrefixes).toEqual(["_"]);
+    expect(settings.ignoredFolderPrefixes).toEqual(["_", "."]);
+    expect("defaultNodeTemplatePath" in settings).toBe(false);
+  });
 });

@@ -14,7 +14,7 @@ export class MigrationModal extends Modal {
   ) { super(app); }
 
   public override onOpen(): void {
-    this.setTitle(this.healthMode ? t("healthSummary") : t("maintenance"));
+    this.setTitle(this.healthMode ? t("healthSummary") : this.adoptionRequired ? t("initialize") : t("maintenance"));
     if (this.healthMode) this.contentEl.createEl("p", { cls: "setting-item-description", text: t("readOnlyHealth") });
     const summary = this.contentEl.createDiv({ cls: "folder-nodes-migration-summary" });
     this.pathSection(summary, t("moveLeafNotes"), this.scan.leafMarkdown.map((path) => `${path} → ${this.target(path)}`));
@@ -34,7 +34,7 @@ export class MigrationModal extends Modal {
     controls.addButton((button) => button
       .setCta()
       .setDisabled(this.scan.conflicts.length > 0 || (this.total() === 0 && !this.adoptionRequired))
-      .setButtonText(this.total() === 0 ? t("startManaging") : t("applyChanges"))
+      .setButtonText(this.adoptionRequired ? t("confirmInitialization") : t("applyChanges"))
       .onClick(async () => {
         button.setDisabled(true);
         try {
@@ -42,7 +42,7 @@ export class MigrationModal extends Modal {
             progress.max = Math.max(1, total);
             progress.value = completed;
           });
-          new Notice(`${t("maintenance")}: ${t("confirm")}`);
+          new Notice(`${t(this.adoptionRequired ? "initialize" : "maintenance")}: ${t("confirm")}`);
           this.close();
         } catch (error) {
           new Notice(formatError(error), 8000);

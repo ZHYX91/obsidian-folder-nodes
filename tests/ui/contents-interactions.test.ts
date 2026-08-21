@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  breadcrumbSegments,
   isContextMenuKey,
   nodeDropZone,
   parseDragPayload,
@@ -7,6 +8,12 @@ import {
 } from "../../src/ui/contents-interactions";
 
 describe("Node Contents interactions", () => {
+  it("omits root-only breadcrumb separators", () => {
+    expect(breadcrumbSegments("")).toEqual([]);
+    expect(breadcrumbSegments("/")).toEqual([]);
+    expect(breadcrumbSegments("A/B")).toEqual(["A", "B"]);
+  });
+
   it("uses before, into, and after node drop zones", () => {
     const rect = { top: 100, height: 80 };
     expect(nodeDropZone(rect, 105)).toBe("before");

@@ -36,7 +36,7 @@ Users may enter an emoji, Lucide name, CSS color, or Vault image wikilink and ma
 
 ## Migration and Health
 
-Initialize & maintain combines empty-Vault adoption and existing-Vault migration. It expands exact source/target leaf-note moves, missing Node Notes, leaf-note exemptions, folder exemptions, and blocking conflicts. With zero file changes an unadopted Vault may still Start managing. Conflicts block apply. Health uses the same summary but is strictly read-only and shows only a close button. Progress begins only after explicit apply, and failure displays a safe-stop notice.
+Before adoption, Settings and Contents prominently say Not initialized and explain that automatic rename synchronization and structural maintenance are unavailable; the primary action is Start initialization. The preview expands exact source/target leaf-note moves, missing Node Notes, exact and prefix exemptions, and blocking conflicts; its final action is Confirm initialization. After adoption, the entry becomes Structure maintenance / Check structure. Health uses the same summary but is strictly read-only and shows only a close button. Progress begins only after explicit confirmation, and failure displays a safe-stop notice. The Contents Nodes section includes healthy nodes, folders missing Node Notes, and non-exempt Markdown missing same-named folders; problem entries use warning marks and explicit repair menus.
 
 ## Structural exemptions
 

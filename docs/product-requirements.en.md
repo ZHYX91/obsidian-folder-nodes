@@ -16,7 +16,7 @@ Natural name order writes no sort property. Manual order uses `folderNodeChildre
 
 ## Node operations
 
-Users can create, rename, move, merge, safely delete, and reorder complete nodes. Explorer and Contents child-node drag placement mean before, into, or after: same-parent placement reorders, and cross-parent placement reparents and reorders. Conflicts, cyclic moves, and ambiguous merges fail closed. Default templates support `{{name}}`, `{{path}}`, `{{parent}}`, and `{{date}}`.
+Users can create, rename, move, merge, safely delete, and reorder complete nodes. Explorer and Contents child-node drag placement mean before, into, or after: same-parent placement reorders, and cross-parent placement reparents and reorders. Conflicts, cyclic moves, and ambiguous merges fail closed. Folder Nodes creates blank Node Notes; content templating belongs to dedicated template plugins.
 
 ## Selection creation
 
@@ -24,7 +24,7 @@ Editor commands and context menus create Child Nodes from selected text. Creatio
 
 ## Homepage and structural exemptions
 
-Users may make the Root Node Note a homepage, open it by command or from Contents View, and optionally open it after Vault layout restoration. A leaf-note exemption is an exact Vault-relative Markdown path. A folder exemption applies to the complete subtree and stops initialization, migration, and structural repair. Exemption does not mean hidden. Root `AGENTS.md` and `CLAUDE.md` are leaf-note exemptions by default.
+Users may make the Root Node Note a homepage, open it by command or from Contents View, and optionally open it after Vault layout restoration. Leaf-note exemptions may use exact Vault-relative Markdown paths or file-name prefixes; folder exemptions may use exact subtrees or name prefixes on any path segment. Exemptions stop initialization, migration, and structural repair but do not hide content. the active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are leaf-note exemptions by default.
 
 ## Node Visual and Contents View
 
@@ -32,7 +32,7 @@ Users may make the Root Node Note a homepage, open it by command or from Content
 
 ## Adoption and safety
 
-Initialization and migration share one read-only scan that lists every create, move, skip, and block path before explicit apply. Health reuses the summary but is strictly read-only and has no write button. Conflicts block commit. Managed state uses stable, coalesced Vault events and respects both exemption types; unique lossless issues may be repaired. Complete-node deletion uses system trash. The plugin makes no network requests.
+The uninitialized state explicitly says that automatic synchronization is unavailable. Initialization and migration share one read-only scan that lists every create, move, skip, and block path before confirmation. Contents shows folders missing Node Notes and non-exempt Markdown missing same-named folders as warning-marked nodes with explicit repair or exemption actions. Health reuses the summary but is strictly read-only and has no write button. Conflicts block commit. Managed state uses stable, coalesced Vault events and respects both exemption types; unique lossless issues may be repaired. Complete-node deletion uses system trash. The plugin makes no network requests.
 
 ## v1 boundary
 

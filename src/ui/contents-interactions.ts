@@ -1,6 +1,12 @@
+import { normalizeVaultPath } from "../core/paths";
 import type { NodeDropZone } from "../core/types";
 
 export const CONTENTS_DRAG_MIME = "application/x-folder-nodes-entry";
+
+export function breadcrumbSegments(path: string): string[] {
+  const normalized = normalizeVaultPath(path);
+  return normalized === "" ? [] : normalized.split("/");
+}
 export const CONTENTS_MENU_SOURCE = "folder-nodes-contents";
 
 export interface ContentsDragPayload {
