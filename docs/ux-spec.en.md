@@ -8,7 +8,7 @@ translation_status: synced
 
 ## Obsidian consistency
 
-The interface uses native Obsidian Setting, Menu, Modal, Notice, theme variables, icons, and keyboard focus. Desktop targets are at least 36px and coarse-pointer targets are 44px. Settings use General and Selection & naming groups. The language dropdown contains `Auto`, `简体中文`, and `English`; Auto follows Obsidian.
+The interface uses native Obsidian Setting, Menu, Modal, Notice, theme variables, icons, and keyboard focus. Desktop targets are at least 36px and coarse-pointer targets are 44px. Settings use General and Selection & naming groups. The language dropdown contains `Follow Obsidian`, `简体中文`, and `English`; Follow Obsidian uses Obsidian's current interface language.
 
 ## Selection creation
 

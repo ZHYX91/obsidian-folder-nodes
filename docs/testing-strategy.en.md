@@ -16,11 +16,11 @@ A normal reorder plan among 10,000 direct Child Nodes must finish within two sec
 
 ## Isolated-Vault host acceptance
 
-Only a disposable isolated Vault may validate plugin loading, both settings groups, Auto/English/Chinese, migration preview, initialization, Explorer opening, canonical-note hiding, before/into/after drag, selection context preview, aliases and basename, template tokens, Visual Picker/inheritance, Node cards, image gallery, narrow sidebar, merge conflicts, Health, and system-trash deletion. Automated tests do not prove those host behaviors.
+Only a disposable isolated Vault may validate plugin loading, both settings groups, Follow Obsidian/English/Chinese, migration preview, initialization, Explorer opening, canonical-note hiding, before/into/after drag, selection context preview, aliases and basename, template tokens, Visual Picker/inheritance, Node cards, image gallery, narrow sidebar, merge conflicts, Health, and system-trash deletion. Automated tests do not prove those host behaviors.
 
 ## Themes and accessibility
 
-Check at least default light, default dark, and one third-party theme. Keyboard checks cover settings tabs, modal buttons, Contents cards, and breadcrumbs; coarse-pointer targets are 44px. English and Chinese must not truncate critical buttons. Auto must match Obsidian's current language. Images use empty decorative alt text or filename alt text.
+Check at least default light, default dark, and one third-party theme. Keyboard checks cover settings tabs, modal buttons, Contents cards, and breadcrumbs; coarse-pointer targets are 44px. English and Chinese must not truncate critical buttons. Follow Obsidian must match Obsidian's current interface language. Images use empty decorative alt text or filename alt text.
 
 ## Production deployment
 

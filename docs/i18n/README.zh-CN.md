@@ -50,7 +50,7 @@ Folder Nodes 将受管 Obsidian Vault 中的每个文件夹转换为一个结构
 
 - **常规**：界面语言、图标继承、默认 Node Note 模板、接管、迁移和健康检查。
 - **选区与命名**：aliases 开关、前缀和后缀来源、独立连接符、自定义文字、时间戳格式及文件名实时预览。
-- 语言选择 **Auto** 时跟随 Obsidian；手动选择 English 或简体中文只覆盖插件界面，不改变文件名或 Markdown 属性。
+- 选择 **跟随 Obsidian** 时使用 Obsidian 当前的界面语言；手动选择 English 或简体中文只覆盖插件界面，不改变文件名或 Markdown 属性。
 - 命名来源包括当前文件、当前 Folder Node、最近的当前标题、时间戳和自定义文字。前后缀只影响 basename；`aliases` 只包含选中的可见文字。
 
 ## 限制

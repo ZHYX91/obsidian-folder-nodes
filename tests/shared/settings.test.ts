@@ -8,7 +8,7 @@ describe("settings", () => {
     expect(settings.prefix.separator).toBe("_");
     expect(settings.suffix).toEqual(DEFAULT_SETTINGS.suffix);
   });
-  it("defaults unknown language values to Auto", () => {
+  it("defaults unknown language values to follow Obsidian", () => {
     expect(normalizeSettings({ language: "unknown" }).language).toBe("auto");
     expect(normalizeSettings({ language: "zh-CN" }).language).toBe("zh-CN");
   });

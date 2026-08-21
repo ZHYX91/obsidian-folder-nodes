@@ -1,4 +1,4 @@
-import { moment } from "obsidian";
+import { getLanguage } from "obsidian";
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
@@ -8,7 +8,7 @@ const zh = {
   contents: "打开节点内容视图", moveUp: "节点上移", moveDown: "节点下移",
   rename: "重命名节点", delete: "删除节点", move: "移动节点", merge: "合并节点",
   managed: "当前 Vault 已由 Folder Nodes 管理。", unadopted: "当前 Vault 尚未接管；不会自动修改已有结构。",
-  language: "界面语言", languageDesc: "Auto 跟随 Obsidian 的界面语言。", auto: "Auto",
+  language: "界面语言", languageDesc: "选择“跟随 Obsidian”可使用 Obsidian 的界面语言。", auto: "跟随 Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "图标继承",
   iconInheritanceDesc: "当前节点没有有效 icon 时，使用最近祖先节点的视觉标识。",
   template: "默认节点笔记模板",
@@ -44,7 +44,7 @@ const en: typeof zh = {
   contents: "Open node contents", moveUp: "Move node up", moveDown: "Move node down",
   rename: "Rename node", delete: "Delete node", move: "Move node", merge: "Merge node",
   managed: "This Vault is managed by Folder Nodes.", unadopted: "This Vault is not adopted; existing structure is read-only.",
-  language: "Interface language", languageDesc: "Auto follows Obsidian's interface language.", auto: "Auto",
+  language: "Interface language", languageDesc: "Choose Follow Obsidian to use Obsidian's interface language.", auto: "Follow Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "Icon inheritance",
   iconInheritanceDesc: "Use the nearest ancestor visual when the current node has no valid icon.",
   template: "Default Node Note template",
@@ -80,7 +80,7 @@ export function setLanguage(language: InterfaceLanguage): void { configuredLangu
 
 export function resolvedLanguage(): "zh-CN" | "en" {
   if (configuredLanguage !== "auto") return configuredLanguage;
-  return moment.locale().toLocaleLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  return getLanguage().toLocaleLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
 export function t(key: TranslationKey, values: Record<string, string | number> = {}): string {

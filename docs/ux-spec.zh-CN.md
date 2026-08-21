@@ -7,7 +7,7 @@ translation_status: source
 
 ## Obsidian 一致性
 
-界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。设置分为“常规”和“选区与命名”两类；语言下拉框使用 `Auto`、`简体中文`、`English`，其中 Auto 跟随 Obsidian。
+界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。设置分为“常规”和“选区与命名”两类；语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
 
 ## 选区创建
 

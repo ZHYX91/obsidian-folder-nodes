@@ -50,7 +50,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 
 - **General** controls interface language, icon inheritance, the default Node Note template, adoption, migration, and health.
 - **Selection & naming** controls the aliases switch, prefix and suffix sources, independent separators, custom text, timestamp format, and live filename preview.
-- **Auto** language follows Obsidian. Manual English or Simplified Chinese selection overrides the host language without changing filenames or Markdown properties.
+- **Follow Obsidian** uses Obsidian's current interface language. Manual English or Simplified Chinese selection overrides the plugin interface without changing filenames or Markdown properties.
 - Naming sources are current file, current Folder Node, nearest current heading, timestamp, and custom text. Prefixes and suffixes affect only the basename; `aliases` contains only selected visible text.
 
 ## Limitations
