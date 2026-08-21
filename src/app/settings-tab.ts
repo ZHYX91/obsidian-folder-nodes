@@ -10,12 +10,20 @@ type ExemptionKind = "leaf" | "folder";
 
 const TABS: TabId[] = ["general", "homepage", "icons", "naming"];
 
+// Obsidian 1.13 bypasses display() for non-empty definitions. Temporarily keep
+// the established top-tab settings surface while retaining the definitions.
+const ENABLE_DECLARATIVE_SETTINGS = false;
+
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
 
   public constructor(app: App, private readonly plugin: FolderNodesPlugin) { super(app, plugin); }
 
   public override getSettingDefinitions(): SettingDefinitionItem[] {
+    return ENABLE_DECLARATIVE_SETTINGS ? this.getDeclarativeSettingDefinitions() : [];
+  }
+
+  public getDeclarativeSettingDefinitions(): SettingDefinitionItem[] {
     return [
       { type: "page", name: t("general"), items: this.generalDefinitions() },
       { type: "page", name: t("homepage"), items: this.homepageDefinitions() },
