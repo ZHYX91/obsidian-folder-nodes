@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import type { NamingPart } from "../core/types";
@@ -260,6 +260,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderIcons(panel: HTMLElement): void {
+    this.renderIconGuide(panel);
     new Setting(panel).setName(t("iconInheritance")).setDesc(t("iconInheritanceDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.iconInheritance).onChange(async (value) => {
       this.plugin.settings.iconInheritance = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
     }));
@@ -269,6 +270,22 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(panel).setName(t("showIconInNoteTitle")).setDesc(t("showIconInNoteTitleDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.showIconInNoteTitle).onChange(async (value) => {
       this.plugin.settings.showIconInNoteTitle = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
     }));
+  }
+
+  private renderIconGuide(panel: HTMLElement): void {
+    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
+    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
+    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
+    setIcon(icon, "info");
+    heading.createEl("strong", { text: t("iconGuideTitle") });
+
+    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
+    body.createEl("p", { text: t("iconGuideIntro") });
+    const example = body.createDiv({ cls: "folder-nodes-settings-guide-example" });
+    example.createSpan({ text: t("iconPropertyExampleLabel") });
+    example.createEl("code", { text: "icon: 💰" });
+    body.createEl("p", { text: t("iconGuideFormats") });
+    body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("iconGuideRootNote") });
   }
 
   private renderNaming(panel: HTMLElement): void {

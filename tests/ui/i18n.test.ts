@@ -27,4 +27,18 @@ describe("interface language", () => {
     setLanguage("zh-CN");
     expect(resolvedLanguage()).toBe("zh-CN");
   });
+
+  it("uses icon terminology consistently in both languages", () => {
+    setLanguage("zh-CN");
+    expect(t("editVisual")).toBe("设置节点图标");
+    expect(t("visualValue")).toBe("icon 属性");
+    expect(t("setAsVisual")).toBe("设为当前节点图标");
+    expect(t("iconInheritanceDesc")).not.toContain("视觉");
+    expect(t("iconGuideIntro")).toContain("icon 属性");
+
+    setLanguage("en");
+    expect(t("editVisual")).toBe("Set node icon");
+    expect(t("visualValue")).toBe("icon property");
+    expect(t("setAsVisual")).toBe("Use as current node icon");
+  });
 });
