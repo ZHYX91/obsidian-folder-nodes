@@ -5,6 +5,7 @@ import {
   formatContentLinks,
   isContextMenuKey,
   selectionRange,
+  siblingDropAxis,
   siblingDropZone,
 } from "../../src/ui/contents-interactions";
 
@@ -26,11 +27,29 @@ describe("Node Contents interactions", () => {
     ]);
   });
 
-  it("limits right-sidebar sibling sorting to before and after", () => {
-    const rect = { top: 100, height: 80 };
-    expect(siblingDropZone(rect, 110)).toBe("before");
-    expect(siblingDropZone(rect, 140)).toBe("after");
-    expect(siblingDropZone(rect, 180)).toBe("after");
+  it("uses left and right insertion edges for a multi-column grid", () => {
+    const rect = { top: 100, left: 200, width: 120, height: 80 };
+    expect(siblingDropZone(rect, { clientX: 210, clientY: 140 }, "horizontal")).toBe("before");
+    expect(siblingDropZone(rect, { clientX: 310, clientY: 140 }, "horizontal")).toBe("after");
+    expect(siblingDropZone(rect, { clientX: 210, clientY: 140 }, "horizontal", true)).toBe("after");
+  });
+
+  it("uses top and bottom insertion edges for a single-column grid", () => {
+    const rect = { top: 100, left: 200, width: 120, height: 80 };
+    expect(siblingDropZone(rect, { clientX: 260, clientY: 110 }, "vertical")).toBe("before");
+    expect(siblingDropZone(rect, { clientX: 260, clientY: 180 }, "vertical")).toBe("after");
+  });
+
+  it("detects whether sibling cards share a row", () => {
+    expect(siblingDropAxis([
+      { top: 0, left: 0, width: 120, height: 80 },
+      { top: 0, left: 128, width: 120, height: 80 },
+      { top: 88, left: 0, width: 120, height: 80 },
+    ])).toBe("horizontal");
+    expect(siblingDropAxis([
+      { top: 0, left: 0, width: 120, height: 80 },
+      { top: 88, left: 0, width: 120, height: 80 },
+    ])).toBe("vertical");
   });
 
   it("embeds album media while leaving file-section entries as links", () => {

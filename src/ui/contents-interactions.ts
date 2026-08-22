@@ -23,9 +23,27 @@ export function breadcrumbItems(rootLabel: string, path: string): BreadcrumbItem
 }
 export const CONTENTS_MENU_SOURCE = "folder-nodes-contents";
 
-export function siblingDropZone(rect: Pick<DOMRect, "height" | "top">, clientY: number): "before" | "after" {
-  const midpoint = rect.top + Math.max(0, rect.height) / 2;
-  return clientY < midpoint ? "before" : "after";
+export type SiblingDropAxis = "horizontal" | "vertical";
+
+export function siblingDropAxis(rects: readonly Pick<DOMRect, "height" | "left" | "top" | "width">[]): SiblingDropAxis {
+  for (const [index, left] of rects.entries()) {
+    for (const right of rects.slice(index + 1)) {
+      const overlap = Math.min(left.top + left.height, right.top + right.height) - Math.max(left.top, right.top);
+      if (overlap > Math.min(left.height, right.height) / 2 && Math.abs(left.left - right.left) > 1) return "horizontal";
+    }
+  }
+  return "vertical";
+}
+
+export function siblingDropZone(
+  rect: Pick<DOMRect, "height" | "left" | "top" | "width">,
+  point: { clientX: number; clientY: number },
+  axis: SiblingDropAxis,
+  rightToLeft = false,
+): "before" | "after" {
+  if (axis === "vertical") return point.clientY < rect.top + Math.max(0, rect.height) / 2 ? "before" : "after";
+  const leadingHalf = point.clientX < rect.left + Math.max(0, rect.width) / 2;
+  return leadingHalf !== rightToLeft ? "before" : "after";
 }
 
 export function selectionRange(order: readonly string[], anchor: string, target: string): string[] {

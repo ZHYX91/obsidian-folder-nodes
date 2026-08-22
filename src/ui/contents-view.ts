@@ -6,7 +6,9 @@ import {
   formatContentLinks,
   isContextMenuKey,
   selectionRange,
+  siblingDropAxis,
   siblingDropZone,
+  type SiblingDropAxis,
 } from "./contents-interactions";
 import { t } from "./i18n";
 import { normalizeVaultPath } from "../core/paths";
@@ -512,7 +514,8 @@ export class FolderNodeContentsView extends ItemView {
     element.addEventListener("dragover", (event) => {
       if (this.draggedNodePath === null || this.draggedNodePath === target.path) return;
       event.preventDefault();
-      this.markDrop(element, siblingDropZone(element.getBoundingClientRect(), event.clientY));
+      const placement = this.nodeDropPlacement(element, event);
+      this.markDrop(element, placement.zone, placement.axis);
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
     });
     element.addEventListener("dragleave", (event) => this.onDragLeave(event, element));
@@ -521,13 +524,26 @@ export class FolderNodeContentsView extends ItemView {
       if (sourcePath === null || sourcePath === target.path) return;
       event.preventDefault();
       event.stopPropagation();
-      const zone = siblingDropZone(element.getBoundingClientRect(), event.clientY);
+      const { zone } = this.nodeDropPlacement(element, event);
       const siblings = this.service.children(parentPath).filter(({ childPath }) => childPath !== sourcePath);
       const targetIndex = siblings.findIndex(({ childPath }) => childPath === target.path);
       const source = this.service.getFolder(sourcePath);
       this.clearNodeDrag();
       if (source !== null && targetIndex >= 0) this.finishDrop(this.service.placeNode(source, parentPath, targetIndex + (zone === "after" ? 1 : 0)));
     });
+  }
+
+  private nodeDropPlacement(element: HTMLElement, event: DragEvent): { axis: SiblingDropAxis; zone: "after" | "before" } {
+    const shells = element.parentElement === null
+      ? [element]
+      : Array.from(element.parentElement.children).filter((child): child is HTMLElement =>
+        child.instanceOf(HTMLElement) && child.matches(".folder-nodes-node-shell"));
+    const axis = siblingDropAxis(shells.map((shell) => shell.getBoundingClientRect()));
+    const rightToLeft = getComputedStyle(element.parentElement ?? element).direction === "rtl";
+    return {
+      axis,
+      zone: siblingDropZone(element.getBoundingClientRect(), event, axis, rightToLeft),
+    };
   }
 
   private bindContentDragSource(element: HTMLElement, file: TFile, kind: "file" | "media"): void {
@@ -552,11 +568,14 @@ export class FolderNodeContentsView extends ItemView {
     });
   }
 
-  private markDrop(element: HTMLElement, zone: "before" | "after"): void {
+  private markDrop(element: HTMLElement, zone: "before" | "after", axis: SiblingDropAxis): void {
     if (this.dropTarget !== element) this.clearDropTarget();
     this.dropTarget = element;
-    element.removeClass("folder-nodes-drop-before", "folder-nodes-drop-after");
-    element.addClass(`folder-nodes-drop-${zone}`);
+    element.removeClass(
+      "folder-nodes-node-drop-before", "folder-nodes-node-drop-after",
+      "folder-nodes-node-drop-horizontal", "folder-nodes-node-drop-vertical",
+    );
+    element.addClass(`folder-nodes-node-drop-${zone}`, `folder-nodes-node-drop-${axis}`);
   }
 
   private onDragLeave(event: DragEvent, element: HTMLElement): void {
@@ -569,7 +588,10 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private clearDropTarget(): void {
-    this.dropTarget?.removeClass("folder-nodes-drop-before", "folder-nodes-drop-into", "folder-nodes-drop-after");
+    this.dropTarget?.removeClass(
+      "folder-nodes-node-drop-before", "folder-nodes-node-drop-after",
+      "folder-nodes-node-drop-horizontal", "folder-nodes-node-drop-vertical",
+    );
     this.dropTarget = null;
   }
 

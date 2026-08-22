@@ -411,6 +411,39 @@ button.folder-nodes-current:focus-visible {
 
 .folder-nodes-is-dragging { opacity: 0.45; }
 
+.folder-nodes-node-shell.folder-nodes-node-drop-before::before,
+.folder-nodes-node-shell.folder-nodes-node-drop-after::before {
+  position: absolute;
+  z-index: 4;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--background-primary), 0 0 9px var(--interactive-accent);
+  content: "";
+  pointer-events: none;
+}
+
+.folder-nodes-node-shell.folder-nodes-node-drop-horizontal::before {
+  inset-block: 10%;
+  width: 4px;
+}
+
+.folder-nodes-node-shell.folder-nodes-node-drop-horizontal.folder-nodes-node-drop-before::before { inset-inline-start: -6px; }
+.folder-nodes-node-shell.folder-nodes-node-drop-horizontal.folder-nodes-node-drop-after::before { inset-inline-end: -6px; }
+
+.folder-nodes-node-shell.folder-nodes-node-drop-vertical::before {
+  inset-inline: 8%;
+  height: 4px;
+}
+
+.folder-nodes-node-shell.folder-nodes-node-drop-vertical.folder-nodes-node-drop-before::before { inset-block-start: -6px; }
+.folder-nodes-node-shell.folder-nodes-node-drop-vertical.folder-nodes-node-drop-after::before { inset-block-end: -6px; }
+
+.folder-nodes-node-shell.folder-nodes-node-drop-before > .folder-nodes-node-card,
+.folder-nodes-node-shell.folder-nodes-node-drop-after > .folder-nodes-node-card {
+  background: var(--background-modifier-hover);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
 .folder-nodes-node-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
