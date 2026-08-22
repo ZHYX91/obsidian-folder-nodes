@@ -5,6 +5,7 @@ import { createNodeDocument, patchFrontmatterScalar } from "../core/frontmatter"
 import { scanMigration, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, planReorder } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
+import { shouldCreateReconciledNote } from "../core/reconciliation";
 import {
   CHILDREN_SORT_PROPERTY,
   SIBLING_RANK_PROPERTY,
@@ -107,10 +108,19 @@ export class NodeService {
     if (this.isIgnoredPath(folderPath)) throw new Error(`Target belongs to an unmanaged folder: ${folderPath}`);
     const target = this.app.vault.getAbstractFileByPath(folderPath);
     if (target !== null && !(target instanceof TFolder)) throw new Error(`Path already exists: ${folderPath}`);
+    if (target === null && await this.app.vault.adapter.exists(folderPath)) throw new Error(`Path already exists: ${folderPath}`);
     const targetNote = this.app.vault.getAbstractFileByPath(notePath);
     if (targetNote !== null && targetNote !== file) throw new Error(`Path already exists: ${notePath}`);
-    if (target === null) await this.app.vault.createFolder(folderPath);
-    await this.app.fileManager.renameFile(file, notePath);
+    if (targetNote === null && await this.app.vault.adapter.exists(notePath)) throw new Error(`Path already exists: ${notePath}`);
+    this.suppressed.add(folderPath);
+    this.suppressed.add(notePath);
+    try {
+      if (target === null) await this.app.vault.createFolder(folderPath);
+      await this.app.fileManager.renameFile(file, notePath);
+    } finally {
+      this.suppressed.delete(folderPath);
+      this.suppressed.delete(notePath);
+    }
     const result = this.getNote(notePath);
     if (result === null) throw new Error("Converted Node Note was not found");
     return result;
@@ -296,7 +306,7 @@ export class NodeService {
     parentPath = normalizeVaultPath(parentPath);
     const parent = parentPath === "" ? this.app.vault.getRoot() : this.getFolder(parentPath);
     if (parent === null) return [];
-    return parent.children.filter((child): child is TFolder => child instanceof TFolder && !this.isIgnoredPath(child.path)).map((child) => {
+    return parent.children.filter((child): child is TFolder => child instanceof TFolder && !this.isIgnoredPath(child.path) && this.getNote(nodeNotePath(child.path)) !== null).map((child) => {
       const note = this.getNote(nodeNotePath(child.path));
       const frontmatter = note === null ? undefined : this.app.metadataCache.getFileCache(note)?.frontmatter;
       const rawRank: unknown = frontmatter?.[SIBLING_RANK_PROPERTY] as unknown;
@@ -331,7 +341,7 @@ export class NodeService {
     if (this.isIgnoredPath(entry instanceof TFolder ? path : dirname(path))) return;
     if (entry instanceof TFolder) {
       const notePath = nodeNotePath(entry.path);
-      if (this.getNote(notePath) === null) await this.app.vault.create(notePath, "");
+      await this.createReconciledNoteIfAbsent(notePath);
       return;
     }
     if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && !isCanonicalNodeNote(entry.path) && entry.path !== this.rootNotePath() && !this.isLeafNoteExempt(entry.path)) {
@@ -342,7 +352,7 @@ export class NodeService {
   public async reconcileDeleted(path: string): Promise<void> {
     if (this.getSettings().adoptionState !== "managed" || this.isIgnoredPath(dirname(path)) || !isCanonicalNodeNote(path)) return;
     const folderPath = dirname(path);
-    if (this.getFolder(folderPath) !== null && this.getNote(path) === null) await this.app.vault.create(path, "");
+    if (this.getFolder(folderPath) !== null) await this.createReconciledNoteIfAbsent(path);
   }
 
   public async reconcileRenamed(entry: TAbstractFile, oldPath: string): Promise<void> {
@@ -352,7 +362,7 @@ export class NodeService {
     if (this.isIgnoredPath(oldScope)) {
       if (entry instanceof TFolder) {
         const notePath = nodeNotePath(entry.path);
-        if (this.getNote(notePath) === null) await this.app.vault.create(notePath, "");
+        await this.createReconciledNoteIfAbsent(notePath);
       } else {
         await this.reconcileCreated(entry.path);
       }
@@ -378,6 +388,16 @@ export class NodeService {
     if (this.sortMode(parentPath) === "manual") return;
     await this.patchScalar(this.getNote(this.notePathForFolder(parentPath)), CHILDREN_SORT_PROPERTY, "manual");
     await this.applyOrderPatches(materializeManualOrder(this.children(parentPath)).patches);
+  }
+
+  private async createReconciledNoteIfAbsent(path: string): Promise<void> {
+    if (!shouldCreateReconciledNote(this.getNote(path) !== null, await this.app.vault.adapter.exists(path))) return;
+    try {
+      await this.app.vault.create(path, "");
+    } catch (error) {
+      if (await this.app.vault.adapter.exists(path)) return;
+      throw error;
+    }
   }
 
   private async appendRankIfManual(parentPath: string, note: TFile): Promise<void> {

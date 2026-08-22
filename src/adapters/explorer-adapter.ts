@@ -1,8 +1,9 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
-import { ensureExplorerIconPosition, ensureExplorerRootRow, isFolderCollapseControl } from "./explorer-events";
+import { ensureExplorerIconPosition, ensureExplorerRootRow, explorerMarkerPlacement, isFolderCollapseControl } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
+import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import type { FolderNodesSettings, NodeDropZone, NodeVisual } from "../core/types";
 
 export class ExplorerAdapter extends Component {
@@ -15,7 +16,7 @@ export class ExplorerAdapter extends Component {
     private readonly service: NodeService,
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
-    private readonly getRootLabels: () => { root: string; missingNodeNote: string },
+    private readonly getRootLabels: () => { root: string; node: string; nodeConflict: string; missingNodeNote: string; missingNodeFolder: string },
     private readonly reportError: (error: unknown) => void,
   ) { super(); }
 
@@ -58,29 +59,80 @@ export class ExplorerAdapter extends Component {
       if (path === undefined) continue;
       const file = this.app.vault.getAbstractFileByPath(path);
       const parent = file instanceof TFile ? file.parent : null;
-      element.toggleClass("folder-nodes-canonical-note", parent !== null && !this.service.isIgnoredPath(parent.path) && this.service.notePathForFolder(parent.path) === path);
+      const managedParent = parent !== null && !this.service.isIgnoredPath(parent.path);
+      const canonical = managedParent && this.service.notePathForFolder(parent.path) === path;
+      element.toggleClass("folder-nodes-canonical-note", canonical);
+      const counterpartPath = file instanceof TFile && parent !== null ? (parent.path === "" ? file.basename : `${parent.path}/${file.basename}`) : "";
+      const counterpart = this.service.getFolder(counterpartPath);
+      const identity = file instanceof TFile && parent !== null ? classifyFileIdentity({
+        canonicalNodeNote: canonical,
+        counterpartNodeExists: counterpart !== null && this.service.getNote(this.service.notePathForFolder(counterpart.path)) !== null,
+        ignored: !managedParent,
+        leafExempt: this.service.isLeafNoteExempt(file.path),
+        markdown: file.extension.toLocaleLowerCase() === "md",
+      }) : "ordinary";
+      const problem = this.getSettings().adoptionState === "managed" && (identity === "missing-folder" || identity === "conflict");
+      element.toggleClass("folder-nodes-missing-folder-note", problem);
+      let status = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-status-icon");
+      if (!problem) {
+        status?.remove();
+        continue;
+      }
+      if (status === null) status = createSpan({ cls: "folder-nodes-explorer-status-icon is-warning" });
+      const title = element.querySelector<HTMLElement>(":scope > .nav-file-title-content");
+      ensureExplorerIconPosition(element, status, title, "before");
+      if (status.childElementCount === 0) setIcon(status, "file-warning");
+      const label = identity === "conflict" ? this.getRootLabels().nodeConflict : this.getRootLabels().missingNodeFolder;
+      status.setAttr("aria-label", label);
+      status.setAttr("title", label);
     }
     for (const element of document.querySelectorAll<HTMLElement>(".nav-folder-title[data-path]")) {
       const path = element.dataset.path;
       const folder = path === undefined ? null : this.service.getFolder(path);
-      if (folder === null || this.service.isIgnoredPath(folder.path) || this.service.getNote(this.service.notePathForFolder(folder.path)) === null) {
+      if (folder === null) continue;
+      const identity = classifyFolderIdentity(
+        this.service.isIgnoredPath(folder.path),
+        this.service.getNote(this.service.notePathForFolder(folder.path)) !== null,
+      );
+      if (identity === "ordinary") {
         element.querySelector(":scope > .folder-nodes-explorer-icon")?.remove();
+        element.removeClass("folder-nodes-node", "folder-nodes-missing-note");
+        element.removeAttribute("draggable");
+        continue;
+      }
+      element.toggleClass("folder-nodes-node", identity === "node");
+      element.toggleClass("folder-nodes-missing-note", identity === "missing-note");
+      let icon = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-icon");
+      if (icon === null) icon = createSpan({ cls: "folder-nodes-explorer-icon" });
+      const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
+      if (identity === "missing-note") {
+        element.removeAttribute("draggable");
+        icon.removeClass("is-default-node");
+        icon.addClass("is-warning");
+        ensureExplorerIconPosition(element, icon, title, "before");
+        this.renderExplorerMarker(icon, { kind: "lucide", value: "folder-warning", inheritedFrom: null }, this.getRootLabels().missingNodeNote, force);
         continue;
       }
       element.setAttr("draggable", "true");
       const position = this.getSettings().explorerIconPosition;
       const resolved = this.visuals.resolve(folder);
-      let icon = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-icon");
-      if (position === "hidden" || resolved.kind === "fallback") {
-        icon?.remove();
-        continue;
-      }
-      if (icon === null) icon = createSpan({ cls: "folder-nodes-explorer-icon" });
-      const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
-      ensureExplorerIconPosition(element, icon, title, position);
-      if (force || icon.childElementCount === 0) renderVisual(icon, resolved, folder.name);
+      const marker = explorerMarkerPlacement(position, resolved.kind === "fallback");
+      const useDefault = marker.useDefault;
+      const visual: NodeVisual = useDefault ? { kind: "lucide", value: "folder-tree", inheritedFrom: null } : resolved;
+      icon.toggleClass("is-default-node", useDefault);
+      icon.removeClass("is-warning");
+      ensureExplorerIconPosition(element, icon, title, marker.position);
+      this.renderExplorerMarker(icon, visual, `${folder.name} · ${this.getRootLabels().node}`, force);
     }
     this.decorateNoteTitles(force);
+  }
+
+  private renderExplorerMarker(icon: HTMLElement, visual: NodeVisual, label: string, force: boolean): void {
+    const key = `${visual.kind}:${visual.value}:${visual.inheritedFrom ?? ""}:${label}`;
+    if (!force && icon.dataset.visualKey === key && icon.childElementCount > 0) return;
+    renderVisual(icon, visual, label);
+    icon.dataset.visualKey = key;
+    icon.setAttr("title", label);
   }
 
   private decorateRoot(): void {

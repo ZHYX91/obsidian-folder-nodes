@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ensureExplorerIconPosition,
   ensureExplorerRootRow,
+  explorerMarkerPlacement,
   isFolderCollapseControl,
 } from "../../src/adapters/explorer-events";
 
@@ -31,6 +32,12 @@ describe("File Explorer disclosure controls", () => {
 });
 
 describe("File Explorer visual placement", () => {
+  it("retains a default node marker when custom icons are hidden or missing", () => {
+    expect(explorerMarkerPlacement("hidden", false)).toEqual({ position: "before", useDefault: true });
+    expect(explorerMarkerPlacement("after", true)).toEqual({ position: "after", useDefault: true });
+    expect(explorerMarkerPlacement("after", false)).toEqual({ position: "after", useDefault: false });
+  });
+
   it("stops mutating after an icon reaches its requested position", async () => {
     const row = document.createElement("div");
     const title = document.createElement("span");

@@ -27,6 +27,16 @@ export function ensureExplorerIconPosition(
   return true;
 }
 
+export function explorerMarkerPlacement(
+  configured: "after" | "before" | "hidden",
+  fallbackVisual: boolean,
+): { position: "after" | "before"; useDefault: boolean } {
+  return {
+    position: configured === "after" ? "after" : "before",
+    useDefault: configured === "hidden" || fallbackVisual,
+  };
+}
+
 export interface ExplorerRootRow {
   row: HTMLElement;
   icon: HTMLElement;

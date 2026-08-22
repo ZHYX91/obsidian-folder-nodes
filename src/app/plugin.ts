@@ -4,6 +4,7 @@ import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
 import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
+import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import { normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import type { FolderNodesSettings } from "../core/types";
 import { DEFAULT_SETTINGS, normalizeSettings } from "../shared/settings";
@@ -22,6 +23,10 @@ export default class FolderNodesPlugin extends Plugin {
   public visuals!: VisualService;
   private explorer!: ExplorerAdapter;
   private reconcileBatches = new Map<string, { timer: number; entries: Map<string, "create" | "delete"> }>();
+  private reconciliationReady = false;
+  private reconcileNoticeTimer: number | null = null;
+  private reconcileErrorCount = 0;
+  private reconcileErrorMessages = new Set<string>();
 
   public override async onload(): Promise<void> {
     this.settings = normalizeSettings(await this.loadData());
@@ -33,7 +38,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.service,
       this.visuals,
       () => this.settings,
-      () => ({ root: t("root"), missingNodeNote: t("missingNodeNote") }),
+      () => ({ root: t("root"), node: t("node"), nodeConflict: t("nodeConflict"), missingNodeNote: t("missingNodeNote"), missingNodeFolder: t("missingNodeFolder") }),
       (error) => new Notice(formatError(error), 8000),
     );
     this.addChild(this.explorer);
@@ -56,6 +61,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvents();
     this.app.workspace.onLayoutReady(() => {
       this.explorer.start();
+      this.reconciliationReady = true;
       if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) void this.openHomepage();
     });
   }
@@ -63,6 +69,8 @@ export default class FolderNodesPlugin extends Plugin {
   public override onunload(): void {
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
     this.reconcileBatches.clear();
+    if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
+    this.reconcileNoticeTimer = null;
   }
 
   public async saveSettings(): Promise<void> { await this.saveData(this.settings); }
@@ -112,6 +120,12 @@ export default class FolderNodesPlugin extends Plugin {
 
   public openProblemMenu(anchor: ContentsMenuAnchor, entry: TFolder | TFile): void {
     const menu = new Menu();
+    this.addProblemMenuItems(menu, entry);
+    this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
+    this.showMenu(menu, anchor);
+  }
+
+  private addProblemMenuItems(menu: Menu, entry: TFolder | TFile): void {
     if (entry instanceof TFolder) {
       menu.addItem((item) => item.setTitle(t("createMissingNodeNote")).setIcon("file-plus").onClick(() => {
         void this.runRepair(async () => { await this.service.createMissingNodeNote(entry); });
@@ -136,8 +150,6 @@ export default class FolderNodesPlugin extends Plugin {
         void this.addLeafExemption(entry.path);
       }));
     }
-    this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
-    this.showMenu(menu, anchor);
   }
 
   private async createAndOpenMissingNote(folder: TFolder): Promise<void> {
@@ -209,7 +221,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("create", (entry) => this.scheduleReconcile(entry.path, "create")));
     this.registerEvent(this.app.vault.on("delete", (entry) => this.scheduleReconcile(entry.path, "delete")));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
-      void this.service.reconcileRenamed(entry, oldPath).catch((error) => new Notice(formatError(error), 8000));
+      if (this.reconciliationReady) void this.service.reconcileRenamed(entry, oldPath).catch((error) => this.reportReconcileError(error));
     }));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, entry, source) => {
       if (source !== CONTENTS_MENU_SOURCE) this.addContextMenu(menu, entry);
@@ -226,6 +238,7 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private scheduleReconcile(path: string, kind: "create" | "delete"): void {
+    if (!this.reconciliationReady) return;
     const key = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path;
     const existing = this.reconcileBatches.get(key);
     if (existing !== undefined) window.clearTimeout(existing.timer);
@@ -235,21 +248,68 @@ export default class FolderNodesPlugin extends Plugin {
       this.reconcileBatches.delete(key);
       void (async () => {
         for (const [entryPath, entryKind] of entries) {
-          if (entryKind === "create") await this.service.reconcileCreated(entryPath);
-          else await this.service.reconcileDeleted(entryPath);
+          try {
+            if (entryKind === "create") await this.service.reconcileCreated(entryPath);
+            else await this.service.reconcileDeleted(entryPath);
+          } catch (error) {
+            this.reportReconcileError(error);
+          }
         }
         this.refreshVisuals();
-      })().catch((error) => new Notice(formatError(error), 8000));
+      })();
     }, 750);
     this.reconcileBatches.set(key, { timer, entries });
   }
 
+  private reportReconcileError(error: unknown): void {
+    this.reconcileErrorCount += 1;
+    this.reconcileErrorMessages.add(formatError(error));
+    if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
+    this.reconcileNoticeTimer = window.setTimeout(() => {
+      const messages = [...this.reconcileErrorMessages];
+      const message = this.reconcileErrorCount === 1
+        ? messages[0] ?? t("errorGeneric", { message: "Unknown reconciliation error" })
+        : t("reconcileErrorsSummary", { count: this.reconcileErrorCount, message: messages[0] ?? "" });
+      new Notice(message, 8000);
+      this.reconcileErrorCount = 0;
+      this.reconcileErrorMessages.clear();
+      this.reconcileNoticeTimer = null;
+    }, 1000);
+  }
+
   private addContextMenu(menu: Menu, entry: TAbstractFile): void {
     if (!(entry instanceof TFile) && !(entry instanceof TFolder)) return;
-    const folder = entry instanceof TFolder ? entry : this.service.folderForFile(entry);
-    if (folder === null || this.service.isIgnoredPath(folder.path)) return;
-    menu.addSeparator();
-    this.addNodeMenuItems(menu, folder, true);
+    if (entry instanceof TFolder) {
+      const identity = classifyFolderIdentity(
+        this.service.isIgnoredPath(entry.path),
+        this.service.getNote(this.service.notePathForFolder(entry.path)) !== null,
+      );
+      if (identity === "ordinary") return;
+      menu.addSeparator();
+      if (identity === "missing-note") this.addProblemMenuItems(menu, entry);
+      else this.addNodeMenuItems(menu, entry, true);
+      return;
+    }
+    const folder = this.service.folderForFile(entry);
+    if (folder === null) return;
+    const counterpartPath = folder.path === "" ? entry.basename : `${folder.path}/${entry.basename}`;
+    const counterpart = this.service.getFolder(counterpartPath);
+    const identity = classifyFileIdentity({
+      canonicalNodeNote: entry.path === this.service.notePathForFolder(folder.path),
+      counterpartNodeExists: counterpart !== null && this.service.getNote(this.service.notePathForFolder(counterpart.path)) !== null,
+      ignored: this.service.isIgnoredPath(folder.path),
+      leafExempt: this.service.isLeafNoteExempt(entry.path),
+      markdown: entry.extension.toLocaleLowerCase() === "md",
+    });
+    if (identity === "node-note") {
+      menu.addSeparator();
+      this.addNodeMenuItems(menu, folder, true);
+      return;
+    }
+    if (identity === "missing-folder" || identity === "conflict") {
+      menu.addSeparator();
+      this.addProblemMenuItems(menu, entry);
+    }
   }
 
   private addNodeMenuItems(menu: Menu, folder: TFolder, includeContents: boolean): void {
