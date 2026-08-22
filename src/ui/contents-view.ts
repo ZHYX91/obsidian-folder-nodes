@@ -5,6 +5,7 @@ import {
   type ContentLinkItem,
   formatContentLinks,
   isContextMenuKey,
+  nodeEntryVisual,
   selectionRange,
   siblingDropAxis,
   siblingDropZone,
@@ -237,13 +238,14 @@ export class FolderNodeContentsView extends ItemView {
     const grid = section.createDiv({ cls: "folder-nodes-node-grid" });
     for (const item of entries.slice(0, this.visibleLimit)) {
       const entry = item.entry;
-      const visual = item.kind === "healthy" && entry instanceof TFolder ? this.visuals.resolve(entry) : null;
+      const resolved = item.kind === "healthy" && entry instanceof TFolder ? this.visuals.resolve(entry) : null;
+      const presentation = nodeEntryVisual(item.kind, resolved);
       const shell = grid.createDiv({ cls: `folder-nodes-entry-shell folder-nodes-node-shell${item.kind === "healthy" ? "" : " is-problem"}` });
-      const card = shell.createEl("button", { cls: `folder-nodes-node-card${visual === null || visual.kind === "fallback" ? " has-no-visual" : ""}` });
-      if (visual !== null && visual.kind !== "fallback") {
-        const preview = card.createSpan({ cls: "folder-nodes-node-visual" });
-        renderVisual(preview, visual, entry.name);
-      }
+      const card = shell.createEl("button", { cls: "folder-nodes-node-card" });
+      const preview = card.createSpan({
+        cls: `folder-nodes-node-visual${presentation.defaultVisual ? " is-default" : ""}${presentation.warning ? " is-warning" : ""}`,
+      });
+      renderVisual(preview, presentation.visual, entry.name);
       card.createSpan({ cls: "folder-nodes-card-title", text: entry instanceof TFile ? entry.basename : entry.name, attr: { title: entry.name } });
       if (item.kind !== "healthy") card.createSpan({
         cls: "folder-nodes-status-badge is-warning",

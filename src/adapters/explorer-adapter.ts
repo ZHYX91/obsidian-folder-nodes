@@ -1,6 +1,6 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
-import { ensureExplorerIconPosition, ensureExplorerRootRow, explorerMarkerPlacement, isFolderCollapseControl, syncExplorerNodeOrder } from "./explorer-events";
+import { ensureExplorerIconPosition, ensureExplorerRootRow, explorerMarkerPlacement, isFolderCollapseControl, setNativeCreateActionsHidden, syncExplorerNodeOrder } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
@@ -9,6 +9,7 @@ import type { FolderNodesSettings, NodeDropZone, NodeVisual } from "../core/type
 export class ExplorerAdapter extends Component {
   private observer: MutationObserver | null = null;
   private draggedPath: string | null = null;
+  private selectedFolderPath: string | null = null;
   private dropTarget: HTMLElement | null = null;
 
   public constructor(
@@ -16,7 +17,11 @@ export class ExplorerAdapter extends Component {
     private readonly service: NodeService,
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
-    private readonly getRootLabels: () => { root: string; node: string; nodeConflict: string; missingNodeNote: string; missingNodeFolder: string },
+    private readonly getRootLabels: () => {
+      createNode: string; missingNodeFolder: string; missingNodeNote: string; newFolder: string; newNote: string;
+      node: string; nodeConflict: string; root: string;
+    },
+    private readonly createNode: (parentPath: string) => void,
     private readonly notifyChanged: () => void,
     private readonly reportError: (error: unknown) => void,
   ) { super(); }
@@ -55,6 +60,7 @@ export class ExplorerAdapter extends Component {
 
   private decorate(force = false): void {
     this.decorateRoot();
+    this.decorateCreateActions();
     for (const element of document.querySelectorAll<HTMLElement>(".nav-file-title[data-path]")) {
       const path = element.dataset.path;
       if (path === undefined) continue;
@@ -129,6 +135,43 @@ export class ExplorerAdapter extends Component {
     this.decorateNoteTitles(force);
   }
 
+  private decorateCreateActions(): void {
+    const labels = this.getRootLabels();
+    const nativeLabels = new Set([labels.newNote, labels.newFolder, "New note", "New folder", "新建笔记", "新建文件夹"]);
+    const parentPath = this.createParentPath();
+    const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
+    const managed = this.getSettings().adoptionState === "managed" && parent !== null && !this.service.isIgnoredPath(parent.path);
+    const containers = new Set<HTMLElement>();
+    for (const files of document.querySelectorAll<HTMLElement>(".nav-files-container")) {
+      const actions = files.closest<HTMLElement>(".workspace-leaf-content")?.querySelector<HTMLElement>(".nav-header .nav-buttons-container");
+      if (actions !== null && actions !== undefined) containers.add(actions);
+    }
+    for (const container of containers) {
+      let button = container.querySelector<HTMLButtonElement>(":scope > .folder-nodes-create-node");
+      if (button === null) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.className = "clickable-icon nav-action-button folder-nodes-create-node";
+        setIcon(button, "folder-tree");
+        button.addEventListener("click", () => {
+          const path = button?.dataset.parentPath;
+          if (path !== undefined) this.createNode(path);
+        });
+        container.prepend(button);
+      }
+      button.dataset.parentPath = parent?.path ?? "";
+      button.setAttribute("aria-label", labels.createNode);
+      button.setAttribute("title", labels.createNode);
+      button.classList.toggle("is-hidden", !managed);
+      setNativeCreateActionsHidden(container, nativeLabels, managed);
+    }
+  }
+
+  private createParentPath(): string {
+    if (this.selectedFolderPath !== null && this.service.getFolder(this.selectedFolderPath) !== null) return this.selectedFolderPath;
+    return this.app.workspace.getActiveFile()?.parent?.path ?? "";
+  }
+
   private syncNodeOrder(): void {
     for (const container of document.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children")) {
       const parentPath = container.matches(".nav-files-container")
@@ -191,14 +234,27 @@ export class ExplorerAdapter extends Component {
   private onClick(event: MouseEvent): void {
     if (!(event.target instanceof Element)) return;
     if (event.target.closest(".folder-nodes-explorer-root") !== null) {
+      this.selectedFolderPath = "";
+      this.decorateCreateActions();
       event.preventDefault();
       event.stopPropagation();
       void this.service.openFolderNode("", event.ctrlKey || event.metaKey);
       return;
     }
-    if (isFolderCollapseControl(event.target)) return;
     const title = event.target.closest<HTMLElement>(".nav-folder-title[data-path]");
     const path = title?.dataset.path;
+    if (path !== undefined) {
+      this.selectedFolderPath = path;
+      this.decorateCreateActions();
+    } else {
+      const filePath = event.target.closest<HTMLElement>(".nav-file-title[data-path]")?.dataset.path;
+      const file = filePath === undefined ? null : this.app.vault.getAbstractFileByPath(filePath);
+      if (file instanceof TFile) {
+        this.selectedFolderPath = file.parent?.path ?? "";
+        this.decorateCreateActions();
+      }
+    }
+    if (isFolderCollapseControl(event.target)) return;
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getNote(this.service.notePathForFolder(path)) === null) return;
     event.preventDefault();
     event.stopPropagation();

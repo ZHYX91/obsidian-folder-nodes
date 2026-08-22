@@ -1,4 +1,5 @@
 import { normalizeVaultPath } from "../core/paths";
+import type { NodeVisual } from "../core/types";
 
 export interface BreadcrumbItem {
   current: boolean;
@@ -22,6 +23,26 @@ export function breadcrumbItems(rootLabel: string, path: string): BreadcrumbItem
   return items;
 }
 export const CONTENTS_MENU_SOURCE = "folder-nodes-contents";
+
+export type NodeEntryVisualKind = "conflict" | "healthy" | "missing-folder" | "missing-note";
+
+export function nodeEntryVisual(
+  kind: NodeEntryVisualKind,
+  resolved: NodeVisual | null,
+): { defaultVisual: boolean; visual: NodeVisual; warning: boolean } {
+  if (kind === "healthy" && resolved !== null && resolved.kind !== "fallback") {
+    return { defaultVisual: false, visual: resolved, warning: false };
+  }
+  return {
+    defaultVisual: true,
+    visual: {
+      kind: "lucide",
+      value: kind === "missing-note" ? "folder-warning" : kind === "healthy" ? "folder-tree" : "file-warning",
+      inheritedFrom: null,
+    },
+    warning: kind !== "healthy",
+  };
+}
 
 export type SiblingDropAxis = "horizontal" | "vertical";
 

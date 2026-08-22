@@ -65,6 +65,17 @@ export function syncExplorerNodeOrder(container: HTMLElement, orderedPaths: read
   return true;
 }
 
+export function setNativeCreateActionsHidden(container: HTMLElement, labels: ReadonlySet<string>, hidden: boolean): number {
+  let matched = 0;
+  for (const action of container.querySelectorAll<HTMLElement>(":scope > [aria-label]")) {
+    const label = action.getAttribute("aria-label");
+    if (label === null || !labels.has(label)) continue;
+    action.classList.toggle("folder-nodes-native-create-hidden", hidden);
+    matched += 1;
+  }
+  return matched;
+}
+
 export interface ExplorerRootRow {
   row: HTMLElement;
   icon: HTMLElement;

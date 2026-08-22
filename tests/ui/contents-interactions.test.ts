@@ -4,6 +4,7 @@ import {
   breadcrumbItems,
   formatContentLinks,
   isContextMenuKey,
+  nodeEntryVisual,
   selectionRange,
   siblingDropAxis,
   siblingDropZone,
@@ -50,6 +51,21 @@ describe("Node Contents interactions", () => {
       { top: 0, left: 0, width: 120, height: 80 },
       { top: 88, left: 0, width: 120, height: 80 },
     ])).toBe("vertical");
+  });
+
+  it("keeps a stable visual slot for nodes without a custom icon", () => {
+    expect(nodeEntryVisual("healthy", { kind: "fallback", value: "", inheritedFrom: null })).toEqual({
+      defaultVisual: true,
+      visual: { kind: "lucide", value: "folder-tree", inheritedFrom: null },
+      warning: false,
+    });
+    expect(nodeEntryVisual("missing-note", null)).toEqual({
+      defaultVisual: true,
+      visual: { kind: "lucide", value: "folder-warning", inheritedFrom: null },
+      warning: true,
+    });
+    const custom = { kind: "emoji" as const, value: "☕", inheritedFrom: null };
+    expect(nodeEntryVisual("healthy", custom)).toEqual({ defaultVisual: false, visual: custom, warning: false });
   });
 
   it("embeds album media while leaving file-section entries as links", () => {

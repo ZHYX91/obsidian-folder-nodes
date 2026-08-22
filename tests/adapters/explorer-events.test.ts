@@ -4,6 +4,7 @@ import {
   ensureExplorerRootRow,
   explorerMarkerPlacement,
   isFolderCollapseControl,
+  setNativeCreateActionsHidden,
   syncExplorerNodeOrder,
 } from "../../src/adapters/explorer-events";
 
@@ -135,5 +136,27 @@ describe("File Explorer node ordering", () => {
     expect(callbacks).toBe(1);
     expect(Array.from(container.children)).toEqual([first, second]);
     observer.disconnect();
+  });
+});
+
+describe("File Explorer create actions", () => {
+  it("hides only the native create actions in a managed context", () => {
+    const container = document.createElement("div");
+    const note = document.createElement("button");
+    note.setAttribute("aria-label", "新建笔记");
+    const folder = document.createElement("button");
+    folder.setAttribute("aria-label", "新建文件夹");
+    const sort = document.createElement("button");
+    sort.setAttribute("aria-label", "排序");
+    container.append(note, folder, sort);
+
+    expect(setNativeCreateActionsHidden(container, new Set(["新建笔记", "新建文件夹"]), true)).toBe(2);
+    expect(note.classList.contains("folder-nodes-native-create-hidden")).toBe(true);
+    expect(folder.classList.contains("folder-nodes-native-create-hidden")).toBe(true);
+    expect(sort.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
+
+    setNativeCreateActionsHidden(container, new Set(["新建笔记", "新建文件夹"]), false);
+    expect(note.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
+    expect(folder.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
   });
 });

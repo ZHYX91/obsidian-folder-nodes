@@ -5,7 +5,7 @@ import { createNodeDocument, patchFrontmatterScalar } from "../core/frontmatter"
 import { scanMigration, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, planReorder } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
-import { shouldCreateReconciledNote } from "../core/reconciliation";
+import { folderRenameReconciliation, shouldCreateReconciledNote } from "../core/reconciliation";
 import {
   CHILDREN_SORT_PROPERTY,
   SIBLING_RANK_PROPERTY,
@@ -372,7 +372,9 @@ export class NodeService {
       const oldName = basename(oldPath);
       const staleNote = this.getNote(`${entry.path}/${oldName}.md`);
       const canonicalPath = nodeNotePath(entry.path);
-      if (staleNote !== null && this.getNote(canonicalPath) === null) await this.app.fileManager.renameFile(staleNote, canonicalPath);
+      const action = folderRenameReconciliation(this.getNote(canonicalPath) !== null, staleNote !== null);
+      if (action === "rename-stale" && staleNote !== null) await this.app.fileManager.renameFile(staleNote, canonicalPath);
+      else if (action === "create-canonical") await this.createReconciledNoteIfAbsent(canonicalPath);
       return;
     }
     if (entry instanceof TFile && isCanonicalNodeNote(oldPath) && entry.parent !== null && dirname(entry.path) === dirname(oldPath) && !isCanonicalNodeNote(entry.path)) {

@@ -146,6 +146,8 @@
 
 .folder-nodes-visual-presets > button { min-width: 44px; min-height: 36px; }
 .folder-nodes-canonical-note { display: none !important; }
+.folder-nodes-native-create-hidden,
+.folder-nodes-create-node.is-hidden { display: none !important; }
 
 .folder-nodes-explorer-root {
   position: sticky;
@@ -473,12 +475,6 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-album-card:hover,
 .folder-nodes-file-row:hover { background: var(--background-modifier-hover); }
 
-.folder-nodes-node-card.has-no-visual {
-  min-height: 44px;
-  align-items: flex-start;
-  text-align: start;
-}
-
 .folder-nodes-node-visual {
   display: flex;
   width: 36px;
@@ -487,6 +483,9 @@ button.folder-nodes-current:focus-visible {
   justify-content: center;
   color: var(--text-muted);
 }
+
+.folder-nodes-node-visual.is-default { color: var(--text-faint); }
+.folder-nodes-node-visual.is-warning { color: var(--color-orange); }
 
 .folder-nodes-node-visual .folder-nodes-visual { width: 36px; height: 36px; }
 .folder-nodes-visual { display: inline-flex; align-items: center; justify-content: center; }
@@ -668,7 +667,7 @@ button.folder-nodes-current:focus-visible {
 
 @container (max-width: 320px) {
   .folder-nodes-node-grid { grid-template-columns: 1fr; }
-  .folder-nodes-node-card { min-height: 44px; flex-direction: row; justify-content: flex-start; text-align: start; }
+  .folder-nodes-node-card { min-height: 44px; flex-direction: row; justify-content: flex-start; padding-inline: 44px; text-align: start; }
   .folder-nodes-node-visual { flex: 0 0 28px; width: 28px; height: 28px; }
   .folder-nodes-node-visual .folder-nodes-visual { width: 28px; height: 28px; }
   .folder-nodes-album-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

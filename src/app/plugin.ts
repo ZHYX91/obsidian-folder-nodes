@@ -38,7 +38,14 @@ export default class FolderNodesPlugin extends Plugin {
       this.service,
       this.visuals,
       () => this.settings,
-      () => ({ root: t("root"), node: t("node"), nodeConflict: t("nodeConflict"), missingNodeNote: t("missingNodeNote"), missingNodeFolder: t("missingNodeFolder") }),
+      () => ({
+        createNode: t("createNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
+        newFolder: t("newFolder"), newNote: t("newNote"), node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"),
+      }),
+      (parentPath) => {
+        const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
+        if (parent !== null) this.promptCreateChild(parent);
+      },
       () => this.refreshVisuals(),
       (error) => new Notice(formatError(error), 8000),
     );
@@ -223,7 +230,9 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("create", (entry) => this.scheduleReconcile(entry.path, "create")));
     this.registerEvent(this.app.vault.on("delete", (entry) => this.scheduleReconcile(entry.path, "delete")));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
-      if (this.reconciliationReady) void this.service.reconcileRenamed(entry, oldPath).catch((error) => this.reportReconcileError(error));
+      if (this.reconciliationReady) void this.service.reconcileRenamed(entry, oldPath)
+        .then(() => this.refreshVisuals())
+        .catch((error) => this.reportReconcileError(error));
     }));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, entry, source) => {
       if (source !== CONTENTS_MENU_SOURCE) this.addContextMenu(menu, entry);
