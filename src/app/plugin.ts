@@ -130,7 +130,7 @@ export default class FolderNodesPlugin extends Plugin {
   public openProblemMenu(anchor: ContentsMenuAnchor, entry: TFolder | TFile): void {
     const menu = new Menu();
     this.addProblemMenuItems(menu, entry);
-    this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
+    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(entry)));
     this.showMenu(menu, anchor);
   }
 
@@ -173,9 +173,9 @@ export default class FolderNodesPlugin extends Plugin {
     menu.addItem((item) => item.setTitle(t("open")).setIcon("file-text").onClick(() => void this.service.openFolderNode(folder.path)));
     menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => void this.service.openFolderNode(folder.path, true)));
     menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(folder)));
+    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(folder)));
     menu.addSeparator();
     this.addNodeMenuItems(menu, folder, false);
-    this.app.workspace.trigger("file-menu", menu, folder, CONTENTS_MENU_SOURCE);
     this.showMenu(menu, anchor);
   }
 
