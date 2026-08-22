@@ -37,11 +37,27 @@ export function nodeEntryVisual(
     defaultVisual: true,
     visual: {
       kind: "lucide",
-      value: kind === "missing-note" ? "folder-warning" : kind === "healthy" ? "folder-tree" : "file-warning",
+      value: kind === "missing-note" || kind === "healthy" ? "folder-tree" : "file-warning",
       inheritedFrom: null,
     },
     warning: kind !== "healthy",
   };
+}
+
+export function referencedVaultPaths(
+  resolvedLinks: Readonly<Record<string, Readonly<Record<string, number>>>>,
+): Set<string> {
+  const referenced = new Set<string>();
+  for (const targets of Object.values(resolvedLinks)) {
+    for (const [path, count] of Object.entries(targets)) {
+      if (count > 0) referenced.add(normalizeVaultPath(path));
+    }
+  }
+  return referenced;
+}
+
+export function filesSectionKey(hasFolders: boolean): "files" | "filesAndFolders" {
+  return hasFolders ? "filesAndFolders" : "files";
 }
 
 export type SiblingDropAxis = "horizontal" | "vertical";

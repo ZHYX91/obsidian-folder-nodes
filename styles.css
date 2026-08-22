@@ -176,6 +176,7 @@
 }
 
 .folder-nodes-explorer-icon {
+  position: relative;
   display: inline-flex;
   flex: 0 0 16px;
   align-items: center;
@@ -186,14 +187,52 @@
   color: var(--text-muted);
   line-height: 1;
   vertical-align: middle;
+  overflow: visible;
 }
 
 .folder-nodes-explorer-icon .folder-nodes-visual,
 .folder-nodes-explorer-icon img { width: 16px; height: 16px; }
 .folder-nodes-explorer-icon .folder-nodes-visual-emoji { font-size: 14px; }
 .folder-nodes-explorer-icon.is-default-node { color: var(--text-faint); }
-.folder-nodes-explorer-icon.is-warning,
 .folder-nodes-explorer-status-icon.is-warning { color: var(--color-orange); }
+
+.folder-nodes-explorer-icon.is-warning { color: var(--text-faint); }
+.folder-nodes-explorer-icon.is-warning::after,
+.folder-nodes-node-visual.is-missing-note::after {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-orange);
+  color: white;
+  font-weight: 700;
+  line-height: 1;
+  content: "!";
+  pointer-events: none;
+}
+
+.folder-nodes-explorer-icon.is-warning::after {
+  inset-block-start: -4px;
+  inset-inline-end: -5px;
+  width: 11px;
+  height: 11px;
+  font-size: 8px;
+  box-shadow: 0 0 0 1px var(--background-secondary);
+}
+
+.folder-nodes-explorer-problem-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin-inline-start: 4px;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  background: rgba(var(--color-orange-rgb), 0.12);
+  color: var(--color-orange);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.45;
+}
 
 .folder-nodes-explorer-status-icon {
   display: inline-flex;
@@ -244,7 +283,7 @@
 }
 
 .folder-nodes-node-shell.is-problem .folder-nodes-node-card {
-  border-color: var(--color-orange);
+  border-color: rgba(var(--color-orange-rgb), 0.55);
 }
 
 .folder-nodes-status-badge {
@@ -476,6 +515,7 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-file-row:hover { background: var(--background-modifier-hover); }
 
 .folder-nodes-node-visual {
+  position: relative;
   display: flex;
   width: 36px;
   height: 36px;
@@ -486,6 +526,16 @@ button.folder-nodes-current:focus-visible {
 
 .folder-nodes-node-visual.is-default { color: var(--text-faint); }
 .folder-nodes-node-visual.is-warning { color: var(--color-orange); }
+.folder-nodes-node-visual.is-missing-note { color: var(--text-faint); }
+
+.folder-nodes-node-visual.is-missing-note::after {
+  inset-block-start: -3px;
+  inset-inline-end: -5px;
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
+  box-shadow: 0 0 0 2px var(--background-primary);
+}
 
 .folder-nodes-node-visual .folder-nodes-visual { width: 36px; height: 36px; }
 .folder-nodes-visual { display: inline-flex; align-items: center; justify-content: center; }
@@ -560,6 +610,24 @@ button.folder-nodes-current:focus-visible {
   font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
+
+.folder-nodes-unreferenced-marker {
+  position: absolute;
+  z-index: 1;
+  inset-block-end: 4px;
+  inset-inline-start: 4px;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 62%);
+  color: rgb(255 255 255 / 78%);
+}
+
+.folder-nodes-unreferenced-marker > svg { width: 14px; height: 14px; }
 
 .folder-nodes-album-title {
   display: block;
@@ -655,6 +723,16 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-file-icon { flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-muted); }
 .folder-nodes-file-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-nodes-file-extension { flex: 0 0 auto; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.folder-nodes-unreferenced-file {
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+}
+.folder-nodes-unreferenced-file > svg { width: 14px; height: 14px; }
 
 .folder-nodes-file-shell > .folder-nodes-entry-menu {
   inset-block-start: 50%;

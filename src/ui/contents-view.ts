@@ -4,8 +4,10 @@ import {
   breadcrumbItems,
   type ContentLinkItem,
   formatContentLinks,
+  filesSectionKey,
   isContextMenuKey,
   nodeEntryVisual,
+  referencedVaultPaths,
   selectionRange,
   siblingDropAxis,
   siblingDropZone,
@@ -147,12 +149,13 @@ export class FolderNodeContentsView extends ItemView {
     this.selectableOrder = [...this.selectableKinds.keys()];
     const selectable = new Set(this.selectableOrder);
     for (const path of this.selectedContent.keys()) if (!selectable.has(path)) this.selectedContent.delete(path);
+    const referencedPaths = referencedVaultPaths(this.app.metadataCache.resolvedLinks);
     this.renderBreadcrumb(container, folder);
     this.renderHeader(container, folder, this.selectableOrder.length > 0);
     if (this.selectionMode) this.renderSelectionToolbar(container);
     this.renderNodes(container, nodeEntries, folderPath);
-    this.renderAlbum(container, album);
-    this.renderFiles(container, ordinaryFiles);
+    this.renderAlbum(container, album, referencedPaths);
+    this.renderFiles(container, ordinaryFiles, referencedPaths);
   }
 
   private renderInitializationNotice(container: HTMLElement): void {
@@ -240,17 +243,18 @@ export class FolderNodeContentsView extends ItemView {
       const entry = item.entry;
       const resolved = item.kind === "healthy" && entry instanceof TFolder ? this.visuals.resolve(entry) : null;
       const presentation = nodeEntryVisual(item.kind, resolved);
+      const problemLabel = item.kind === "missing-note" ? t("missingNodeNote") : item.kind === "conflict" ? t("nodeConflict") : t("missingNodeFolder");
       const shell = grid.createDiv({ cls: `folder-nodes-entry-shell folder-nodes-node-shell${item.kind === "healthy" ? "" : " is-problem"}` });
       const card = shell.createEl("button", { cls: "folder-nodes-node-card" });
+      if (item.kind !== "healthy") {
+        card.setAttr("aria-label", `${entry.name} · ${problemLabel}`);
+        card.setAttr("title", problemLabel);
+      }
       const preview = card.createSpan({
-        cls: `folder-nodes-node-visual${presentation.defaultVisual ? " is-default" : ""}${presentation.warning ? " is-warning" : ""}`,
+        cls: `folder-nodes-node-visual${presentation.defaultVisual ? " is-default" : ""}${presentation.warning ? " is-warning" : ""}${item.kind === "missing-note" ? " is-missing-note" : ""}`,
       });
       renderVisual(preview, presentation.visual, entry.name);
       card.createSpan({ cls: "folder-nodes-card-title", text: entry instanceof TFile ? entry.basename : entry.name, attr: { title: entry.name } });
-      if (item.kind !== "healthy") card.createSpan({
-        cls: "folder-nodes-status-badge is-warning",
-        text: item.kind === "missing-note" ? t("missingNodeNote") : item.kind === "conflict" ? t("nodeConflict") : t("missingNodeFolder"),
-      });
       card.addEventListener("click", (event) => {
         if (item.kind === "healthy" && entry instanceof TFolder) void this.service.openFolderNode(entry.path, event.ctrlKey || event.metaKey);
         else if (entry instanceof TFolder) this.setFolder(entry.path);
@@ -276,7 +280,7 @@ export class FolderNodeContentsView extends ItemView {
     this.more(section, entries.length);
   }
 
-  private renderAlbum(container: HTMLElement, entries: readonly TFile[]): void {
+  private renderAlbum(container: HTMLElement, entries: readonly TFile[], referencedPaths: ReadonlySet<string>): void {
     const section = this.section(container, `${t("album")} (${entries.length})`);
     const grid = section.createDiv({ cls: "folder-nodes-album-grid" });
     for (const entry of entries.slice(0, this.visibleLimit)) {
@@ -297,6 +301,13 @@ export class FolderNodeContentsView extends ItemView {
         setIcon(icon, "video");
         preview.createSpan({ cls: "folder-nodes-media-badge", text: extension.toLocaleUpperCase() || t("video") });
       }
+      if (!referencedPaths.has(normalizeVaultPath(entry.path))) {
+        const marker = preview.createSpan({
+          cls: "folder-nodes-unreferenced-marker",
+          attr: { "aria-label": t("unreferenced"), title: t("unreferenced") },
+        });
+        setIcon(marker, "link-2-off");
+      }
       if (this.selectionMode) this.renderSelectionIndicator(preview, entry.path);
       card.createSpan({ cls: "folder-nodes-album-title", text: entry.basename, attr: { title: entry.name } });
       card.addEventListener("click", (event) => {
@@ -310,8 +321,9 @@ export class FolderNodeContentsView extends ItemView {
     this.more(section, entries.length);
   }
 
-  private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[]): void {
-    const section = this.section(container, `${t("files")} (${entries.length})`);
+  private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[], referencedPaths: ReadonlySet<string>): void {
+    const hasFolders = entries.some((entry) => entry instanceof TFolder);
+    const section = this.section(container, `${t(filesSectionKey(hasFolders))} (${entries.length})`);
     const list = section.createDiv({ cls: "folder-nodes-file-list" });
     for (const entry of entries.slice(0, this.visibleLimit)) {
       const shell = list.createDiv({ cls: "folder-nodes-entry-shell folder-nodes-file-shell" });
@@ -325,9 +337,16 @@ export class FolderNodeContentsView extends ItemView {
       if (entry instanceof TFolder) setIcon(icon, "folder");
       else setIcon(icon, FILE_ICONS[entry.extension.toLocaleLowerCase()] ?? "file");
       row.createSpan({ cls: "folder-nodes-file-name", text: entry.name, attr: { title: entry.name } });
-      if (entry instanceof TFolder && this.service.isIgnoredPath(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge", text: t("unmanaged") });
+      if (entry instanceof TFolder && this.service.isIgnoredPath(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge", text: t("unmanagedFolder") });
       if (entry instanceof TFile && this.service.isLeafNoteExempt(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge", text: t("exempt") });
       if (entry instanceof TFile && entry.extension !== "") row.createSpan({ cls: "folder-nodes-file-extension", text: entry.extension.toLocaleUpperCase() });
+      if (entry instanceof TFile && !referencedPaths.has(normalizeVaultPath(entry.path))) {
+        const marker = row.createSpan({
+          cls: "folder-nodes-unreferenced-file",
+          attr: { "aria-label": t("unreferenced"), title: t("unreferenced") },
+        });
+        setIcon(marker, "link-2-off");
+      }
       row.addEventListener("click", (event) => {
         if (entry instanceof TFolder) this.setFolder(entry.path);
         else if (this.selectionMode) this.toggleSelection(entry.path, "file", event.shiftKey);

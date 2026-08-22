@@ -39,7 +39,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.visuals,
       () => this.settings,
       () => ({
-        createNode: t("createNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
+        createNode: t("createNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"), missingNoteShort: t("missingNoteShort"),
         newFolder: t("newFolder"), newNote: t("newNote"), node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"),
       }),
       (parentPath) => {

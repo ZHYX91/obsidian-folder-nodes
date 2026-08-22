@@ -18,7 +18,7 @@ export class ExplorerAdapter extends Component {
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
     private readonly getRootLabels: () => {
-      createNode: string; missingNodeFolder: string; missingNodeNote: string; newFolder: string; newNote: string;
+      createNode: string; missingNodeFolder: string; missingNodeNote: string; missingNoteShort: string; newFolder: string; newNote: string;
       node: string; nodeConflict: string; root: string;
     },
     private readonly createNode: (parentPath: string) => void,
@@ -103,6 +103,7 @@ export class ExplorerAdapter extends Component {
       );
       if (identity === "ordinary") {
         element.querySelector(":scope > .folder-nodes-explorer-icon")?.remove();
+        element.querySelector(":scope > .folder-nodes-explorer-problem-badge")?.remove();
         element.removeClass("folder-nodes-node", "folder-nodes-missing-note");
         element.removeAttribute("draggable");
         continue;
@@ -111,15 +112,24 @@ export class ExplorerAdapter extends Component {
       element.toggleClass("folder-nodes-missing-note", identity === "missing-note");
       let icon = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-icon");
       if (icon === null) icon = createSpan({ cls: "folder-nodes-explorer-icon" });
+      let problemBadge = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-problem-badge");
       const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
       if (identity === "missing-note") {
         element.removeAttribute("draggable");
         icon.removeClass("is-default-node");
         icon.addClass("is-warning");
         ensureExplorerIconPosition(element, icon, title, "before");
-        this.renderExplorerMarker(icon, { kind: "lucide", value: "folder-warning", inheritedFrom: null }, this.getRootLabels().missingNodeNote, force);
+        this.renderExplorerMarker(icon, { kind: "lucide", value: "folder-tree", inheritedFrom: null }, this.getRootLabels().missingNodeNote, force);
+        if (problemBadge === null) {
+          problemBadge = createSpan({ cls: "folder-nodes-explorer-problem-badge" });
+          element.append(problemBadge);
+        }
+        problemBadge.setText(this.getRootLabels().missingNoteShort);
+        problemBadge.setAttr("aria-label", this.getRootLabels().missingNodeNote);
+        problemBadge.setAttr("title", this.getRootLabels().missingNodeNote);
         continue;
       }
+      problemBadge?.remove();
       element.setAttr("draggable", "true");
       const position = this.getSettings().explorerIconPosition;
       const resolved = this.visuals.resolve(folder);

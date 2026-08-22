@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   breadcrumbSegments,
   breadcrumbItems,
+  filesSectionKey,
   formatContentLinks,
   isContextMenuKey,
   nodeEntryVisual,
+  referencedVaultPaths,
   selectionRange,
   siblingDropAxis,
   siblingDropZone,
@@ -61,11 +63,23 @@ describe("Node Contents interactions", () => {
     });
     expect(nodeEntryVisual("missing-note", null)).toEqual({
       defaultVisual: true,
-      visual: { kind: "lucide", value: "folder-warning", inheritedFrom: null },
+      visual: { kind: "lucide", value: "folder-tree", inheritedFrom: null },
       warning: true,
     });
     const custom = { kind: "emoji" as const, value: "☕", inheritedFrom: null };
     expect(nodeEntryVisual("healthy", custom)).toEqual({ defaultVisual: false, visual: custom, warning: false });
+  });
+
+  it("builds one normalized reverse reference set from Obsidian link metadata", () => {
+    expect(referencedVaultPaths({
+      "A.md": { "media/photo.jpg": 2, "documents/report.pdf": 1, "ignored.bin": 0 },
+      "B.md": { "/media/photo.jpg/": 1 },
+    })).toEqual(new Set(["media/photo.jpg", "documents/report.pdf"]));
+  });
+
+  it("names the content section according to whether it contains folders", () => {
+    expect(filesSectionKey(false)).toBe("files");
+    expect(filesSectionKey(true)).toBe("filesAndFolders");
   });
 
   it("embeds album media while leaving file-section entries as links", () => {
