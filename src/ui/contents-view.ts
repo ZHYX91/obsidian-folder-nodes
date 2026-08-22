@@ -2,7 +2,7 @@ import { ItemView, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from 
 
 import {
   CONTENTS_DRAG_MIME,
-  breadcrumbSegments,
+  breadcrumbItems,
   type ContentsDragPayload,
   isContextMenuKey,
   nodeDropZone,
@@ -40,6 +40,7 @@ export type ContentsMenuAnchor = MouseEvent | HTMLElement;
 
 interface ContentsActions {
   createChild(folder: TFolder): void;
+  createMissingNote(folder: TFolder): void;
   nodeMenu(anchor: ContentsMenuAnchor, folder: TFolder): void;
   entryMenu(anchor: ContentsMenuAnchor, entry: TAbstractFile, sourceFolder: TFolder): void;
   problemMenu(anchor: ContentsMenuAnchor, entry: TFolder | TFile): void;
@@ -135,37 +136,46 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderBreadcrumb(container: HTMLElement, folder: TFolder): void {
-    const breadcrumb = container.createDiv({ cls: "folder-nodes-breadcrumb", attr: { "aria-label": t("openParent") } });
-    const root = breadcrumb.createEl("button", { text: this.app.vault.getName() });
-    root.addEventListener("click", () => this.setFolder(""));
-    this.bindFolderDropTarget(root, "");
+    const breadcrumb = container.createDiv({ cls: "folder-nodes-breadcrumb", attr: { "aria-label": t("nodePath") } });
     const folderPath = normalizeVaultPath(folder.path);
-    if (folderPath === "") return;
-    let path = "";
-    for (const segment of breadcrumbSegments(folderPath)) {
-      breadcrumb.createSpan({ text: "/" });
-      path = path === "" ? segment : `${path}/${segment}`;
-      const target = path;
-      const button = breadcrumb.createEl("button", { text: segment });
-      button.addEventListener("click", () => this.setFolder(target));
-      this.bindFolderDropTarget(button, target);
+    const items = breadcrumbItems(this.app.vault.getName(), folderPath);
+    for (const [index, item] of items.entries()) {
+      if (index > 0) breadcrumb.createSpan({ cls: "folder-nodes-breadcrumb-separator", text: "/", attr: { "aria-hidden": "true" } });
+      if (item.current) {
+        const current = breadcrumb.createSpan({
+          cls: "folder-nodes-breadcrumb-current",
+          text: item.label,
+          attr: { "aria-current": "page" },
+        });
+        this.bindFolderDropTarget(current, item.path);
+        continue;
+      }
+      const button = breadcrumb.createEl("button", { text: item.label });
+      button.addEventListener("click", () => this.setFolder(item.path));
+      this.bindFolderDropTarget(button, item.path);
     }
   }
 
   private renderHeader(container: HTMLElement, folder: TFolder): void {
     const header = container.createDiv({ cls: "folder-nodes-contents-header" });
-    const identity = header.createDiv({ cls: "folder-nodes-current" });
     const folderPath = normalizeVaultPath(folder.path);
-    this.bindFolderDropTarget(identity, folderPath);
     const managedNode = !this.service.isIgnoredPath(folderPath) && this.service.getNote(this.service.notePathForFolder(folderPath)) !== null;
+    const identity = managedNode
+      ? header.createEl("button", { cls: "folder-nodes-current", attr: { "aria-label": t("openCurrentNodeNote") } })
+      : header.createDiv({ cls: "folder-nodes-current" });
+    this.bindFolderDropTarget(identity, folderPath);
     const resolved = managedNode ? this.visuals.resolve(folder) : null;
     if (resolved !== null && resolved.kind !== "fallback") {
       const visual = identity.createSpan({ cls: "folder-nodes-current-visual" });
       renderVisual(visual, resolved, folderPath === "" ? this.app.vault.getName() : folder.name);
     }
-    const title = identity.createEl("h3", { text: folderPath === "" ? this.app.vault.getName() : folder.name });
+    const title = identity.createSpan({ cls: "folder-nodes-current-title", text: folderPath === "" ? this.app.vault.getName() : folder.name });
     title.setAttr("title", folderPath);
     if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-warning", text: t("missingNodeNote") });
+    if (managedNode) identity.addEventListener("click", (event) => {
+      const mouseEvent = event as MouseEvent;
+      void this.service.openFolderNode(folderPath, mouseEvent.ctrlKey || mouseEvent.metaKey);
+    });
     const actions = header.createDiv({ cls: "folder-nodes-header-actions" });
     if (this.actions.homepageEnabled()) {
       const homepage = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("openHomepage") } });
@@ -173,12 +183,19 @@ export class FolderNodeContentsView extends ItemView {
       homepage.addEventListener("click", () => this.actions.openHomepage());
     }
     if (managedNode) {
+      const open = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("openCurrentNodeNote") } });
+      setIcon(open, "file-text");
+      open.addEventListener("click", (event) => void this.service.openFolderNode(folderPath, event.ctrlKey || event.metaKey));
       const visual = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("editVisual") } });
       setIcon(visual, "palette");
       visual.addEventListener("click", () => this.actions.editVisual(folder));
       const create = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("createChild") } });
       setIcon(create, "folder-plus");
       create.addEventListener("click", () => this.actions.createChild(folder));
+    } else if (!this.service.isIgnoredPath(folderPath)) {
+      const create = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("createMissingNodeNote") } });
+      setIcon(create, "file-plus");
+      create.addEventListener("click", () => this.actions.createMissingNote(folder));
     }
   }
 

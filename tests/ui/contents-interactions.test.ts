@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   breadcrumbSegments,
+  breadcrumbItems,
   isContextMenuKey,
   nodeDropZone,
   parseDragPayload,
@@ -12,6 +13,17 @@ describe("Node Contents interactions", () => {
     expect(breadcrumbSegments("")).toEqual([]);
     expect(breadcrumbSegments("/")).toEqual([]);
     expect(breadcrumbSegments("A/B")).toEqual(["A", "B"]);
+  });
+
+  it("marks only the current breadcrumb as the current location", () => {
+    expect(breadcrumbItems("Note", "")).toEqual([
+      { current: true, label: "Note", path: "" },
+    ]);
+    expect(breadcrumbItems("Note", "学习/考试")).toEqual([
+      { current: false, label: "Note", path: "" },
+      { current: false, label: "学习", path: "学习" },
+      { current: true, label: "考试", path: "学习/考试" },
+    ]);
   });
 
   it("uses before, into, and after node drop zones", () => {

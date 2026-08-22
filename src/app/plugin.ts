@@ -39,6 +39,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.addChild(this.explorer);
     this.registerView(CONTENTS_VIEW_TYPE, (leaf) => new FolderNodeContentsView(leaf, this.service, this.visuals, {
       createChild: (folder) => this.promptCreateChild(folder),
+      createMissingNote: (folder) => void this.createAndOpenMissingNote(folder),
       nodeMenu: (event, folder) => this.openNodeMenu(event, folder),
       entryMenu: (anchor, entry, sourceFolder) => this.openEntryMenu(anchor, entry, sourceFolder),
       problemMenu: (anchor, entry) => this.openProblemMenu(anchor, entry),
@@ -137,6 +138,13 @@ export default class FolderNodesPlugin extends Plugin {
     }
     this.app.workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE);
     this.showMenu(menu, anchor);
+  }
+
+  private async createAndOpenMissingNote(folder: TFolder): Promise<void> {
+    await this.runRepair(async () => {
+      const note = await this.service.createMissingNodeNote(folder);
+      await this.app.workspace.getLeaf(false).openFile(note);
+    });
   }
 
   public openNodeMenu(anchor: ContentsMenuAnchor, folder: TFolder): void {

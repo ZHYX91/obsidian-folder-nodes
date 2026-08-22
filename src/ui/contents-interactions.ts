@@ -3,9 +3,26 @@ import type { NodeDropZone } from "../core/types";
 
 export const CONTENTS_DRAG_MIME = "application/x-folder-nodes-entry";
 
+export interface BreadcrumbItem {
+  current: boolean;
+  label: string;
+  path: string;
+}
+
 export function breadcrumbSegments(path: string): string[] {
   const normalized = normalizeVaultPath(path);
   return normalized === "" ? [] : normalized.split("/");
+}
+
+export function breadcrumbItems(rootLabel: string, path: string): BreadcrumbItem[] {
+  const segments = breadcrumbSegments(path);
+  const items: BreadcrumbItem[] = [{ current: segments.length === 0, label: rootLabel, path: "" }];
+  let target = "";
+  for (const [index, segment] of segments.entries()) {
+    target = target === "" ? segment : `${target}/${segment}`;
+    items.push({ current: index === segments.length - 1, label: segment, path: target });
+  }
+  return items;
 }
 export const CONTENTS_MENU_SOURCE = "folder-nodes-contents";
 

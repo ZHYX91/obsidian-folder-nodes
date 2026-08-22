@@ -258,14 +258,40 @@
   color: var(--text-muted);
 }
 
+.folder-nodes-breadcrumb > button,
+.folder-nodes-breadcrumb-current {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 7px;
+  border-radius: var(--radius-s);
+  line-height: 1.4;
+}
+
 .folder-nodes-breadcrumb > button {
-  padding: 0;
+  appearance: none;
   border: 0;
   background: transparent;
+  box-shadow: none;
   color: var(--text-muted);
 }
 
-.folder-nodes-breadcrumb > button:hover { color: var(--text-normal); }
+.folder-nodes-breadcrumb > button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.folder-nodes-breadcrumb > button:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 1px;
+}
+
+.folder-nodes-breadcrumb-current {
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+}
+
+.folder-nodes-breadcrumb-separator { color: var(--text-faint); }
 
 .folder-nodes-contents-header,
 .folder-nodes-current,
@@ -280,11 +306,39 @@
   margin-bottom: var(--size-4-4);
 }
 
-.folder-nodes-current { min-width: 0; }
-.folder-nodes-current h3 {
+.folder-nodes-current {
+  height: auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  text-align: start;
+}
+
+button.folder-nodes-current {
+  appearance: none;
+  cursor: pointer;
+}
+button.folder-nodes-current:hover { background: var(--background-modifier-hover); }
+button.folder-nodes-current:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 1px;
+}
+
+.folder-nodes-current-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-2);
   min-width: 0;
   margin: 0;
   overflow: hidden;
+  font-size: var(--h3-size);
+  font-weight: var(--h3-weight);
+  line-height: var(--h3-line-height);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -327,7 +381,8 @@
 .folder-nodes-is-dragging { opacity: 0.45; }
 
 .folder-nodes-current.folder-nodes-drop-into,
-.folder-nodes-breadcrumb > button.folder-nodes-drop-into {
+.folder-nodes-breadcrumb > button.folder-nodes-drop-into,
+.folder-nodes-breadcrumb-current.folder-nodes-drop-into {
   border-radius: var(--radius-s);
   outline-offset: 3px;
 }
@@ -451,8 +506,16 @@
 }
 
 .folder-nodes-album-title {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
-  padding-inline: 2px;
+  padding-inline: 4px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
