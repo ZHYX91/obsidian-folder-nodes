@@ -4,6 +4,7 @@ import {
   ensureExplorerRootRow,
   explorerMarkerPlacement,
   isFolderCollapseControl,
+  syncExplorerNodeOrder,
 } from "../../src/adapters/explorer-events";
 
 describe("File Explorer disclosure controls", () => {
@@ -87,5 +88,52 @@ describe("File Explorer root row", () => {
     expect(first.row.getAttribute("draggable")).toBe("false");
     expect(first.row.querySelector(".collapse-icon")).toBeNull();
     expect(isFolderCollapseControl(first.row)).toBe(false);
+  });
+});
+
+describe("File Explorer node ordering", () => {
+  function folder(path: string): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = "nav-folder";
+    const title = document.createElement("div");
+    title.className = "nav-folder-title";
+    title.dataset.path = path;
+    wrapper.append(title);
+    return wrapper;
+  }
+
+  it("reorders only managed node slots and leaves ordinary entries anchored", () => {
+    const container = document.createElement("div");
+    const first = folder("生活/餐饮");
+    const file = document.createElement("div");
+    file.className = "nav-file";
+    const third = folder("生活/宠物");
+    const unmanaged = folder("生活/_附件");
+    const second = folder("生活/购物");
+    container.append(first, file, third, unmanaged, second);
+
+    expect(syncExplorerNodeOrder(container, ["生活/餐饮", "生活/购物", "生活/宠物"])).toBe(true);
+    expect(Array.from(container.children)).toEqual([first, file, second, unmanaged, third]);
+    expect(syncExplorerNodeOrder(container, ["生活/餐饮", "生活/购物", "生活/宠物"])).toBe(false);
+  });
+
+  it("settles after one mutation-observer refresh", async () => {
+    const container = document.createElement("div");
+    const first = folder("A");
+    const second = folder("B");
+    container.append(second, first);
+    let callbacks = 0;
+    const observer = new MutationObserver(() => {
+      callbacks += 1;
+      syncExplorerNodeOrder(container, ["A", "B"]);
+    });
+    observer.observe(container, { childList: true });
+
+    expect(syncExplorerNodeOrder(container, ["A", "B"])).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(callbacks).toBe(1);
+    expect(Array.from(container.children)).toEqual([first, second]);
+    observer.disconnect();
   });
 });

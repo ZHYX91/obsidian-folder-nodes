@@ -37,6 +37,34 @@ export function explorerMarkerPlacement(
   };
 }
 
+export function syncExplorerNodeOrder(container: HTMLElement, orderedPaths: readonly string[]): boolean {
+  const order = new Map(orderedPaths.map((path, index) => [path, index]));
+  const slots = Array.from(container.children).filter((child) => {
+    const title = child.matches(".nav-folder-title[data-path]")
+      ? child
+      : child.querySelector(":scope > .nav-folder-title[data-path]");
+    const path = title?.getAttribute("data-path");
+    return path !== null && path !== undefined && order.has(path);
+  });
+  const pathFor = (element: Element): string => {
+    const title = element.matches(".nav-folder-title[data-path]")
+      ? element
+      : element.querySelector(":scope > .nav-folder-title[data-path]");
+    return title?.getAttribute("data-path") ?? "";
+  };
+  const desired = [...slots].sort((left, right) =>
+    (order.get(pathFor(left)) ?? Number.MAX_SAFE_INTEGER) - (order.get(pathFor(right)) ?? Number.MAX_SAFE_INTEGER));
+  if (slots.every((element, index) => element === desired[index])) return false;
+
+  const markers = slots.map((element) => {
+    const marker = container.ownerDocument.createComment("folder-nodes-order-slot");
+    container.insertBefore(marker, element);
+    return marker;
+  });
+  markers.forEach((marker, index) => marker.replaceWith(desired[index]!));
+  return true;
+}
+
 export interface ExplorerRootRow {
   row: HTMLElement;
   icon: HTMLElement;

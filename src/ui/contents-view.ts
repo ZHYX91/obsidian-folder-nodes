@@ -46,6 +46,7 @@ interface ContentsActions {
   homepageEnabled(): boolean;
   initialized(): boolean;
   initialize(): void;
+  refresh(): void;
   reportError(error: unknown): void;
 }
 
@@ -564,7 +565,7 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private finishDrop(operation: Promise<unknown>): void {
-    void operation.then(() => this.refresh()).catch((error) => this.actions.reportError(error));
+    void operation.then(() => this.actions.refresh()).catch((error) => this.actions.reportError(error));
   }
 
   private clearDropTarget(): void {

@@ -39,6 +39,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.visuals,
       () => this.settings,
       () => ({ root: t("root"), node: t("node"), nodeConflict: t("nodeConflict"), missingNodeNote: t("missingNodeNote"), missingNodeFolder: t("missingNodeFolder") }),
+      () => this.refreshVisuals(),
       (error) => new Notice(formatError(error), 8000),
     );
     this.addChild(this.explorer);
@@ -53,6 +54,7 @@ export default class FolderNodesPlugin extends Plugin {
       homepageEnabled: () => this.settings.homepageEnabled,
       initialized: () => this.settings.adoptionState === "managed",
       initialize: () => this.openMaintenance(),
+      refresh: () => this.refreshVisuals(),
       reportError: (error) => new Notice(formatError(error), 8000),
     }));
     this.addSettingTab(new FolderNodesSettingTab(this.app, this));

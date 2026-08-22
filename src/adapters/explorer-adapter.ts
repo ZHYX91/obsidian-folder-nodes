@@ -1,6 +1,6 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
-import { ensureExplorerIconPosition, ensureExplorerRootRow, explorerMarkerPlacement, isFolderCollapseControl } from "./explorer-events";
+import { ensureExplorerIconPosition, ensureExplorerRootRow, explorerMarkerPlacement, isFolderCollapseControl, syncExplorerNodeOrder } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
@@ -17,6 +17,7 @@ export class ExplorerAdapter extends Component {
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
     private readonly getRootLabels: () => { root: string; node: string; nodeConflict: string; missingNodeNote: string; missingNodeFolder: string },
+    private readonly notifyChanged: () => void,
     private readonly reportError: (error: unknown) => void,
   ) { super(); }
 
@@ -124,7 +125,18 @@ export class ExplorerAdapter extends Component {
       ensureExplorerIconPosition(element, icon, title, marker.position);
       this.renderExplorerMarker(icon, visual, `${folder.name} · ${this.getRootLabels().node}`, force);
     }
+    this.syncNodeOrder();
     this.decorateNoteTitles(force);
+  }
+
+  private syncNodeOrder(): void {
+    for (const container of document.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children")) {
+      const parentPath = container.matches(".nav-files-container")
+        ? ""
+        : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
+      if (parentPath === undefined) continue;
+      syncExplorerNodeOrder(container, this.service.children(parentPath).map(({ childPath }) => childPath));
+    }
   }
 
   private renderExplorerMarker(icon: HTMLElement, visual: NodeVisual, label: string, force: boolean): void {
@@ -233,7 +245,7 @@ export class ExplorerAdapter extends Component {
     event.stopPropagation();
     const zone = this.zone(title, event.clientY);
     void this.service.placeNodeRelative(source, target, zone)
-      .then(() => this.refresh())
+      .then(() => this.notifyChanged())
       .catch((error) => this.reportError(error));
     this.clearDrop();
   }
