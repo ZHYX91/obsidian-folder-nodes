@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   breadcrumbSegments,
   breadcrumbItems,
+  contentDragPolicy,
   filesSectionKey,
   formatContentLinks,
   isContextMenuKey,
   nodeEntryVisual,
-  referencedVaultPaths,
   selectionRange,
   siblingDropAxis,
   siblingDropZone,
@@ -56,25 +56,18 @@ describe("Node Contents interactions", () => {
   });
 
   it("keeps a stable visual slot for nodes without a custom icon", () => {
-    expect(nodeEntryVisual("healthy", { kind: "fallback", value: "", inheritedFrom: null })).toEqual({
+    expect(nodeEntryVisual("healthy", { kind: "fallback", value: "", accent: null, inheritedFrom: null })).toEqual({
       defaultVisual: true,
-      visual: { kind: "lucide", value: "folder-tree", inheritedFrom: null },
+      visual: { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null },
       warning: false,
     });
     expect(nodeEntryVisual("missing-note", null)).toEqual({
       defaultVisual: true,
-      visual: { kind: "lucide", value: "folder-tree", inheritedFrom: null },
+      visual: { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null },
       warning: true,
     });
-    const custom = { kind: "emoji" as const, value: "☕", inheritedFrom: null };
+    const custom = { kind: "emoji" as const, value: "☕", accent: null, inheritedFrom: null };
     expect(nodeEntryVisual("healthy", custom)).toEqual({ defaultVisual: false, visual: custom, warning: false });
-  });
-
-  it("builds one normalized reverse reference set from Obsidian link metadata", () => {
-    expect(referencedVaultPaths({
-      "A.md": { "media/photo.jpg": 2, "documents/report.pdf": 1, "ignored.bin": 0 },
-      "B.md": { "/media/photo.jpg/": 1 },
-    })).toEqual(new Set(["media/photo.jpg", "documents/report.pdf"]));
   });
 
   it("names the content section according to whether it contains folders", () => {
@@ -91,6 +84,12 @@ describe("Node Contents interactions", () => {
     ];
     expect(formatContentLinks(items)).toBe("![[photo.jpg]]\n![[clip.mp4]]\n[[document.pdf]]\n[[audio.mp3]]");
     expect(formatContentLinks(items, true)).toBe("[[photo.jpg]]\n[[clip.mp4]]\n[[document.pdf]]\n[[audio.mp3]]");
+  });
+
+  it("allows an internal move only for exactly one dragged content item", () => {
+    expect(contentDragPolicy(1)).toEqual({ effectAllowed: "copyMove", internalMove: true });
+    expect(contentDragPolicy(2)).toEqual({ effectAllowed: "copy", internalMove: false });
+    expect(contentDragPolicy(0)).toEqual({ effectAllowed: "copy", internalMove: false });
   });
 
   it("extends content selection across the visible album and file order", () => {

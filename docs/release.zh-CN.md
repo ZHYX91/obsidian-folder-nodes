@@ -17,6 +17,13 @@ translation_status: source
 
 本地 commit、push、tag、GitHub Release、Obsidian community submission 和正式 Vault 部署是独立动作。Commit 使用正常 Git 身份与 Conventional Commit subject。没有用户明确授权不得 push、创建 tag、发布 Release 或提交社区目录。
 
+创建 tag 前，从当前远端默认分支 HEAD 手动运行只读 Release preflight，并输入计划版本；它要求
+远端 tag 与同版本 Release 尚不存在，运行完整门禁并生成手动安装 ZIP，但不发布。推送数值 tag
+后才进入写权限阶段。失败的 tag workflow 可以安全重跑：只有既有 Release 为稳定、不可变、精确
+四资产、字节与当前候选一致，且四项 provenance 均绑定同一 tag 和 commit 时，才按成功 no-op
+接受；否则必须提升版本，绝不覆盖、编辑或追加同 tag 资产。`SHA256SUMS` 只存在于 workflow
+handoff，公共 Release 固定为三个 loose assets 与版本化 ZIP。
+
 ## 正式 Vault
 
 正式部署前确认 exact Vault、插件 ID 和 Obsidian 进程。保留现有 `data.json`；只复制 exact candidate 的三个运行文件，部署后重新计算哈希并确认 enabled 状态。正式 Vault 不能运行迁移 fixture 或自动 destructive acceptance。

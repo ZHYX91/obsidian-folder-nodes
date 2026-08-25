@@ -68,10 +68,11 @@ export interface MigrationScan {
   conflicts: MigrationConflict[];
 }
 
-export type VisualKind = "emoji" | "lucide" | "image" | "color" | "fallback";
+export type VisualKind = "emoji" | "glyph" | "lucide" | "image" | "color" | "fallback";
 
 export interface NodeVisual {
   kind: VisualKind;
   value: string;
+  accent: string | null;
   inheritedFrom: string | null;
 }

@@ -2,21 +2,22 @@ import { type Editor, ItemView, Notice, setIcon, TAbstractFile, TFile, TFolder, 
 
 import {
   breadcrumbItems,
+  contentDragPolicy,
   type ContentLinkItem,
   formatContentLinks,
   filesSectionKey,
   isContextMenuKey,
   nodeEntryVisual,
-  referencedVaultPaths,
   selectionRange,
   siblingDropAxis,
   siblingDropZone,
   type SiblingDropAxis,
 } from "./contents-interactions";
 import { t } from "./i18n";
-import { normalizeVaultPath } from "../core/paths";
+import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import type { ChildOrderRecord, NodeVisual } from "../core/types";
 import { renderVisual } from "./render-visual";
+import type { ReferenceIndex } from "../core/reference-index";
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "svg", "webp"]);
 const VIDEO_EXTENSIONS = new Set(["m4v", "mkv", "mov", "mp4", "webm"]);
@@ -27,13 +28,16 @@ const FILE_ICONS: Record<string, string> = {
 
 interface ContentsService {
   getFolder(path: string): TFolder | null;
-  getNote(path: string): TFile | null;
+  getFile(path: string): TFile | null;
+  getCanonicalFile(folderPath: string): TFile | null;
+  isCanonicalFile(file: TFile): boolean;
   notePathForFolder(path: string): string;
   isIgnoredPath(path: string): boolean;
   isLeafNoteExempt(path: string): boolean;
   children(path: string): ChildOrderRecord[];
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
   placeNode(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder>;
+  moveFile(file: TFile, targetFolderPath: string): Promise<void>;
 }
 
 interface ContentsVisuals { resolve(folder: TFolder): NodeVisual; }
@@ -58,33 +62,39 @@ interface ContentsActions {
 type NodeEntry =
   | { kind: "healthy" | "missing-note"; entry: TFolder }
   | { kind: "conflict" | "missing-folder"; entry: TFile };
+type ContentsSection = "album" | "files" | "nodes";
 
 export const CONTENTS_VIEW_TYPE = "folder-nodes-contents";
 
 export class FolderNodeContentsView extends ItemView {
   private folderPath = "";
-  private visibleLimit = 200;
+  private visibleLimits: Record<ContentsSection, number> = { album: 200, files: 200, nodes: 200 };
   private selectionMode = false;
   private selectedContent = new Map<string, "file" | "media">();
   private selectionAnchor: string | null = null;
   private selectableOrder: string[] = [];
   private selectableKinds = new Map<string, "file" | "media">();
+  private selectionPositions = new Map<string, number>();
   private lastEditor: { editor: Editor; file: TFile } | null = null;
   private draggedNodePath: string | null = null;
+  private draggedContentPath: string | null = null;
   private draggedSource: HTMLElement | null = null;
   private dropTarget: HTMLElement | null = null;
+  private contentDropTarget: HTMLElement | null = null;
+  private readonly pendingImages = new Set<HTMLImageElement>();
 
   public constructor(
     leaf: WorkspaceLeaf,
     private readonly service: ContentsService,
     private readonly visuals: ContentsVisuals,
+    private readonly references: ReferenceIndex,
     private readonly actions: ContentsActions,
   ) {
     super(leaf);
     this.registerDomEvent(this.containerEl.ownerDocument, "keydown", (event) => {
       if (event.key !== "Escape") return;
       if (this.selectionMode) this.finishSelection();
-      else this.clearNodeDrag();
+      else this.clearAllDrag();
     });
   }
 
@@ -95,17 +105,25 @@ export class FolderNodeContentsView extends ItemView {
   public setFolder(path: string): void {
     const normalized = normalizeVaultPath(path);
     if (normalizeVaultPath(this.folderPath) !== normalized) this.finishSelection(false);
-    this.clearNodeDrag();
+    this.clearAllDrag();
     this.folderPath = normalized;
-    this.visibleLimit = 200;
+    this.visibleLimits = { album: 200, files: 200, nodes: 200 };
     this.render();
   }
 
-  public refresh(): void { this.render(); }
+  public refresh(paths?: ReadonlySet<string>): void {
+    if (paths !== undefined && !this.isAffected(paths)) return;
+    this.render();
+  }
   public override async onOpen(): Promise<void> { this.render(); }
+  public override async onClose(): Promise<void> {
+    this.cancelPendingImages();
+    this.clearAllDrag();
+  }
 
   private render(): void {
-    this.clearNodeDrag();
+    this.cancelPendingImages();
+    this.clearAllDrag();
     this.captureActiveEditor();
     const container = this.contentEl;
     container.empty();
@@ -123,17 +141,16 @@ export class FolderNodeContentsView extends ItemView {
     const managedFolders = (currentIgnored ? [] : childFolders.filter((entry) => !this.service.isIgnoredPath(entry.path)))
       .sort((a, b) => (childOrder.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (childOrder.get(b.path) ?? Number.MAX_SAFE_INTEGER));
     const nodeEntries: NodeEntry[] = managedFolders.map((entry) => ({
-      kind: this.service.getNote(this.service.notePathForFolder(entry.path)) === null ? "missing-note" : "healthy",
+      kind: this.service.getCanonicalFile(entry.path) === null ? "missing-note" : "healthy",
       entry,
     }));
-    const canonicalPath = this.service.notePathForFolder(folderPath);
-    const directFiles = folder.children.filter((entry): entry is TFile => entry instanceof TFile && entry.path !== canonicalPath);
+    const directFiles = folder.children.filter((entry): entry is TFile => entry instanceof TFile && !this.service.isCanonicalFile(entry));
     const pendingNotes = currentIgnored ? [] : directFiles.filter((entry) =>
       entry.extension.toLocaleLowerCase() === "md" && !this.service.isLeafNoteExempt(entry.path));
     nodeEntries.push(...pendingNotes.map((entry): NodeEntry => {
       const targetPath = folderPath === "" ? entry.basename : `${folderPath}/${entry.basename}`;
       const targetFolder = this.service.getFolder(targetPath);
-      const targetNodeExists = targetFolder !== null && this.service.getNote(this.service.notePathForFolder(targetFolder.path)) !== null;
+      const targetNodeExists = targetFolder !== null && this.service.getCanonicalFile(targetFolder.path) !== null;
       return { kind: targetNodeExists ? "conflict" : "missing-folder", entry };
     }));
     const album = directFiles.filter((entry) => this.isAlbumEntry(entry));
@@ -149,13 +166,13 @@ export class FolderNodeContentsView extends ItemView {
     this.selectableOrder = [...this.selectableKinds.keys()];
     const selectable = new Set(this.selectableOrder);
     for (const path of this.selectedContent.keys()) if (!selectable.has(path)) this.selectedContent.delete(path);
-    const referencedPaths = referencedVaultPaths(this.app.metadataCache.resolvedLinks);
+    this.selectionPositions = new Map([...this.selectedContent.keys()].map((path, index) => [path, index]));
     this.renderBreadcrumb(container, folder);
     this.renderHeader(container, folder, this.selectableOrder.length > 0);
     if (this.selectionMode) this.renderSelectionToolbar(container);
     this.renderNodes(container, nodeEntries, folderPath);
-    this.renderAlbum(container, album, referencedPaths);
-    this.renderFiles(container, ordinaryFiles, referencedPaths);
+    this.renderAlbum(container, album);
+    this.renderFiles(container, ordinaryFiles);
   }
 
   private renderInitializationNotice(container: HTMLElement): void {
@@ -172,25 +189,28 @@ export class FolderNodeContentsView extends ItemView {
     for (const [index, item] of items.entries()) {
       if (index > 0) breadcrumb.createSpan({ cls: "folder-nodes-breadcrumb-separator", text: "/", attr: { "aria-hidden": "true" } });
       if (item.current) {
-        breadcrumb.createSpan({
+        const current = breadcrumb.createSpan({
           cls: "folder-nodes-breadcrumb-current",
           text: item.label,
           attr: { "aria-current": "page" },
         });
+        this.bindContentDropTarget(current, item.path);
         continue;
       }
       const button = breadcrumb.createEl("button", { text: item.label });
       button.addEventListener("click", () => this.setFolder(item.path));
+      this.bindContentDropTarget(button, item.path);
     }
   }
 
   private renderHeader(container: HTMLElement, folder: TFolder, hasSelectableContent: boolean): void {
     const header = container.createDiv({ cls: "folder-nodes-contents-header" });
     const folderPath = normalizeVaultPath(folder.path);
-    const managedNode = !this.service.isIgnoredPath(folderPath) && this.service.getNote(this.service.notePathForFolder(folderPath)) !== null;
+    const managedNode = !this.service.isIgnoredPath(folderPath) && this.service.getCanonicalFile(folderPath) !== null;
     const identity = managedNode
       ? header.createEl("button", { cls: "folder-nodes-current", attr: { "aria-label": t("openCurrentNodeNote") } })
       : header.createDiv({ cls: "folder-nodes-current" });
+    this.bindContentDropTarget(identity, folderPath);
     const resolved = managedNode ? this.visuals.resolve(folder) : null;
     if (resolved !== null && resolved.kind !== "fallback") {
       const visual = identity.createSpan({ cls: "folder-nodes-current-visual" });
@@ -201,7 +221,7 @@ export class FolderNodeContentsView extends ItemView {
     if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-warning", text: t("missingNodeNote") });
     if (managedNode) identity.addEventListener("click", (event) => {
       const mouseEvent = event as MouseEvent;
-      void this.service.openFolderNode(folderPath, mouseEvent.ctrlKey || mouseEvent.metaKey);
+      this.runAction(this.service.openFolderNode(folderPath, mouseEvent.ctrlKey || mouseEvent.metaKey));
     });
     const actions = header.createDiv({ cls: "folder-nodes-header-actions" });
     if (this.actions.homepageEnabled()) {
@@ -220,7 +240,7 @@ export class FolderNodeContentsView extends ItemView {
     if (managedNode) {
       const open = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("openCurrentNodeNote") } });
       setIcon(open, "file-text");
-      open.addEventListener("click", (event) => void this.service.openFolderNode(folderPath, event.ctrlKey || event.metaKey));
+      open.addEventListener("click", (event) => this.runAction(this.service.openFolderNode(folderPath, event.ctrlKey || event.metaKey)));
       const visual = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("editVisual") } });
       setIcon(visual, "palette");
       visual.addEventListener("click", () => this.actions.editVisual(folder));
@@ -239,7 +259,7 @@ export class FolderNodeContentsView extends ItemView {
     const label = problems === 0 ? `${t("nodes")} (${entries.length})` : `${t("nodes")} (${entries.length}) · ${t("needsRepair")} ${problems}`;
     const section = this.section(container, label);
     const grid = section.createDiv({ cls: "folder-nodes-node-grid" });
-    for (const item of entries.slice(0, this.visibleLimit)) {
+    for (const item of entries.slice(0, this.visibleLimits.nodes)) {
       const entry = item.entry;
       const resolved = item.kind === "healthy" && entry instanceof TFolder ? this.visuals.resolve(entry) : null;
       const presentation = nodeEntryVisual(item.kind, resolved);
@@ -256,11 +276,12 @@ export class FolderNodeContentsView extends ItemView {
       renderVisual(preview, presentation.visual, entry.name);
       card.createSpan({ cls: "folder-nodes-card-title", text: entry instanceof TFile ? entry.basename : entry.name, attr: { title: entry.name } });
       card.addEventListener("click", (event) => {
-        if (item.kind === "healthy" && entry instanceof TFolder) void this.service.openFolderNode(entry.path, event.ctrlKey || event.metaKey);
+        if (item.kind === "healthy" && entry instanceof TFolder) this.runAction(this.service.openFolderNode(entry.path, event.ctrlKey || event.metaKey));
         else if (entry instanceof TFolder) this.setFolder(entry.path);
-        else void this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry);
+        else this.runAction(this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry));
       });
       if (item.kind === "healthy" && entry instanceof TFolder) {
+        this.bindContentDropTarget(card, entry.path);
         this.bindMenu(shell, card, entry, (anchor) => this.actions.nodeMenu(anchor, entry));
         const handle = shell.createEl("button", {
           cls: "folder-nodes-node-drag-handle clickable-icon",
@@ -277,13 +298,13 @@ export class FolderNodeContentsView extends ItemView {
         this.bindMenu(shell, card, entry, (anchor) => this.actions.problemMenu(anchor, entry));
       }
     }
-    this.more(section, entries.length);
+    this.more(section, entries.length, "nodes");
   }
 
-  private renderAlbum(container: HTMLElement, entries: readonly TFile[], referencedPaths: ReadonlySet<string>): void {
+  private renderAlbum(container: HTMLElement, entries: readonly TFile[]): void {
     const section = this.section(container, `${t("album")} (${entries.length})`);
     const grid = section.createDiv({ cls: "folder-nodes-album-grid" });
-    for (const entry of entries.slice(0, this.visibleLimit)) {
+    for (const entry of entries.slice(0, this.visibleLimits.album)) {
       const extension = entry.extension.toLocaleLowerCase();
       const shell = grid.createDiv({ cls: "folder-nodes-entry-shell folder-nodes-album-shell" });
       const selected = this.selectedContent.has(entry.path);
@@ -301,7 +322,7 @@ export class FolderNodeContentsView extends ItemView {
         setIcon(icon, "video");
         preview.createSpan({ cls: "folder-nodes-media-badge", text: extension.toLocaleUpperCase() || t("video") });
       }
-      if (!referencedPaths.has(normalizeVaultPath(entry.path))) {
+      if (!this.references.isReferenced(entry.path)) {
         const marker = preview.createSpan({
           cls: "folder-nodes-unreferenced-marker",
           attr: { "aria-label": t("unreferenced"), title: t("unreferenced") },
@@ -312,20 +333,20 @@ export class FolderNodeContentsView extends ItemView {
       card.createSpan({ cls: "folder-nodes-album-title", text: entry.basename, attr: { title: entry.name } });
       card.addEventListener("click", (event) => {
         if (this.selectionMode) this.toggleSelection(entry.path, "media", event.shiftKey);
-        else void this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry);
+        else this.runAction(this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry));
       });
       const sourceFolder = entry.parent ?? this.app.vault.getRoot();
       this.bindMenu(shell, card, entry, (anchor) => this.actions.entryMenu(anchor, entry, sourceFolder));
       this.bindContentDragSource(card, entry, "media");
     }
-    this.more(section, entries.length);
+    this.more(section, entries.length, "album");
   }
 
-  private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[], referencedPaths: ReadonlySet<string>): void {
+  private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[]): void {
     const hasFolders = entries.some((entry) => entry instanceof TFolder);
     const section = this.section(container, `${t(filesSectionKey(hasFolders))} (${entries.length})`);
     const list = section.createDiv({ cls: "folder-nodes-file-list" });
-    for (const entry of entries.slice(0, this.visibleLimit)) {
+    for (const entry of entries.slice(0, this.visibleLimits.files)) {
       const shell = list.createDiv({ cls: "folder-nodes-entry-shell folder-nodes-file-shell" });
       const selected = entry instanceof TFile && this.selectedContent.has(entry.path);
       const row = shell.createEl("button", {
@@ -337,10 +358,11 @@ export class FolderNodeContentsView extends ItemView {
       if (entry instanceof TFolder) setIcon(icon, "folder");
       else setIcon(icon, FILE_ICONS[entry.extension.toLocaleLowerCase()] ?? "file");
       row.createSpan({ cls: "folder-nodes-file-name", text: entry.name, attr: { title: entry.name } });
-      if (entry instanceof TFolder && this.service.isIgnoredPath(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge", text: t("unmanagedFolder") });
+      if (entry instanceof TFolder && this.service.isIgnoredPath(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge", text: t("unmanaged") });
       if (entry instanceof TFile && this.service.isLeafNoteExempt(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge", text: t("exempt") });
+      if (entry instanceof TFolder) row.createSpan({ cls: "folder-nodes-file-extension", text: t("folderType") });
       if (entry instanceof TFile && entry.extension !== "") row.createSpan({ cls: "folder-nodes-file-extension", text: entry.extension.toLocaleUpperCase() });
-      if (entry instanceof TFile && !referencedPaths.has(normalizeVaultPath(entry.path))) {
+      if (entry instanceof TFile && !this.references.isReferenced(entry.path)) {
         const marker = row.createSpan({
           cls: "folder-nodes-unreferenced-file",
           attr: { "aria-label": t("unreferenced"), title: t("unreferenced") },
@@ -350,12 +372,12 @@ export class FolderNodeContentsView extends ItemView {
       row.addEventListener("click", (event) => {
         if (entry instanceof TFolder) this.setFolder(entry.path);
         else if (this.selectionMode) this.toggleSelection(entry.path, "file", event.shiftKey);
-        else void this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry);
+        else this.runAction(this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry));
       });
       this.bindMenu(shell, row, entry, (anchor) => this.actions.entryMenu(anchor, entry, folderForEntry(entry, this.app.vault.getRoot())));
       if (entry instanceof TFile) this.bindContentDragSource(row, entry, "file");
     }
-    this.more(section, entries.length);
+    this.more(section, entries.length, "files");
   }
 
   private isAlbumEntry(file: TFile): boolean {
@@ -365,19 +387,30 @@ export class FolderNodeContentsView extends ItemView {
 
   private renderStaticImage(file: TFile, preview: HTMLElement): void {
     const canvas = preview.createEl("canvas", { attr: { role: "img", "aria-label": file.basename } });
-    const source = new Image();
+    const ImageConstructor = preview.ownerDocument.defaultView?.Image ?? Image;
+    const source = new ImageConstructor();
+    this.pendingImages.add(source);
     source.addEventListener("load", () => {
+      this.pendingImages.delete(source);
+      if (!preview.isConnected) return;
       const scale = Math.min(1, 512 / Math.max(source.naturalWidth, source.naturalHeight));
       canvas.width = Math.max(1, Math.round(source.naturalWidth * scale));
       canvas.height = Math.max(1, Math.round(source.naturalHeight * scale));
       canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height);
     }, { once: true });
     source.addEventListener("error", () => {
+      this.pendingImages.delete(source);
+      if (!preview.isConnected) return;
       canvas.remove();
       const icon = preview.createSpan({ cls: "folder-nodes-video-placeholder" });
       setIcon(icon, "image");
     }, { once: true });
     source.src = this.app.vault.getResourcePath(file);
+  }
+
+  private cancelPendingImages(): void {
+    for (const image of this.pendingImages) image.src = "";
+    this.pendingImages.clear();
   }
 
   private renderSelectionToolbar(container: HTMLElement): void {
@@ -441,7 +474,7 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderSelectionIndicator(container: HTMLElement, path: string): void {
-    const index = [...this.selectedContent.keys()].indexOf(path);
+    const index = this.selectionPositions.get(path) ?? -1;
     const indicator = container.createSpan({
       cls: `folder-nodes-selection-indicator${index >= 0 ? " is-selected" : ""}`,
       attr: { "aria-hidden": "true" },
@@ -490,6 +523,20 @@ export class FolderNodeContentsView extends ItemView {
     if (active?.editor !== undefined && active.file !== null) this.lastEditor = { editor: active.editor, file: active.file };
   }
 
+  private isAffected(paths: ReadonlySet<string>): boolean {
+    const current = normalizeVaultPath(this.folderPath);
+    const notePath = normalizeVaultPath(this.service.notePathForFolder(current));
+    for (const rawPath of paths) {
+      const path = normalizeVaultPath(rawPath);
+      if (path === notePath || path === current || dirname(path) === current) return true;
+      if (isCanonicalNodeNote(path)) {
+        const nodeFolder = dirname(path);
+        if (dirname(nodeFolder) === current || current.startsWith(`${nodeFolder}/`)) return true;
+      }
+    }
+    return false;
+  }
+
   private bindMenu(
     shell: HTMLElement,
     primary: HTMLButtonElement,
@@ -521,7 +568,7 @@ export class FolderNodeContentsView extends ItemView {
 
   private bindNodeReorderSource(handle: HTMLElement, shell: HTMLElement, path: string): void {
     handle.addEventListener("dragstart", (event) => {
-      this.clearNodeDrag();
+      this.clearAllDrag();
       this.draggedNodePath = path;
       this.draggedSource = shell;
       shell.addClass("folder-nodes-is-dragging");
@@ -560,7 +607,8 @@ export class FolderNodeContentsView extends ItemView {
       : Array.from(element.parentElement.children).filter((child): child is HTMLElement =>
         child.instanceOf(HTMLElement) && child.matches(".folder-nodes-node-shell"));
     const axis = siblingDropAxis(shells.map((shell) => shell.getBoundingClientRect()));
-    const rightToLeft = getComputedStyle(element.parentElement ?? element).direction === "rtl";
+    const styleTarget = element.parentElement ?? element;
+    const rightToLeft = (element.ownerDocument.defaultView?.getComputedStyle(styleTarget) ?? getComputedStyle(styleTarget)).direction === "rtl";
     return {
       axis,
       zone: siblingDropZone(element.getBoundingClientRect(), event, axis, rightToLeft),
@@ -570,6 +618,7 @@ export class FolderNodeContentsView extends ItemView {
   private bindContentDragSource(element: HTMLElement, file: TFile, kind: "file" | "media"): void {
     element.setAttr("draggable", "true");
     element.addEventListener("dragstart", (event) => {
+      this.clearAllDrag();
       const selected = this.selectionMode && this.selectedContent.has(file.path)
         ? [...this.selectedContent.entries()].map(([path, selectedKind]) => ({ path, kind: selectedKind }))
         : [{ path: file.path, kind }];
@@ -581,11 +630,41 @@ export class FolderNodeContentsView extends ItemView {
       this.draggedSource = element;
       element.addClass("folder-nodes-is-dragging");
       event.dataTransfer.setData("text/plain", text);
-      event.dataTransfer.effectAllowed = "copy";
+      const policy = contentDragPolicy(selected.length);
+      if (policy.internalMove) {
+        this.draggedContentPath = file.path;
+        event.dataTransfer.setData("application/x-folder-nodes-file", file.path);
+      }
+      event.dataTransfer.effectAllowed = policy.effectAllowed;
     });
     element.addEventListener("dragend", () => {
-      this.draggedSource?.removeClass("folder-nodes-is-dragging");
-      this.draggedSource = null;
+      this.clearContentDrag();
+    });
+  }
+
+  private bindContentDropTarget(element: HTMLElement, targetFolderPath: string): void {
+    element.addEventListener("dragover", (event) => {
+      if (this.draggedContentPath === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (this.contentDropTarget !== element) this.clearContentDropTarget();
+      this.contentDropTarget = element;
+      element.addClass("folder-nodes-content-drop-into");
+      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
+    });
+    element.addEventListener("dragleave", (event) => {
+      const NodeConstructor = element.ownerDocument.defaultView?.Node;
+      if (NodeConstructor !== undefined && event.relatedTarget instanceof NodeConstructor && element.contains(event.relatedTarget)) return;
+      if (this.contentDropTarget === element) this.clearContentDropTarget();
+    });
+    element.addEventListener("drop", (event) => {
+      const sourcePath = this.draggedContentPath;
+      if (sourcePath === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const source = this.service.getFile(sourcePath);
+      this.clearContentDrag();
+      if (source !== null) this.finishDrop(this.service.moveFile(source, targetFolderPath));
     });
   }
 
@@ -600,12 +679,17 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private onDragLeave(event: DragEvent, element: HTMLElement): void {
-    if (event.relatedTarget instanceof Node && element.contains(event.relatedTarget)) return;
+    const NodeConstructor = element.ownerDocument.defaultView?.Node;
+    if (NodeConstructor !== undefined && event.relatedTarget instanceof NodeConstructor && element.contains(event.relatedTarget)) return;
     if (this.dropTarget === element) this.clearDropTarget();
   }
 
   private finishDrop(operation: Promise<unknown>): void {
     void operation.then(() => this.actions.refresh()).catch((error) => this.actions.reportError(error));
+  }
+
+  private runAction(operation: Promise<unknown>): void {
+    void operation.catch((error) => this.actions.reportError(error));
   }
 
   private clearDropTarget(): void {
@@ -623,18 +707,36 @@ export class FolderNodeContentsView extends ItemView {
     this.draggedNodePath = null;
   }
 
+  private clearContentDropTarget(): void {
+    this.contentDropTarget?.removeClass("folder-nodes-content-drop-into");
+    this.contentDropTarget = null;
+  }
+
+  private clearContentDrag(): void {
+    this.clearContentDropTarget();
+    this.draggedSource?.removeClass("folder-nodes-is-dragging");
+    this.draggedSource = null;
+    this.draggedContentPath = null;
+  }
+
+  private clearAllDrag(): void {
+    this.clearNodeDrag();
+    this.clearContentDrag();
+  }
+
   private section(container: HTMLElement, label: string): HTMLElement {
     const details = container.createEl("details", { cls: "folder-nodes-section", attr: { open: "" } });
     details.createEl("summary", { text: label });
     return details;
   }
 
-  private more(container: HTMLElement, total: number): void {
-    if (total <= this.visibleLimit) return;
-    const count = Math.min(200, total - this.visibleLimit);
+  private more(container: HTMLElement, total: number, section: ContentsSection): void {
+    const limit = this.visibleLimits[section];
+    if (total <= limit) return;
+    const count = Math.min(200, total - limit);
     const more = container.createEl("button", { cls: "folder-nodes-more", text: t("showMore", { count }) });
     more.addEventListener("click", () => {
-      this.visibleLimit += 200;
+      this.visibleLimits[section] += 200;
       this.render();
     });
   }

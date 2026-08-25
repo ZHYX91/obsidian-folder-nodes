@@ -1,6 +1,8 @@
-const WINDOWS_FORBIDDEN = /[<>:"/\\|?*]/gu;
+const WINDOWS_FORBIDDEN = /[<>:"/\\|?*#[\]^]/gu;
 const TRAILING_DOTS_OR_SPACES = /[. ]+$/u;
 const MULTIPLE_SPACES = /\s+/gu;
+const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function normalizeVaultPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
@@ -28,17 +30,34 @@ export function isCanonicalNodeNote(notePath: string): boolean {
   if (!normalized.toLocaleLowerCase().endsWith(".md")) return false;
   const folder = dirname(normalized);
   if (folder.length === 0) return false;
-  return basename(folder) === basename(normalized).slice(0, -3);
+  return isSameVaultName(basename(folder), basename(normalized).slice(0, -3));
+}
+
+export function isSameVaultName(left: string, right: string): boolean {
+  return left.normalize("NFC").localeCompare(right.normalize("NFC"), undefined, { sensitivity: "accent" }) === 0;
+}
+
+export function isSameVaultPath(left: string, right: string): boolean {
+  return isSameVaultName(normalizeVaultPath(left), normalizeVaultPath(right));
 }
 
 export function sanitizeNodeName(input: string): string {
-  const value = input
+  let value = input
     .normalize("NFC")
     .replace(WINDOWS_FORBIDDEN, "-")
     .replace(MULTIPLE_SPACES, " ")
     .replace(TRAILING_DOTS_OR_SPACES, "")
     .trim();
-  return value === "" ? "Untitled" : value.slice(0, 180);
+  if (value === "") value = "Untitled";
+  if (WINDOWS_RESERVED.test(value)) value = `_${value}`;
+  let length = 0;
+  let truncated = "";
+  for (const { segment } of GRAPHEMES.segment(value)) {
+    if (length + segment.length > 180) break;
+    truncated += segment;
+    length += segment.length;
+  }
+  return truncated.replace(TRAILING_DOTS_OR_SPACES, "") || "Untitled";
 }
 
 export function isDescendantPath(candidate: string, ancestor: string): boolean {

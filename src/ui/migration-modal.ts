@@ -1,10 +1,11 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, Notice, Setting } from "obsidian";
 
 import { formatError, t } from "./i18n";
+import { SubmittingModal } from "./submitting-modal";
 import { basename, dirname, nodeNotePath, sanitizeNodeName } from "../core/paths";
 import type { MigrationScan } from "../core/types";
 
-export class MigrationModal extends Modal {
+export class MigrationModal extends SubmittingModal {
   public constructor(
     app: App,
     private readonly scan: MigrationScan,
@@ -36,6 +37,8 @@ export class MigrationModal extends Modal {
       .setDisabled(this.scan.conflicts.length > 0 || (this.total() === 0 && !this.adoptionRequired))
       .setButtonText(this.adoptionRequired ? t("confirmInitialization") : t("applyChanges"))
       .onClick(async () => {
+        if (this.submitting) return;
+        this.submitting = true;
         button.setDisabled(true);
         try {
           await this.onCommit((completed, total) => {
@@ -43,10 +46,12 @@ export class MigrationModal extends Modal {
             progress.value = completed;
           });
           new Notice(`${t(this.adoptionRequired ? "initialize" : "maintenance")}: ${t("confirm")}`);
-          this.close();
+          this.closeAfterSubmission();
         } catch (error) {
           new Notice(formatError(error), 8000);
           button.setDisabled(false);
+        } finally {
+          this.submitting = false;
         }
       }));
   }
@@ -62,7 +67,7 @@ export class MigrationModal extends Modal {
 
   private target(path: string): string {
     const parent = dirname(path);
-    const name = basename(path).slice(0, -3);
+    const name = sanitizeNodeName(basename(path).slice(0, -3));
     const folder = parent === "" ? name : `${parent}/${name}`;
     return `${folder}/${name}.md`;
   }

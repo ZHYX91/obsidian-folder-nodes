@@ -1,7 +1,8 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, Notice, Setting } from "obsidian";
 import { formatError, t } from "./i18n";
+import { SubmittingModal } from "./submitting-modal";
 
-export class PromptModal extends Modal {
+export class PromptModal extends SubmittingModal {
   private value: string;
 
   public constructor(
@@ -32,18 +33,22 @@ export class PromptModal extends Modal {
   }
 
   private async submit(): Promise<void> {
+    if (this.submitting) return;
     const value = this.value.trim();
     if (value === "") return;
+    this.submitting = true;
     try {
       await this.onSubmit(value);
-      this.close();
+      this.closeAfterSubmission();
     } catch (error) {
       new Notice(formatError(error), 8000);
+    } finally {
+      this.submitting = false;
     }
   }
 }
 
-export class ConfirmModal extends Modal {
+export class ConfirmModal extends SubmittingModal {
   public constructor(
     app: App,
     private readonly titleText: string,
@@ -60,11 +65,17 @@ export class ConfirmModal extends Modal {
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
       .addButton((button) => {
         button.setButtonText(this.confirmText).setCta().onClick(async () => {
+          if (this.submitting) return;
+          this.submitting = true;
+          button.setDisabled(true);
           try {
             await this.onConfirm();
-            this.close();
+            this.closeAfterSubmission();
           } catch (error) {
             new Notice(formatError(error), 8000);
+          } finally {
+            this.submitting = false;
+            button.setDisabled(false);
           }
         });
         if (this.danger) button.buttonEl.addClass("mod-warning");

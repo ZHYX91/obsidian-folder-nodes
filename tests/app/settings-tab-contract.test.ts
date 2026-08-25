@@ -36,4 +36,18 @@ describe("settings tab compatibility contract", () => {
     );
     expect(styles).toContain("background: var(--background-secondary)");
   });
+
+  it("explains selection and unresolved-link creation before the shared aliases switch", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/app/settings-tab.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("this.renderNamingGuide(panel);");
+    expect(source.indexOf("this.renderNamingGuide(panel);")).toBeLessThan(
+      source.indexOf('new Setting(panel).setName(t("aliases"))'),
+    );
+    expect(source).toContain('this.creationExample(body, "[[a]]", "a/a.md", null);');
+    expect(source).toContain('this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));');
+  });
 });

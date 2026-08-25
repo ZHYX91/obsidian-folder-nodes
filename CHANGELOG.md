@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+- Added direct Folder Node creation for unresolved managed Markdown links, including transactional explicit paths, modifier-click panes, and optional `[[a|b]]` display aliases.
+- Added a Selection & naming explanation card and expanded the aliases switch across selection and unresolved-link creation.
+- Aligned unmanaged folder and Markdown metadata in Node Contents with one shared status badge and separate Folder/MD type columns.
+- Rebuilt structural operations around one serialized coordinator, FileManager-only rename/move, preflight validation, post-validation, and recoverable rollback.
+- Replaced coarse event suppression with expected-event attribution at Vault event boundaries; added full managed startup repair and recursive adoption of formerly ignored subtrees.
+- Scoped File Explorer observation and event handling to each Explorer leaf, including popouts, with batched decoration and complete unload cleanup/restoration.
+- Moved note-title visuals outside editable title text so icons cannot enter node names, cursors, selections, or copied titles.
+- Added coalesced path-targeted refreshes and an incremental reverse-reference index to remove repeated full-Vault rendering scans.
+- Added real single-file drops in Contents, independent section pagination, cancellable image loading, and explicit link-only behavior for multi-selected drags.
+- Hardened Windows/grapheme path sanitization, case-only canonical names, malformed-frontmatter refusal, nested settings normalization, migration TOCTOU checks, non-Markdown target collisions, and modal cancellation during writes.
+- Expanded behavioral, runtime-lifecycle, architecture-contract, rollback, event-coordination, refresh-storm, and 100,000-item performance coverage.
 
 - Made initialization explicit before automatic synchronization, with distinct uninitialized and maintenance states.
 - Removed the partial built-in Node Note template feature; new nodes use blank notes or selection content.
@@ -12,6 +24,9 @@
 - Fixed File Explorer disclosure-arrow clicks for current Obsidian collapse-icon markup while retaining legacy compatibility.
 - Added complete Node Contents menus through right-click, More actions, Shift+F10, and the Menu key, with third-party `file-menu` extension support.
 - Added before/into/after child-node placement and ordinary-file into moves onto nodes, the current-node header, and breadcrumbs without file-order metadata.
+- Added ordered `icon` Text/List declarations with local fallback, single-glyph candidates, `color:` accents, and preserved unknown entries.
+- Added Visual Picker list editing, reorder controls, presets, diagnostics, and live File Explorer/Contents previews.
+- Documented selection-body writes and wikilink replacement, canonical-note safety, deterministic manual ranks, and Root/Contents resolution.
 
 ## 0.3.0
 

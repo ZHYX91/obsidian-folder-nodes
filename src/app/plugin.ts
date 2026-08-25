@@ -1,13 +1,16 @@
-import { Editor, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
+import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
 
 import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
+import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
-import { normalizeVaultPath, sanitizeNodeName } from "../core/paths";
+import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
+import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
 import type { FolderNodesSettings } from "../core/types";
 import { DEFAULT_SETTINGS, normalizeSettings } from "../shared/settings";
+import { SettingsSaveCoordinator } from "../shared/settings-save-coordinator";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE, type ContentsMenuAnchor } from "../ui/contents-view";
 import { CONTENTS_MENU_SOURCE } from "../ui/contents-interactions";
 import { MigrationModal } from "../ui/migration-modal";
@@ -16,20 +19,34 @@ import { SelectionCreateModal } from "../ui/selection-create-modal";
 import { VisualPickerModal } from "../ui/visual-picker-modal";
 import { formatError, setLanguage, t } from "../ui/i18n";
 import { FolderNodesSettingTab } from "./settings-tab";
+import { runAdoptionMigration } from "./migration-state";
+import { RefreshScheduler, type RefreshBatch } from "./refresh-scheduler";
 
 export default class FolderNodesPlugin extends Plugin {
   public override settings: FolderNodesSettings = structuredClone(DEFAULT_SETTINGS);
   public service!: NodeService;
   public visuals!: VisualService;
   private explorer!: ExplorerAdapter;
+  private readonly references = new ReferenceIndex();
+  private refreshScheduler!: RefreshScheduler;
   private reconcileBatches = new Map<string, { timer: number; entries: Map<string, "create" | "delete"> }>();
   private reconciliationReady = false;
   private reconcileNoticeTimer: number | null = null;
   private reconcileErrorCount = 0;
   private reconcileErrorMessages = new Set<string>();
+  private readonly unresolvedLinkDocuments = new Set<Document>();
+  private unloaded = false;
+  private lifecycleGeneration = 0;
+  private readonly settingsSaver = new SettingsSaveCoordinator<FolderNodesSettings>(
+    (snapshot) => this.saveData(snapshot),
+  );
 
   public override async onload(): Promise<void> {
-    this.settings = normalizeSettings(await this.loadData());
+    const generation = ++this.lifecycleGeneration;
+    this.unloaded = false;
+    const stored: unknown = await this.loadData();
+    if (this.unloaded || generation !== this.lifecycleGeneration) return;
+    this.settings = normalizeSettings(stored);
     setLanguage(this.settings.language);
     this.service = new NodeService(this.app, () => this.settings);
     this.visuals = new VisualService(this.app, this.service, () => this.settings.iconInheritance);
@@ -49,15 +66,16 @@ export default class FolderNodesPlugin extends Plugin {
       () => this.refreshVisuals(),
       (error) => new Notice(formatError(error), 8000),
     );
+    this.refreshScheduler = new RefreshScheduler((batch) => this.applyRefresh(batch));
     this.addChild(this.explorer);
-    this.registerView(CONTENTS_VIEW_TYPE, (leaf) => new FolderNodeContentsView(leaf, this.service, this.visuals, {
+    this.registerView(CONTENTS_VIEW_TYPE, (leaf) => new FolderNodeContentsView(leaf, this.service, this.visuals, this.references, {
       createChild: (folder) => this.promptCreateChild(folder),
-      createMissingNote: (folder) => void this.createAndOpenMissingNote(folder),
+      createMissingNote: (folder) => this.runAction(this.createAndOpenMissingNote(folder)),
       nodeMenu: (event, folder) => this.openNodeMenu(event, folder),
       entryMenu: (anchor, entry, sourceFolder) => this.openEntryMenu(anchor, entry, sourceFolder),
       problemMenu: (anchor, entry) => this.openProblemMenu(anchor, entry),
       editVisual: (folder) => this.promptVisual(folder),
-      openHomepage: () => void this.openHomepage(),
+      openHomepage: () => this.runAction(this.openHomepage()),
       homepageEnabled: () => this.settings.homepageEnabled,
       initialized: () => this.settings.adoptionState === "managed",
       initialize: () => this.openMaintenance(),
@@ -65,24 +83,40 @@ export default class FolderNodesPlugin extends Plugin {
       reportError: (error) => new Notice(formatError(error), 8000),
     }));
     this.addSettingTab(new FolderNodesSettingTab(this.app, this));
-    this.addRibbonIcon("layout-grid", t("contents"), () => void this.openContents());
+    this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
     this.registerCommands();
     this.registerEvents();
+    this.registerUnresolvedLinkDocument(this.app.workspace.rootSplit.win.document);
     this.app.workspace.onLayoutReady(() => {
+      if (this.unloaded || generation !== this.lifecycleGeneration) return;
       this.explorer.start();
       this.reconciliationReady = true;
-      if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) void this.openHomepage();
+      this.references.rebuild(this.app.metadataCache.resolvedLinks);
+      this.app.workspace.iterateAllLeaves((leaf) => this.registerUnresolvedLinkDocument(leaf.view.containerEl.ownerDocument));
+      if (this.settings.adoptionState === "managed") void this.service.repairManagedVault()
+        .then(() => { if (!this.unloaded) this.refreshVisuals(); })
+        .catch((error) => { if (!this.unloaded) this.reportReconcileError(error); });
+      if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) this.runAction(this.openHomepage());
     });
   }
 
   public override onunload(): void {
+    this.lifecycleGeneration += 1;
+    this.unloaded = true;
+    this.reconciliationReady = false;
+    this.service?.dispose();
+    this.refreshScheduler.cancel();
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
     this.reconcileBatches.clear();
+    this.unresolvedLinkDocuments.clear();
     if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
     this.reconcileNoticeTimer = null;
+    for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) leaf.detach();
   }
 
-  public async saveSettings(): Promise<void> { await this.saveData(this.settings); }
+  public async saveSettings(): Promise<void> {
+    await this.settingsSaver.save(this.settings);
+  }
 
   public previewSelectionName(selection: string): string {
     const file = this.app.workspace.getActiveFile();
@@ -95,11 +129,13 @@ export default class FolderNodesPlugin extends Plugin {
     }, this.settings.prefix, this.settings.suffix, this.settings.timestampFormat));
   }
 
-  public refreshVisuals(): void {
-    this.explorer.refresh();
-    for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
-      if (leaf.view instanceof FolderNodeContentsView) leaf.view.refresh();
-    }
+  public refreshVisuals(path?: string): void {
+    if (!this.unloaded) this.refreshScheduler.request(path);
+  }
+
+  public async reconcileSettingsChange(): Promise<void> {
+    if (this.settings.adoptionState === "managed") await this.service.repairManagedVault();
+    this.refreshVisuals();
   }
 
   public openMaintenance(): void { this.showScan(false); }
@@ -110,7 +146,7 @@ export default class FolderNodesPlugin extends Plugin {
       new Notice(t("homepageDisabled"));
       return;
     }
-    const note = this.service.getNote(this.service.rootNotePath());
+    const note = this.service.getCanonicalFile("");
     if (note === null) {
       new Notice(t("homepageMissing"), 8000);
       return;
@@ -130,7 +166,7 @@ export default class FolderNodesPlugin extends Plugin {
   public openProblemMenu(anchor: ContentsMenuAnchor, entry: TFolder | TFile): void {
     const menu = new Menu();
     this.addProblemMenuItems(menu, entry);
-    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(entry)));
+    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(entry))));
     this.showMenu(menu, anchor);
   }
 
@@ -140,14 +176,14 @@ export default class FolderNodesPlugin extends Plugin {
         void this.runRepair(async () => { await this.service.createMissingNodeNote(entry); });
       }));
       menu.addItem((item) => item.setTitle(t("renameFolderToMatch")).setIcon("pencil").onClick(() => this.promptRename(entry)));
-      menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(entry)));
+      menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(entry))));
     } else {
-      menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => void this.app.workspace.getLeaf(false).openFile(entry)));
+      menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => this.runAction(this.app.workspace.getLeaf(false).openFile(entry))));
       menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
         void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
       }));
       const parent = entry.parent;
-      if (parent !== null && this.service.getNote(this.service.notePathForFolder(parent.path)) === null) {
+      if (parent !== null && this.service.getCanonicalFile(parent.path) === null) {
         menu.addItem((item) => item.setTitle(t("useAsNodeNote")).setIcon("file-check").onClick(() => {
           void this.runRepair(async () => { await this.service.useAsNodeNote(parent, entry); });
         }));
@@ -170,44 +206,43 @@ export default class FolderNodesPlugin extends Plugin {
 
   public openNodeMenu(anchor: ContentsMenuAnchor, folder: TFolder): void {
     const menu = new Menu();
-    menu.addItem((item) => item.setTitle(t("open")).setIcon("file-text").onClick(() => void this.service.openFolderNode(folder.path)));
-    menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => void this.service.openFolderNode(folder.path, true)));
-    menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(folder)));
-    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(folder)));
+    menu.addItem((item) => item.setTitle(t("open")).setIcon("file-text").onClick(() => this.runAction(this.service.openFolderNode(folder.path))));
+    menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => this.runAction(this.service.openFolderNode(folder.path, true))));
+    menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(folder))));
+    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(folder))));
     menu.addSeparator();
     this.addNodeMenuItems(menu, folder, false);
     this.showMenu(menu, anchor);
   }
 
   public promptVisual(folder: TFolder): void {
-    new VisualPickerModal(this.app, folder, async (value) => {
-      await this.visuals.set(folder, value);
-      this.refreshVisuals();
-    }).open();
+    try {
+      new VisualPickerModal(this.app, folder, this.visuals.candidates(folder),
+        (values) => this.visuals.preview(folder, values), (values) => this.visuals.diagnostics(values), async (values) => {
+        await this.visuals.set(folder, values);
+        this.refreshVisuals();
+      }).open();
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    }
   }
 
   private showScan(healthMode: boolean): void {
     const scan = this.service.scan();
     new MigrationModal(this.app, scan, async (progress) => {
-      this.settings.adoptionState = "migrating";
-      await this.saveSettings();
-      try {
-        await this.service.migrate(scan, progress);
-        this.settings.adoptionState = "managed";
-        await this.saveSettings();
-        this.refreshVisuals();
-      } catch (error) {
-        this.settings.adoptionState = "unadopted";
-        await this.saveSettings();
-        throw error;
-      }
+      await runAdoptionMigration(
+        this.settings,
+        () => this.saveSettings(),
+        () => this.service.migrate(scan, progress),
+      );
+      this.refreshVisuals();
     }, healthMode, this.settings.adoptionState !== "managed").open();
   }
 
   private registerCommands(): void {
     this.addCommand({ id: "review-vault-changes", name: t("maintenance"), callback: () => this.openMaintenance() });
     this.addCommand({ id: "health", name: t("health"), callback: () => this.showHealth() });
-    this.addCommand({ id: "open-homepage", name: t("openHomepage"), callback: () => void this.openHomepage() });
+    this.addCommand({ id: "open-homepage", name: t("openHomepage"), callback: () => this.runAction(this.openHomepage()) });
     this.addCommand({ id: "create-child-node", name: t("createChild"), callback: () => this.promptCreateChild() });
     this.addCommand({
       id: "create-from-selection",
@@ -218,18 +253,33 @@ export default class FolderNodesPlugin extends Plugin {
         return true;
       },
     });
-    this.addCommand({ id: "open-contents", name: t("contents"), callback: () => void this.openContents() });
+    this.addCommand({ id: "open-contents", name: t("contents"), callback: () => this.runAction(this.openContents()) });
     this.addCommand({ id: "rename-node", name: t("rename"), callback: () => this.promptRenameCurrent() });
     this.addCommand({ id: "move-node", name: t("move"), callback: () => this.promptMoveCurrent() });
     this.addCommand({ id: "merge-node", name: t("merge"), callback: () => this.promptMergeCurrent() });
-    this.addCommand({ id: "move-node-up", name: t("moveUp"), callback: () => void this.reorderCurrent(-1) });
-    this.addCommand({ id: "move-node-down", name: t("moveDown"), callback: () => void this.reorderCurrent(1) });
+    this.addCommand({ id: "move-node-up", name: t("moveUp"), callback: () => this.runAction(this.reorderCurrent(-1)) });
+    this.addCommand({ id: "move-node-down", name: t("moveDown"), callback: () => this.runAction(this.reorderCurrent(1)) });
   }
 
   private registerEvents(): void {
-    this.registerEvent(this.app.vault.on("create", (entry) => this.scheduleReconcile(entry.path, "create")));
-    this.registerEvent(this.app.vault.on("delete", (entry) => this.scheduleReconcile(entry.path, "delete")));
+    this.registerEvent(this.app.vault.on("create", (entry) => {
+      if (this.service.consumeExpectedEvent("create", entry.path)) { this.refreshVisuals(entry.path); return; }
+      this.scheduleReconcile(entry.path, "create");
+    }));
+    this.registerEvent(this.app.vault.on("delete", (entry) => {
+      const affected = this.references.removeSource(entry.path);
+      for (const path of affected) this.refreshVisuals(path);
+      if (this.service.consumeExpectedEvent("delete", entry.path)) { this.refreshVisuals(entry.path); return; }
+      this.scheduleReconcile(entry.path, "delete");
+    }));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
+      const affected = this.references.removeSource(oldPath);
+      for (const path of affected) this.refreshVisuals(path);
+      if (this.service.consumeExpectedEvent("rename", entry.path, oldPath)) {
+        this.refreshVisuals(oldPath);
+        this.refreshVisuals(entry.path);
+        return;
+      }
       if (this.reconciliationReady) void this.service.reconcileRenamed(entry, oldPath)
         .then(() => this.refreshVisuals())
         .catch((error) => this.reportReconcileError(error));
@@ -241,11 +291,22 @@ export default class FolderNodesPlugin extends Plugin {
       if (editor.getSelection().trim() === "" || info.file === null) return;
       menu.addItem((item) => item.setTitle(t("createSelection")).setIcon("folder-plus").onClick(() => this.previewSelectionCreation(editor, info.file)));
     }));
+    this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, window) => {
+      this.registerUnresolvedLinkDocument(window.document);
+    }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       this.updateContentsView();
-      this.explorer.refresh();
+      this.refreshVisuals();
     }));
-    this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshVisuals()));
+    this.registerEvent(this.app.metadataCache.on("changed", (file) => {
+      const affected = this.references.updateSource(file.path, this.app.metadataCache.resolvedLinks[file.path] ?? {});
+      this.refreshVisuals(file.path);
+      for (const path of affected) this.refreshVisuals(path);
+    }));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => {
+      this.references.rebuild(this.app.metadataCache.resolvedLinks);
+      this.refreshVisuals();
+    }));
   }
 
   private scheduleReconcile(path: string, kind: "create" | "delete"): void {
@@ -272,7 +333,62 @@ export default class FolderNodesPlugin extends Plugin {
     this.reconcileBatches.set(key, { timer, entries });
   }
 
+  private registerUnresolvedLinkDocument(document: Document): void {
+    if (this.unresolvedLinkDocuments.has(document)) return;
+    this.unresolvedLinkDocuments.add(document);
+    const handle = (event: MouseEvent) => this.interceptUnresolvedLink(event);
+    this.registerDomEvent(document, "click", handle, { capture: true });
+    this.registerDomEvent(document, "auxclick", handle, { capture: true });
+  }
+
+  private interceptUnresolvedLink(event: MouseEvent): void {
+    if (this.settings.adoptionState !== "managed" || event.defaultPrevented || (event.button !== 0 && event.button !== 1)) return;
+    const target = event.target as { closest?: (selector: string) => Element | null } | null;
+    const link = target?.closest?.("a.internal-link.is-unresolved");
+    const rawLinkText = link?.getAttribute("data-href")?.trim();
+    if (link === null || link === undefined || rawLinkText === undefined || rawLinkText === "") return;
+    const source = this.sourceFileForLink(link);
+    if (source === null) return;
+    const linkPath = getLinkpath(rawLinkText).trim();
+    if (linkPath === "" || this.app.metadataCache.getFirstLinkpathDest(linkPath, source.path) !== null) return;
+    const requestedFile = linkPath.toLocaleLowerCase().endsWith(".md") ? linkPath : `${linkPath}.md`;
+    const defaultParent = this.app.fileManager.getNewFileParent(source.path, requestedFile);
+    const plan = planUnresolvedNode(linkPath, defaultParent.path);
+    if (plan === null || this.service.isIgnoredPath(plan.nodePath) || this.service.isLeafNoteExempt(plan.leafPath)) return;
+
+    const visibleText = link.textContent ?? "";
+    const cacheLinks = this.app.metadataCache.getFileCache(source)?.links ?? [];
+    const candidates: LinkAliasCandidate[] = cacheLinks.map((candidate) => ({
+      linkPath: getLinkpath(candidate.link),
+      original: candidate.original,
+      ...(candidate.displayText === undefined ? {} : { displayText: candidate.displayText }),
+    }));
+    const alias = this.settings.addSelectionAlias
+      ? aliasFromLinkDisplay(linkPath, visibleText, candidates, rawLinkText === linkPath)
+      : null;
+    const pane = event.button === 1 ? "tab" : Keymap.isModEvent(event);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.runAction(this.createAndOpenUnresolvedNode(plan.nodePath, alias, pane));
+  }
+
+  private sourceFileForLink(link: Element): TFile | null {
+    let source: TFile | null = null;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (source === null && leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(link)) source = leaf.view.file;
+    });
+    return source;
+  }
+
+  private async createAndOpenUnresolvedNode(nodePath: string, alias: string | null, pane: ReturnType<typeof Keymap.isModEvent>): Promise<void> {
+    const note = await this.service.createNodePath(nodePath, alias === null ? {} : { alias });
+    if (this.unloaded) return;
+    await this.app.workspace.getLeaf(pane).openFile(note);
+    this.refreshVisuals();
+  }
+
   private reportReconcileError(error: unknown): void {
+    if (this.unloaded) return;
     this.reconcileErrorCount += 1;
     this.reconcileErrorMessages.add(formatError(error));
     if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
@@ -293,7 +409,7 @@ export default class FolderNodesPlugin extends Plugin {
     if (entry instanceof TFolder) {
       const identity = classifyFolderIdentity(
         this.service.isIgnoredPath(entry.path),
-        this.service.getNote(this.service.notePathForFolder(entry.path)) !== null,
+        this.service.getCanonicalFile(entry.path) !== null,
       );
       if (identity === "ordinary") return;
       menu.addSeparator();
@@ -306,8 +422,8 @@ export default class FolderNodesPlugin extends Plugin {
     const counterpartPath = folder.path === "" ? entry.basename : `${folder.path}/${entry.basename}`;
     const counterpart = this.service.getFolder(counterpartPath);
     const identity = classifyFileIdentity({
-      canonicalNodeNote: entry.path === this.service.notePathForFolder(folder.path),
-      counterpartNodeExists: counterpart !== null && this.service.getNote(this.service.notePathForFolder(counterpart.path)) !== null,
+      canonicalNodeNote: this.service.isCanonicalFile(entry),
+      counterpartNodeExists: counterpart !== null && this.service.getCanonicalFile(counterpart.path) !== null,
       ignored: this.service.isIgnoredPath(folder.path),
       leafExempt: this.service.isLeafNoteExempt(entry.path),
       markdown: entry.extension.toLocaleLowerCase() === "md",
@@ -325,36 +441,36 @@ export default class FolderNodesPlugin extends Plugin {
 
   private addNodeMenuItems(menu: Menu, folder: TFolder, includeContents: boolean): void {
     menu.addItem((item) => item.setTitle(t("createChild")).setIcon("folder-plus").onClick(() => this.promptCreateChild(folder)));
-    if (includeContents) menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(folder)));
+    if (includeContents) menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(folder))));
     menu.addItem((item) => item.setTitle(t("editVisual")).setIcon("palette").onClick(() => this.promptVisual(folder)));
     if (normalizeVaultPath(folder.path) === "") return;
     menu.addItem((item) => item.setTitle(t("rename")).setIcon("pencil").onClick(() => this.promptRename(folder)));
     menu.addItem((item) => item.setTitle(t("move")).setIcon("folder-input").onClick(() => this.promptMove(folder)));
     menu.addItem((item) => item.setTitle(t("merge")).setIcon("combine").onClick(() => this.promptMerge(folder)));
-    menu.addItem((item) => item.setTitle(t("moveUp")).setIcon("arrow-up").onClick(() => void this.service.reorder(folder, -1)));
-    menu.addItem((item) => item.setTitle(t("moveDown")).setIcon("arrow-down").onClick(() => void this.service.reorder(folder, 1)));
+    menu.addItem((item) => item.setTitle(t("moveUp")).setIcon("arrow-up").onClick(() => void this.runRepair(() => this.service.reorder(folder, -1))));
+    menu.addItem((item) => item.setTitle(t("moveDown")).setIcon("arrow-down").onClick(() => void this.runRepair(() => this.service.reorder(folder, 1))));
     menu.addItem((item) => item.setTitle(t("delete")).setIcon("trash-2").setWarning(true).onClick(() => this.confirmDelete(folder)));
   }
 
   private openEntryMenu(anchor: ContentsMenuAnchor, entry: TAbstractFile, sourceFolder: TFolder): void {
     const menu = new Menu();
     if (entry instanceof TFolder) {
-      menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => void this.openContents(entry)));
-      menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(entry)));
+      menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(entry))));
+      menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(entry))));
     } else if (entry instanceof TFile) {
-      menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => void this.app.workspace.getLeaf(false).openFile(entry)));
-      menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => void this.app.workspace.getLeaf(true).openFile(entry)));
-      menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => void this.revealEntry(entry)));
+      menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => this.runAction(this.app.workspace.getLeaf(false).openFile(entry))));
+      menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => this.runAction(this.app.workspace.getLeaf(true).openFile(entry))));
+      menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(entry))));
       menu.addItem((item) => item.setTitle(t("copyLink")).setIcon("copy").onClick(() => {
-        const sourcePath = this.service.getNote(this.service.notePathForFolder(sourceFolder.path))?.path ?? "";
-        void this.copyFileLink(entry, sourcePath);
+        const sourcePath = this.service.getCanonicalFile(sourceFolder.path)?.path ?? "";
+        this.runAction(this.copyFileLink(entry, sourcePath));
       }));
       if (
         !this.service.isIgnoredPath(sourceFolder.path) &&
-        this.service.getNote(this.service.notePathForFolder(sourceFolder.path)) !== null &&
+        this.service.getCanonicalFile(sourceFolder.path) !== null &&
         ["avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp"].includes(entry.extension.toLocaleLowerCase())
       ) {
-        menu.addItem((item) => item.setTitle(t("setAsVisual")).setIcon("image").onClick(() => void this.setFileAsVisual(entry, sourceFolder)));
+        menu.addItem((item) => item.setTitle(t("setAsVisual")).setIcon("image").onClick(() => this.runAction(this.setFileAsVisual(entry, sourceFolder))));
       }
       menu.addSeparator();
       menu.addItem((item) => item.setTitle(t("renameFile")).setIcon("pencil").onClick(() => this.promptRenameFile(entry)));
@@ -374,15 +490,19 @@ export default class FolderNodesPlugin extends Plugin {
     }
   }
 
+  private runAction(operation: Promise<unknown>): void {
+    void operation.catch((error) => new Notice(formatError(error), 8000));
+  }
+
   private async addLeafExemption(path: string): Promise<void> {
     if (!this.settings.leafNoteExemptions.includes(path)) this.settings.leafNoteExemptions.push(path);
     this.settings.leafNoteExemptions.sort((a, b) => a.localeCompare(b));
     await this.saveSettings();
-    this.refreshVisuals();
+    await this.reconcileSettingsChange();
   }
 
   private showMenu(menu: Menu, anchor: ContentsMenuAnchor): void {
-    if (anchor instanceof MouseEvent) {
+    if (isMouseEventAnchor(anchor)) {
       anchor.preventDefault();
       anchor.stopPropagation();
       menu.showAtMouseEvent(anchor);
@@ -411,7 +531,9 @@ export default class FolderNodesPlugin extends Plugin {
 
   private async setFileAsVisual(file: TFile, folder: TFolder): Promise<void> {
     try {
-      await this.visuals.set(folder, `[[${file.path}]]`);
+      const sourcePath = this.service.notePathForFolder(folder.path);
+      const linkText = this.app.metadataCache.fileToLinktext(file, sourcePath);
+      await this.visuals.set(folder, [`[[${linkText}]]`]);
       this.refreshVisuals();
     } catch (error) {
       new Notice(formatError(error), 8000);
@@ -466,8 +588,19 @@ export default class FolderNodesPlugin extends Plugin {
       if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, name, options);
-      editor.replaceSelection(wikiLink);
-      await this.app.workspace.getLeaf(false).openFile(note);
+      try {
+        editor.replaceSelection(wikiLink);
+      } catch (error) {
+        if (note.parent !== null) {
+          try { await this.service.deleteNode(note.parent); }
+          catch (rollbackError) {
+            throw new AggregateError([error, rollbackError], "Selection replacement failed and the new node could not be rolled back", { cause: error });
+          }
+        }
+        throw error;
+      }
+      try { await this.app.workspace.getLeaf(false).openFile(note); }
+      catch (error) { new Notice(formatError(error), 8000); }
       this.refreshVisuals();
     }).open();
   }
@@ -523,9 +656,24 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private updateContentsView(): void {
+    if (this.app.workspace.getActiveViewOfType(FolderNodeContentsView) !== null) return;
     const folder = this.currentFolder();
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeContentsView) leaf.view.setFolder(folder?.path ?? "");
     }
   }
+
+  private applyRefresh(batch: RefreshBatch): void {
+    const explorerAffected = batch.full || [...batch.paths].some((path) =>
+      normalizeVaultPath(path) === normalizeVaultPath(this.service.rootNotePath()) ||
+      isCanonicalNodeNote(path) || this.service.getFolder(path) !== null);
+    if (explorerAffected) this.explorer.refresh();
+    for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
+      if (leaf.view instanceof FolderNodeContentsView) leaf.view.refresh(batch.full ? undefined : batch.paths);
+    }
+  }
+}
+
+function isMouseEventAnchor(anchor: ContentsMenuAnchor): anchor is MouseEvent {
+  return typeof (anchor as MouseEvent).clientX === "number" && typeof (anchor as MouseEvent).preventDefault === "function";
 }

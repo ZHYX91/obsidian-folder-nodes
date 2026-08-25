@@ -10,5 +10,9 @@ describe("source-preserving frontmatter patches", () => {
   it("creates exact aliases from selected text", () => {
     expect(createNodeDocument("Selected text", "Selected text")).toBe("---\naliases:\n  - \"Selected text\"\n---\nSelected text");
     expect(createNodeDocument(null, "Body")).toBe("Body");
+    expect(createNodeDocument(null, "\n    indented\n")).toBe("\n    indented\n");
+  });
+  it("fails closed on unterminated frontmatter", () => {
+    expect(() => patchFrontmatterScalar("---\nicon: x\nbody", "folderNodeSiblingRank", 1)).toThrow("malformed frontmatter");
   });
 });

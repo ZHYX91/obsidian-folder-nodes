@@ -49,4 +49,13 @@ describe("migration scan", () => {
     expect(scan.leafMarkdown).toEqual([]);
     expect(scan.conflicts).toEqual([{ path: "Generated.md", reason: "Target belongs to an unmanaged folder: Generated" }]);
   });
+  it("treats one case-only name variant as canonical and blocks ambiguous variants", () => {
+    expect(scanMigration({ folders: ["Folder"], markdown: ["Folder/folder.md"] })).toEqual({
+      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: [], missingNodeNotes: [],
+    });
+    const ambiguous = scanMigration({ folders: ["Folder"], markdown: ["Folder/Folder.md", "Folder/folder.md"] });
+    expect(ambiguous.conflicts[0]?.reason).toContain("Multiple canonical Node Notes");
+    expect(ambiguous.leafMarkdown).toEqual([]);
+    expect(ambiguous.missingNodeNotes).toEqual([]);
+  });
 });

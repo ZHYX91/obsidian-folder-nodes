@@ -145,6 +145,14 @@
 }
 
 .folder-nodes-visual-presets > button { min-width: 44px; min-height: 36px; }
+.folder-nodes-visual-editor { display: flex; flex-direction: column; gap: var(--size-4-2); }
+.folder-nodes-visual-candidate { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 32px); gap: var(--size-2-2); }
+.folder-nodes-visual-candidate > input { width: 100%; }
+.folder-nodes-visual-candidate > button { padding: 0; }
+.folder-nodes-visual-preview { display: flex; flex-wrap: wrap; align-items: center; gap: var(--size-4-3); margin-block: var(--size-4-3); }
+.folder-nodes-visual-preview-item { display: flex; align-items: center; gap: var(--size-2-3); }
+.folder-nodes-visual-preview-item .folder-nodes-visual { width: 28px; height: 28px; }
+.folder-nodes-visual-preview > .setting-item-description { flex-basis: 100%; }
 .folder-nodes-canonical-note { display: none !important; }
 .folder-nodes-native-create-hidden,
 .folder-nodes-create-node.is-hidden { display: none !important; }
@@ -192,7 +200,8 @@
 
 .folder-nodes-explorer-icon .folder-nodes-visual,
 .folder-nodes-explorer-icon img { width: 16px; height: 16px; }
-.folder-nodes-explorer-icon .folder-nodes-visual-emoji { font-size: 14px; }
+.folder-nodes-explorer-icon .folder-nodes-visual-emoji,
+.folder-nodes-explorer-icon .folder-nodes-visual-glyph { font-size: 14px; }
 .folder-nodes-explorer-icon.is-default-node { color: var(--text-faint); }
 .folder-nodes-explorer-status-icon.is-warning { color: var(--color-orange); }
 
@@ -244,14 +253,26 @@
 
 .folder-nodes-explorer-status-icon > svg { width: 16px; height: 16px; }
 
+.folder-nodes-note-title-host {
+  position: relative;
+}
+
 .folder-nodes-note-title-icon {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 0.2em;
+  inset-inline-start: 0;
   display: inline-flex;
   width: 0.9em;
   height: 0.9em;
-  margin-inline-end: 0.35em;
-  vertical-align: -0.05em;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
 }
-.folder-nodes-note-title-icon .folder-nodes-visual-emoji { font-size: 0.8em; }
+.inline-title.folder-nodes-has-title-icon { padding-inline-start: 1.25em; }
+.folder-nodes-note-title-icon .folder-nodes-visual-emoji,
+.folder-nodes-note-title-icon .folder-nodes-visual-glyph { font-size: 0.8em; }
 
 .folder-nodes-drop-before { box-shadow: inset 0 2px var(--interactive-accent); }
 .folder-nodes-drop-after { box-shadow: inset 0 -2px var(--interactive-accent); }
@@ -451,6 +472,10 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-entry-menu:focus-visible { opacity: 1; }
 
 .folder-nodes-is-dragging { opacity: 0.45; }
+.folder-nodes-content-drop-into {
+  background: var(--background-modifier-hover) !important;
+  box-shadow: inset 0 0 0 2px var(--interactive-accent) !important;
+}
 
 .folder-nodes-node-shell.folder-nodes-node-drop-before::before,
 .folder-nodes-node-shell.folder-nodes-node-drop-after::before {
@@ -542,7 +567,16 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-visual > svg { width: 100%; height: 100%; }
 .folder-nodes-visual img { width: 100%; height: 100%; object-fit: cover; }
 .folder-nodes-visual-emoji { font-size: 2rem; line-height: 1; }
+.folder-nodes-visual-glyph { display: inline-flex; min-width: 1em; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 600; line-height: 1; }
 .folder-nodes-visual-color { width: 100%; height: 100%; border-radius: inherit; }
+.folder-nodes-visual.has-accent > svg,
+.folder-nodes-visual.has-accent .folder-nodes-visual-glyph { color: var(--folder-nodes-visual-accent); }
+.folder-nodes-visual.has-accent .folder-nodes-visual-emoji,
+.folder-nodes-visual.has-accent img {
+  border-radius: 0.25em;
+  background: color-mix(in srgb, var(--folder-nodes-visual-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--folder-nodes-visual-accent) 55%, transparent);
+}
 
 .folder-nodes-card-title {
   flex: 0 0 auto;
@@ -722,7 +756,12 @@ button.folder-nodes-current:focus-visible {
 
 .folder-nodes-file-icon { flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-muted); }
 .folder-nodes-file-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.folder-nodes-file-extension { flex: 0 0 auto; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.folder-nodes-file-extension {
+  flex: 0 0 4.5em;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  text-align: start;
+}
 .folder-nodes-unreferenced-file {
   display: inline-flex;
   flex: 0 0 16px;

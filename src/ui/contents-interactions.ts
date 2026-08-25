@@ -38,22 +38,11 @@ export function nodeEntryVisual(
     visual: {
       kind: "lucide",
       value: kind === "missing-note" || kind === "healthy" ? "folder-tree" : "file-warning",
+      accent: null,
       inheritedFrom: null,
     },
     warning: kind !== "healthy",
   };
-}
-
-export function referencedVaultPaths(
-  resolvedLinks: Readonly<Record<string, Readonly<Record<string, number>>>>,
-): Set<string> {
-  const referenced = new Set<string>();
-  for (const targets of Object.values(resolvedLinks)) {
-    for (const [path, count] of Object.entries(targets)) {
-      if (count > 0) referenced.add(normalizeVaultPath(path));
-    }
-  }
-  return referenced;
 }
 
 export function filesSectionKey(hasFolders: boolean): "files" | "filesAndFolders" {
@@ -97,6 +86,10 @@ export interface ContentLinkItem {
 
 export function formatContentLinks(items: readonly ContentLinkItem[], allAsLinks = false): string {
   return items.map(({ kind, link }) => kind === "media" && !allAsLinks && !link.startsWith("!") ? `!${link}` : link).join("\n");
+}
+
+export function contentDragPolicy(itemCount: number): { effectAllowed: "copy" | "copyMove"; internalMove: boolean } {
+  return itemCount === 1 ? { effectAllowed: "copyMove", internalMove: true } : { effectAllowed: "copy", internalMove: false };
 }
 
 export function isContextMenuKey(event: KeyboardEvent): boolean {

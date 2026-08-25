@@ -1,4 +1,4 @@
-import type { FolderNodesSettings } from "../core/types";
+import type { FolderNodesSettings, NamingPart } from "../core/types";
 
 export const DEFAULT_SETTINGS: FolderNodesSettings = {
   adoptionState: "unadopted",
@@ -35,7 +35,7 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     ? input.explorerIconPosition
     : "before";
   return {
-    adoptionState: input.adoptionState === "managed" || input.adoptionState === "migrating" ? input.adoptionState : "unadopted",
+    adoptionState: input.adoptionState === "managed" ? "managed" : "unadopted",
     language,
     homepageEnabled: input.homepageEnabled === true,
     openHomepageOnStartup: input.openHomepageOnStartup === true,
@@ -47,9 +47,21 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     leafNotePrefixes: normalizePrefixes(input.leafNotePrefixes, DEFAULT_SETTINGS.leafNotePrefixes),
     ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes, DEFAULT_SETTINGS.ignoredFolderPrefixes),
     addSelectionAlias: input.addSelectionAlias !== false,
-    prefix: { ...DEFAULT_SETTINGS.prefix, ...input.prefix },
-    suffix: { ...DEFAULT_SETTINGS.suffix, ...input.suffix },
+    prefix: normalizeNamingPart(input.prefix, DEFAULT_SETTINGS.prefix),
+    suffix: normalizeNamingPart(input.suffix, DEFAULT_SETTINGS.suffix),
     timestampFormat: typeof input.timestampFormat === "string" ? input.timestampFormat : DEFAULT_SETTINGS.timestampFormat,
+  };
+}
+
+function normalizeNamingPart(value: unknown, fallback: NamingPart): NamingPart {
+  const input = typeof value === "object" && value !== null ? value as Partial<NamingPart> : {};
+  const source = input.source === "current-file" || input.source === "current-node" || input.source === "current-heading" ||
+    input.source === "timestamp" || input.source === "custom" ? input.source : fallback.source;
+  return {
+    enabled: input.enabled === true,
+    source,
+    separator: typeof input.separator === "string" ? input.separator : fallback.separator,
+    customText: typeof input.customText === "string" ? input.customText : fallback.customText,
   };
 }
 

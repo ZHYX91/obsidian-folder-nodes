@@ -289,6 +289,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNaming(panel: HTMLElement): void {
+    this.renderNamingGuide(panel);
     new Setting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
       this.plugin.settings.addSelectionAlias = value; await this.plugin.saveSettings();
     }));
@@ -300,6 +301,28 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const preview = panel.createDiv({ cls: "folder-nodes-name-preview" });
     preview.createEl("strong", { text: `${t("preview")}: ` });
     preview.createSpan({ cls: "folder-nodes-name-preview-value", text: this.plugin.previewSelectionName(t("sampleSelection")) });
+  }
+
+  private renderNamingGuide(panel: HTMLElement): void {
+    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
+    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
+    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
+    setIcon(icon, "info");
+    heading.createEl("strong", { text: t("creationGuideTitle") });
+
+    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
+    body.createEl("p", { text: t("creationGuideSelection") });
+    this.creationExample(body, "[[a]]", "a/a.md", null);
+    this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));
+    body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("creationGuideScope") });
+  }
+
+  private creationExample(container: HTMLElement, source: string, target: string, detail: string | null): void {
+    const example = container.createDiv({ cls: "folder-nodes-settings-guide-example" });
+    example.createEl("code", { text: source });
+    example.createSpan({ text: "→" });
+    example.createEl("code", { text: target });
+    if (detail !== null) example.createSpan({ text: detail });
   }
 
   private renderNamingPart(panel: HTMLElement, label: string, part: NamingPart): void {
@@ -349,6 +372,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       if (!paths.includes(path)) paths.push(path);
       paths.sort((a, b) => a.localeCompare(b));
       await this.plugin.saveSettings();
+      await this.plugin.reconcileSettingsChange();
       this.display();
       updateDeclarativeSettingTab(this);
     }).open();
@@ -362,6 +386,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       if (!prefixes.includes(prefix)) prefixes.push(prefix);
       prefixes.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
       await this.plugin.saveSettings();
+      await this.plugin.reconcileSettingsChange();
       this.display();
       updateDeclarativeSettingTab(this);
     }).open();
@@ -376,6 +401,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
     prefixes.splice(index, 1);
     await this.plugin.saveSettings();
+    await this.plugin.reconcileSettingsChange();
     this.display();
     updateDeclarativeSettingTab(this);
   }
@@ -384,6 +410,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
     paths.splice(index, 1);
     await this.plugin.saveSettings();
+    await this.plugin.reconcileSettingsChange();
     this.display();
     updateDeclarativeSettingTab(this);
   }

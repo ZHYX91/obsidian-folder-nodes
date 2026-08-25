@@ -1,5 +1,6 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, Notice, Setting } from "obsidian";
 import { formatError, t } from "./i18n";
+import { SubmittingModal } from "./submitting-modal";
 
 export interface SelectionPreview {
   parentPath: string;
@@ -9,7 +10,7 @@ export interface SelectionPreview {
   wikiLink: string;
 }
 
-export class SelectionCreateModal extends Modal {
+export class SelectionCreateModal extends SubmittingModal {
   public constructor(
     app: App,
     private readonly preview: SelectionPreview,
@@ -26,13 +27,16 @@ export class SelectionCreateModal extends Modal {
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
       .addButton((button) => button.setCta().setButtonText(t("create")).onClick(async () => {
+        if (this.submitting) return;
+        this.submitting = true;
         button.setDisabled(true);
         try {
           await this.onCreate();
-          this.close();
+          this.closeAfterSubmission();
         } catch (error) {
           new Notice(formatError(error), 8000);
         } finally {
+          this.submitting = false;
           button.setDisabled(false);
         }
       }));

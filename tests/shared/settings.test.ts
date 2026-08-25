@@ -8,9 +8,20 @@ describe("settings", () => {
     expect(settings.prefix.separator).toBe("_");
     expect(settings.suffix).toEqual(DEFAULT_SETTINGS.suffix);
   });
+  it("rejects malformed nested naming values", () => {
+    const settings = normalizeSettings({
+      prefix: { enabled: "yes", source: "broken", separator: 42, customText: null },
+      suffix: "broken",
+    });
+    expect(settings.prefix).toEqual(DEFAULT_SETTINGS.prefix);
+    expect(settings.suffix).toEqual(DEFAULT_SETTINGS.suffix);
+  });
   it("defaults unknown language values to follow Obsidian", () => {
     expect(normalizeSettings({ language: "unknown" }).language).toBe("auto");
     expect(normalizeSettings({ language: "zh-CN" }).language).toBe("zh-CN");
+  });
+  it("recovers a crashed migration as unadopted", () => {
+    expect(normalizeSettings({ adoptionState: "migrating" }).adoptionState).toBe("unadopted");
   });
   it("normalizes icon placement and exact exemption paths", () => {
     const settings = normalizeSettings({

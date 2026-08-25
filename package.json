@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Treat every folder in an Obsidian Vault as a same-named folder node.",
   "type": "module",
   "main": "dist/main.js",
@@ -31,9 +31,9 @@
   ],
   "author": "ZhengYX",
   "license": "MIT",
-  "packageManager": "npm@11.16.0",
+  "packageManager": "npm@11.17.0",
   "engines": {
-    "node": "24.18.0"
+    "node": "24.19.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -47,5 +47,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
     "vitest": "4.1.10"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

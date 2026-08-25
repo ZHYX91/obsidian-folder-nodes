@@ -1,10 +1,11 @@
 import type { MigrationConflict, MigrationScan } from "./types";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "./exemptions";
-import { basename, dirname, nodeNotePath, normalizeVaultPath } from "./paths";
+import { basename, dirname, isSameVaultName, normalizeVaultPath, sanitizeNodeName } from "./paths";
 
 export interface VaultInventory {
   folders: readonly string[];
   markdown: readonly string[];
+  files?: readonly string[];
 }
 
 export interface MigrationExemptions {
@@ -21,6 +22,7 @@ export function scanMigration(inventory: VaultInventory, exemptions: MigrationEx
   const leafMarkdownPrefixes = exemptions.leafMarkdownPrefixes ?? [];
   const allFolders = new Set(inventory.folders.map(normalizeVaultPath).filter((path) => path !== ""));
   const allMarkdown = new Set(inventory.markdown.map(normalizeVaultPath).filter((path) => path !== ""));
+  const allFiles = new Set((inventory.files ?? inventory.markdown).map(normalizeVaultPath).filter((path) => path !== ""));
   const isIgnored = (path: string): boolean => matchesFolderExemption(path, configuredFolders, folderPrefixes);
   const ignoredFolders = [...allFolders].filter((path) => isIgnored(path) && !isIgnored(dirname(path))).sort();
   const folders = new Set([...allFolders].filter((path) => !isIgnored(path)));
@@ -33,19 +35,22 @@ export function scanMigration(inventory: VaultInventory, exemptions: MigrationEx
   const conflicts: MigrationConflict[] = [];
 
   for (const folder of folders) {
-    const note = nodeNotePath(folder);
-    if (note !== "" && !markdown.has(note)) missingNodeNotes.push(folder);
+    const canonical = [...markdown].filter((note) => dirname(note) === folder && isSameVaultName(basename(note).slice(0, -3), basename(folder)));
+    if (canonical.length === 0) missingNodeNotes.push(folder);
+    else if (canonical.length > 1) conflicts.push({ path: folder, reason: `Multiple canonical Node Notes: ${canonical.join(", ")}` });
   }
   for (const note of markdown) {
     const parent = dirname(note);
-    if (nodeNotePath(parent) === note) continue;
-    const name = basename(note).slice(0, -3);
+    if (folders.has(parent) && isSameVaultName(basename(note).slice(0, -3), basename(parent))) continue;
+    const name = sanitizeNodeName(basename(note).slice(0, -3));
     const targetFolder = parent === "" ? name : `${parent}/${name}`;
-    const targetNote = `${targetFolder}/${name}.md`;
-    if (isIgnored(targetFolder)) {
+    const targetFile = `${targetFolder}/${name}.md`;
+    if (allFiles.has(targetFolder)) {
+      conflicts.push({ path: note, reason: `Target folder path is occupied by a file: ${targetFolder}` });
+    } else if (isIgnored(targetFolder)) {
       conflicts.push({ path: note, reason: `Target belongs to an unmanaged folder: ${targetFolder}` });
-    } else if (folders.has(targetFolder) && markdown.has(targetNote)) {
-      conflicts.push({ path: note, reason: `Target node already exists: ${targetNote}` });
+    } else if (folders.has(targetFolder) && markdown.has(targetFile)) {
+      conflicts.push({ path: note, reason: `Target node already exists: ${targetFile}` });
     } else {
       leafMarkdown.push(note);
     }

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   ensureExplorerIconPosition,
   ensureExplorerRootRow,
+  ensureNoteTitleIcon,
   explorerMarkerPlacement,
   isFolderCollapseControl,
   setNativeCreateActionsHidden,
+  removeNoteTitleIcon,
   syncExplorerNodeOrder,
 } from "../../src/adapters/explorer-events";
 
@@ -158,5 +160,27 @@ describe("File Explorer create actions", () => {
     setNativeCreateActionsHidden(container, new Set(["新建笔记", "新建文件夹"]), false);
     expect(note.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
     expect(folder.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
+  });
+});
+
+describe("inline title decoration", () => {
+  it("keeps visual text outside the editable title and removes it cleanly", () => {
+    const host = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "inline-title";
+    title.contentEditable = "true";
+    title.textContent = "Node";
+    host.append(title);
+
+    const icon = ensureNoteTitleIcon(title);
+    icon.textContent = "📔";
+
+    expect(title.contains(icon)).toBe(false);
+    expect(title.textContent).toBe("Node");
+    expect(icon.contentEditable).toBe("false");
+    expect(icon.nextElementSibling).toBe(title);
+    removeNoteTitleIcon(title);
+    expect(host.querySelector(".folder-nodes-note-title-icon")).toBeNull();
+    expect(title.classList.contains("folder-nodes-has-title-icon")).toBe(false);
   });
 });

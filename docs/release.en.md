@@ -18,6 +18,16 @@ Before candidacy, run `npm ci`, `npm run check`, `npm run release:check`, and th
 
 Local commit, push, tag, GitHub Release, Obsidian community submission, and production-Vault deployment are separate actions. Commits use normal Git identity and a Conventional Commit subject. Do not push, tag, publish a Release, or submit to the community directory without explicit user authorization.
 
+Before tagging, manually run the read-only Release preflight from the current remote default-branch
+HEAD with the proposed version. It requires the remote tag and same-version Release to be absent,
+runs the full gate, and builds the manual-install ZIP without publishing. Only a numeric tag push
+enters the write-enabled stage. A failed tag workflow is safely rerunnable: an existing Release is
+accepted as a successful no-op only when it is stable, immutable, has the exact four assets, matches
+the current candidate byte for byte, and every provenance record binds the same tag and commit.
+Otherwise publish a higher version; never overwrite, edit, or append same-tag assets. `SHA256SUMS`
+stays inside the workflow handoff, while the public Release contains the three loose assets and the
+versioned ZIP.
+
 ## Production Vault
 
 Before deployment, confirm the exact Vault, plugin ID, and Obsidian process state. Preserve existing `data.json`. Copy only the exact candidate's three runtime files, recompute hashes after deployment, and confirm enabled state. A production Vault never receives migration fixtures or automated destructive acceptance.

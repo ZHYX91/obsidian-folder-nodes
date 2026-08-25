@@ -6,7 +6,8 @@ export function patchFrontmatterScalar(source: string, key: string, value: strin
   const end = hasFrontmatter ? lines.slice(1).findIndex((line) => FRONTMATTER_BOUNDARY.test(line)) + 1 : -1;
   const rendered = value === null ? null : `${key}: ${typeof value === "number" ? value : JSON.stringify(value)}`;
 
-  if (!hasFrontmatter || end <= 0) {
+  if (hasFrontmatter && end <= 0) throw new Error("Cannot update malformed frontmatter without a closing boundary");
+  if (!hasFrontmatter) {
     if (rendered === null) return source;
     return `---\n${rendered}\n---\n${source}`;
   }
@@ -22,7 +23,6 @@ export function patchFrontmatterScalar(source: string, key: string, value: strin
 }
 
 export function createNodeDocument(alias: string | null, body: string): string {
-  const normalizedBody = body.trimStart();
-  if (alias === null || alias.trim() === "") return normalizedBody;
-  return `---\naliases:\n  - ${JSON.stringify(alias.trim())}\n---\n${normalizedBody}`;
+  if (alias === null || alias.trim() === "") return body;
+  return `---\naliases:\n  - ${JSON.stringify(alias.trim())}\n---\n${body}`;
 }

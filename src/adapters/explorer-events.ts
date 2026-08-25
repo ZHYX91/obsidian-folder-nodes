@@ -1,5 +1,5 @@
 export function isFolderCollapseControl(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(
+  return isElementTarget(target) && target.closest(
     ".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon",
   ) !== null;
 }
@@ -83,22 +83,45 @@ export interface ExplorerRootRow {
   badge: HTMLElement;
 }
 
+export function ensureNoteTitleIcon(title: HTMLElement): HTMLElement {
+  const host = title.parentElement;
+  if (host === null) throw new Error("Inline title has no host element");
+  let icon = host.querySelector<HTMLElement>(":scope > .folder-nodes-note-title-icon");
+  if (icon === null) {
+    icon = title.ownerDocument.createElement("span");
+    icon.className = "folder-nodes-note-title-icon";
+    icon.contentEditable = "false";
+    icon.setAttribute("aria-hidden", "true");
+    host.insertBefore(icon, title);
+  }
+  host.classList.add("folder-nodes-note-title-host");
+  title.classList.add("folder-nodes-has-title-icon");
+  return icon;
+}
+
+export function removeNoteTitleIcon(title: HTMLElement): void {
+  const host = title.parentElement;
+  host?.querySelector(":scope > .folder-nodes-note-title-icon")?.remove();
+  host?.classList.remove("folder-nodes-note-title-host");
+  title.classList.remove("folder-nodes-has-title-icon");
+}
+
 export function ensureExplorerRootRow(container: HTMLElement): ExplorerRootRow {
   let row = container.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-root");
   if (row === null) {
-    row = document.createElement("div");
+    row = container.ownerDocument.createElement("div");
     row.className = "tree-item-self nav-file-title folder-nodes-explorer-root";
     row.tabIndex = 0;
     row.setAttribute("role", "treeitem");
     row.setAttribute("draggable", "false");
 
-    const icon = document.createElement("span");
+    const icon = container.ownerDocument.createElement("span");
     icon.className = "folder-nodes-explorer-root-icon";
     icon.dataset.role = "icon";
-    const title = document.createElement("span");
+    const title = container.ownerDocument.createElement("span");
     title.className = "nav-file-title-content folder-nodes-explorer-root-title";
     title.dataset.role = "title";
-    const badge = document.createElement("span");
+    const badge = container.ownerDocument.createElement("span");
     badge.className = "folder-nodes-explorer-root-badge";
     badge.dataset.role = "badge";
     row.append(icon, title, badge);
@@ -109,4 +132,8 @@ export function ensureExplorerRootRow(container: HTMLElement): ExplorerRootRow {
   const badge = row.querySelector<HTMLElement>(":scope > [data-role=badge]");
   if (icon === null || title === null || badge === null) throw new Error("Invalid Folder Nodes root row");
   return { row, icon, title, badge };
+}
+
+function isElementTarget(target: EventTarget | null): target is Element {
+  return target !== null && typeof (target as Element).closest === "function";
 }

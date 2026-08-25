@@ -11,7 +11,16 @@ export default defineConfig({
   test: {
     coverage: {
       exclude: ["src/**/*.d.ts"],
-      include: ["src/core/**/*.ts", "src/shared/settings.ts"],
+      include: [
+        "src/core/**/*.ts",
+        "src/shared/settings.ts",
+        "src/adapters/node-service.ts",
+        "src/adapters/vault-operation-coordinator.ts",
+        "src/adapters/explorer-events.ts",
+        "src/app/refresh-scheduler.ts",
+        "src/ui/contents-interactions.ts",
+        "src/ui/submitting-modal.ts",
+      ],
       provider: "v8",
       reporter: ["text", "html", "json-summary"],
       thresholds: {
