@@ -7,6 +7,7 @@ import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
+import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
 import type { FolderNodesSettings } from "../core/types";
 import { DEFAULT_SETTINGS, normalizeSettings } from "../shared/settings";
@@ -21,6 +22,8 @@ import { formatError, setLanguage, t } from "../ui/i18n";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { runAdoptionMigration } from "./migration-state";
 import { RefreshScheduler, type RefreshBatch } from "./refresh-scheduler";
+
+type NodeMenuSurface = "owned" | "native-folder" | "native-note";
 
 export default class FolderNodesPlugin extends Plugin {
   public override settings: FolderNodesSettings = structuredClone(DEFAULT_SETTINGS);
@@ -57,7 +60,7 @@ export default class FolderNodesPlugin extends Plugin {
       () => this.settings,
       () => ({
         createNode: t("createNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"), missingNoteShort: t("missingNoteShort"),
-        newFolder: t("newFolder"), newNote: t("newNote"), node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"),
+        node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"),
       }),
       (parentPath) => {
         const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
@@ -175,7 +178,6 @@ export default class FolderNodesPlugin extends Plugin {
       menu.addItem((item) => item.setTitle(t("createMissingNodeNote")).setIcon("file-plus").onClick(() => {
         void this.runRepair(async () => { await this.service.createMissingNodeNote(entry); });
       }));
-      menu.addItem((item) => item.setTitle(t("renameFolderToMatch")).setIcon("pencil").onClick(() => this.promptRename(entry)));
       menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(entry))));
     } else {
       menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => this.runAction(this.app.workspace.getLeaf(false).openFile(entry))));
@@ -211,7 +213,7 @@ export default class FolderNodesPlugin extends Plugin {
     menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(folder))));
     menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(folder))));
     menu.addSeparator();
-    this.addNodeMenuItems(menu, folder, false);
+    this.addNodeMenuItems(menu, folder, false, "owned");
     this.showMenu(menu, anchor);
   }
 
@@ -254,9 +256,9 @@ export default class FolderNodesPlugin extends Plugin {
       },
     });
     this.addCommand({ id: "open-contents", name: t("contents"), callback: () => this.runAction(this.openContents()) });
-    this.addCommand({ id: "rename-node", name: t("rename"), callback: () => this.promptRenameCurrent() });
-    this.addCommand({ id: "move-node", name: t("move"), callback: () => this.promptMoveCurrent() });
-    this.addCommand({ id: "merge-node", name: t("merge"), callback: () => this.promptMergeCurrent() });
+    this.addCommand({ id: "rename-node", name: t("renameCurrentNode"), callback: () => this.promptRenameCurrent() });
+    this.addCommand({ id: "move-node", name: t("moveContainingNode"), callback: () => this.promptMoveCurrent() });
+    this.addCommand({ id: "merge-node", name: t("mergeContainingNode"), callback: () => this.promptMergeCurrent() });
     this.addCommand({ id: "move-node-up", name: t("moveUp"), callback: () => this.runAction(this.reorderCurrent(-1)) });
     this.addCommand({ id: "move-node-down", name: t("moveDown"), callback: () => this.runAction(this.reorderCurrent(1)) });
   }
@@ -414,7 +416,7 @@ export default class FolderNodesPlugin extends Plugin {
       if (identity === "ordinary") return;
       menu.addSeparator();
       if (identity === "missing-note") this.addProblemMenuItems(menu, entry);
-      else this.addNodeMenuItems(menu, entry, true);
+      else this.addNodeMenuItems(menu, entry, true, "native-folder");
       return;
     }
     const folder = this.service.folderForFile(entry);
@@ -430,26 +432,38 @@ export default class FolderNodesPlugin extends Plugin {
     });
     if (identity === "node-note") {
       menu.addSeparator();
-      this.addNodeMenuItems(menu, folder, true);
+      this.addNodeMenuItems(menu, folder, true, "native-note");
       return;
     }
     if (identity === "missing-folder" || identity === "conflict") {
       menu.addSeparator();
       this.addProblemMenuItems(menu, entry);
+      return;
+    }
+    if (entry.extension.toLocaleLowerCase() === "md" && !this.service.isIgnoredPath(folder.path) && !this.service.isLeafNoteExempt(entry.path)) {
+      menu.addSeparator();
+      menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
+        void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
+      }));
     }
   }
 
-  private addNodeMenuItems(menu: Menu, folder: TFolder, includeContents: boolean): void {
+  private addNodeMenuItems(menu: Menu, folder: TFolder, includeContents: boolean, surface: NodeMenuSurface): void {
     menu.addItem((item) => item.setTitle(t("createChild")).setIcon("folder-plus").onClick(() => this.promptCreateChild(folder)));
     if (includeContents) menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(folder))));
     menu.addItem((item) => item.setTitle(t("editVisual")).setIcon("palette").onClick(() => this.promptVisual(folder)));
     if (normalizeVaultPath(folder.path) === "") return;
-    menu.addItem((item) => item.setTitle(t("rename")).setIcon("pencil").onClick(() => this.promptRename(folder)));
-    menu.addItem((item) => item.setTitle(t("move")).setIcon("folder-input").onClick(() => this.promptMove(folder)));
-    menu.addItem((item) => item.setTitle(t("merge")).setIcon("combine").onClick(() => this.promptMerge(folder)));
+    menu.addSeparator();
+    if (surface === "owned") {
+      menu.addItem((item) => item.setTitle(t("rename")).setIcon("pencil").onClick(() => this.promptRename(folder)));
+      menu.addItem((item) => item.setTitle(t("move")).setIcon("folder-input").onClick(() => this.promptMove(folder)));
+    } else if (surface === "native-note") {
+      menu.addItem((item) => item.setTitle(t("moveContainingNode")).setIcon("folder-input").onClick(() => this.promptMove(folder)));
+    }
+    menu.addItem((item) => item.setTitle(surface === "native-note" ? t("mergeContainingNode") : t("merge")).setIcon("combine").onClick(() => this.promptMerge(folder)));
     menu.addItem((item) => item.setTitle(t("moveUp")).setIcon("arrow-up").onClick(() => void this.runRepair(() => this.service.reorder(folder, -1))));
     menu.addItem((item) => item.setTitle(t("moveDown")).setIcon("arrow-down").onClick(() => void this.runRepair(() => this.service.reorder(folder, 1))));
-    menu.addItem((item) => item.setTitle(t("delete")).setIcon("trash-2").setWarning(true).onClick(() => this.confirmDelete(folder)));
+    if (surface !== "native-folder") menu.addItem((item) => item.setTitle(surface === "native-note" ? t("deleteContainingNode") : t("delete")).setIcon("trash-2").setWarning(true).onClick(() => this.confirmDelete(folder)));
   }
 
   private openEntryMenu(anchor: ContentsMenuAnchor, entry: TAbstractFile, sourceFolder: TFolder): void {
@@ -471,6 +485,11 @@ export default class FolderNodesPlugin extends Plugin {
         ["avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp"].includes(entry.extension.toLocaleLowerCase())
       ) {
         menu.addItem((item) => item.setTitle(t("setAsVisual")).setIcon("image").onClick(() => this.runAction(this.setFileAsVisual(entry, sourceFolder))));
+      }
+      if (entry.extension.toLocaleLowerCase() === "md" && !this.service.isIgnoredPath(sourceFolder.path) && !this.service.isLeafNoteExempt(entry.path)) {
+        menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
+          void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
+        }));
       }
       menu.addSeparator();
       menu.addItem((item) => item.setTitle(t("renameFile")).setIcon("pencil").onClick(() => this.promptRenameFile(entry)));
@@ -566,8 +585,16 @@ export default class FolderNodesPlugin extends Plugin {
   private previewSelectionCreation(editor: Editor, file: TFile | null): void {
     const selection = editor.getSelection();
     if (file === null || selection.trim() === "") return;
+    const sourcePath = file.path;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const tableContext = classifySelectionTableContext(from, to, (line) => editor.getLine(line));
+    if (tableContext === "cross-cell") {
+      new Notice(t("selectionCrossesTableCells"), 8000);
+      return;
+    }
     const folder = this.service.folderForFile(file) ?? this.app.vault.getRoot();
-    const cursorLine = editor.getCursor("from").line;
+    const cursorLine = from.line;
     const heading = this.app.metadataCache.getFileCache(file)?.headings
       ?.filter((item) => item.position.start.line <= cursorLine)
       .at(-1)?.heading ?? "";
@@ -582,10 +609,14 @@ export default class FolderNodesPlugin extends Plugin {
     const nodePath = parentPath === "" ? name : `${parentPath}/${name}`;
     const notePath = `${nodePath}/${name}.md`;
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
-    const linkLabel = selection.trim().replace(/\s+/gu, " ");
-    const wikiLink = `[[${notePath.slice(0, -3)}|${linkLabel}]]`;
+    const wikiLink = buildSelectionWikiLink(notePath.slice(0, -3), selection, tableContext);
     new SelectionCreateModal(this.app, { parentPath, nodeName: name, notePath, alias, wikiLink }, async () => {
       if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
+      if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new Error("Source note changed after preview");
+      const currentFrom = editor.getCursor("from");
+      const currentTo = editor.getCursor("to");
+      if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new Error("Selection changed after preview");
+      if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new Error("Table structure changed after preview");
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, name, options);
       try {

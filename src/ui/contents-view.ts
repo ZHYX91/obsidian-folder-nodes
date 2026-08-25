@@ -16,7 +16,7 @@ import {
 import { t } from "./i18n";
 import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import type { ChildOrderRecord, NodeVisual } from "../core/types";
-import { renderVisual } from "./render-visual";
+import { renderVisual } from "../presentation/render-visual";
 import type { ReferenceIndex } from "../core/reference-index";
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "svg", "webp"]);
@@ -145,13 +145,16 @@ export class FolderNodeContentsView extends ItemView {
       entry,
     }));
     const directFiles = folder.children.filter((entry): entry is TFile => entry instanceof TFile && !this.service.isCanonicalFile(entry));
-    const pendingNotes = currentIgnored ? [] : directFiles.filter((entry) =>
-      entry.extension.toLocaleLowerCase() === "md" && !this.service.isLeafNoteExempt(entry.path));
+    const pendingNotes = currentIgnored ? [] : directFiles.filter((entry) => {
+      if (entry.extension.toLocaleLowerCase() !== "md" || this.service.isLeafNoteExempt(entry.path)) return false;
+      const targetPath = folderPath === "" ? entry.basename : `${folderPath}/${entry.basename}`;
+      const targetFolder = this.service.getFolder(targetPath);
+      return targetFolder !== null && this.service.getCanonicalFile(targetFolder.path) !== null;
+    });
     nodeEntries.push(...pendingNotes.map((entry): NodeEntry => {
       const targetPath = folderPath === "" ? entry.basename : `${folderPath}/${entry.basename}`;
       const targetFolder = this.service.getFolder(targetPath);
-      const targetNodeExists = targetFolder !== null && this.service.getCanonicalFile(targetFolder.path) !== null;
-      return { kind: targetNodeExists ? "conflict" : "missing-folder", entry };
+      return { kind: targetFolder === null ? "missing-folder" : "conflict", entry };
     }));
     const album = directFiles.filter((entry) => this.isAlbumEntry(entry));
     const pendingPaths = new Set(pendingNotes.map((entry) => entry.path));
@@ -218,7 +221,7 @@ export class FolderNodeContentsView extends ItemView {
     }
     const title = identity.createSpan({ cls: "folder-nodes-current-title", text: folderPath === "" ? this.app.vault.getName() : folder.name });
     title.setAttr("title", folderPath);
-    if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-warning", text: t("missingNodeNote") });
+    if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-folder-only", text: t("missingNodeNote") });
     if (managedNode) identity.addEventListener("click", (event) => {
       const mouseEvent = event as MouseEvent;
       this.runAction(this.service.openFolderNode(folderPath, mouseEvent.ctrlKey || mouseEvent.metaKey));
@@ -255,7 +258,7 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderNodes(container: HTMLElement, entries: readonly NodeEntry[], parentPath: string): void {
-    const problems = entries.filter((entry) => entry.kind !== "healthy").length;
+    const problems = entries.filter((entry) => entry.kind === "conflict" || entry.kind === "missing-folder").length;
     const label = problems === 0 ? `${t("nodes")} (${entries.length})` : `${t("nodes")} (${entries.length}) · ${t("needsRepair")} ${problems}`;
     const section = this.section(container, label);
     const grid = section.createDiv({ cls: "folder-nodes-node-grid" });
@@ -264,7 +267,7 @@ export class FolderNodeContentsView extends ItemView {
       const resolved = item.kind === "healthy" && entry instanceof TFolder ? this.visuals.resolve(entry) : null;
       const presentation = nodeEntryVisual(item.kind, resolved);
       const problemLabel = item.kind === "missing-note" ? t("missingNodeNote") : item.kind === "conflict" ? t("nodeConflict") : t("missingNodeFolder");
-      const shell = grid.createDiv({ cls: `folder-nodes-entry-shell folder-nodes-node-shell${item.kind === "healthy" ? "" : " is-problem"}` });
+      const shell = grid.createDiv({ cls: `folder-nodes-entry-shell folder-nodes-node-shell${item.kind === "conflict" || item.kind === "missing-folder" ? " is-problem" : ""}` });
       const card = shell.createEl("button", { cls: "folder-nodes-node-card" });
       if (item.kind !== "healthy") {
         card.setAttr("aria-label", `${entry.name} · ${problemLabel}`);

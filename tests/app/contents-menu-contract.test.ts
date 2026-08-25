@@ -30,4 +30,15 @@ describe("Node Contents menu boundary", () => {
 
     expect(entryMenu).toContain('workspace.trigger("file-menu", menu, entry, CONTENTS_MENU_SOURCE)');
   });
+
+  it("keeps native folder operations and labels whole-node actions on Node Note tabs", () => {
+    const contextMenu = methodSource(source, "private addContextMenu", "private addNodeMenuItems");
+    const nodeItems = methodSource(source, "private addNodeMenuItems", "private openEntryMenu");
+
+    expect(contextMenu).toContain('"native-folder"');
+    expect(contextMenu).toContain('"native-note"');
+    expect(nodeItems).toContain('surface === "native-note" ? t("mergeContainingNode")');
+    expect(nodeItems).toContain('surface !== "native-folder"');
+    expect(nodeItems).not.toContain('surface === "native-folder" ? t("rename")');
+  });
 });

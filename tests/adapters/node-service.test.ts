@@ -38,6 +38,18 @@ describe("NodeService structural safety", () => {
     expect(fake.renames).toEqual([{ from: "A", to: "B" }, { from: "B/A.md", to: "B/B.md" }]);
   });
 
+  it("renames a folder-only node without inventing a Node Note", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("A");
+
+    const renamed = await service(fake).renameNode(source, "B");
+
+    expect(renamed.path).toBe("B");
+    expect(fake.files.has("B/B.md")).toBe(false);
+    expect(fake.renames).toEqual([{ from: "A", to: "B" }]);
+  });
+
   it("supports case-only node and file renames on a case-insensitive adapter", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -55,8 +67,9 @@ describe("NodeService structural safety", () => {
     const mixed = fake.addFolder("Mixed");
     const mixedNote = fake.addFile("Mixed/mixed.md");
     expect(nodes.getCanonicalFile(mixed.path)).toBe(mixedNote);
-    await expect(nodes.deleteFile(mixedNote)).rejects.toThrow("canonical");
     expect(await nodes.convertLeafNote(mixedNote)).toBe(mixedNote);
+    await nodes.deleteFile(mixedNote);
+    expect(fake.files.has("Mixed/mixed.md")).toBe(false);
   });
 
   it("rolls back a newly created folder when note creation fails", async () => {
@@ -110,17 +123,17 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("x/a")).toBe(false);
   });
 
-  it("recreates a deleted Root Node Note", async () => {
+  it("keeps a deleted Root Node Note deleted", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "root body");
     fake.remove("Vault.md");
 
     await service(fake).reconcileDeleted("Vault.md");
 
-    expect(fake.requireFile("Vault.md")).toBeDefined();
+    expect(fake.files.has("Vault.md")).toBe(false);
   });
 
-  it("repairs the source and converts the destination after a canonical note is moved", async () => {
+  it("leaves the source folder-only and the moved Node Note ordinary", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     const a = fake.addFolder("A");
@@ -132,8 +145,8 @@ describe("NodeService structural safety", () => {
 
     await service(fake).reconcileRenamed(moved, "A/A.md");
 
-    expect(fake.requireFile("A/A.md")).toBeDefined();
-    expect(fake.requireFile("B/A/A.md").path).toBe("B/A/A.md");
+    expect(fake.files.has("A/A.md")).toBe(false);
+    expect(fake.requireFile("B/A.md").path).toBe("B/A.md");
     expect(a.path).toBe("A");
   });
 
@@ -187,7 +200,7 @@ describe("NodeService structural safety", () => {
     expect(fake.requireFile("B/B.md")).toBeDefined();
   });
 
-  it("repairs a complete managed subtree during startup reconciliation", async () => {
+  it("does not convert native folders or notes during startup reconciliation", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFolder("A");
@@ -196,9 +209,25 @@ describe("NodeService structural safety", () => {
 
     await service(fake).repairManagedVault();
 
-    expect(fake.requireFile("A/A.md")).toBeDefined();
-    expect(fake.requireFile("A/C/C.md")).toBeDefined();
-    expect(fake.requireFile("A/Leaf/Leaf.md")).toBeDefined();
+    expect(fake.files.has("A/A.md")).toBe(false);
+    expect(fake.files.has("A/C/C.md")).toBe(false);
+    expect(fake.requireFile("A/Leaf.md")).toBeDefined();
+  });
+
+  it("treats native folder and note creation as valid managed Vault state", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFolder("FolderOnly");
+    fake.addFile("Loose.md", "ordinary");
+    const nodes = service(fake);
+
+    await nodes.reconcileCreated("FolderOnly");
+    await nodes.reconcileCreated("Loose.md");
+
+    expect(fake.files.has("FolderOnly/FolderOnly.md")).toBe(false);
+    expect(fake.requireFile("Loose.md")).toBeDefined();
+    expect(nodes.scan().missingNodeNotes).toEqual([]);
+    expect(nodes.scan().leafMarkdown).toEqual([]);
   });
 
   it("rejects a migration disposed before its queued operation can write", async () => {
@@ -216,31 +245,15 @@ describe("NodeService structural safety", () => {
     expect(fake.renames).toEqual([]);
   });
 
-  it("rolls back an active startup repair and starts no later writes after dispose", async () => {
+  it("keeps startup validation read-only and starts no writes after dispose", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("First.md", "first");
     fake.addFile("Second.md", "second");
     const nodes = service(fake);
-    const originalCreateFolder = fake.app.vault.createFolder;
-    let markFirstStarted!: () => void;
-    let releaseFirst!: () => void;
-    const firstStarted = new Promise<void>((resolve) => { markFirstStarted = resolve; });
-    const firstRelease = new Promise<void>((resolve) => { releaseFirst = resolve; });
-    fake.app.vault.createFolder = vi.fn(async (path: string) => {
-      if (path === "First") {
-        markFirstStarted();
-        await firstRelease;
-      }
-      return originalCreateFolder(path);
-    });
-
-    const repair = nodes.repairManagedVault();
-    await firstStarted;
     nodes.dispose();
-    releaseFirst();
 
-    await expect(repair).rejects.toThrow("service unloaded");
+    await expect(nodes.repairManagedVault()).rejects.toThrow("service unloaded");
     expect(fake.requireFile("First.md")).toBeDefined();
     expect(fake.requireFile("Second.md")).toBeDefined();
     expect(fake.files.has("First")).toBe(false);
@@ -460,7 +473,7 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Child")).toBe(false);
   });
 
-  it("moves, renames, and deletes ordinary files while protecting canonical notes", async () => {
+  it("moves and deletes a Node Note without deleting its containing folder", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     const folder = fake.addFolder("A");
@@ -471,8 +484,12 @@ describe("NodeService structural safety", () => {
     await nodes.renameFile(fake.requireFile("data.pdf"), "renamed.pdf");
     await nodes.deleteFile(fake.requireFile("renamed.pdf"));
     expect(fake.files.has("renamed.pdf")).toBe(false);
-    await expect(nodes.moveFile(canonical, "")).rejects.toThrow("canonical");
-    await expect(nodes.deleteFile(canonical)).rejects.toThrow("canonical");
+    await nodes.moveFile(canonical, "");
+    expect(fake.files.has("A/A.md")).toBe(false);
+    expect(fake.requireFile("A.md")).toBe(canonical);
+    await nodes.deleteFile(canonical);
+    expect(fake.files.has("A.md")).toBe(false);
+    expect(fake.requireFolder("A")).toBe(folder);
     await nodes.deleteNode(folder);
     expect(fake.files.has("A")).toBe(false);
   });
@@ -520,7 +537,7 @@ describe("NodeService structural safety", () => {
     expect(progress.at(-1)).toBe(preview.leafMarkdown.length + preview.missingNodeNotes.length);
   });
 
-  it("repairs an ignored folder subtree when it is moved into managed scope", async () => {
+  it("keeps a natively moved folder subtree and its notes unchanged", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     const ignored = fake.addFolder("_Archive");
@@ -528,12 +545,12 @@ describe("NodeService structural safety", () => {
     fake.addFile("_Archive/loose.md", "loose");
     await fake.rename(ignored, "Archive");
     await service(fake).reconcileRenamed(fake.requireFolder("Archive"), "_Archive");
-    expect(fake.requireFile("Archive/Archive.md")).toBeDefined();
-    expect(fake.requireFile("Archive/Child/Child.md")).toBeDefined();
-    expect(fake.requireFile("Archive/loose/loose.md")).toBeDefined();
+    expect(fake.files.has("Archive/Archive.md")).toBe(false);
+    expect(fake.files.has("Archive/Child/Child.md")).toBe(false);
+    expect(fake.requireFile("Archive/loose.md")).toBeDefined();
   });
 
-  it("repairs both stale and absent canonical notes after folder renames", async () => {
+  it("renames an existing Node Note but leaves a folder-only node note-free", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     const stale = fake.addFolder("Old");
@@ -545,6 +562,6 @@ describe("NodeService structural safety", () => {
     const empty = fake.addFolder("Before");
     await fake.rename(empty, "After");
     await nodes.reconcileRenamed(fake.requireFolder("After"), "Before");
-    expect(fake.requireFile("After/After.md")).toBeDefined();
+    expect(fake.files.has("After/After.md")).toBe(false);
   });
 });

@@ -1,10 +1,11 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
 
-import { ensureExplorerIconPosition, ensureExplorerRootRow, ensureNoteTitleIcon, explorerMarkerPlacement, isFolderCollapseControl, removeNoteTitleIcon, setNativeCreateActionsHidden, syncExplorerNodeOrder } from "./explorer-events";
+import { alignNoteTitleIcon, ensureExplorerIconPosition, ensureExplorerRootRow, ensureNoteTitleIcon, explorerMarkerPlacement, isFolderCollapseControl, removeNoteTitleIcon, syncExplorerNodeOrder } from "./explorer-events";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import type { FolderNodesSettings, NodeDropZone, NodeVisual } from "../core/types";
+import { renderVisual } from "../presentation/render-visual";
 
 interface ExplorerSurface {
   abort: AbortController;
@@ -14,6 +15,7 @@ interface ExplorerSurface {
 
 interface NoteTitleSurface {
   observer: MutationObserver;
+  resizeObserver: ResizeObserver | null;
   root: HTMLElement;
 }
 
@@ -32,7 +34,7 @@ export class ExplorerAdapter extends Component {
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
     private readonly getRootLabels: () => {
-      createNode: string; missingNodeFolder: string; missingNodeNote: string; missingNoteShort: string; newFolder: string; newNote: string;
+      createNode: string; missingNodeFolder: string; missingNodeNote: string; missingNoteShort: string;
       node: string; nodeConflict: string; root: string;
     },
     private readonly createNode: (parentPath: string) => void,
@@ -73,6 +75,7 @@ export class ExplorerAdapter extends Component {
     this.surfaces.clear();
     for (const surface of this.noteTitleSurfaces.values()) {
       surface.observer.disconnect();
+      surface.resizeObserver?.disconnect();
       this.cleanupNoteTitleSurface(surface.root);
     }
     this.noteTitleSurfaces.clear();
@@ -122,11 +125,15 @@ export class ExplorerAdapter extends Component {
       const Observer = root.ownerDocument.defaultView?.MutationObserver ?? MutationObserver;
       const observer = new Observer(() => this.scheduleDecorate());
       observer.observe(root, { childList: true, subtree: true });
-      this.noteTitleSurfaces.set(root, { observer, root });
+      const ResizeObserverConstructor = root.ownerDocument.defaultView?.ResizeObserver;
+      const resizeObserver = ResizeObserverConstructor === undefined ? null : new ResizeObserverConstructor(() => this.scheduleDecorate());
+      resizeObserver?.observe(root);
+      this.noteTitleSurfaces.set(root, { observer, resizeObserver, root });
     }
     for (const [root, surface] of this.noteTitleSurfaces) {
       if (active.has(root) && root.isConnected) continue;
       surface.observer.disconnect();
+      surface.resizeObserver?.disconnect();
       this.cleanupNoteTitleSurface(root);
       this.noteTitleSurfaces.delete(root);
     }
@@ -205,14 +212,15 @@ export class ExplorerAdapter extends Component {
       const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
       if (identity === "missing-note") {
         restoreOwnedDraggable(element);
-        icon.removeClass("is-default-node");
-        icon.addClass("is-warning");
+        icon.addClass("is-default-node");
+        icon.removeClass("is-warning");
         ensureExplorerIconPosition(element, icon, title, "before");
         this.renderExplorerMarker(icon, { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null }, this.getRootLabels().missingNodeNote);
         if (problemBadge === null) {
           problemBadge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
           element.append(problemBadge);
         }
+        problemBadge.addClass("is-folder-only");
         problemBadge.setText(this.getRootLabels().missingNoteShort);
         problemBadge.setAttr("title", this.getRootLabels().missingNodeNote);
         continue;
@@ -231,7 +239,6 @@ export class ExplorerAdapter extends Component {
 
   private decorateCreateActions(root: HTMLElement): void {
     const labels = this.getRootLabels();
-    const nativeLabels = new Set([labels.newNote, labels.newFolder, "New note", "New folder", "新建笔记", "新建文件夹"]);
     const parentPath = this.createParentPath();
     const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
     const managed = this.getSettings().adoptionState === "managed" && parent !== null && !this.service.isIgnoredPath(parent.path);
@@ -257,7 +264,6 @@ export class ExplorerAdapter extends Component {
       button.setAttribute("aria-label", labels.createNode);
       button.setAttribute("title", labels.createNode);
       button.classList.toggle("is-hidden", !managed);
-      setNativeCreateActionsHidden(container, nativeLabels, managed);
     }
   }
 
@@ -322,6 +328,7 @@ export class ExplorerAdapter extends Component {
       }
       if (icon === null) icon = ensureNoteTitleIcon(title);
       if (resolved !== null) this.renderExplorerMarker(icon, resolved, folder.name);
+      alignNoteTitleIcon(title, icon);
     }
     for (const { root } of this.noteTitleSurfaces.values()) {
       for (const icon of root.querySelectorAll<HTMLElement>(".folder-nodes-note-title-icon")) {
@@ -450,7 +457,6 @@ export class ExplorerAdapter extends Component {
       element.removeClass("folder-nodes-canonical-note", "folder-nodes-missing-folder-note", "folder-nodes-node", "folder-nodes-missing-note");
       restoreOwnedDraggable(element);
     }
-    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-native-create-hidden")) element.removeClass("folder-nodes-native-create-hidden");
     for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge")) element.remove();
   }
 
@@ -484,25 +490,4 @@ function restoreOwnedDraggable(element: HTMLElement): void {
   if (original === "missing") element.removeAttribute("draggable");
   else element.setAttribute("draggable", original.slice(6));
   delete element.dataset.folderNodesOriginalDraggable;
-}
-
-function renderVisual(container: HTMLElement, visual: NodeVisual, label: string): void {
-  container.empty();
-  container.addClass("folder-nodes-visual");
-  container.setAttr("aria-label", label);
-  delete container.dataset.inheritedFrom;
-  container.removeClass("has-accent");
-  container.style.removeProperty("--folder-nodes-visual-accent");
-  if (visual.inheritedFrom !== null) container.dataset.inheritedFrom = visual.inheritedFrom;
-  if (visual.accent !== null) {
-    container.addClass("has-accent");
-    container.style.setProperty("--folder-nodes-visual-accent", visual.accent);
-  }
-  if (visual.kind === "image") container.createEl("img", { attr: { src: visual.value, alt: "", loading: "lazy" } });
-  else if (visual.kind === "emoji") container.createSpan({ cls: "folder-nodes-visual-emoji", text: visual.value });
-  else if (visual.kind === "glyph") container.createSpan({ cls: "folder-nodes-visual-glyph", text: visual.value });
-  else if (visual.kind === "color") {
-    const swatch = container.createSpan({ cls: "folder-nodes-visual-color" });
-    swatch.style.backgroundColor = visual.value;
-  } else setIcon(container, visual.value);
 }

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  alignNoteTitleIcon,
   ensureExplorerIconPosition,
   ensureExplorerRootRow,
   ensureNoteTitleIcon,
   explorerMarkerPlacement,
   isFolderCollapseControl,
-  setNativeCreateActionsHidden,
   removeNoteTitleIcon,
   syncExplorerNodeOrder,
 } from "../../src/adapters/explorer-events";
@@ -141,36 +141,33 @@ describe("File Explorer node ordering", () => {
   });
 });
 
-describe("File Explorer create actions", () => {
-  it("hides only the native create actions in a managed context", () => {
-    const container = document.createElement("div");
-    const note = document.createElement("button");
-    note.setAttribute("aria-label", "新建笔记");
-    const folder = document.createElement("button");
-    folder.setAttribute("aria-label", "新建文件夹");
-    const sort = document.createElement("button");
-    sort.setAttribute("aria-label", "排序");
-    container.append(note, folder, sort);
-
-    expect(setNativeCreateActionsHidden(container, new Set(["新建笔记", "新建文件夹"]), true)).toBe(2);
-    expect(note.classList.contains("folder-nodes-native-create-hidden")).toBe(true);
-    expect(folder.classList.contains("folder-nodes-native-create-hidden")).toBe(true);
-    expect(sort.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
-
-    setNativeCreateActionsHidden(container, new Set(["新建笔记", "新建文件夹"]), false);
-    expect(note.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
-    expect(folder.classList.contains("folder-nodes-native-create-hidden")).toBe(false);
-  });
-});
-
 describe("inline title decoration", () => {
-  it("keeps visual text outside the editable title and removes it cleanly", () => {
+  it("keeps visual text outside the editable title and aligns to its first line inside a padded host", () => {
     const host = document.createElement("div");
     const title = document.createElement("div");
     title.className = "inline-title";
     title.contentEditable = "true";
     title.textContent = "Node";
+    title.style.fontSize = "40px";
+    title.style.lineHeight = "48px";
+    title.style.paddingTop = "18px";
     host.append(title);
+    document.body.append(host);
+    Object.defineProperties(host, {
+      clientLeft: { configurable: true, value: 3 },
+      clientTop: { configurable: true, value: 2 },
+      clientWidth: { configurable: true, value: 594 },
+      offsetWidth: { configurable: true, value: 600 },
+      scrollLeft: { configurable: true, value: 7 },
+      scrollTop: { configurable: true, value: 5 },
+    });
+    host.getBoundingClientRect = () => ({ bottom: 440, height: 400, left: 20, right: 620, top: 40, width: 600, x: 20, y: 40, toJSON: () => ({}) });
+    title.getBoundingClientRect = () => ({ bottom: 208, height: 96, left: 68, right: 500, top: 112, width: 432, x: 68, y: 112, toJSON: () => ({}) });
+    const createRange = vi.spyOn(document, "createRange").mockReturnValue({
+      getBoundingClientRect: () => ({ bottom: 180, height: 40, left: 68, right: 96, top: 140, width: 28, x: 68, y: 140, toJSON: () => ({}) }),
+      setEnd: vi.fn(),
+      setStart: vi.fn(),
+    } as unknown as Range);
 
     const icon = ensureNoteTitleIcon(title);
     icon.textContent = "📔";
@@ -179,8 +176,14 @@ describe("inline title decoration", () => {
     expect(title.textContent).toBe("Node");
     expect(icon.contentEditable).toBe("false");
     expect(icon.nextElementSibling).toBe(title);
+    alignNoteTitleIcon(title, icon);
+    expect(icon.style.getPropertyValue("--folder-nodes-note-title-font-size")).toBe("40px");
+    expect(icon.style.getPropertyValue("--folder-nodes-note-title-offset")).toBe("106px");
+    expect(icon.style.getPropertyValue("--folder-nodes-note-title-inline-offset")).toBe("8px");
     removeNoteTitleIcon(title);
     expect(host.querySelector(".folder-nodes-note-title-icon")).toBeNull();
     expect(title.classList.contains("folder-nodes-has-title-icon")).toBe(false);
+    createRange.mockRestore();
+    host.remove();
   });
 });

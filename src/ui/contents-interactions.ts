@@ -41,7 +41,7 @@ export function nodeEntryVisual(
       accent: null,
       inheritedFrom: null,
     },
-    warning: kind !== "healthy",
+    warning: kind !== "healthy" && kind !== "missing-note",
   };
 }
 

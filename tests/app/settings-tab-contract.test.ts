@@ -30,11 +30,51 @@ describe("settings tab compatibility contract", () => {
       source.indexOf('new Setting(panel).setName(t("iconInheritance"))'),
     );
     expect(source).toContain('text: "icon: 💰"');
+    expect(source).toContain('t("iconColorBehavior")');
+    expect(source).toContain("this.renderIconComparisonRow");
+    expect(source).toContain('t("iconDistinctionDesc")');
     expect(styles).toContain(".folder-nodes-settings-guide");
     expect(styles).toContain(
       "border-inline-start: 3px solid var(--interactive-accent)",
     );
     expect(styles).toContain("background: var(--background-secondary)");
+    expect(styles).toContain("--folder-nodes-glyph-font: var(--font-interface)");
+    expect(styles).toContain('"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"');
+    expect(styles).toContain(".folder-nodes-explorer-icon:not(.is-default-node):not(.is-warning)");
+  });
+
+  it("matches the established tab-to-section hierarchy without a duplicate plugin heading", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
+    const styles = readFileSync(resolve(process.cwd(), "styles.css"), "utf8");
+
+    expect(source).not.toContain('new Setting(this.containerEl).setName(t("settings")).setHeading()');
+    expect(source).not.toContain('new Setting(panel).setName(this.tabLabel(this.activeTab)).setHeading()');
+    expect(source).toContain('button.type = "button"');
+    expect(source).toContain('getComputedStyle(container).direction === "rtl"');
+    expect(styles).toContain("container-type: inline-size");
+    expect(styles).toContain("margin-block-start: var(--size-4-5)");
+    expect(styles).toContain(".folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab");
+    expect(styles).toContain("appearance: none !important");
+    expect(styles).toContain("min-block-size: 34px");
+    expect(styles).toContain("background: transparent !important");
+    expect(styles).toContain("font-weight: var(--font-semibold) !important");
+    expect(styles).toContain("min-block-size: 44px");
+    expect(styles).not.toMatch(/\n\s+height: 34px/);
+  });
+
+  it("keeps root, property visuals, names, and statuses in distinct visual slots", () => {
+    const styles = readFileSync(resolve(process.cwd(), "styles.css"), "utf8");
+
+    expect(styles).toContain("var(--interactive-accent) 10%");
+    expect(styles).toContain("var(--interactive-accent) 38%");
+    expect(styles).toContain("grid-template-columns: 22px minmax(0, 1fr) max-content");
+    expect(styles).toContain("inline-size: calc(100% - 12px) !important");
+    expect(styles).toContain("flex-basis: 22px");
+    expect(styles).toContain("margin-inline-start: auto");
+    expect(styles).toContain("background: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary))");
+    expect(styles).toContain(".folder-nodes-visual.has-accent:is(.is-emoji, .is-image)");
+    expect(styles).toContain(".folder-nodes-visual.has-accent .folder-nodes-visual-glyph");
+    expect(styles).toContain(".folder-nodes-visual-color { width: 100%; height: 100%;");
   });
 
   it("explains selection and unresolved-link creation before the shared aliases switch", () => {

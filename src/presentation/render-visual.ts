@@ -4,6 +4,9 @@ import type { NodeVisual } from "../core/types";
 export function renderVisual(container: HTMLElement, visual: NodeVisual, label: string): void {
   container.empty();
   container.addClass("folder-nodes-visual");
+  container.removeClass("is-emoji", "is-glyph", "is-cjk-glyph", "is-lucide", "is-image", "is-color", "is-fallback");
+  container.addClass(`is-${visual.kind}`);
+  if (visual.kind === "glyph" && /\p{Script=Han}/u.test(visual.value)) container.addClass("is-cjk-glyph");
   container.setAttr("aria-label", label);
   delete container.dataset.inheritedFrom;
   container.removeClass("has-accent");

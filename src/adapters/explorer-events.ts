@@ -65,17 +65,6 @@ export function syncExplorerNodeOrder(container: HTMLElement, orderedPaths: read
   return true;
 }
 
-export function setNativeCreateActionsHidden(container: HTMLElement, labels: ReadonlySet<string>, hidden: boolean): number {
-  let matched = 0;
-  for (const action of container.querySelectorAll<HTMLElement>(":scope > [aria-label]")) {
-    const label = action.getAttribute("aria-label");
-    if (label === null || !labels.has(label)) continue;
-    action.classList.toggle("folder-nodes-native-create-hidden", hidden);
-    matched += 1;
-  }
-  return matched;
-}
-
 export interface ExplorerRootRow {
   row: HTMLElement;
   icon: HTMLElement;
@@ -97,6 +86,50 @@ export function ensureNoteTitleIcon(title: HTMLElement): HTMLElement {
   host.classList.add("folder-nodes-note-title-host");
   title.classList.add("folder-nodes-has-title-icon");
   return icon;
+}
+
+export function alignNoteTitleIcon(title: HTMLElement, icon: HTMLElement): void {
+  const host = title.parentElement;
+  if (host === null) return;
+  const computed = title.ownerDocument.defaultView?.getComputedStyle(title);
+  const parsedFontSize = Number.parseFloat(computed?.fontSize ?? "");
+  const fontSize = Number.isFinite(parsedFontSize) && parsedFontSize > 0 ? parsedFontSize : 16;
+  const parsedLineHeight = Number.parseFloat(computed?.lineHeight ?? "");
+  const lineHeight = Number.isFinite(parsedLineHeight) && parsedLineHeight > 0 ? parsedLineHeight : fontSize * 1.2;
+  const parsedPaddingBlockStart = Number.parseFloat(computed?.paddingBlockStart ?? "");
+  const parsedPaddingTop = Number.parseFloat(computed?.paddingTop ?? "");
+  const paddingBlockStart = Number.isFinite(parsedPaddingBlockStart) && parsedPaddingBlockStart > 0
+    ? parsedPaddingBlockStart
+    : Number.isFinite(parsedPaddingTop) && parsedPaddingTop > 0 ? parsedPaddingTop : 0;
+  const iconSize = fontSize * 0.85;
+  const iconGap = fontSize * 0.25;
+  const titleRect = title.getBoundingClientRect();
+  const firstLineRect = firstTitleLineRect(title);
+  const hostRect = host.getBoundingClientRect();
+  const lineTop = firstLineRect?.top ?? titleRect.top + paddingBlockStart;
+  const measuredLineHeight = firstLineRect?.height ?? lineHeight;
+  const blockOffset = lineTop - hostRect.top - host.clientTop + host.scrollTop + Math.max(0, (measuredLineHeight - iconSize) / 2);
+  const rightBorder = Math.max(0, host.offsetWidth - host.clientWidth - host.clientLeft);
+  const titleInlineOffset = computed?.direction === "rtl"
+    ? hostRect.right - titleRect.right - rightBorder
+    : titleRect.left - hostRect.left - host.clientLeft + host.scrollLeft;
+  const inlineOffset = titleInlineOffset - iconSize - iconGap;
+  icon.style.setProperty("--folder-nodes-note-title-font-size", `${fontSize}px`);
+  icon.style.setProperty("--folder-nodes-note-title-offset", `${Math.max(0, blockOffset)}px`);
+  icon.style.setProperty("--folder-nodes-note-title-inline-offset", `${inlineOffset}px`);
+}
+
+function firstTitleLineRect(title: HTMLElement): DOMRect | null {
+  const view = title.ownerDocument.defaultView;
+  const walker = title.ownerDocument.createTreeWalker(title, view?.NodeFilter.SHOW_TEXT ?? 4);
+  const node = walker.nextNode();
+  if (node === null || node.nodeType !== 3 || node.textContent === null || node.textContent.length === 0) return null;
+  const text = node as Text;
+  const range = title.ownerDocument.createRange();
+  range.setStart(text, 0);
+  range.setEnd(text, 1);
+  const rect = range.getBoundingClientRect();
+  return rect.height > 0 ? rect : null;
 }
 
 export function removeNoteTitleIcon(title: HTMLElement): void {

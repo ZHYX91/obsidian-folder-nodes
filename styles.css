@@ -1,3 +1,11 @@
+body {
+  --folder-nodes-glyph-font: var(--font-interface);
+  --folder-nodes-emoji-font: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", emoji;
+  --folder-nodes-icon-badge-background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+  --folder-nodes-icon-badge-border: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
+  --folder-nodes-icon-badge-radius: var(--radius-s);
+}
+
 .folder-nodes-settings,
 .folder-nodes-contents {
   color: var(--text-normal);
@@ -5,58 +13,65 @@
 }
 
 .folder-nodes-tabs {
-  align-items: flex-end;
+  align-items: stretch;
+  border-block-end: 1px solid var(--background-modifier-border);
   display: flex;
   flex-wrap: nowrap;
-  gap: 2px;
+  gap: var(--size-2-1);
   max-width: 100%;
-  margin: 0 0 22px;
+  margin: 0;
   padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  border-bottom: 1px solid var(--background-modifier-border);
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;
 }
 
-.folder-nodes-tab {
+.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-block-end: 2px solid transparent !important;
+  border-radius: 0 !important;
   box-sizing: border-box;
-  flex: 0 0 auto;
-  height: 34px;
-  min-height: 34px;
-  margin-bottom: -1px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-bottom: 2px solid transparent;
-  border-radius: 5px 5px 0 0;
-  background: transparent;
   box-shadow: none !important;
-  color: var(--text-muted);
+  color: var(--text-muted) !important;
   cursor: pointer;
-  font-size: var(--font-ui-small);
+  flex: 0 0 auto;
+  font-family: inherit !important;
+  font-size: var(--font-ui-small) !important;
+  font-weight: inherit;
+  block-size: auto;
+  min-block-size: 34px;
+  margin: 0 0 -1px !important;
+  padding: 7px 12px !important;
   white-space: nowrap;
 }
 
-.folder-nodes-tab:focus-visible {
+.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: -2px;
 }
 
-.folder-nodes-tab:hover {
-  color: var(--text-normal);
-  border-color: var(--background-modifier-border);
-  background: var(--interactive-hover);
+.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab:hover {
+  background: transparent !important;
+  color: var(--text-normal) !important;
 }
 
-.folder-nodes-tab.is-active,
-.folder-nodes-tab.is-active:hover {
-  color: var(--text-normal);
-  border-color: var(--background-modifier-border);
-  border-bottom-color: var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab.is-active,
+.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab.is-active:hover {
+  background: transparent !important;
+  border-block-end-color: var(--interactive-accent) !important;
+  color: var(--text-normal) !important;
+  font-weight: var(--font-semibold) !important;
 }
 
-.folder-nodes-tab-panel { max-width: 760px; }
+.folder-nodes-tab-panel {
+  container-type: inline-size;
+  margin-block-start: var(--size-4-5);
+  min-width: 0;
+}
 
 .folder-nodes-settings-guide {
   margin: 0 0 18px;
@@ -116,6 +131,44 @@
 
 .folder-nodes-settings-guide-note { color: var(--text-faint); }
 
+.folder-nodes-icon-comparison {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr);
+  gap: 6px 12px;
+  margin-block: 10px;
+  padding: 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+}
+
+.folder-nodes-icon-comparison-row { display: contents; }
+.folder-nodes-icon-comparison-label { color: var(--text-faint); }
+.folder-nodes-icon-comparison-example { display: inline-flex; min-width: 0; align-items: center; gap: 6px; color: var(--text-normal); }
+
+.folder-nodes-settings-icon-demo-badge {
+  display: inline-flex;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--folder-nodes-icon-badge-border);
+  border-radius: var(--folder-nodes-icon-badge-radius);
+  background: var(--folder-nodes-icon-badge-background);
+}
+
+.folder-nodes-settings-icon-demo-badge .folder-nodes-visual-emoji { font-size: 13px; }
+.folder-nodes-settings-icon-demo-badge .folder-nodes-visual-glyph { font-size: 12px; }
+.folder-nodes-settings-icon-demo-badge.is-cjk-glyph .folder-nodes-visual-glyph { font-size: 11px; }
+
+@container (max-width: 420px) {
+  .folder-nodes-icon-comparison { grid-template-columns: minmax(0, 1fr); }
+  .folder-nodes-icon-comparison-row { display: grid; gap: 2px; }
+}
+
 .folder-nodes-name-preview,
 .folder-nodes-migration-summary,
 .folder-nodes-preview-grid {
@@ -154,33 +207,73 @@
 .folder-nodes-visual-preview-item .folder-nodes-visual { width: 28px; height: 28px; }
 .folder-nodes-visual-preview > .setting-item-description { flex-basis: 100%; }
 .folder-nodes-canonical-note { display: none !important; }
-.folder-nodes-native-create-hidden,
 .folder-nodes-create-node.is-hidden { display: none !important; }
 
 .folder-nodes-explorer-root {
   position: sticky;
   z-index: 4;
   inset-block-start: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) max-content;
+  min-block-size: 36px;
+  box-sizing: border-box;
   align-items: center;
   gap: var(--size-2-3);
-  margin-block-end: var(--size-2-2);
-  border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
+  padding: var(--size-2-2) var(--size-2-3);
+  margin: var(--size-2-2) 6px var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--background-secondary) 82%, var(--background-primary));
+  box-shadow: inset 3px 0 var(--interactive-accent);
   color: var(--text-normal);
   cursor: pointer;
+}
+
+.nav-files-container > .folder-nodes-explorer-root.tree-item-self.nav-file-title {
+  align-self: stretch;
+  inline-size: calc(100% - 12px) !important;
+  min-inline-size: 0;
+  max-inline-size: calc(100% - 12px);
 }
 
 .folder-nodes-explorer-root:hover { background: var(--nav-item-background-hover); }
 .folder-nodes-explorer-root.is-active { background: var(--nav-item-background-active); color: var(--nav-item-color-active); }
 .folder-nodes-explorer-root.is-missing { box-shadow: inset 3px 0 var(--color-orange); }
-.folder-nodes-explorer-root-icon { display: inline-flex; flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-muted); }
-.folder-nodes-explorer-root-icon > svg { width: 16px; height: 16px; }
-.folder-nodes-explorer-root-title { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-nodes-explorer-root-icon {
+  display: inline-flex;
+  inline-size: 22px;
+  block-size: 22px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 1px solid var(--folder-nodes-icon-badge-border);
+  border-radius: var(--folder-nodes-icon-badge-radius);
+  background: var(--folder-nodes-icon-badge-background);
+  color: var(--text-muted);
+}
+.folder-nodes-explorer-root-icon > svg { inline-size: 14px; block-size: 14px; }
+.folder-nodes-explorer-root-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .folder-nodes-explorer-root-badge {
-  flex: 0 0 auto;
-  color: var(--text-faint);
+  display: inline-flex;
+  min-block-size: 20px;
+  align-items: center;
+  padding-inline: 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  color: var(--text-muted);
   font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .folder-nodes-explorer-icon {
@@ -198,16 +291,28 @@
   overflow: visible;
 }
 
-.folder-nodes-explorer-icon .folder-nodes-visual,
-.folder-nodes-explorer-icon img { width: 16px; height: 16px; }
+.folder-nodes-explorer-icon:not(.is-default-node):not(.is-warning) {
+  flex-basis: 22px;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--folder-nodes-icon-badge-border);
+  border-radius: var(--folder-nodes-icon-badge-radius);
+  background: var(--folder-nodes-icon-badge-background);
+}
+
+.folder-nodes-explorer-icon img { width: 14px; height: 14px; }
 .folder-nodes-explorer-icon .folder-nodes-visual-emoji,
-.folder-nodes-explorer-icon .folder-nodes-visual-glyph { font-size: 14px; }
+.folder-nodes-explorer-icon .folder-nodes-visual-glyph { font-size: 13px; }
+.folder-nodes-explorer-icon.is-cjk-glyph .folder-nodes-visual-glyph { font-size: 11px; }
 .folder-nodes-explorer-icon.is-default-node { color: var(--text-faint); }
 .folder-nodes-explorer-status-icon.is-warning { color: var(--color-orange); }
 
 .folder-nodes-explorer-icon.is-warning { color: var(--text-faint); }
 .folder-nodes-explorer-icon.is-warning::after,
-.folder-nodes-node-visual.is-missing-note::after {
+.folder-nodes-node-visual.is-warning::after {
   position: absolute;
   display: inline-flex;
   align-items: center;
@@ -234,13 +339,17 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  margin-inline-start: 4px;
-  padding: 0 4px;
-  border-radius: var(--radius-s);
-  background: rgba(var(--color-orange-rgb), 0.12);
-  color: var(--color-orange);
+  min-block-size: 20px;
+  margin-inline-start: auto;
+  padding-inline: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-orange) 42%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary));
+  color: var(--text-muted);
   font-size: var(--font-ui-smaller);
-  line-height: 1.45;
+  font-weight: var(--font-medium);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .folder-nodes-explorer-status-icon {
@@ -260,19 +369,26 @@
 .folder-nodes-note-title-icon {
   position: absolute;
   z-index: 1;
-  inset-block-start: 0.2em;
-  inset-inline-start: 0;
+  inset-block-start: var(--folder-nodes-note-title-offset, 0);
+  inset-inline-start: var(--folder-nodes-note-title-inline-offset, 0);
   display: inline-flex;
-  width: 0.9em;
-  height: 0.9em;
+  width: 0.85em;
+  height: 0.85em;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--folder-nodes-icon-badge-border);
+  border-radius: var(--folder-nodes-icon-badge-radius);
+  background: var(--folder-nodes-icon-badge-background);
+  font-size: var(--folder-nodes-note-title-font-size, 1em);
   pointer-events: none;
   user-select: none;
 }
-.inline-title.folder-nodes-has-title-icon { padding-inline-start: 1.25em; }
 .folder-nodes-note-title-icon .folder-nodes-visual-emoji,
-.folder-nodes-note-title-icon .folder-nodes-visual-glyph { font-size: 0.8em; }
+.folder-nodes-note-title-icon .folder-nodes-visual-glyph { font-size: 0.68em; }
+.folder-nodes-note-title-icon .folder-nodes-visual-emoji { font-size: 0.72em; }
+.folder-nodes-note-title-icon.is-cjk-glyph .folder-nodes-visual-glyph { font-size: 0.64em; }
 
 .folder-nodes-drop-before { box-shadow: inset 0 2px var(--interactive-accent); }
 .folder-nodes-drop-after { box-shadow: inset 0 -2px var(--interactive-accent); }
@@ -322,6 +438,10 @@
 .folder-nodes-status-badge.is-warning {
   background: rgba(var(--color-orange-rgb), 0.14);
   color: var(--color-orange);
+}
+
+.folder-nodes-status-badge.is-folder-only {
+  color: var(--text-faint);
 }
 
 .folder-nodes-breadcrumb {
@@ -553,7 +673,7 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-node-visual.is-warning { color: var(--color-orange); }
 .folder-nodes-node-visual.is-missing-note { color: var(--text-faint); }
 
-.folder-nodes-node-visual.is-missing-note::after {
+.folder-nodes-node-visual.is-warning::after {
   inset-block-start: -3px;
   inset-inline-end: -5px;
   width: 15px;
@@ -563,19 +683,24 @@ button.folder-nodes-current:focus-visible {
 }
 
 .folder-nodes-node-visual .folder-nodes-visual { width: 36px; height: 36px; }
+.folder-nodes-node-visual.is-cjk-glyph .folder-nodes-visual-glyph { font-size: 1.65rem; }
 .folder-nodes-visual { display: inline-flex; align-items: center; justify-content: center; }
 .folder-nodes-visual > svg { width: 100%; height: 100%; }
 .folder-nodes-visual img { width: 100%; height: 100%; object-fit: cover; }
-.folder-nodes-visual-emoji { font-size: 2rem; line-height: 1; }
-.folder-nodes-visual-glyph { display: inline-flex; min-width: 1em; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 600; line-height: 1; }
+.folder-nodes-visual-emoji {
+  font-family: var(--folder-nodes-emoji-font);
+  font-size: 2rem;
+  font-variant-emoji: emoji;
+  line-height: 1;
+}
+.folder-nodes-visual-glyph { display: inline-flex; min-width: 1em; align-items: center; justify-content: center; font-family: var(--folder-nodes-glyph-font); font-size: 1.8rem; font-weight: 600; line-height: 1; }
 .folder-nodes-visual-color { width: 100%; height: 100%; border-radius: inherit; }
 .folder-nodes-visual.has-accent > svg,
 .folder-nodes-visual.has-accent .folder-nodes-visual-glyph { color: var(--folder-nodes-visual-accent); }
-.folder-nodes-visual.has-accent .folder-nodes-visual-emoji,
-.folder-nodes-visual.has-accent img {
+.folder-nodes-visual.has-accent:is(.is-emoji, .is-image) {
   border-radius: 0.25em;
-  background: color-mix(in srgb, var(--folder-nodes-visual-accent) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--folder-nodes-visual-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--folder-nodes-visual-accent) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--folder-nodes-visual-accent) 70%, transparent);
 }
 
 .folder-nodes-card-title {
@@ -797,7 +922,7 @@ button.folder-nodes-current:focus-visible {
   .folder-nodes-file-row,
   .folder-nodes-more { min-height: 44px; }
 
-  .folder-nodes-tab { height: 44px; }
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-block-size: 44px; }
   .folder-nodes-entry-menu { width: 44px; height: 44px; opacity: 1; }
   .folder-nodes-node-drag-handle { width: 44px; height: 44px; padding: 13px; opacity: 1; }
   .folder-nodes-file-row { padding-inline-end: 52px; }

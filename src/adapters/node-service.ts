@@ -129,7 +129,9 @@ export class NodeService {
       if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
       const sourcePath = normalizeVaultPath(folder.path);
       if (sourcePath === "") throw new Error("The Root Node cannot be renamed");
-      const note = this.requireCanonicalNote(folder);
+      const noteCandidates = this.canonicalFiles(sourcePath);
+      if (noteCandidates.length > 1) throw new Error(`Multiple canonical Node Notes: ${sourcePath}`);
+      const note = noteCandidates[0] ?? null;
       const name = sanitizeNodeName(rawName);
       const oldName = folder.name;
       if (name === oldName) return folder;
@@ -138,7 +140,7 @@ export class NodeService {
       const nextNotePath = `${nextPath}/${name}.md`;
       const conflictingNoteBeforeMove = `${sourcePath}/${name}.md`;
       await this.assertAvailable(nextPath, folder);
-      if (conflictingNoteBeforeMove !== note.path) await this.assertAvailable(conflictingNoteBeforeMove, note);
+      if (note !== null && conflictingNoteBeforeMove !== note.path) await this.assertAvailable(conflictingNoteBeforeMove, note);
 
       const undos: Undo[] = [];
       try {
@@ -149,8 +151,12 @@ export class NodeService {
           this.expectEvent("rename", sourcePath, nextPath, true);
           await this.app.fileManager.renameFile(folder, sourcePath);
         });
-        const oldNoteAtNewLocation = this.getFile(`${nextPath}/${oldName}.md`);
-        if (oldNoteAtNewLocation === null) throw new Error("Renamed Node Note was not found");
+        if (note === null) {
+          this.assertEntryIdentity(folder, nextPath, TFolder);
+          return folder;
+        }
+        const oldNoteAtNewLocation = note;
+        this.assertEntryIdentity(oldNoteAtNewLocation, `${nextPath}/${oldName}.md`, TFile);
         const oldNotePathAtNewLocation = oldNoteAtNewLocation.path;
         this.expectEvent("rename", nextNotePath, oldNoteAtNewLocation.path);
         await this.app.fileManager.renameFile(oldNoteAtNewLocation, nextNotePath);
@@ -204,7 +210,6 @@ export class NodeService {
       targetFolderPath = normalizeVaultPath(targetFolderPath);
       const target = targetFolderPath === "" ? this.app.vault.getRoot() : this.getFolder(targetFolderPath);
       if (target === null) throw new Error(`Unknown target folder: ${targetFolderPath}`);
-      if (this.isCanonicalFile(file)) throw new Error(`Cannot move canonical Node Note: ${file.path}`);
       const normalizedTarget = normalizeVaultPath(target.path);
       const nextPath = normalizePath(normalizedTarget === "" ? file.name : `${normalizedTarget}/${file.name}`);
       if (nextPath === file.path) return;
@@ -228,7 +233,6 @@ export class NodeService {
 
   public deleteFile(file: TFile): Promise<void> {
     return this.exclusive(async () => {
-      if (this.isCanonicalFile(file)) throw new Error(`Cannot delete canonical Node Note: ${file.path}`);
       this.expectEvent("delete", file.path);
       await this.app.fileManager.trashFile(file);
     });
@@ -322,6 +326,11 @@ export class NodeService {
       leafMarkdown: this.getSettings().leafNoteExemptions,
       leafMarkdownPrefixes: this.getSettings().leafNotePrefixes,
     });
+    if (this.getSettings().adoptionState === "managed") {
+      result.leafMarkdown = [];
+      result.missingNodeNotes = [];
+      result.conflicts = result.conflicts.filter(({ reason }) => reason.startsWith("Multiple canonical Node Notes:"));
+    }
     const rootCandidates = this.canonicalFiles("");
     if (rootCandidates.length > 1) {
       return {
@@ -329,7 +338,10 @@ export class NodeService {
         conflicts: [{ path: "", reason: `Multiple Root Node Notes: ${rootCandidates.map(({ path }) => path).join(", ")}` }, ...result.conflicts],
       };
     }
-    return rootCandidates.length === 0 ? { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] } : result;
+    if (rootCandidates.length === 0 && this.getSettings().adoptionState !== "managed") {
+      return { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] };
+    }
+    return result;
   }
 
   public migrate(expected: MigrationScan, onStep?: (completed: number, total: number) => void): Promise<void> {
@@ -347,7 +359,8 @@ export class NodeService {
     return this.exclusive(async () => {
       throwIfAborted(signal);
       if (this.getSettings().adoptionState === "managed") {
-        await this.migrateUnlocked(this.scan(), signal);
+        const scan = this.scan();
+        if (scan.conflicts.length > 0) throw new Error(`Managed Vault contains blocking conflicts: ${scan.conflicts[0]?.reason ?? "unknown conflict"}`);
       }
     });
   }
@@ -379,25 +392,18 @@ export class NodeService {
 
   public reconcileCreated(path: string): Promise<void> {
     return this.exclusive(async () => {
-      if (this.getSettings().adoptionState !== "managed") return;
-      const entry = this.app.vault.getAbstractFileByPath(path);
-      if (entry === null) return;
-      const scope = entry instanceof TFolder ? entry.path : dirname(entry.path);
-      if (this.isIgnoredPath(scope)) return;
-      if (entry instanceof TFolder) await this.reconcileFolderTree(entry);
-      else if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && entry.path !== this.rootNotePath() && !isCanonicalNodeNote(entry.path) && !this.isLeafNoteExempt(entry.path)) await this.convertLeafNoteUnlocked(entry);
+      // Native creation remains native: a new folder is a folder-only node shell,
+      // while a new Markdown file remains an ordinary note until the user invokes
+      // an explicit Folder Nodes conversion or creation action.
+      void path;
     });
   }
 
   public reconcileDeleted(path: string): Promise<void> {
     return this.exclusive(async () => {
-      if (this.getSettings().adoptionState !== "managed") return;
-      if (isSameVaultPath(path, this.rootNotePath())) {
-        await this.createReconciledNoteIfAbsent(this.rootNotePath());
-        return;
-      }
-      if (this.isIgnoredPath(dirname(path)) || !isCanonicalNodeNote(path)) return;
-      if (this.getFolder(dirname(path)) !== null) await this.createReconciledNoteIfAbsent(path);
+      // Deleting a Node Note intentionally leaves a folder-only node shell. Never
+      // recreate user-deleted content in a background reconciliation pass.
+      void path;
     });
   }
 
@@ -408,18 +414,9 @@ export class NodeService {
       const oldCanonical = oldRoot || isCanonicalNodeNote(oldPath);
       const entryScope = entry instanceof TFolder ? entry.path : dirname(entry.path);
       const oldScope = entry instanceof TFolder ? oldPath : dirname(oldPath);
-      const sameFolderNodeRename = entry instanceof TFile && !oldRoot && oldCanonical &&
-        dirname(entry.path) === dirname(oldPath) && !isCanonicalNodeNote(entry.path);
-      if (entry instanceof TFile && oldCanonical && !sameFolderNodeRename) {
-        if (oldRoot) await this.createReconciledNoteIfAbsent(this.rootNotePath());
-        else if (this.getFolder(dirname(oldPath)) !== null) await this.createReconciledNoteIfAbsent(oldPath);
-      }
       if (this.isIgnoredPath(entryScope)) return;
       if (entry instanceof TFolder) {
-        if (this.isIgnoredPath(oldScope)) {
-          await this.reconcileFolderTree(entry);
-          return;
-        }
+        if (this.isIgnoredPath(oldScope)) return;
         const canonicalPath = nodeNotePath(entry.path);
         const previousName = basename(oldPath);
         const candidates = [...new Set([
@@ -429,8 +426,7 @@ export class NodeService {
         ])];
         if (candidates.length > 1) throw new Error(`Folder rename conflict: multiple canonical notes exist in ${entry.path}`);
         const candidate = candidates[0];
-        if (candidate === undefined) await this.createReconciledNoteIfAbsent(canonicalPath);
-        else if (candidate.path !== canonicalPath) {
+        if (candidate !== undefined && candidate.path !== canonicalPath) {
           await this.assertAvailable(canonicalPath, candidate);
           this.expectEvent("rename", canonicalPath, candidate.path);
           await this.app.fileManager.renameFile(candidate, canonicalPath);
@@ -439,9 +435,7 @@ export class NodeService {
       }
       if (entry instanceof TFile && oldCanonical && dirname(entry.path) === dirname(oldPath) && !isCanonicalNodeNote(entry.path)) {
         if (entry.parent !== null) await this.renameNodeUnlockedFromRenamedNote(entry.parent, entry);
-        return;
       }
-      if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && entry.path !== this.rootNotePath() && !isCanonicalNodeNote(entry.path) && !this.isLeafNoteExempt(entry.path)) await this.convertLeafNoteUnlocked(entry);
     });
   }
 
@@ -694,27 +688,6 @@ export class NodeService {
       const post = this.scan();
       if (post.conflicts.length > 0 || post.leafMarkdown.length > 0 || post.missingNodeNotes.length > 0) throw new Error("Structural validation failed after migration");
     } catch (error) { await this.rollback(undos, error); }
-  }
-
-  private async reconcileFolderTree(root: TFolder): Promise<void> {
-    const folders: TFolder[] = [root];
-    for (let index = 0; index < folders.length; index += 1) {
-      const folder = folders[index];
-      if (folder === undefined || this.isIgnoredPath(folder.path)) continue;
-      await this.createReconciledNoteIfAbsent(this.notePathForFolder(folder.path));
-      for (const child of [...folder.children]) {
-        if (child instanceof TFolder) folders.push(child);
-        else if (child instanceof TFile && child.extension.toLocaleLowerCase() === "md" && !isCanonicalNodeNote(child.path) && !this.isLeafNoteExempt(child.path)) await this.convertLeafNoteUnlocked(child);
-      }
-    }
-  }
-
-  private async createReconciledNoteIfAbsent(path: string): Promise<void> {
-    const folderPath = isSameVaultPath(path, this.rootNotePath()) ? "" : dirname(path);
-    if (this.getCanonicalFile(folderPath) !== null) return;
-    await this.assertAvailable(path);
-    this.expectEvent("create", path);
-    await this.app.vault.create(path, "");
   }
 
   private requireCanonicalNote(folder: TFolder): TFile {

@@ -64,7 +64,7 @@ describe("Node Contents interactions", () => {
     expect(nodeEntryVisual("missing-note", null)).toEqual({
       defaultVisual: true,
       visual: { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null },
-      warning: true,
+      warning: false,
     });
     const custom = { kind: "emoji" as const, value: "☕", accent: null, inheritedFrom: null };
     expect(nodeEntryVisual("healthy", custom)).toEqual({ defaultVisual: false, visual: custom, warning: false });

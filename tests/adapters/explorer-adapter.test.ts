@@ -32,14 +32,14 @@ describe("ExplorerAdapter lifecycle", () => {
       app, service,
       { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
       () => ({ ...structuredClone(DEFAULT_SETTINGS), adoptionState: "managed" }),
-      () => ({ createNode: "Create node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", missingNoteShort: "Missing", newFolder: "New folder", newNote: "New note", node: "Node", nodeConflict: "Conflict", root: "Root" }),
+      () => ({ createNode: "Create node", missingNodeFolder: "Missing folder", missingNodeNote: "Folder only", missingNoteShort: "No note", node: "Node", nodeConflict: "Conflict", root: "Root" }),
       () => undefined, () => undefined, () => undefined,
     );
 
     adapter.start();
     expect(root.querySelectorAll(".folder-nodes-explorer-root")).toHaveLength(1);
     expect(root.querySelectorAll(".folder-nodes-create-node")).toHaveLength(1);
-    expect(root.querySelectorAll(".folder-nodes-native-create-hidden")).toHaveLength(2);
+    expect(actions.querySelectorAll(":scope > [aria-label='New note'], :scope > [aria-label='New folder']")).toHaveLength(2);
     const rootRow = root.querySelector(".folder-nodes-explorer-root");
     const rootVisual = root.querySelector(".folder-nodes-explorer-root-icon > svg");
     adapter.refresh();
@@ -79,7 +79,7 @@ describe("ExplorerAdapter lifecycle", () => {
       app, service,
       { resolve: () => ({ kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null }) } as unknown as VisualService,
       () => ({ ...structuredClone(DEFAULT_SETTINGS), adoptionState: "managed", showIconInNoteTitle: true }),
-      () => ({ createNode: "Create node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", missingNoteShort: "Missing", newFolder: "New folder", newNote: "New note", node: "Node", nodeConflict: "Conflict", root: "Root" }),
+      () => ({ createNode: "Create node", missingNodeFolder: "Missing folder", missingNodeNote: "Folder only", missingNoteShort: "No note", node: "Node", nodeConflict: "Conflict", root: "Root" }),
       () => undefined, () => undefined, () => undefined,
     );
 

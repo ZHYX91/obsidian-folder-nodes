@@ -1,7 +1,7 @@
 import { App, Notice, Setting, TFolder } from "obsidian";
 import type { NodeVisual } from "../core/types";
 import { formatError, t } from "./i18n";
-import { renderVisual } from "./render-visual";
+import { renderVisual } from "../presentation/render-visual";
 import { SubmittingModal } from "./submitting-modal";
 
 const PRESETS = ["📁", "🧠", "⭐", "lucide:folder-tree", "lucide:book-open", "文", "color:#7c3aed"];

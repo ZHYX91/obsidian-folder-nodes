@@ -82,6 +82,11 @@ export class VisualService {
     const note = this.nodes.getCanonicalFile(folder.path);
     if (note === null) throw new Error(`Missing node note: ${folder.path}`);
     const candidates = values.map((value) => value.trim()).filter((value) => value !== "");
+    const declaration = parseVisualDeclaration(candidates, {
+      iconIds: this.iconIds,
+      isColor: (value) => CSS.supports("color", value),
+    });
+    if (declaration.unknown.length > 0) throw new Error(`Unsupported icon value: ${declaration.unknown[0] ?? "unknown"}`);
     await this.app.fileManager.processFrontMatter(note, (frontmatter: Record<string, unknown>) => {
       if (candidates.length === 0) delete frontmatter[ICON_PROPERTY];
       else frontmatter[ICON_PROPERTY] = candidates.length === 1 ? candidates[0] : candidates;

@@ -16,5 +16,5 @@ export function classifyFileIdentity(options: {
   if (options.ignored) return "ordinary";
   if (options.canonicalNodeNote) return "node-note";
   if (!options.markdown || options.leafExempt) return "ordinary";
-  return options.counterpartNodeExists ? "conflict" : "missing-folder";
+  return options.counterpartNodeExists ? "conflict" : "ordinary";
 }

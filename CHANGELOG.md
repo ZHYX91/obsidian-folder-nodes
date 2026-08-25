@@ -1,7 +1,14 @@
 # Changelog
 
+## Unreleased
+
 ## 0.4.0
 
+- Aligned Folder Nodes with Obsidian's native file and folder actions: native note move/delete remains note-only, native folder actions remain subtree-wide, canonical folder/note renames stay synchronized, and explicit “containing node” actions handle whole-node operations.
+- Made folder-only nodes a supported neutral state, removed automatic Node Note recreation and ordinary-Markdown conversion, and kept startup validation read-only.
+- Made selection-created links safe inside Markdown table cells with `\|` aliases and fail-closed rejection for cross-cell or cross-row selections.
+- Refined Settings hierarchy and icon guidance, added a visible badge distinction between property icons and filename characters, separated glyph/CJK/emoji font fallbacks, and measured title-icon alignment without changing title text.
+- Corrected real-host UI regressions by shielding settings tabs from theme button overrides, strengthening property-icon badge contrast, documenting color-only and accented-icon behavior, and aligning title badges to the first title line inside padded editor hosts.
 - Added direct Folder Node creation for unresolved managed Markdown links, including transactional explicit paths, modifier-click panes, and optional `[[a|b]]` display aliases.
 - Added a Selection & naming explanation card and expanded the aliases switch across selection and unresolved-link creation.
 - Aligned unmanaged folder and Markdown metadata in Node Contents with one shared status badge and separate Folder/MD type columns.

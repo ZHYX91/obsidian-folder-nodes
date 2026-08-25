@@ -22,7 +22,7 @@ describe("Folder Node entry identity", () => {
 
   it("distinguishes canonical notes, structural problems, and exempt Markdown", () => {
     expect(classifyFileIdentity({ canonicalNodeNote: true, counterpartNodeExists: true, ignored: false, leafExempt: false, markdown: true })).toBe("node-note");
-    expect(classifyFileIdentity({ canonicalNodeNote: false, counterpartNodeExists: false, ignored: false, leafExempt: false, markdown: true })).toBe("missing-folder");
+    expect(classifyFileIdentity({ canonicalNodeNote: false, counterpartNodeExists: false, ignored: false, leafExempt: false, markdown: true })).toBe("ordinary");
     expect(classifyFileIdentity({ canonicalNodeNote: false, counterpartNodeExists: true, ignored: false, leafExempt: false, markdown: true })).toBe("conflict");
     expect(classifyFileIdentity({ canonicalNodeNote: false, counterpartNodeExists: false, ignored: false, leafExempt: true, markdown: true })).toBe("ordinary");
   });

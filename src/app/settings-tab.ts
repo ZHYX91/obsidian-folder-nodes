@@ -4,6 +4,7 @@ import type FolderNodesPlugin from "./plugin";
 import type { NamingPart } from "../core/types";
 import { PromptModal } from "../ui/prompt-modal";
 import { setLanguage, t } from "../ui/i18n";
+import { renderVisual } from "../presentation/render-visual";
 
 type TabId = "general" | "homepage" | "icons" | "naming";
 type ExemptionKind = "leaf" | "folder";
@@ -92,7 +93,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   public override display(): void {
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
-    new Setting(this.containerEl).setName(t("settings")).setHeading();
     const tabs = this.containerEl.createDiv({
       cls: "folder-nodes-tabs",
       attr: { role: "tablist", "aria-label": t("settings"), "aria-orientation": "horizontal" },
@@ -116,12 +116,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       cls: `folder-nodes-tab${isActive ? " is-active" : ""}`,
       attr: { id: this.tabId(id), role: "tab", "aria-selected": String(isActive), "aria-controls": this.panelId(id), tabindex: isActive ? "0" : "-1" },
     });
+    button.type = "button";
     button.addEventListener("click", () => this.selectTab(id, false));
     button.addEventListener("keydown", (event) => {
       const currentIndex = TABS.indexOf(id);
       let targetIndex: number | null = null;
-      if (event.key === "ArrowRight") targetIndex = (currentIndex + 1) % TABS.length;
-      else if (event.key === "ArrowLeft") targetIndex = (currentIndex - 1 + TABS.length) % TABS.length;
+      const isRtl = getComputedStyle(container).direction === "rtl";
+      if (event.key === "ArrowRight") targetIndex = (currentIndex + (isRtl ? -1 : 1) + TABS.length) % TABS.length;
+      else if (event.key === "ArrowLeft") targetIndex = (currentIndex + (isRtl ? 1 : -1) + TABS.length) % TABS.length;
       else if (event.key === "Home") targetIndex = 0;
       else if (event.key === "End") targetIndex = TABS.length - 1;
       if (targetIndex === null) return;
@@ -285,7 +287,25 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     example.createSpan({ text: t("iconPropertyExampleLabel") });
     example.createEl("code", { text: "icon: 💰" });
     body.createEl("p", { text: t("iconGuideFormats") });
+    body.createEl("p", { text: t("iconColorBehavior") });
+    body.createEl("p", { text: t("iconDistinctionDesc") });
+    const comparison = body.createDiv({ cls: "folder-nodes-icon-comparison", attr: { "aria-label": t("iconDistinctionTitle") } });
+    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "想", "1994", true);
+    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "想1994", false);
+    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "1994", true);
+    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓1994", false);
     body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("iconGuideRootNote") });
+  }
+
+  private renderIconComparisonRow(container: HTMLElement, label: string, iconValue: string, name: string, propertyIcon: boolean): void {
+    const row = container.createDiv({ cls: "folder-nodes-icon-comparison-row" });
+    row.createSpan({ cls: "folder-nodes-icon-comparison-label", text: label });
+    const example = row.createSpan({ cls: "folder-nodes-icon-comparison-example" });
+    if (propertyIcon) {
+      const icon = example.createSpan({ cls: "folder-nodes-settings-icon-demo-badge" });
+      renderVisual(icon, { kind: /\p{Extended_Pictographic}/u.test(iconValue) ? "emoji" : "glyph", value: iconValue, accent: null, inheritedFrom: null }, label);
+    }
+    example.createSpan({ text: name });
   }
 
   private renderNaming(panel: HTMLElement): void {

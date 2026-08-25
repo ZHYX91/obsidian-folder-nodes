@@ -2,7 +2,7 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
 
-Folder Nodes turns every folder in a managed Obsidian Vault into one structural node whose canonical note has the same name: `A/A.md`.
+Folder Nodes represents a complete structural node as a folder plus its same-named Node Note, `A/A.md`. Managed folders may also remain folder-only until you explicitly create their Node Note.
 
 ## Screenshots
 
@@ -14,27 +14,36 @@ Browse child nodes, visual media, ordinary files, and explicit unmanaged boundar
 
 ### File Explorer
 
-Navigate the Root and nested Folder Nodes while keeping ordinary resources in Obsidian's familiar file tree.
+Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. Property icons use a badge, while a character that belongs to the file name remains plain text.
 
-![Obsidian File Explorer showing a Folder Nodes hierarchy and ordinary resources](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian File Explorer distinguishing property icons from characters in node names](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+
+### Icons & appearance
+
+The settings card explains where icons come from and directly compares `icon: 想` or `icon: 📓` with the same character at the start of a file name.
+
+### Node Note title icon
+
+An optional title icon stays in its own aligned badge before the Node Note title. It does not become part of editable title text.
+
+![Folder Nodes property glyph displayed in a separate badge before the Node Note title](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
 
 ### Predictable Node creation
 
 See exactly how selected text and uncreated links map to Node paths, note bodies, and aliases before changing naming options.
 
-![Folder Nodes selection and naming settings explaining paths, bodies, and aliases](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
-
 ## Features
 
 - Create, rename, move, merge, reorder, and safely trash complete Folder Nodes.
-- Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, then write the selection into the new note and replace the source selection with that wikilink.
+- Keep Obsidian's native New note and New folder actions visible. A native folder is a folder-only node; a native Markdown file remains an ordinary note. File Explorer folder actions operate the whole folder, while tab actions move, delete, or merge only the Node Note. Renaming either half keeps an existing folder/Node Note pair synchronized, and explicitly labelled containing-node actions remain available from a Node Note tab.
+- Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, then write the selection into the new note and replace the source selection with that wikilink. Inside one Markdown table cell, the generated alias separator is escaped as `\|`; cross-cell and cross-row selections stop without writing.
 - In Managed scope, click an uncreated internal link to create the complete Node directly. `[[a]]` creates `a/a.md`; with aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
 - Navigate the global Node Tree through File Explorer: use the pinned, non-collapsible Root row; click a folder name to open its Node Note; keep disclosure arrows for ordinary nodes; hide duplicate canonical notes; and drag before, into, or after another node.
 - Browse the current node through independently paged Nodes, static Album, and compact Files sections with 200-item batches. Every entry has context-menu and keyboard menu access; child nodes support before/into/after placement, while one ordinary file may move only into a node or breadcrumb folder. Multi-selection inserts or copies links; a multi-selected drag exports links without partially moving files. GIFs use still thumbnails; video and audio never receive inline playback controls.
-- Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` accent, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text.
+- Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` accent, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed bordered badge so `icon: 想` is visibly different from a file name that begins with `想`; glyphs follow Obsidian's interface font and emoji use the platform color-emoji stack.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
-- Keep incomplete structures visible as warning-marked Nodes with explicit repair actions instead of misclassifying them as Files.
+- Keep folder-only nodes visible as neutral nodes with an explicit Create Node Note action. True conflicts—including ordinary Markdown that collides with an existing same-name Folder Node—remain warning-marked and fail closed.
 - Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and name prefixes; `.` and `_` are first-release defaults. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
 - Follow Obsidian's language automatically or override the interface with English or Simplified Chinese.
@@ -43,8 +52,8 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 ## Requirements and compatibility
 
 - Obsidian 1.12.7 or later.
-- Version 0.4.0 is desktop-only while the File Explorer adapter and drag placement receive dated host acceptance.
-- The managed model requires each managed folder to have one same-named Node Note and each managed Markdown document to be a Folder Node. Unmanaged Markdown and folder rules are explicit boundaries.
+- Version 0.4.1 is desktop-only while the File Explorer adapter and drag placement receive dated host acceptance.
+- A complete structural node still uses exactly one same-named Node Note. Folder-only nodes and ordinary Markdown files are valid managed-Vault content; unmanaged Markdown and folder rules remain explicit boundaries for initialization and plugin-owned structural actions.
 
 ## Installation
 
@@ -69,19 +78,20 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 5. In Managed scope, click an uncreated `[[a]]` or `[[a|b]]` link to create and open its complete Folder Node directly.
 6. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Right-click an entry, use its More actions button, or press Shift+F10 for the same menu.
 7. Drag a Folder Node before, into, or after another node to reorder or reparent it. Drag an Album or Files item into a child node, the current-node header, or a breadcrumb to move the file. The drop marker shows the resulting placement before the write.
+8. Use Obsidian's native file/folder actions when you mean the selected file or folder. From a Node Note tab, choose **Move/Delete/Merge containing node** only when the whole folder subtree is intended.
 
 ## Settings
 
 - **General** controls initialization state, interface language, preview-first maintenance, read-only Health, and two unified unmanaged-content rule groups for Markdown files and folders.
 - **Homepage** controls whether the root Node Note is a homepage and whether it opens after startup.
-- **Icons & appearance** controls inheritance, File Explorer placement, and note-title display. Icon size and alignment follow Obsidian rather than an arbitrary size setting.
+- **Icons & appearance** controls inheritance, File Explorer placement, and note-title display. Its comparison card shows the difference between a property icon and the same character in a file name. Icon size and alignment follow Obsidian rather than an arbitrary size setting.
 - **Selection & naming** explains both Node-creation paths and controls their shared aliases switch, prefix and suffix sources, independent separators, custom text, timestamp format, and live filename preview.
 - **Follow Obsidian** uses Obsidian's current interface language. Manual English or Simplified Chinese selection overrides the plugin interface without changing filenames or Markdown properties.
 - Naming sources are current file, current Folder Node, nearest current heading, timestamp, and custom text. Prefixes and suffixes affect only the basename. With aliases enabled, selection creation writes the selected text, while uncreated `[[a|b]]` link creation writes the display text `b`.
 
 ## Icon property
 
-`icon` stays compatible with Obsidian Properties: use one string or a flat list of strings, not nested YAML. The first renderable base candidate wins; a missing image continues to the next item. The first valid `color:` item accents that base, or becomes a swatch when no base resolves.
+`icon` stays compatible with Obsidian Properties: use one string or a flat list of strings, not nested YAML. The first renderable base candidate wins; a missing image continues to the next item. The first valid `color:` item accents that base, or becomes a swatch that fills the badge interior when no base resolves. With a glyph or Lucide icon, the accent colors the foreground; with emoji or an image, the original pixels remain unchanged while the badge background and border receive the accent.
 
 ```yaml
 icon:
@@ -91,13 +101,15 @@ icon:
   - "color:#7c3aed"
 ```
 
-The picker loads the complete current list and supports add, remove, reorder, presets, and live File Explorer/Contents previews without dropping unknown strings. Inheritance starts only after the local list is exhausted.
+The picker loads the complete current list and supports add, remove, reorder, presets, and live File Explorer/Contents previews. Unknown or multi-grapheme values are shown as invalid and cannot be saved; a single letter, CJK character, symbol, or emoji remains valid. Inheritance starts only after the local list is exhausted.
+
+Advanced CSS snippets may override `--folder-nodes-glyph-font`, `--folder-nodes-emoji-font`, `--folder-nodes-icon-badge-background`, `--folder-nodes-icon-badge-border`, and `--folder-nodes-icon-badge-radius`. There is deliberately no font picker in ordinary settings.
 
 ## Limitations
 
 - Structural identity is the current normalized Vault path, not a permanent ID. An external delete followed by an unrelated create is not guessed to be a rename.
 - File Explorer integration is a host compatibility boundary and keeps this version desktop-only.
-- Node visuals support Vault images but do not fetch remote images, recolor inline SVG, overlay badges, infer initials from node names, accept nested `icon` objects, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
+- Node visuals support Vault images and a lightweight semantic icon badge, but do not fetch remote images, recolor inline SVG, infer initials from node names, accept nested `icon` objects, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
 - The Contents View can move one ordinary file at a time into a displayed node or breadcrumb folder and can select multiple files for link insertion/copying, but it does not independently order files, transactionally move multiple files, accept cross-view internal drops, or become a second complete Vault tree.
 - Merge fails closed on path or frontmatter conflicts instead of presenting a complex conflict-resolution UI.
 - Alternate canonical names such as `README.md`, `index.md`, or `_A.md` and arbitrary property inheritance are not supported. Unmanaged folders are explicit whole-subtree boundaries, not partially managed nodes.
