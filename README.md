@@ -44,7 +44,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
 - Keep folder-only nodes visible as neutral nodes with an explicit Create Node Note action. True conflicts—including ordinary Markdown that collides with an existing same-name Folder Node—remain warning-marked and fail closed.
-- Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and name prefixes; `.` and `_` are first-release defaults. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
+- Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and name prefixes; `.` and `_` are the default prefixes. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
 - Follow Obsidian's language automatically or override the interface with English or Simplified Chinese.
 - Keep all processing local and write no permanent node ID, `_pkwf` metadata, manifest, path, parent, or complete child list.
@@ -52,14 +52,14 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 ## Requirements and compatibility
 
 - Obsidian 1.12.7 or later.
-- Version 0.4.1 is desktop-only while the File Explorer adapter and drag placement receive dated host acceptance.
+- Desktop Obsidian only.
 - A complete structural node still uses exactly one same-named Node Note. Folder-only nodes and ordinary Markdown files are valid managed-Vault content; unmanaged Markdown and folder rules remain explicit boundaries for initialization and plugin-owned structural actions.
 
 ## Installation
 
 ### Community Plugins
 
-After community-directory approval, open **Settings → Community plugins → Browse**, search for **Folder Nodes**, install it, and enable it.
+Open **Settings → Community plugins → Browse**, search for **Folder Nodes**, install it, and enable it. If it is not available in your catalog, use the manual installation below.
 
 ### Manual installation
 
@@ -108,7 +108,7 @@ Advanced CSS snippets may override `--folder-nodes-glyph-font` and `--folder-nod
 ## Limitations
 
 - Structural identity is the current normalized Vault path, not a permanent ID. An external delete followed by an unrelated create is not guessed to be a rename.
-- File Explorer integration is a host compatibility boundary and keeps this version desktop-only.
+- Mobile Obsidian is not supported because Folder Nodes integrates with desktop File Explorer behavior.
 - Node visuals support Vault images and a lightweight semantic icon slot, but do not fetch remote images, recolor inline SVG, infer initials from node names, accept nested `icon` objects, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
 - The Contents View can move one ordinary file at a time into a displayed node or breadcrumb folder and can select multiple files for link insertion/copying, but it does not independently order files, transactionally move multiple files, accept cross-view internal drops, or become a second complete Vault tree.
 - Merge fails closed on path or frontmatter conflicts instead of presenting a complex conflict-resolution UI.
