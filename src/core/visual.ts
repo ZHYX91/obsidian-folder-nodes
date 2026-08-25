@@ -97,7 +97,10 @@ export function resolveVisualDeclaration(raw: unknown, options: VisualResolveOpt
   const declaration = parseVisualDeclaration(raw, options);
   for (const base of declaration.bases) {
     const value = base.kind === "image" ? options.resolveImage(base.value) : base.value;
-    if (value !== null) return { ...base, value, accent: declaration.accent };
+    if (value !== null) {
+      const accent = base.kind === "glyph" || base.kind === "lucide" ? declaration.accent : null;
+      return { ...base, value, accent };
+    }
   }
   if (declaration.accent !== null) return { kind: "color", value: declaration.accent, accent: null };
   return null;

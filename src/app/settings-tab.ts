@@ -91,6 +91,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public override display(): void {
+    this.plugin.ensureStyles(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
     const tabs = this.containerEl.createDiv({
@@ -290,8 +291,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     body.createEl("p", { text: t("iconColorBehavior") });
     body.createEl("p", { text: t("iconDistinctionDesc") });
     const comparison = body.createDiv({ cls: "folder-nodes-icon-comparison", attr: { "aria-label": t("iconDistinctionTitle") } });
-    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "想", "1994", true);
-    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "想1994", false);
+    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "A", "1994", true);
+    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "A1994", false);
     this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "1994", true);
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓1994", false);
     body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("iconGuideRootNote") });
@@ -302,7 +303,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     row.createSpan({ cls: "folder-nodes-icon-comparison-label", text: label });
     const example = row.createSpan({ cls: "folder-nodes-icon-comparison-example" });
     if (propertyIcon) {
-      const icon = example.createSpan({ cls: "folder-nodes-settings-icon-demo-badge" });
+      const icon = example.createSpan({ cls: "folder-nodes-settings-icon-demo-slot" });
       renderVisual(icon, { kind: /\p{Extended_Pictographic}/u.test(iconValue) ? "emoji" : "glyph", value: iconValue, accent: null, inheritedFrom: null }, label);
     }
     example.createSpan({ text: name });

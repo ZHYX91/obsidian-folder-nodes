@@ -33,11 +33,42 @@ describe("runtime architecture contract", () => {
     expect(plugin).toContain("this.service.createNodePath");
     expect(plugin).toContain("this.settings.addSelectionAlias");
     expect(plugin).not.toContain("document.body");
+    expect(plugin.indexOf("this.registerUnresolvedLinkDocument(this.app.workspace.rootSplit.win.document)")).toBeGreaterThan(
+      plugin.indexOf("onLayoutReadyOnce(this.app.workspace"),
+    );
   });
 
   it("invalidates delayed startup and disposes structural service on unload", () => {
     const plugin = source("src/app/plugin.ts");
+    const layoutReady = source("src/app/layout-ready.ts");
     expect(plugin).toContain("generation !== this.lifecycleGeneration");
     expect(plugin).toContain("this.service?.dispose()");
+    expect(plugin).toContain("onLayoutReadyOnce(this.app.workspace");
+    expect(layoutReady).toContain("host.onLayoutReady(run)");
+    expect(layoutReady).toContain("if (host.layoutReady) run()");
+    expect(layoutReady).toContain("queueMicrotask");
+    expect(layoutReady).not.toContain("setTimeout");
+  });
+
+  it("owns one authoritative versioned stylesheet per workspace document", () => {
+    const plugin = source("src/app/plugin.ts");
+    const settings = source("src/app/settings-tab.ts");
+    const build = source("scripts/esbuild-options.mjs");
+    const runtimeStyles = source("src/ui/runtime-styles.ts");
+    expect(plugin).toContain('import PLUGIN_STYLES from "../ui/styles.css"');
+    expect(plugin).toContain("new RuntimeStyles(PLUGIN_STYLES)");
+    expect(plugin).not.toContain("adapter.read");
+    expect(plugin).toContain("runtimeStyles.install(document)");
+    expect(plugin).toContain("runtimeStyles.removeAll()");
+    expect(plugin).toContain('this.app.workspace.on("css-change", () => this.ensureWorkspaceStyles())');
+    expect(plugin).toContain("this.ensureWorkspaceStyles()");
+    expect(runtimeStyles).toContain("document.adoptedStyleSheets");
+    expect(runtimeStyles).toContain("--folder-nodes-runtime-style");
+    expect(runtimeStyles).not.toContain('createElement("style")');
+    expect(runtimeStyles).not.toContain("setTimeout");
+    expect(runtimeStyles).not.toContain("nativeStylesAreReady");
+    expect(settings).toContain("ensureStyles(this.containerEl.ownerDocument)");
+    expect(build).toContain('loader: { ".css": "text" }');
+    expect(source("styles.css")).not.toContain(".folder-nodes-");
   });
 });

@@ -143,7 +143,7 @@ export function ensureExplorerRootRow(container: HTMLElement): ExplorerRootRow {
   let row = container.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-root");
   if (row === null) {
     row = container.ownerDocument.createElement("div");
-    row.className = "tree-item-self nav-file-title folder-nodes-explorer-root";
+    row.className = "folder-nodes-explorer-root";
     row.tabIndex = 0;
     row.setAttribute("role", "treeitem");
     row.setAttribute("draggable", "false");
@@ -152,7 +152,7 @@ export function ensureExplorerRootRow(container: HTMLElement): ExplorerRootRow {
     icon.className = "folder-nodes-explorer-root-icon";
     icon.dataset.role = "icon";
     const title = container.ownerDocument.createElement("span");
-    title.className = "nav-file-title-content folder-nodes-explorer-root-title";
+    title.className = "folder-nodes-explorer-root-title";
     title.dataset.role = "title";
     const badge = container.ownerDocument.createElement("span");
     badge.className = "folder-nodes-explorer-root-badge";

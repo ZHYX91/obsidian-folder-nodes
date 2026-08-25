@@ -4,6 +4,11 @@
 
 ## 0.4.0
 
+- Made the embedded stylesheet the single runtime authority in every Obsidian window, with one versioned plugin-owned constructable stylesheet that is refreshed after host CSS lifecycle changes and removed on unload.
+- Removed native stylesheet readiness probing, delayed retries, all dual-path fallback logic, and the duplicated active release stylesheet.
+- Closed Obsidian 1.13 cold-start races by registering the final readiness check before accessing the root Workspace document and moving root-document events, authoritative styles, and one-time workspace initialization behind that boundary.
+- Replaced bordered icon badges with one frameless, fixed-size visual slot; normalized SVG, glyph, emoji, image, and color-swatch sizing; and made `color:` a foreground color for glyph/Lucide visuals or a circular fallback only after every base candidate fails.
+- Center-aligned decorated File Explorer rows so SVG, image, emoji, and status-badge baselines cannot change row height.
 - Aligned Folder Nodes with Obsidian's native file and folder actions: native note move/delete remains note-only, native folder actions remain subtree-wide, canonical folder/note renames stay synchronized, and explicit “containing node” actions handle whole-node operations.
 - Made folder-only nodes a supported neutral state, removed automatic Node Note recreation and ordinary-Markdown conversion, and kept startup validation read-only.
 - Made selection-created links safe inside Markdown table cells with `\|` aliases and fail-closed rejection for cross-cell or cross-row selections.

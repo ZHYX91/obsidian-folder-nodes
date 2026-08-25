@@ -14,7 +14,7 @@ Browse child nodes, visual media, ordinary files, and explicit unmanaged boundar
 
 ### File Explorer
 
-Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. Property icons use a badge, while a character that belongs to the file name remains plain text.
+Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. Property icons use a fixed frameless slot, while a character that belongs to the file name remains plain text.
 
 ![Obsidian File Explorer distinguishing property icons from characters in node names](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
@@ -24,9 +24,9 @@ The settings card explains where icons come from and directly compares `icon: �
 
 ### Node Note title icon
 
-An optional title icon stays in its own aligned badge before the Node Note title. It does not become part of editable title text.
+An optional title icon stays in its own aligned slot before the Node Note title. It does not become part of editable title text.
 
-![Folder Nodes property glyph displayed in a separate badge before the Node Note title](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
+![Folder Nodes property glyph displayed in a separate slot before the Node Note title](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
 
 ### Predictable Node creation
 
@@ -40,7 +40,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 - In Managed scope, click an uncreated internal link to create the complete Node directly. `[[a]]` creates `a/a.md`; with aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
 - Navigate the global Node Tree through File Explorer: use the pinned, non-collapsible Root row; click a folder name to open its Node Note; keep disclosure arrows for ordinary nodes; hide duplicate canonical notes; and drag before, into, or after another node.
 - Browse the current node through independently paged Nodes, static Album, and compact Files sections with 200-item batches. Every entry has context-menu and keyboard menu access; child nodes support before/into/after placement, while one ordinary file may move only into a node or breadcrumb folder. Multi-selection inserts or copies links; a multi-selected drag exports links without partially moving files. GIFs use still thumbnails; video and audio never receive inline playback controls.
-- Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` accent, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed bordered badge so `icon: 想` is visibly different from a file name that begins with `想`; glyphs follow Obsidian's interface font and emoji use the platform color-emoji stack.
+- Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` value, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed frameless slot; glyph weight, size, and color distinguish them from file-name characters, while emoji retain the platform color-emoji appearance.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
 - Keep folder-only nodes visible as neutral nodes with an explicit Create Node Note action. True conflicts—including ordinary Markdown that collides with an existing same-name Folder Node—remain warning-marked and fail closed.
@@ -91,7 +91,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 
 ## Icon property
 
-`icon` stays compatible with Obsidian Properties: use one string or a flat list of strings, not nested YAML. The first renderable base candidate wins; a missing image continues to the next item. The first valid `color:` item accents that base, or becomes a swatch that fills the badge interior when no base resolves. With a glyph or Lucide icon, the accent colors the foreground; with emoji or an image, the original pixels remain unchanged while the badge background and border receive the accent.
+`icon` stays compatible with Obsidian Properties: use one string or a flat list of strings, not nested YAML. The first renderable base candidate wins; a missing image continues to the next item. With a glyph or Lucide icon, the first valid `color:` item colors the foreground. Emoji and images keep their native pixels and receive no added dot, background, or border; for them, `color:` is used only when every base candidate fails, becoming a centered solid circular swatch.
 
 ```yaml
 icon:
@@ -103,13 +103,13 @@ icon:
 
 The picker loads the complete current list and supports add, remove, reorder, presets, and live File Explorer/Contents previews. Unknown or multi-grapheme values are shown as invalid and cannot be saved; a single letter, CJK character, symbol, or emoji remains valid. Inheritance starts only after the local list is exhausted.
 
-Advanced CSS snippets may override `--folder-nodes-glyph-font`, `--folder-nodes-emoji-font`, `--folder-nodes-icon-badge-background`, `--folder-nodes-icon-badge-border`, and `--folder-nodes-icon-badge-radius`. There is deliberately no font picker in ordinary settings.
+Advanced CSS snippets may override `--folder-nodes-glyph-font` and `--folder-nodes-emoji-font`. There is deliberately no font picker in ordinary settings.
 
 ## Limitations
 
 - Structural identity is the current normalized Vault path, not a permanent ID. An external delete followed by an unrelated create is not guessed to be a rename.
 - File Explorer integration is a host compatibility boundary and keeps this version desktop-only.
-- Node visuals support Vault images and a lightweight semantic icon badge, but do not fetch remote images, recolor inline SVG, infer initials from node names, accept nested `icon` objects, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
+- Node visuals support Vault images and a lightweight semantic icon slot, but do not fetch remote images, recolor inline SVG, infer initials from node names, accept nested `icon` objects, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
 - The Contents View can move one ordinary file at a time into a displayed node or breadcrumb folder and can select multiple files for link insertion/copying, but it does not independently order files, transactionally move multiple files, accept cross-view internal drops, or become a second complete Vault tree.
 - Merge fails closed on path or frontmatter conflicts instead of presenting a complex conflict-resolution UI.
 - Alternate canonical names such as `README.md`, `index.md`, or `_A.md` and arbitrary property inheritance are not supported. Unmanaged folders are explicit whole-subtree boundaries, not partially managed nodes.

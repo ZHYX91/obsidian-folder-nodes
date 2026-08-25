@@ -11,7 +11,7 @@ translation_status: source
 
 ## 分层
 
-Core 只处理路径、命名、不管理边界规则、迁移计划、反向引用索引、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View 与批量刷新调度。公开仓库不依赖本地工作区或个人 Vault。
+Core 只处理路径、命名、不管理边界规则、迁移计划、反向引用索引、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View 与批量刷新调度。UI/App 还为每个 Workspace document 唯一管理一份带内容指纹的 constructable stylesheet；发布包中的 `styles.css` 刻意保持无效，因此 Obsidian 原生样式缓存不会成为第二个运行时来源。一次性 layout gate 会先向宿主注册，再检查 `layoutReady`，不用轮询或延时重试即可封闭状态转换竞争窗口。公开仓库不依赖本地工作区或个人 Vault。
 
 ## 排序引擎
 
@@ -25,7 +25,7 @@ NodeService 把 create、rename、move、place、merge、repair 和 trash 作为
 
 ## Visual 解析
 
-Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示颜色修饰。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选；本地只有颜色时生成 swatch。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用系统彩色 Emoji 字体，来自属性的 Explorer/标题图标进入固定且边界清晰的徽标。标题徽标仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量开放字体和徽标 token，不增加设置字体选择器。
+Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示前景强调色或回退色。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选。解析到文字或 Lucide 时，颜色直接作用于前景；解析到 Emoji 或图片时保留原始像素，不增加圆点或容器装饰；所有基础候选都失败时，颜色才成为居中的圆形色标。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用系统彩色 Emoji 字体，来自属性的 Explorer/标题图标进入固定且无边框的图标位。标题图标位仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量只开放字体，不增加设置字体选择器。
 
 Picker 使用 `FileManager.processFrontMatter` 写回：零项删除属性，一项写 Text，多项写 List。遇到未知、多字素、非字符串或嵌套值时拒绝写入，不静默接受或丢失数据。
 

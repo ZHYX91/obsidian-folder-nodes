@@ -23,7 +23,7 @@ describe("settings tab compatibility contract", () => {
       resolve(process.cwd(), "src/app/settings-tab.ts"),
       "utf8",
     );
-    const styles = readFileSync(resolve(process.cwd(), "styles.css"), "utf8");
+    const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
     expect(source).toContain("this.renderIconGuide(panel);");
     expect(source.indexOf("this.renderIconGuide(panel);")).toBeLessThan(
@@ -32,6 +32,9 @@ describe("settings tab compatibility contract", () => {
     expect(source).toContain('text: "icon: 💰"');
     expect(source).toContain('t("iconColorBehavior")');
     expect(source).toContain("this.renderIconComparisonRow");
+    expect(source).toContain('t("iconFromProperty"), "A", "1994", true');
+    expect(source).toContain('t("characterInFilename"), "", "A1994", false');
+    expect(source).not.toContain('t("iconFromProperty"), "想"');
     expect(source).toContain('t("iconDistinctionDesc")');
     expect(styles).toContain(".folder-nodes-settings-guide");
     expect(styles).toContain(
@@ -40,12 +43,13 @@ describe("settings tab compatibility contract", () => {
     expect(styles).toContain("background: var(--background-secondary)");
     expect(styles).toContain("--folder-nodes-glyph-font: var(--font-interface)");
     expect(styles).toContain('"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"');
-    expect(styles).toContain(".folder-nodes-explorer-icon:not(.is-default-node):not(.is-warning)");
+    expect(styles).toContain(".folder-nodes-settings-icon-demo-slot");
+    expect(styles).not.toContain(".folder-nodes-settings-icon-demo-badge");
   });
 
   it("matches the established tab-to-section hierarchy without a duplicate plugin heading", () => {
     const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
-    const styles = readFileSync(resolve(process.cwd(), "styles.css"), "utf8");
+    const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
     expect(source).not.toContain('new Setting(this.containerEl).setName(t("settings")).setHeading()');
     expect(source).not.toContain('new Setting(panel).setName(this.tabLabel(this.activeTab)).setHeading()');
@@ -63,18 +67,27 @@ describe("settings tab compatibility contract", () => {
   });
 
   it("keeps root, property visuals, names, and statuses in distinct visual slots", () => {
-    const styles = readFileSync(resolve(process.cwd(), "styles.css"), "utf8");
+    const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
-    expect(styles).toContain("var(--interactive-accent) 10%");
-    expect(styles).toContain("var(--interactive-accent) 38%");
-    expect(styles).toContain("grid-template-columns: 22px minmax(0, 1fr) max-content");
-    expect(styles).toContain("inline-size: calc(100% - 12px) !important");
-    expect(styles).toContain("flex-basis: 22px");
+    expect(styles).toContain("display: grid !important");
+    expect(styles).toContain("grid-template-columns: 22px minmax(0, 1fr) max-content !important");
+    expect(styles).toContain("inline-size: calc(100% - 12px)");
+    expect(styles).toContain("flex: 0 0 auto");
+    expect(styles).toContain("justify-self: end");
+    expect(styles).not.toContain(".folder-nodes-explorer-root.tree-item-self.nav-file-title");
+    expect(styles).toContain("max-inline-size: 100%");
+    expect(styles).toContain("flex: 0 0 22px");
+    expect(styles).toContain(".folder-nodes-explorer-icon > svg { display: block; width: 16px; height: 16px; }");
+    expect(styles).toContain(".folder-nodes-explorer-icon img { display: block; width: 18px; height: 18px; border-radius: 4px; }");
+    expect(styles).toContain(".folder-nodes-explorer-icon .folder-nodes-visual-emoji { font-size: 16px; }");
+    expect(styles).toContain(".nav-folder-title.folder-nodes-missing-note { align-items: center; }");
     expect(styles).toContain("margin-inline-start: auto");
     expect(styles).toContain("background: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary))");
-    expect(styles).toContain(".folder-nodes-visual.has-accent:is(.is-emoji, .is-image)");
+    expect(styles).not.toContain(".folder-nodes-visual.has-accent:is(.is-emoji, .is-image)");
     expect(styles).toContain(".folder-nodes-visual.has-accent .folder-nodes-visual-glyph");
-    expect(styles).toContain(".folder-nodes-visual-color { width: 100%; height: 100%;");
+    expect(styles).toContain(".folder-nodes-visual-color { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; }");
+    expect(styles).not.toContain("--folder-nodes-icon-badge-");
+    expect(styles).not.toContain("border: 1px solid var(--folder-nodes-icon-badge-border)");
   });
 
   it("explains selection and unresolved-link creation before the shared aliases switch", () => {

@@ -21,7 +21,7 @@ translation_status: source
 
 ## Explorer Node Tree
 
-File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称和“根节点”状态分别占用固定图标位、弹性名称位和尾部状态位，卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定徽标位，把名称留在原生 title 位，并把“无笔记”等状态固定为尾部胶囊，不把这些内容拼进名称。点击完整节点的 folder title 打开 Node Note；仅有文件夹时保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。拖拽时必须显示 before line、into highlight 或 after line；drop 前不得修改 Vault。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件只增加新建完整子节点、Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
+File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称和“根节点”状态分别占用固定图标位、弹性名称位和尾部状态位，卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定且无边框的图标位，把名称留在原生 title 位，并把“无笔记”等状态固定为尾部胶囊，不把这些内容拼进名称。所有图标位使用相同几何尺寸，默认 SVG、文字、Emoji 和图片都不得改变原生行高。点击完整节点的 folder title 打开 Node Note；仅有文件夹时保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。拖拽时必须显示 before line、into highlight 或 after line；drop 前不得修改 Vault。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件只增加新建完整子节点、Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
 
 ## Node Contents View
 
@@ -33,7 +33,7 @@ Node 卡片上方 25% 是 before line，中间 50% 是 into highlight，下方 2
 
 ## Visual Picker
 
-Picker 打开时载入当前 `icon` 的完整 Text/List，而不是显示空输入框。用户可添加、删除、上下移动 Vault image wikilink、`lucide:` 候选、单个文字/Emoji 和 `color:` 修饰，也可追加稳定预设；Explorer 与 Contents 预览随输入更新。确认时零项删除属性、一项写 Text、多项写扁平 Text List；未知、多字素、非字符串或嵌套值都拒绝保存并提示，不静默接受或覆盖。图片缺失会预览后续本地候选，第一个合法颜色生效，只有本地声明全部无效时才预览继承 visual。属性图标统一位于固定且边界清晰的徽标中，文件名中的相同字符保持无徽标；“图标与外观”说明卡片同时展示两种情况。文件列表图标可置于名称之前、之后或隐藏。笔记标题图标可单独开启，仍是可编辑 `.inline-title` 外部的不可编辑 sibling，按标题首行的实际几何位置对齐，并在 view resize 后重算。文字使用 Obsidian 界面字体，Emoji 使用系统彩色 Emoji 字体；高级覆盖通过 CSS 变量完成，不增加普通字体选择器。
+Picker 打开时载入当前 `icon` 的完整 Text/List，而不是显示空输入框。用户可添加、删除、上下移动 Vault image wikilink、`lucide:` 候选、单个文字/Emoji 和 `color:` 修饰，也可追加稳定预设；Explorer 与 Contents 预览随输入更新。确认时零项删除属性、一项写 Text、多项写扁平 Text List；未知、多字素、非字符串或嵌套值都拒绝保存并提示，不静默接受或覆盖。图片缺失会预览后续本地候选，只有本地声明全部无效时才预览继承 visual。第一个合法颜色为文字或 Lucide 前景着色；Emoji 和图片不叠加圆点或装饰，只有所有基础候选都失败时颜色才成为居中的实心圆形色标。属性图标统一位于固定且无边框的图标位中，文件名中的相同字符保持普通文字；“图标与外观”说明卡片通过字重、大小和颜色同时展示两种情况。文件列表图标可置于名称之前、之后或隐藏。笔记标题图标可单独开启，仍是可编辑 `.inline-title` 外部的不可编辑 sibling，按标题首行的实际几何位置对齐，并在 view resize 后重算。文字使用 Obsidian 界面字体，Emoji 使用系统彩色 Emoji 字体；高级覆盖通过 CSS 变量完成，不增加普通字体选择器。
 
 ## 迁移与健康
 

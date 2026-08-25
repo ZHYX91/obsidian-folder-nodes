@@ -14,7 +14,7 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 
 ### 文件列表
 
-在 Obsidian 熟悉的文件列表中浏览 Root 与嵌套 Folder Node。属性图标使用徽标，属于文件名的开头字符仍保持普通文字。
+在 Obsidian 熟悉的文件列表中浏览 Root 与嵌套 Folder Node。属性图标使用固定且无边框的图标位，属于文件名的开头字符仍保持普通文字。
 
 ![Obsidian 文件列表区分属性图标与节点名中的字符](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
@@ -24,9 +24,9 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 
 ### 节点笔记标题图标
 
-可选标题图标在节点笔记标题前使用单独且对齐的徽标，不会进入可编辑的标题文字。
+可选标题图标在节点笔记标题前使用单独且对齐的图标位，不会进入可编辑的标题文字。
 
-![Folder Nodes 属性文字图标在节点笔记标题前显示为独立徽标](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
+![Folder Nodes 属性文字图标在节点笔记标题前显示为独立图标位](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
 
 ### 可预测的 Node 创建
 
@@ -40,7 +40,7 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 - 在 Managed 范围内，点击未创建的内部链接即可直接创建完整 Node。`[[a]]` 创建 `a/a.md`；开启 aliases 后，`[[a|b]]` 还会把 `b` 写入 `aliases`。
 - 通过文件资源管理器浏览全局 Node Tree：使用置顶且不可折叠的根节点行；点击普通文件夹名称打开 Node Note，其展开箭头仍只负责展开；隐藏重复 canonical note，并支持拖到另一节点的 before、into 或 after。
 - 在响应式侧栏中分别按每批 200 项浏览“节点”“静态相册”和紧凑“文件”。所有条目都有右键菜单和键盘菜单入口；子节点支持 before/into/after 放置，单个普通文件只允许移入节点或面包屑目录。多选可插入或复制链接；拖动多个已选条目只导出链接，不会部分移动文件。GIF 只显示静态缩略图，视频和音频没有侧栏内播放控件。
-- 将一个 Obsidian 原生 `icon` Text/List 解析为有序 Vault 图片、Lucide 或单字素候选及可选 `color:` 修饰，支持本地回退、祖先继承、文件列表名称前/后/隐藏位置，以及位于可编辑标题文字之外的可选笔记标题图标。属性图标统一放入有清晰边界的徽标，因此 `icon: 想` 与文件名自身以“想”开头可以明显区分；文字跟随 Obsidian 界面字体，Emoji 使用系统彩色 Emoji 字体。
+- 将一个 Obsidian 原生 `icon` Text/List 解析为有序 Vault 图片、Lucide 或单字素候选及可选 `color:` 值，支持本地回退、祖先继承、文件列表名称前/后/隐藏位置，以及位于可编辑标题文字之外的可选笔记标题图标。属性图标统一放入固定且无边框的图标位，通过文字的字重、大小和颜色与文件名自身的开头字符区分；Emoji 使用系统彩色 Emoji 字体并保留原色。
 - 可将根节点笔记作为主页，通过命令或节点内容视图打开，并可选择在 Vault 启动后打开。
 - 初始化和迁移共用一份精确路径预览；冲突阻止提交，健康检查严格只读。
 - 仅有文件夹的节点使用中性状态并提供“创建节点笔记”；真正的冲突——包括与已有同名 Folder Node 碰撞的普通 Markdown——继续使用警告状态并失败关闭。
@@ -91,7 +91,7 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 
 ## icon 属性
 
-`icon` 与 Obsidian Properties 兼容：使用一个字符串或扁平字符串列表，不使用嵌套 YAML。按顺序采用第一个实际可显示的基础候选；图片缺失时继续下一项。第一个有效 `color:` 项修饰该基础候选；没有基础候选时显示为填满徽标内部的色块。与文字或 Lucide 搭配时，颜色用于字符或线条；与 Emoji 或图片搭配时保留原始像素，只强调徽标背景和边框。
+`icon` 与 Obsidian Properties 兼容：使用一个字符串或扁平字符串列表，不使用嵌套 YAML。按顺序采用第一个实际可显示的基础候选；图片缺失时继续下一项。与文字或 Lucide 搭配时，第一个有效 `color:` 项直接为前景着色。Emoji 和图片保留原始像素，不增加圆点、背景或边框；对它们而言，只有所有基础候选都失败时，`color:` 才回退为居中的实心圆形色标。
 
 ```yaml
 icon:
@@ -103,13 +103,13 @@ icon:
 
 Picker 会载入当前完整列表，支持添加、删除、排序、预设和 File Explorer/Contents 实时预览。未知值或多字素值会显示为无效且不能保存；单个英文字符、中文字符、符号或 Emoji 仍然有效。只有本地列表全部耗尽后才开始继承。
 
-高级 CSS snippet 可覆盖 `--folder-nodes-glyph-font`、`--folder-nodes-emoji-font`、`--folder-nodes-icon-badge-background`、`--folder-nodes-icon-badge-border` 和 `--folder-nodes-icon-badge-radius`。普通设置页不会增加字体选择器。
+高级 CSS snippet 可覆盖 `--folder-nodes-glyph-font` 和 `--folder-nodes-emoji-font`。普通设置页不会增加字体选择器。
 
 ## 限制
 
 - 结构身份是当前规范化 Vault 路径，不是永久 ID。外部删除后再创建不会被猜测为重命名。
 - 文件资源管理器集成属于主机兼容边界，因此当前版本仅支持桌面端。
-- 节点视觉支持 Vault 图片和轻量语义徽标，但不抓取远程图片、不做 inline SVG 重着色、不从节点名推断首字母、不接受嵌套 `icon` 对象、不生成 PDF 首页或视频帧、不预览 HEIC/HEIF、不播放 GIF、视频或音频。
+- 节点视觉支持 Vault 图片和轻量语义图标位，但不抓取远程图片、不做 inline SVG 重着色、不从节点名推断首字母、不接受嵌套 `icon` 对象、不生成 PDF 首页或视频帧、不预览 HEIC/HEIF、不播放 GIF、视频或音频。
 - Contents View 可将单个普通文件移入当前显示的节点或面包屑目录，并可多选文件插入或复制链接，但不提供普通文件独立排序、事务式多文件移动、跨视图内部放置，也不是第二棵完整 Vault 目录树。
 - 合并遇到路径或 frontmatter 冲突会失败关闭，不提供复杂的冲突合并界面。
 - 不支持 `README.md`、`index.md`、`_A.md` 等替代 canonical note 名称或任意属性继承。不管理的文件夹是完整子树边界，不是部分受管节点。

@@ -91,6 +91,10 @@ describe("File Explorer root row", () => {
     expect(first.row.getAttribute("draggable")).toBe("false");
     expect(first.row.querySelector(".collapse-icon")).toBeNull();
     expect(isFolderCollapseControl(first.row)).toBe(false);
+    expect(first.row.classList.contains("tree-item-self")).toBe(false);
+    expect(first.row.classList.contains("nav-file-title")).toBe(false);
+    expect(first.title.classList.contains("nav-file-title-content")).toBe(false);
+    expect(Array.from(first.row.children)).toEqual([first.icon, first.title, first.badge]);
   });
 });
 

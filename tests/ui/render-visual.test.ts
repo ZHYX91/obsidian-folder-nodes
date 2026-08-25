@@ -16,7 +16,7 @@ describe("visual rendering semantics", () => {
     expect(container.querySelector(".folder-nodes-visual-emoji")?.textContent).toBe("📓");
   });
 
-  it("keeps accent metadata on the visual container and renders lone colors as full swatches", () => {
+  it("keeps foreground accent metadata and renders lone colors as swatches", () => {
     const container = document.createElement("span");
 
     renderVisual(container, { kind: "glyph", value: "A", accent: "#4caf50", inheritedFrom: null }, "Node icon");

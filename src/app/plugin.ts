@@ -1,5 +1,7 @@
 import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
 
+import PLUGIN_STYLES from "../ui/styles.css";
+
 import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
@@ -19,6 +21,8 @@ import { ConfirmModal, PromptModal } from "../ui/prompt-modal";
 import { SelectionCreateModal } from "../ui/selection-create-modal";
 import { VisualPickerModal } from "../ui/visual-picker-modal";
 import { formatError, setLanguage, t } from "../ui/i18n";
+import { RuntimeStyles } from "../ui/runtime-styles";
+import { onLayoutReadyOnce } from "./layout-ready";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { runAdoptionMigration } from "./migration-state";
 import { RefreshScheduler, type RefreshBatch } from "./refresh-scheduler";
@@ -40,6 +44,7 @@ export default class FolderNodesPlugin extends Plugin {
   private readonly unresolvedLinkDocuments = new Set<Document>();
   private unloaded = false;
   private lifecycleGeneration = 0;
+  private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
   private readonly settingsSaver = new SettingsSaveCoordinator<FolderNodesSettings>(
     (snapshot) => this.saveData(snapshot),
   );
@@ -89,9 +94,10 @@ export default class FolderNodesPlugin extends Plugin {
     this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
     this.registerCommands();
     this.registerEvents();
-    this.registerUnresolvedLinkDocument(this.app.workspace.rootSplit.win.document);
-    this.app.workspace.onLayoutReady(() => {
+    onLayoutReadyOnce(this.app.workspace, () => {
       if (this.unloaded || generation !== this.lifecycleGeneration) return;
+      this.registerUnresolvedLinkDocument(this.app.workspace.rootSplit.win.document);
+      this.ensureWorkspaceStyles();
       this.explorer.start();
       this.reconciliationReady = true;
       this.references.rebuild(this.app.metadataCache.resolvedLinks);
@@ -112,6 +118,7 @@ export default class FolderNodesPlugin extends Plugin {
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
     this.reconcileBatches.clear();
     this.unresolvedLinkDocuments.clear();
+    this.runtimeStyles.removeAll();
     if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
     this.reconcileNoticeTimer = null;
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) leaf.detach();
@@ -119,6 +126,10 @@ export default class FolderNodesPlugin extends Plugin {
 
   public async saveSettings(): Promise<void> {
     await this.settingsSaver.save(this.settings);
+  }
+
+  public ensureStyles(document: Document): void {
+    this.runtimeStyles.install(document);
   }
 
   public previewSelectionName(selection: string): string {
@@ -294,8 +305,10 @@ export default class FolderNodesPlugin extends Plugin {
       menu.addItem((item) => item.setTitle(t("createSelection")).setIcon("folder-plus").onClick(() => this.previewSelectionCreation(editor, info.file)));
     }));
     this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, window) => {
+      this.ensureStyles(window.document);
       this.registerUnresolvedLinkDocument(window.document);
     }));
+    this.registerEvent(this.app.workspace.on("css-change", () => this.ensureWorkspaceStyles()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       this.updateContentsView();
       this.refreshVisuals();
@@ -341,6 +354,12 @@ export default class FolderNodesPlugin extends Plugin {
     const handle = (event: MouseEvent) => this.interceptUnresolvedLink(event);
     this.registerDomEvent(document, "click", handle, { capture: true });
     this.registerDomEvent(document, "auxclick", handle, { capture: true });
+  }
+
+  private ensureWorkspaceStyles(): void {
+    const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
+    this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
+    for (const document of documents) this.ensureStyles(document);
   }
 
   private interceptUnresolvedLink(event: MouseEvent): void {
