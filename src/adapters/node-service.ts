@@ -11,7 +11,7 @@ import {
 import { VaultOperationCoordinator, type VaultEventKind } from "./vault-operation-coordinator";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exemptions";
 import { createNodeDocument, patchFrontmatterScalar } from "../core/frontmatter";
-import { scanMigration, type VaultInventory } from "../core/migration";
+import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planReorder } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { CHILDREN_SORT_PROPERTY, SIBLING_RANK_PROPERTY } from "../core/properties";
@@ -80,6 +80,11 @@ export class NodeService {
     return matchesFolderExemption(path, [...settings.ignoredFolders, this.app.vault.configDir], settings.ignoredFolderPrefixes);
   }
 
+  public isIgnoredRootPath(path: string): boolean {
+    const normalized = normalizeVaultPath(path);
+    return normalized !== "" && this.isIgnoredPath(normalized) && !this.isIgnoredPath(dirname(normalized));
+  }
+
   public isLeafNoteExempt(path: string): boolean {
     const settings = this.getSettings();
     return matchesLeafNoteExemption(path, settings.leafNoteExemptions, settings.leafNotePrefixes);
@@ -103,6 +108,27 @@ export class NodeService {
       const notePath = this.notePathForFolder(folder.path);
       const existing = this.getCanonicalFile(folder.path);
       if (existing !== null) return existing;
+      await this.assertAvailable(notePath);
+      this.expectEvent("create", notePath);
+      return this.app.vault.create(notePath, "");
+    });
+  }
+
+  public completeFolder(folder: TFolder): Promise<TFile> {
+    return this.exclusive(async () => {
+      if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
+      const existing = this.getCanonicalFile(folder.path);
+      if (existing !== null) return existing;
+      const parent = folder.parent;
+      const candidates = parent === null ? [] : parent.children.filter((entry): entry is TFile =>
+        entry instanceof TFile &&
+        entry.extension.toLocaleLowerCase() === "md" &&
+        !this.isLeafNoteExempt(entry.path) &&
+        isSameVaultName(entry.basename, folder.name));
+      if (candidates.length > 1) throw new Error(`Multiple leaf Markdown candidates for folder: ${folder.path}`);
+      const candidate = candidates[0];
+      if (candidate !== undefined) return this.convertLeafNoteUnlocked(candidate);
+      const notePath = this.notePathForFolder(folder.path);
       await this.assertAvailable(notePath);
       this.expectEvent("create", notePath);
       return this.app.vault.create(notePath, "");
@@ -326,11 +352,6 @@ export class NodeService {
       leafMarkdown: this.getSettings().leafNoteExemptions,
       leafMarkdownPrefixes: this.getSettings().leafNotePrefixes,
     });
-    if (this.getSettings().adoptionState === "managed") {
-      result.leafMarkdown = [];
-      result.missingNodeNotes = [];
-      result.conflicts = result.conflicts.filter(({ reason }) => reason.startsWith("Multiple canonical Node Notes:"));
-    }
     const rootCandidates = this.canonicalFiles("");
     if (rootCandidates.length > 1) {
       return {
@@ -338,30 +359,39 @@ export class NodeService {
         conflicts: [{ path: "", reason: `Multiple Root Node Notes: ${rootCandidates.map(({ path }) => path).join(", ")}` }, ...result.conflicts],
       };
     }
-    if (rootCandidates.length === 0 && this.getSettings().adoptionState !== "managed") {
+    if (rootCandidates.length === 0) {
       return { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] };
     }
     return result;
+  }
+
+  public async scanAsync(onProgress?: (completed: number, total: number) => void, externalSignal?: AbortSignal): Promise<MigrationScan> {
+    const signal = externalSignal === undefined ? this.lifecycle.signal : AbortSignal.any([this.lifecycle.signal, externalSignal]);
+    throwIfAborted(signal);
+    const result = await scanMigrationAsync(this.inventory(), {
+      folders: this.getSettings().ignoredFolders,
+      folderPrefixes: this.getSettings().ignoredFolderPrefixes,
+      leafMarkdown: this.getSettings().leafNoteExemptions,
+      leafMarkdownPrefixes: this.getSettings().leafNotePrefixes,
+    }, onProgress, signal);
+    throwIfAborted(signal);
+    const rootCandidates = this.canonicalFiles("");
+    if (rootCandidates.length > 1) {
+      return {
+        ...result,
+        conflicts: [{ path: "", reason: `Multiple Root Node Notes: ${rootCandidates.map(({ path }) => path).join(", ")}` }, ...result.conflicts],
+      };
+    }
+    return rootCandidates.length === 0 ? { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] } : result;
   }
 
   public migrate(expected: MigrationScan, onStep?: (completed: number, total: number) => void): Promise<void> {
     const signal = this.lifecycle.signal;
     return this.exclusive(async () => {
       throwIfAborted(signal);
-      const current = this.scan();
+      const current = await this.scanAsync();
       if (scanSignature(current) !== scanSignature(expected)) throw new Error("The Vault changed after preview. Review the structure again before applying changes.");
       await this.migrateUnlocked(current, signal, onStep);
-    });
-  }
-
-  public repairManagedVault(): Promise<void> {
-    const signal = this.lifecycle.signal;
-    return this.exclusive(async () => {
-      throwIfAborted(signal);
-      if (this.getSettings().adoptionState === "managed") {
-        const scan = this.scan();
-        if (scan.conflicts.length > 0) throw new Error(`Managed Vault contains blocking conflicts: ${scan.conflicts[0]?.reason ?? "unknown conflict"}`);
-      }
     });
   }
 
@@ -392,16 +422,15 @@ export class NodeService {
 
   public reconcileCreated(path: string): Promise<void> {
     return this.exclusive(async () => {
-      // Native creation remains native: a new folder is a folder-only node shell,
-      // while a new Markdown file remains an ordinary note until the user invokes
-      // an explicit Folder Nodes conversion or creation action.
+      // Native creation remains native. A new folder or Markdown file is surfaced
+      // as an incomplete node until the user completes it or marks it unmanaged.
       void path;
     });
   }
 
   public reconcileDeleted(path: string): Promise<void> {
     return this.exclusive(async () => {
-      // Deleting a Node Note intentionally leaves a folder-only node shell. Never
+      // Deleting a Node Note intentionally leaves an incomplete folder-side node. Never
       // recreate user-deleted content in a background reconciliation pass.
       void path;
     });
@@ -409,7 +438,6 @@ export class NodeService {
 
   public reconcileRenamed(entry: TAbstractFile, oldPath: string): Promise<void> {
     return this.exclusive(async () => {
-      if (this.getSettings().adoptionState !== "managed") return;
       const oldRoot = isSameVaultPath(oldPath, this.rootNotePath());
       const oldCanonical = oldRoot || isCanonicalNodeNote(oldPath);
       const entryScope = entry instanceof TFolder ? entry.path : dirname(entry.path);
@@ -534,10 +562,14 @@ export class NodeService {
     const originalPath = file.path;
     const parentPath = normalizeVaultPath(file.parent?.path ?? "");
     const name = sanitizeNodeName(file.basename);
-    const folderPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
-    const notePath = `${folderPath}/${name}.md`;
+    const desiredFolderPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
+    const existingFolder = file.parent?.children.find((entry): entry is TFolder =>
+      entry instanceof TFolder && isSameVaultName(entry.name, name)) ?? null;
+    const folderPath = existingFolder?.path ?? desiredFolderPath;
+    const noteName = existingFolder?.name ?? name;
+    const notePath = `${folderPath}/${noteName}.md`;
     if (this.isIgnoredPath(folderPath)) throw new Error(`Target belongs to an unmanaged folder: ${folderPath}`);
-    const target = this.app.vault.getAbstractFileByPath(folderPath);
+    const target = existingFolder ?? this.app.vault.getAbstractFileByPath(folderPath);
     if (target !== null && !(target instanceof TFolder)) throw new Error(`Path already exists: ${folderPath}`);
     if (target === null) await this.assertAvailable(folderPath);
     await this.assertAvailable(notePath, file);
@@ -685,8 +717,8 @@ export class NodeService {
         throwIfAborted(signal);
       }
       throwIfAborted(signal);
-      const post = this.scan();
-      if (post.conflicts.length > 0 || post.leafMarkdown.length > 0 || post.missingNodeNotes.length > 0) throw new Error("Structural validation failed after migration");
+      const post = await this.scanAsync();
+      if (post.conflicts.length > 0 || post.leafMarkdown.length > 0 || post.missingNodeNotes.length > 0) throw new Error("Structural validation failed after bulk organization");
     } catch (error) { await this.rollback(undos, error); }
   }
 

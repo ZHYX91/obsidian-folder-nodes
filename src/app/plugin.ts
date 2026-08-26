@@ -7,6 +7,7 @@ import { NodeService } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
+import { configuredEmojiFontStack } from "../core/emoji-font";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
@@ -17,6 +18,7 @@ import { SettingsSaveCoordinator } from "../shared/settings-save-coordinator";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE, type ContentsMenuAnchor } from "../ui/contents-view";
 import { CONTENTS_MENU_SOURCE } from "../ui/contents-interactions";
 import { MigrationModal } from "../ui/migration-modal";
+import { ScanProgressModal } from "../ui/scan-progress-modal";
 import { ConfirmModal, PromptModal } from "../ui/prompt-modal";
 import { SelectionCreateModal } from "../ui/selection-create-modal";
 import { VisualPickerModal } from "../ui/visual-picker-modal";
@@ -24,7 +26,6 @@ import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { FolderNodesSettingTab } from "./settings-tab";
-import { runAdoptionMigration } from "./migration-state";
 import { RefreshScheduler, type RefreshBatch } from "./refresh-scheduler";
 
 type NodeMenuSurface = "owned" | "native-folder" | "native-note";
@@ -35,7 +36,7 @@ export default class FolderNodesPlugin extends Plugin {
   public visuals!: VisualService;
   private explorer!: ExplorerAdapter;
   private readonly references = new ReferenceIndex();
-  private refreshScheduler!: RefreshScheduler;
+  private refreshScheduler: RefreshScheduler | null = null;
   private reconcileBatches = new Map<string, { timer: number; entries: Map<string, "create" | "delete"> }>();
   private reconciliationReady = false;
   private reconcileNoticeTimer: number | null = null;
@@ -55,6 +56,7 @@ export default class FolderNodesPlugin extends Plugin {
     const stored: unknown = await this.loadData();
     if (this.unloaded || generation !== this.lifecycleGeneration) return;
     this.settings = normalizeSettings(stored);
+    this.updateEmojiFontStyle();
     setLanguage(this.settings.language);
     this.service = new NodeService(this.app, () => this.settings);
     this.visuals = new VisualService(this.app, this.service, () => this.settings.iconInheritance);
@@ -64,12 +66,16 @@ export default class FolderNodesPlugin extends Plugin {
       this.visuals,
       () => this.settings,
       () => ({
-        createNode: t("createNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"), missingNoteShort: t("missingNoteShort"),
-        node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"),
+        createNode: t("createNode"), incompleteNode: t("incompleteNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
+        node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"), unmanaged: t("unmanaged"),
       }),
       (parentPath) => {
         const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
         if (parent !== null) this.promptCreateChild(parent);
+      },
+      (entry) => {
+        if (entry instanceof TFolder) this.runAction(this.createAndOpenMissingNote(entry));
+        else this.runAction(this.service.convertLeafNote(entry).then(() => this.refreshVisuals()));
       },
       () => this.refreshVisuals(),
       (error) => new Notice(formatError(error), 8000),
@@ -85,8 +91,6 @@ export default class FolderNodesPlugin extends Plugin {
       editVisual: (folder) => this.promptVisual(folder),
       openHomepage: () => this.runAction(this.openHomepage()),
       homepageEnabled: () => this.settings.homepageEnabled,
-      initialized: () => this.settings.adoptionState === "managed",
-      initialize: () => this.openMaintenance(),
       refresh: () => this.refreshVisuals(),
       reportError: (error) => new Notice(formatError(error), 8000),
     }));
@@ -102,9 +106,6 @@ export default class FolderNodesPlugin extends Plugin {
       this.reconciliationReady = true;
       this.references.rebuild(this.app.metadataCache.resolvedLinks);
       this.app.workspace.iterateAllLeaves((leaf) => this.registerUnresolvedLinkDocument(leaf.view.containerEl.ownerDocument));
-      if (this.settings.adoptionState === "managed") void this.service.repairManagedVault()
-        .then(() => { if (!this.unloaded) this.refreshVisuals(); })
-        .catch((error) => { if (!this.unloaded) this.reportReconcileError(error); });
       if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) this.runAction(this.openHomepage());
     });
   }
@@ -114,7 +115,8 @@ export default class FolderNodesPlugin extends Plugin {
     this.unloaded = true;
     this.reconciliationReady = false;
     this.service?.dispose();
-    this.refreshScheduler.cancel();
+    this.refreshScheduler?.cancel();
+    this.refreshScheduler = null;
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
     this.reconcileBatches.clear();
     this.unresolvedLinkDocuments.clear();
@@ -132,6 +134,11 @@ export default class FolderNodesPlugin extends Plugin {
     this.runtimeStyles.install(document);
   }
 
+  public applyEmojiFontSetting(): void {
+    this.updateEmojiFontStyle();
+    this.refreshVisuals();
+  }
+
   public previewSelectionName(selection: string): string {
     const file = this.app.workspace.getActiveFile();
     return sanitizeNodeName(buildNodeName({
@@ -144,15 +151,14 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   public refreshVisuals(path?: string): void {
-    if (!this.unloaded) this.refreshScheduler.request(path);
+    if (!this.unloaded) this.refreshScheduler?.request(path);
   }
 
   public async reconcileSettingsChange(): Promise<void> {
-    if (this.settings.adoptionState === "managed") await this.service.repairManagedVault();
     this.refreshVisuals();
   }
 
-  public openMaintenance(): void { this.showScan(false); }
+  public openBatchOrganize(): void { this.showScan(false); }
   public showHealth(): void { this.showScan(true); }
 
   public async openHomepage(): Promise<void> {
@@ -187,32 +193,22 @@ export default class FolderNodesPlugin extends Plugin {
   private addProblemMenuItems(menu: Menu, entry: TFolder | TFile): void {
     if (entry instanceof TFolder) {
       menu.addItem((item) => item.setTitle(t("createMissingNodeNote")).setIcon("file-plus").onClick(() => {
-        void this.runRepair(async () => { await this.service.createMissingNodeNote(entry); });
+        void this.runRepair(async () => { await this.service.completeFolder(entry); });
       }));
       menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(entry))));
+      menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setFolderUnmanaged(entry.path)));
     } else {
       menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => this.runAction(this.app.workspace.getLeaf(false).openFile(entry))));
       menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
         void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
       }));
-      const parent = entry.parent;
-      if (parent !== null && this.service.getCanonicalFile(parent.path) === null) {
-        menu.addItem((item) => item.setTitle(t("useAsNodeNote")).setIcon("file-check").onClick(() => {
-          void this.runRepair(async () => { await this.service.useAsNodeNote(parent, entry); });
-        }));
-        if (normalizeVaultPath(parent.path) !== "") menu.addItem((item) => item.setTitle(t("renameFolderToMatch")).setIcon("folder-cog").onClick(() => {
-          void this.runRepair(async () => { await this.service.renameNode(parent, entry.basename); });
-        }));
-      }
-      menu.addItem((item) => item.setTitle(t("keepAsLeafNote")).setIcon("shield-check").onClick(() => {
-        void this.addLeafExemption(entry.path);
-      }));
+      menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setLeafUnmanaged(entry.path)));
     }
   }
 
   private async createAndOpenMissingNote(folder: TFolder): Promise<void> {
     await this.runRepair(async () => {
-      const note = await this.service.createMissingNodeNote(folder);
+      const note = await this.service.completeFolder(folder);
       await this.app.workspace.getLeaf(false).openFile(note);
     });
   }
@@ -241,19 +237,26 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private showScan(healthMode: boolean): void {
-    const scan = this.service.scan();
-    new MigrationModal(this.app, scan, async (progress) => {
-      await runAdoptionMigration(
-        this.settings,
-        () => this.saveSettings(),
-        () => this.service.migrate(scan, progress),
-      );
-      this.refreshVisuals();
-    }, healthMode, this.settings.adoptionState !== "managed").open();
+    const controller = new AbortController();
+    const progressModal = new ScanProgressModal(this.app, () => controller.abort(new Error("Folder Nodes scan cancelled")));
+    progressModal.open();
+    void this.service.scanAsync((completed, total) => progressModal.update(completed, total), controller.signal)
+      .then((scan) => {
+        progressModal.finish();
+        if (this.unloaded) return;
+        new MigrationModal(this.app, scan, async (progress) => {
+          await this.service.migrate(scan, progress);
+          this.refreshVisuals();
+        }, healthMode).open();
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) progressModal.finish();
+        if (!this.unloaded && !controller.signal.aborted) new Notice(formatError(error), 8000);
+      });
   }
 
   private registerCommands(): void {
-    this.addCommand({ id: "review-vault-changes", name: t("maintenance"), callback: () => this.openMaintenance() });
+    this.addCommand({ id: "review-vault-changes", name: t("batchOrganize"), callback: () => this.openBatchOrganize() });
     this.addCommand({ id: "health", name: t("health"), callback: () => this.showHealth() });
     this.addCommand({ id: "open-homepage", name: t("openHomepage"), callback: () => this.runAction(this.openHomepage()) });
     this.addCommand({ id: "create-child-node", name: t("createChild"), callback: () => this.promptCreateChild() });
@@ -286,6 +289,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.scheduleReconcile(entry.path, "delete");
     }));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
+      this.remapUnmanagedPaths(entry, oldPath);
       const affected = this.references.removeSource(oldPath);
       for (const path of affected) this.refreshVisuals(path);
       if (this.service.consumeExpectedEvent("rename", entry.path, oldPath)) {
@@ -362,8 +366,15 @@ export default class FolderNodesPlugin extends Plugin {
     for (const document of documents) this.ensureStyles(document);
   }
 
+  private updateEmojiFontStyle(): void {
+    this.runtimeStyles.setBodyProperty(
+      "--folder-nodes-configured-emoji-font",
+      configuredEmojiFontStack(this.settings.emojiFont),
+    );
+  }
+
   private interceptUnresolvedLink(event: MouseEvent): void {
-    if (this.settings.adoptionState !== "managed" || event.defaultPrevented || (event.button !== 0 && event.button !== 1)) return;
+    if (event.defaultPrevented || (event.button !== 0 && event.button !== 1)) return;
     const target = event.target as { closest?: (selector: string) => Element | null } | null;
     const link = target?.closest?.("a.internal-link.is-unresolved");
     const rawLinkText = link?.getAttribute("data-href")?.trim();
@@ -430,11 +441,13 @@ export default class FolderNodesPlugin extends Plugin {
     if (entry instanceof TFolder) {
       const identity = classifyFolderIdentity(
         this.service.isIgnoredPath(entry.path),
+        this.service.isIgnoredRootPath(entry.path),
         this.service.getCanonicalFile(entry.path) !== null,
       );
       if (identity === "ordinary") return;
       menu.addSeparator();
-      if (identity === "missing-note") this.addProblemMenuItems(menu, entry);
+      if (identity === "unmanaged") menu.addItem((item) => item.setTitle(t("manageAgain")).setIcon("shield-check").onClick(() => void this.manageFolder(entry.path)));
+      else if (identity === "incomplete") this.addProblemMenuItems(menu, entry);
       else this.addNodeMenuItems(menu, entry, true, "native-folder");
       return;
     }
@@ -445,7 +458,7 @@ export default class FolderNodesPlugin extends Plugin {
     const identity = classifyFileIdentity({
       canonicalNodeNote: this.service.isCanonicalFile(entry),
       counterpartNodeExists: counterpart !== null && this.service.getCanonicalFile(counterpart.path) !== null,
-      ignored: this.service.isIgnoredPath(folder.path),
+      parentUnmanaged: this.service.isIgnoredPath(folder.path),
       leafExempt: this.service.isLeafNoteExempt(entry.path),
       markdown: entry.extension.toLocaleLowerCase() === "md",
     });
@@ -454,7 +467,12 @@ export default class FolderNodesPlugin extends Plugin {
       this.addNodeMenuItems(menu, folder, true, "native-note");
       return;
     }
-    if (identity === "missing-folder" || identity === "conflict") {
+    if (identity === "unmanaged") {
+      menu.addSeparator();
+      menu.addItem((item) => item.setTitle(t("manageAgain")).setIcon("shield-check").onClick(() => void this.manageLeaf(entry.path)));
+      return;
+    }
+    if (identity === "incomplete" || identity === "conflict") {
       menu.addSeparator();
       this.addProblemMenuItems(menu, entry);
       return;
@@ -482,6 +500,7 @@ export default class FolderNodesPlugin extends Plugin {
     menu.addItem((item) => item.setTitle(surface === "native-note" ? t("mergeContainingNode") : t("merge")).setIcon("combine").onClick(() => this.promptMerge(folder)));
     menu.addItem((item) => item.setTitle(t("moveUp")).setIcon("arrow-up").onClick(() => void this.runRepair(() => this.service.reorder(folder, -1))));
     menu.addItem((item) => item.setTitle(t("moveDown")).setIcon("arrow-down").onClick(() => void this.runRepair(() => this.service.reorder(folder, 1))));
+    menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setFolderUnmanaged(folder.path)));
     if (surface !== "native-folder") menu.addItem((item) => item.setTitle(surface === "native-note" ? t("deleteContainingNode") : t("delete")).setIcon("trash-2").setWarning(true).onClick(() => this.confirmDelete(folder)));
   }
 
@@ -490,6 +509,7 @@ export default class FolderNodesPlugin extends Plugin {
     if (entry instanceof TFolder) {
       menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(entry))));
       menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(entry))));
+      if (this.service.isIgnoredRootPath(entry.path)) menu.addItem((item) => item.setTitle(t("manageAgain")).setIcon("shield-check").onClick(() => void this.manageFolder(entry.path)));
     } else if (entry instanceof TFile) {
       menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => this.runAction(this.app.workspace.getLeaf(false).openFile(entry))));
       menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => this.runAction(this.app.workspace.getLeaf(true).openFile(entry))));
@@ -509,6 +529,9 @@ export default class FolderNodesPlugin extends Plugin {
         menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
           void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
         }));
+        menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setLeafUnmanaged(entry.path)));
+      } else if (entry.extension.toLocaleLowerCase() === "md" && this.service.isLeafNoteExempt(entry.path)) {
+        menu.addItem((item) => item.setTitle(t("manageAgain")).setIcon("shield-check").onClick(() => void this.manageLeaf(entry.path)));
       }
       menu.addSeparator();
       menu.addItem((item) => item.setTitle(t("renameFile")).setIcon("pencil").onClick(() => this.promptRenameFile(entry)));
@@ -532,11 +555,57 @@ export default class FolderNodesPlugin extends Plugin {
     void operation.catch((error) => new Notice(formatError(error), 8000));
   }
 
-  private async addLeafExemption(path: string): Promise<void> {
+  private async setLeafUnmanaged(path: string): Promise<void> {
     if (!this.settings.leafNoteExemptions.includes(path)) this.settings.leafNoteExemptions.push(path);
     this.settings.leafNoteExemptions.sort((a, b) => a.localeCompare(b));
     await this.saveSettings();
     await this.reconcileSettingsChange();
+  }
+
+  private setFolderUnmanaged(path: string): void {
+    const normalized = normalizeVaultPath(path);
+    if (normalized === "" || this.settings.ignoredFolders.includes(normalized)) return;
+    new ConfirmModal(this.app, t("setUnmanaged"), t("unmanageFolderConfirm", { path: normalized }), t("setUnmanaged"), false, async () => {
+      if (!this.settings.ignoredFolders.includes(normalized)) this.settings.ignoredFolders.push(normalized);
+      this.settings.ignoredFolders.sort((a, b) => a.localeCompare(b));
+      await this.saveSettings();
+      await this.reconcileSettingsChange();
+    }).open();
+  }
+
+  private async manageLeaf(path: string): Promise<void> {
+    const index = this.settings.leafNoteExemptions.indexOf(path);
+    if (index < 0) { new Notice(t("unmanagedByRule"), 8000); return; }
+    this.settings.leafNoteExemptions.splice(index, 1);
+    await this.saveSettings();
+    await this.reconcileSettingsChange();
+  }
+
+  private async manageFolder(path: string): Promise<void> {
+    const index = this.settings.ignoredFolders.indexOf(normalizeVaultPath(path));
+    if (index < 0) { new Notice(t("unmanagedByRule"), 8000); return; }
+    this.settings.ignoredFolders.splice(index, 1);
+    await this.saveSettings();
+    await this.reconcileSettingsChange();
+  }
+
+  private remapUnmanagedPaths(entry: TAbstractFile, oldPath: string): void {
+    const previous = normalizeVaultPath(oldPath);
+    const next = normalizeVaultPath(entry.path);
+    const recursive = entry instanceof TFolder;
+    let changed = false;
+    const remap = (paths: string[]): void => {
+      for (const [index, path] of paths.entries()) {
+        const normalized = normalizeVaultPath(path);
+        if (normalized !== previous && !(recursive && normalized.startsWith(`${previous}/`))) continue;
+        paths[index] = normalized === previous ? next : `${next}${normalized.slice(previous.length)}`;
+        changed = true;
+      }
+      if (changed) paths.sort((a, b) => a.localeCompare(b));
+    };
+    remap(this.settings.ignoredFolders);
+    remap(this.settings.leafNoteExemptions);
+    if (changed) void this.saveSettings().catch((error) => this.reportReconcileError(error));
   }
 
   private showMenu(menu: Menu, anchor: ContentsMenuAnchor): void {

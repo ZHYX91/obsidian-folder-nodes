@@ -20,9 +20,6 @@ describe("settings", () => {
     expect(normalizeSettings({ language: "unknown" }).language).toBe("auto");
     expect(normalizeSettings({ language: "zh-CN" }).language).toBe("zh-CN");
   });
-  it("recovers a crashed migration as unadopted", () => {
-    expect(normalizeSettings({ adoptionState: "migrating" }).adoptionState).toBe("unadopted");
-  });
   it("normalizes icon placement and exact exemption paths", () => {
     const settings = normalizeSettings({
       explorerIconPosition: "after",
@@ -33,6 +30,10 @@ describe("settings", () => {
     expect(settings.leafNoteExemptions).toEqual(["AGENTS.md"]);
     expect(settings.ignoredFolders).toEqual(["Generated/Cache"]);
     expect(normalizeSettings({ explorerIconPosition: "unknown" }).explorerIconPosition).toBe("before");
+  });
+  it("keeps only curated Emoji font preferences", () => {
+    expect(normalizeSettings({ emojiFont: "Twemoji Mozilla" }).emojiFont).toBe("Twemoji Mozilla");
+    expect(normalizeSettings({ emojiFont: "Comic Sans MS" }).emojiFont).toBe("system");
   });
   it("uses the first-release unmanaged prefix defaults", () => {
     const settings = normalizeSettings({});

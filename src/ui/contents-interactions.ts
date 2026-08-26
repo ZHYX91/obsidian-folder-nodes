@@ -24,7 +24,7 @@ export function breadcrumbItems(rootLabel: string, path: string): BreadcrumbItem
 }
 export const CONTENTS_MENU_SOURCE = "folder-nodes-contents";
 
-export type NodeEntryVisualKind = "conflict" | "healthy" | "missing-folder" | "missing-note";
+export type NodeEntryVisualKind = "conflict" | "healthy" | "incomplete" | "missing-folder";
 
 export function nodeEntryVisual(
   kind: NodeEntryVisualKind,
@@ -37,11 +37,11 @@ export function nodeEntryVisual(
     defaultVisual: true,
     visual: {
       kind: "lucide",
-      value: kind === "missing-note" || kind === "healthy" ? "folder-tree" : "file-warning",
+      value: kind === "incomplete" || kind === "healthy" ? "folder-tree" : "file-warning",
       accent: null,
       inheritedFrom: null,
     },
-    warning: kind !== "healthy" && kind !== "missing-note",
+    warning: kind !== "healthy" && kind !== "incomplete",
   };
 }
 

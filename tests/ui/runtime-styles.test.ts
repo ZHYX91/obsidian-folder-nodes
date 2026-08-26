@@ -68,6 +68,30 @@ describe("RuntimeStyles", () => {
     expect(target.adoptedStyleSheets.at(-1)).toBe(owned);
   });
 
+  it("updates plugin-owned body properties in every installed document", () => {
+    const first = testDocument();
+    const second = testDocument();
+    const styles = new RuntimeStyles(CSS);
+    styles.install(first);
+    styles.install(second);
+
+    expect(styles.setBodyProperty("--folder-nodes-configured-emoji-font", '"Twemoji Mozilla", emoji')).toBe(true);
+    for (const target of [first, second]) {
+      const rules = target.adoptedStyleSheets.at(-1)?.cssRules;
+      expect(Array.from(rules ?? []).at(-1)?.cssText).toContain(
+        '--folder-nodes-configured-emoji-font: "Twemoji Mozilla", emoji',
+      );
+    }
+    expect(styles.setBodyProperty("--folder-nodes-configured-emoji-font", null)).toBe(true);
+    expect(first.adoptedStyleSheets.at(-1)?.cssRules).toHaveLength(2);
+  });
+
+  it("rejects unsafe dynamic property names and values", () => {
+    const styles = new RuntimeStyles(CSS);
+    expect(() => styles.setBodyProperty("--theme-font", "serif")).toThrow("Invalid Folder Nodes style property");
+    expect(() => styles.setBodyProperty("--folder-nodes-font", "serif; color: red")).toThrow("Invalid Folder Nodes style value");
+  });
+
   it("rejects an empty authoritative stylesheet", () => {
     expect(() => new RuntimeStyles("  \n")).toThrow("must not be empty");
   });

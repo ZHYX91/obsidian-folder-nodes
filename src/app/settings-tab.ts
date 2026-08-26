@@ -1,8 +1,10 @@
 import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
+import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
 import type { NamingPart } from "../core/types";
 import { PromptModal } from "../ui/prompt-modal";
+import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { setLanguage, t } from "../ui/i18n";
 import { renderVisual } from "../presentation/render-visual";
 
@@ -11,12 +13,16 @@ type ExemptionKind = "leaf" | "folder";
 
 const TABS: TabId[] = ["general", "homepage", "icons", "naming"];
 
-// Obsidian 1.13 bypasses display() for non-empty definitions. Temporarily keep
-// the established top-tab settings surface while retaining the definitions.
+// Declarative settings are intentionally inactive. Obsidian 1.13 bypasses
+// display() for non-empty definitions, removing the established top-tab surface
+// and degrading the settings experience. Retain dormant definitions for tests only.
 const ENABLE_DECLARATIVE_SETTINGS = false;
 
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
+  private installedEmojiFonts: EmojiFontFamily[] | null = null;
+  private emojiFontScan: Promise<EmojiFontFamily[]> | null = null;
+  private emojiFontScanGeneration = 0;
 
   public constructor(app: App, private readonly plugin: FolderNodesPlugin) { super(app, plugin); }
 
@@ -40,6 +46,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       homepageEnabled: settings.homepageEnabled,
       openHomepageOnStartup: settings.openHomepageOnStartup,
       iconInheritance: settings.iconInheritance,
+      emojiFont: settings.emojiFont,
       explorerIconPosition: settings.explorerIconPosition,
       showIconInNoteTitle: settings.showIconInNoteTitle,
       addSelectionAlias: settings.addSelectionAlias,
@@ -68,6 +75,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       case "homepageEnabled": settings.homepageEnabled = Boolean(value); this.plugin.refreshVisuals(); break;
       case "openHomepageOnStartup": settings.openHomepageOnStartup = Boolean(value); break;
       case "iconInheritance": settings.iconInheritance = Boolean(value); this.plugin.refreshVisuals(); break;
+      case "emojiFont":
+        if (!isEmojiFontPreference(value)) throw new Error("Unsupported Emoji font");
+        settings.emojiFont = value;
+        this.plugin.applyEmojiFontSetting();
+        break;
       case "explorerIconPosition":
         if (value !== "before" && value !== "after" && value !== "hidden") throw new Error("Unsupported icon position");
         settings.explorerIconPosition = value;
@@ -150,17 +162,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private panelId(id: TabId): string { return `folder-nodes-settings-panel-${id}`; }
 
   private generalDefinitions(): SettingDefinitionItem[] {
-    const initialized = this.plugin.settings.adoptionState === "managed";
     return [
       { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } } },
-      this.actionDefinition(initialized ? t("maintenance") : t("initialize"), initialized ? t("maintenanceManagedDesc") : t("initializationRequiredDesc"), (setting) => {
-        setting.addButton((button) => { button.setCta().setButtonText(initialized ? t("reviewStructure") : t("startInitialization")).onClick(() => { this.plugin.openMaintenance(); }); });
+      ...this.unmanagedRuleDefinitions("leaf"),
+      ...this.unmanagedRuleDefinitions("folder"),
+      this.actionDefinition(t("batchOrganize"), t("batchOrganizeDesc"), (setting) => {
+        setting.addButton((button) => { button.setCta().setButtonText(t("previewOrganizePlan")).onClick(() => { this.plugin.openBatchOrganize(); }); });
       }),
       this.actionDefinition(t("health"), t("healthDesc"), (setting) => {
         setting.addButton((button) => { button.setButtonText(t("health")).onClick(() => { this.plugin.showHealth(); }); });
       }),
-      ...this.unmanagedRuleDefinitions("leaf"),
-      ...this.unmanagedRuleDefinitions("folder"),
     ];
   }
 
@@ -206,7 +217,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const heading = kind === "leaf" ? t("leafExemptions") : t("folderExemptions");
     const items = [
       ...paths.map((path) => ({ name: path, desc: t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")) })),
-      ...prefixes.map((prefix) => ({ name: prefix + "*", desc: t("namePrefixRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")) })),
+      ...prefixes.map((prefix) => ({ name: t("nameStartsWith", { prefix }), desc: t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")) })),
     ];
     return [
       {
@@ -218,7 +229,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       },
       this.actionDefinition(t("addRule"), t("addRuleDesc"), (setting) => {
         setting.addButton((button) => button.setButtonText(t("addPathRule")).onClick(() => this.promptExemption(kind)));
-        setting.addButton((button) => button.setButtonText(t("addPrefixRule")).onClick(() => this.promptPrefix(kind)));
+        setting.addButton((button) => button.setButtonText(t("addNameStartRule")).onClick(() => this.promptPrefix(kind)));
       }),
     ];
   }
@@ -241,15 +252,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         new Notice(t("reloadLanguage"));
         this.display();
       }));
-    const initialized = this.plugin.settings.adoptionState === "managed";
-    panel.createEl("p", { cls: `folder-nodes-adoption-status ${initialized ? "is-managed" : "is-warning"}`, text: initialized ? t("managed") : t("unadopted") });
-    new Setting(panel)
-      .setName(initialized ? t("maintenance") : t("initialize"))
-      .setDesc(initialized ? t("maintenanceManagedDesc") : t("initializationRequiredDesc"))
-      .addButton((button) => button.setCta().setButtonText(initialized ? t("reviewStructure") : t("startInitialization")).onClick(() => this.plugin.openMaintenance()));
-    new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
     this.renderUnmanagedGroup(panel, "leaf");
     this.renderUnmanagedGroup(panel, "folder");
+    new Setting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
+    new Setting(panel)
+      .setName(t("batchOrganize"))
+      .setDesc(t("batchOrganizeDesc"))
+      .addButton((button) => button.setCta().setButtonText(t("previewOrganizePlan")).onClick(() => this.plugin.openBatchOrganize()));
+    new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
   }
 
   private renderHomepage(panel: HTMLElement): void {
@@ -264,6 +274,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderIcons(panel: HTMLElement): void {
     this.renderIconGuide(panel);
+    this.renderEmojiFontSetting(panel);
     new Setting(panel).setName(t("iconInheritance")).setDesc(t("iconInheritanceDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.iconInheritance).onChange(async (value) => {
       this.plugin.settings.iconInheritance = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
     }));
@@ -273,6 +284,71 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(panel).setName(t("showIconInNoteTitle")).setDesc(t("showIconInNoteTitleDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.showIconInNoteTitle).onChange(async (value) => {
       this.plugin.settings.showIconInNoteTitle = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
     }));
+  }
+
+  private renderEmojiFontSetting(panel: HTMLElement): void {
+    const current = this.plugin.settings.emojiFont;
+    const installed = this.installedEmojiFonts;
+    const unavailable = installed !== null && current !== SYSTEM_EMOJI_FONT && !installed.includes(current);
+    const options: Record<string, string> = { [SYSTEM_EMOJI_FONT]: t("systemDefault") };
+    for (const family of installed ?? []) options[family] = family;
+    if (current !== SYSTEM_EMOJI_FONT && options[current] === undefined) {
+      options[current] = `${current} · ${t("fontUnavailable")}`;
+    }
+
+    const description = unavailable
+      ? `${t("emojiFontDesc")} ${t("emojiFontUnavailable")}`
+      : installed === null ? `${t("emojiFontDesc")} ${t("detectingFonts")}` : t("emojiFontDesc");
+    new Setting(panel)
+      .setName(t("emojiFont"))
+      .setDesc(description)
+      .addDropdown((dropdown) => dropdown
+        .addOptions(options)
+        .setValue(current)
+        .setDisabled(installed === null)
+        .onChange(async (value) => {
+          if (!isEmojiFontPreference(value)) return;
+          this.plugin.settings.emojiFont = value;
+          await this.plugin.saveSettings();
+          this.plugin.applyEmojiFontSetting();
+          this.display();
+        }))
+      .addExtraButton((button) => button
+        .setIcon("refresh-cw")
+        .setTooltip(t("redetectFonts"))
+        .setDisabled(installed === null)
+        .onClick(() => this.restartEmojiFontScan()));
+
+    const preview = panel.createDiv({ cls: "folder-nodes-emoji-font-preview" });
+    preview.createSpan({ cls: "folder-nodes-emoji-font-preview-label", text: t("emojiFontPreview") });
+    preview.createSpan({
+      cls: "folder-nodes-emoji-font-preview-sample",
+      text: "📔 🫠 🩷 👨‍👩‍👧‍👦 🏳️‍🌈 🇨🇳",
+      attr: { lang: "zxx" },
+    });
+
+    if (installed === null) this.startEmojiFontScan(panel);
+  }
+
+  private startEmojiFontScan(panel: HTMLElement): void {
+    if (this.emojiFontScan !== null) return;
+    const generation = ++this.emojiFontScanGeneration;
+    const scan = detectInstalledEmojiFonts();
+    this.emojiFontScan = scan;
+    void scan.then((families) => {
+      if (generation === this.emojiFontScanGeneration) this.installedEmojiFonts = families;
+    }).finally(() => {
+      if (generation !== this.emojiFontScanGeneration) return;
+      this.emojiFontScan = null;
+      if (panel.isConnected && this.activeTab === "icons") this.display();
+    });
+  }
+
+  private restartEmojiFontScan(): void {
+    this.emojiFontScanGeneration += 1;
+    this.emojiFontScan = null;
+    this.installedEmojiFonts = null;
+    this.display();
   }
 
   private renderIconGuide(panel: HTMLElement): void {
@@ -374,15 +450,15 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       .setDesc(t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")))
       .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removeExemption(kind, index)));
     for (const [index, prefix] of prefixes.entries()) new Setting(panel)
-      .setName(prefix + "*")
-      .setDesc(t("namePrefixRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")))
+      .setName(t("nameStartsWith", { prefix }))
+      .setDesc(t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")))
       .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removePrefix(kind, index)));
     if (paths.length + prefixes.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noUnmanagedRules") });
     new Setting(panel)
       .setName(t("addRule"))
       .setDesc(t("addRuleDesc"))
       .addButton((button) => button.setButtonText(t("addPathRule")).onClick(() => this.promptExemption(kind)))
-      .addButton((button) => button.setButtonText(t("addPrefixRule")).onClick(() => this.promptPrefix(kind)));
+      .addButton((button) => button.setButtonText(t("addNameStartRule")).onClick(() => this.promptPrefix(kind)));
   }
 
   private promptExemption(kind: ExemptionKind): void {

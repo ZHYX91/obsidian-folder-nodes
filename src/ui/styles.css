@@ -1,6 +1,6 @@
 body {
   --folder-nodes-glyph-font: var(--font-interface);
-  --folder-nodes-emoji-font: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", emoji;
+  --folder-nodes-emoji-font: var(--folder-nodes-configured-emoji-font, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", emoji);
 }
 
 .folder-nodes-visual { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); line-height: 1; }
@@ -173,9 +173,35 @@ body {
 .folder-nodes-settings-icon-demo-slot .folder-nodes-visual-emoji { font-size: 16px; }
 .folder-nodes-settings-icon-demo-slot .folder-nodes-visual-glyph { font-size: 14px; }
 
+.folder-nodes-emoji-font-preview {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-3);
+  margin-block: 0 var(--size-4-3);
+  padding: var(--size-4-2) var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+}
+
+.folder-nodes-emoji-font-preview-label { color: var(--text-muted); }
+.folder-nodes-emoji-font-preview-sample {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--folder-nodes-emoji-font);
+  font-size: 1.25rem;
+  font-variant-emoji: emoji;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @container (max-width: 420px) {
   .folder-nodes-icon-comparison { grid-template-columns: minmax(0, 1fr); }
   .folder-nodes-icon-comparison-row { display: grid; gap: 2px; }
+  .folder-nodes-emoji-font-preview { align-items: flex-start; flex-direction: column; }
 }
 
 .folder-nodes-name-preview,
@@ -344,14 +370,46 @@ body {
   min-block-size: 20px;
   margin-inline-start: auto;
   padding-inline: 6px;
-  border: 1px solid color-mix(in srgb, var(--color-orange) 42%, var(--background-modifier-border));
+  border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary));
+  background: var(--background-secondary);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-medium);
   line-height: 1;
   white-space: nowrap;
+}
+
+.folder-nodes-explorer-problem-badge.is-incomplete {
+  border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+}
+
+.folder-nodes-explorer-problem-badge.is-unmanaged {
+  border-color: var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-faint);
+}
+
+.folder-nodes-explorer-problem-badge.is-conflict {
+  border-color: color-mix(in srgb, var(--color-orange) 42%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary));
+  color: var(--color-orange);
+}
+
+.folder-nodes-explorer-repair {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-inline-start: 2px;
+  opacity: 0;
+}
+
+.nav-file-title:hover > .folder-nodes-explorer-repair,
+.nav-file-title:focus-within > .folder-nodes-explorer-repair,
+.nav-folder-title:hover > .folder-nodes-explorer-repair,
+.nav-folder-title:focus-within > .folder-nodes-explorer-repair {
+  opacity: 1;
 }
 
 .folder-nodes-explorer-status-icon {
@@ -396,29 +454,6 @@ body {
 
 .folder-nodes-contents { padding: var(--size-4-3); container-type: inline-size; }
 
-.folder-nodes-initialization-notice,
-.folder-nodes-adoption-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--size-4-2);
-  margin-block: var(--size-4-2);
-  padding: var(--size-4-2);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-}
-
-.folder-nodes-initialization-notice,
-.folder-nodes-adoption-status.is-warning {
-  border-color: var(--color-orange);
-  background: rgba(var(--color-orange-rgb), 0.12);
-}
-
-.folder-nodes-adoption-status.is-managed {
-  border-color: var(--color-green);
-  background: rgba(var(--color-green-rgb), 0.1);
-}
-
 .folder-nodes-node-shell.is-problem .folder-nodes-node-card {
   border-color: rgba(var(--color-orange-rgb), 0.55);
 }
@@ -440,9 +475,8 @@ body {
   color: var(--color-orange);
 }
 
-.folder-nodes-status-badge.is-folder-only {
-  color: var(--text-faint);
-}
+.folder-nodes-status-badge.is-incomplete { color: var(--text-muted); }
+.folder-nodes-status-badge.is-unmanaged { color: var(--text-faint); }
 
 .folder-nodes-breadcrumb {
   display: flex;

@@ -2,7 +2,7 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
 
-Folder Nodes represents a complete structural node as a folder plus its same-named Node Note, `A/A.md`. Managed folders may also remain folder-only until you explicitly create their Node Note.
+Folder Nodes represents a complete structural node as a folder plus its same-named Node Note, `A/A.md`. A managed folder or Markdown without its counterpart remains visible as a neutral incomplete node until you complete it or mark it unmanaged.
 
 ## Screenshots
 
@@ -35,16 +35,16 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 ## Features
 
 - Create, rename, move, merge, reorder, and safely trash complete Folder Nodes.
-- Keep Obsidian's native New note and New folder actions visible. A native folder is a folder-only node; a native Markdown file remains an ordinary note. File Explorer folder actions operate the whole folder, while tab actions move, delete, or merge only the Node Note. Renaming either half keeps an existing folder/Node Note pair synchronized, and explicitly labelled containing-node actions remain available from a Node Note tab.
+- Keep Obsidian's native New note and New folder actions beside New node. Native creation produces an incomplete folder or Markdown half; New node creates the complete pair atomically. File Explorer folder actions operate the whole folder, while tab actions move, delete, or merge only the Node Note. Renaming either half keeps an existing folder/Node Note pair synchronized, and explicitly labelled containing-node actions remain available from a Node Note tab.
 - Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, then write the selection into the new note and replace the source selection with that wikilink. Inside one Markdown table cell, the generated alias separator is escaped as `\|`; cross-cell and cross-row selections stop without writing.
-- In Managed scope, click an uncreated internal link to create the complete Node directly. `[[a]]` creates `a/a.md`; with aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
+- In managed scope, click an uncreated internal link to create the complete Node directly. `[[a]]` creates `a/a.md`; with aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
 - Navigate the global Node Tree through File Explorer: use the pinned, non-collapsible Root row; click a folder name to open its Node Note; keep disclosure arrows for ordinary nodes; hide duplicate canonical notes; and drag before, into, or after another node.
 - Browse the current node through independently paged Nodes, static Album, and compact Files sections with 200-item batches. Every entry has context-menu and keyboard menu access; child nodes support before/into/after placement, while one ordinary file may move only into a node or breadcrumb folder. Multi-selection inserts or copies links; a multi-selected drag exports links without partially moving files. GIFs use still thumbnails; video and audio never receive inline playback controls.
-- Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` value, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed frameless slot; glyph weight, size, and color distinguish them from file-name characters, while emoji retain the platform color-emoji appearance.
+- Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` value, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed frameless slot; glyph weight, size, and color distinguish them from file-name characters, while emoji retain the selected installed color-font or platform appearance.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
-- Initialize or migrate only after one exact-path preview, block collisions, and keep Health strictly read-only.
-- Keep folder-only nodes visible as neutral nodes with an explicit Create Node Note action. True conflicts—including ordinary Markdown that collides with an existing same-name Folder Node—remain warning-marked and fail closed.
-- Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and name prefixes; `.` and `_` are the default prefixes. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
+- Recognize complete and incomplete nodes immediately without initialization. Optional bulk organization uses a responsive exact-path preview, blocks collisions, and leaves Health strictly read-only.
+- Show both folder-only and Markdown-only halves as neutral Incomplete node states with explicit completion and Set as unmanaged actions. True pair conflicts remain warning-marked and fail closed.
+- Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and plain-language name-start rules; `.` and `_` are the defaults. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
 - Follow Obsidian's language automatically or override the interface with English or Simplified Chinese.
 - Keep all processing local and write no permanent node ID, `_pkwf` metadata, manifest, path, parent, or complete child list.
@@ -53,7 +53,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 
 - Obsidian 1.12.7 or later.
 - Desktop Obsidian only.
-- A complete structural node still uses exactly one same-named Node Note. Folder-only nodes and ordinary Markdown files are valid managed-Vault content; unmanaged Markdown and folder rules remain explicit boundaries for initialization and plugin-owned structural actions.
+- A complete structural node still uses exactly one same-named Node Note. A managed folder or Markdown without its counterpart is an incomplete node; unmanaged Markdown and folder rules define explicit boundaries for plugin-owned structural actions.
 
 ## Installation
 
@@ -67,22 +67,22 @@ Download one matching release and place `main.js`, `manifest.json`, and `styles.
 
 ### Upgrade
 
-Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace only `main.js`, `manifest.json`, and `styles.css`; delete `data.json` only when you explicitly want to reset plugin preferences and adoption state.
+Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace only `main.js`, `manifest.json`, and `styles.css`; delete `data.json` only when you explicitly want to reset plugin preferences and unmanaged rules.
 
 ## Usage
 
 1. Back up the Vault and open **Settings → Folder Nodes → General**.
-2. Open **Initialize Folder Nodes**, review every exact create, move, skip, and conflict path, then confirm initialization. Automatic rename synchronization and structural maintenance start only after initialization.
+2. Review the Incomplete node and Unmanaged labels in File Explorer. Complete individual halves directly, or open **Organize incomplete nodes** for an optional exact-path bulk preview.
 3. Use File Explorer, the ribbon, node context menus, or the command palette to create and navigate nodes.
 4. Select editor text and choose **Create Folder Node from selection** from the editor context menu or command palette. Confirm the name, alias, and wikilink preview before creation.
-5. In Managed scope, click an uncreated `[[a]]` or `[[a|b]]` link to create and open its complete Folder Node directly.
+5. In managed scope, click an uncreated `[[a]]` or `[[a|b]]` link to create and open its complete Folder Node directly.
 6. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Right-click an entry, use its More actions button, or press Shift+F10 for the same menu.
 7. Drag a Folder Node before, into, or after another node to reorder or reparent it. Drag an Album or Files item into a child node, the current-node header, or a breadcrumb to move the file. The drop marker shows the resulting placement before the write.
 8. Use Obsidian's native file/folder actions when you mean the selected file or folder. From a Node Note tab, choose **Move/Delete/Merge containing node** only when the whole folder subtree is intended.
 
 ## Settings
 
-- **General** controls initialization state, interface language, preview-first maintenance, read-only Health, and two unified unmanaged-content rule groups for Markdown files and folders.
+- **General** controls interface language, two unified unmanaged-content rule groups, optional preview-first bulk organization, and read-only Health.
 - **Homepage** controls whether the root Node Note is a homepage and whether it opens after startup.
 - **Icons & appearance** controls inheritance, File Explorer placement, and note-title display. Its comparison card shows the difference between a property icon and the same character in a file name. Icon size and alignment follow Obsidian rather than an arbitrary size setting.
 - **Selection & naming** explains both Node-creation paths and controls their shared aliases switch, prefix and suffix sources, independent separators, custom text, timestamp format, and live filename preview.
@@ -103,7 +103,7 @@ icon:
 
 The picker loads the complete current list and supports add, remove, reorder, presets, and live File Explorer/Contents previews. Unknown or multi-grapheme values are shown as invalid and cannot be saved; a single letter, CJK character, symbol, or emoji remains valid. Inheritance starts only after the local list is exhausted.
 
-Advanced CSS snippets may override `--folder-nodes-glyph-font` and `--folder-nodes-emoji-font`. There is deliberately no font picker in ordinary settings.
+**Icons & appearance** lists System default plus supported color Emoji fonts detected on the current device: Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Twemoji Mozilla, and OpenMoji. A complex-sequence preview makes missing glyphs or split Emoji visible before use. A font that disappears after sync or uninstall falls back to the platform stack, and **Detect local fonts again** refreshes the list. Advanced CSS snippets may still override `--folder-nodes-glyph-font` and `--folder-nodes-emoji-font`.
 
 ## Limitations
 
@@ -116,7 +116,7 @@ Advanced CSS snippets may override `--folder-nodes-glyph-font` and `--folder-nod
 
 ## Privacy and security
 
-Folder Nodes runs locally and makes no network requests. Migration is preview-first and revalidated before commit; structural writes are serialized, collisions block commits, and ambiguous operations fail closed. Rollback actions stay bound to the original Vault objects and refuse changed or replaced entries instead of touching a new occupant at the same path. Complete-node deletion uses Obsidian's system-trash path. Settings stay in the plugin's `data.json`; structural facts stay in the Vault. No node content, path, visual, or diagnostic is uploaded.
+Folder Nodes runs locally and makes no network requests. Health scans and bulk-organization previews inventory Vault paths, and documented user actions can create, modify, move, rename, merge, or trash notes and folders. Bulk organization is preview-first and revalidated before commit; structural writes are serialized, collisions block commits, and ambiguous operations fail closed. Rollback actions stay bound to the original Vault objects and refuse changed or replaced entries instead of touching a new occupant at the same path. Complete-node deletion uses Obsidian's system-trash path. The plugin writes generated Markdown links to the system clipboard only after an explicit copy action and never reads the clipboard. Settings and unmanaged rules stay in the plugin's `data.json`; structural facts stay in the Vault. No node content, path, visual, or diagnostic is uploaded.
 
 ## Development
 

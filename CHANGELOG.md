@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Removed the initialization gate: Folder Nodes now classifies managed folders and Markdown continuously, synchronizes unambiguous complete pairs immediately, and keeps native creation non-destructive.
+- Added neutral Incomplete node and gray Unmanaged states for both folder and Markdown halves, with explicit complete, convert, Set as unmanaged, and Manage again actions.
+- Kept New node beside Obsidian's native New note and New folder actions so users can create a complete pair atomically or complete either native half later.
+- Replaced wildcard-looking unmanaged-rule labels with plain-language name-start rules and kept exact Markdown and folder-subtree exclusions in plugin settings.
+- Replaced initialization with optional preview-first bulk organization in General settings, including a cancellable responsive scan and exact create, move, skip, and conflict paths.
+- Reindexed migration candidates by parent folder, eliminating the previous folder-by-Markdown quadratic scan and adding 100,000-item scan coverage.
+- Added an Emoji font setting that detects a curated set of installed color fonts, previews complex sequences, applies the choice across workspace windows, and safely falls back to the system stack.
+
 ## 0.4.0
 
 - Made the embedded stylesheet the single runtime authority in every Obsidian window, with one versioned plugin-owned constructable stylesheet that is refreshed after host CSS lifecycle changes and removed on unload.

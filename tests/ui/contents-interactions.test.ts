@@ -61,7 +61,7 @@ describe("Node Contents interactions", () => {
       visual: { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null },
       warning: false,
     });
-    expect(nodeEntryVisual("missing-note", null)).toEqual({
+    expect(nodeEntryVisual("incomplete", null)).toEqual({
       defaultVisual: true,
       visual: { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null },
       warning: false,

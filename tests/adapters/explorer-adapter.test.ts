@@ -24,16 +24,16 @@ describe("ExplorerAdapter lifecycle", () => {
       },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, isCanonicalFile: () => false, isIgnoredPath: () => false,
+      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, isCanonicalFile: () => false, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
       isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md", openFolderNode: async () => undefined,
       placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
       { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
-      () => ({ ...structuredClone(DEFAULT_SETTINGS), adoptionState: "managed" }),
-      () => ({ createNode: "Create node", missingNodeFolder: "Missing folder", missingNodeNote: "Folder only", missingNoteShort: "No note", node: "Node", nodeConflict: "Conflict", root: "Root" }),
-      () => undefined, () => undefined, () => undefined,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
     );
 
     adapter.start();
@@ -71,16 +71,16 @@ describe("ExplorerAdapter lifecycle", () => {
       },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => file, isCanonicalFile: () => true, isIgnoredPath: () => false,
+      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => file, isCanonicalFile: () => true, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
       isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md", openFolderNode: async () => undefined,
       placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
       { resolve: () => ({ kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null }) } as unknown as VisualService,
-      () => ({ ...structuredClone(DEFAULT_SETTINGS), adoptionState: "managed", showIconInNoteTitle: true }),
-      () => ({ createNode: "Create node", missingNodeFolder: "Missing folder", missingNodeNote: "Folder only", missingNoteShort: "No note", node: "Node", nodeConflict: "Conflict", root: "Root" }),
-      () => undefined, () => undefined, () => undefined,
+      () => ({ ...structuredClone(DEFAULT_SETTINGS), showIconInNoteTitle: true }),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
     );
 
     adapter.start();

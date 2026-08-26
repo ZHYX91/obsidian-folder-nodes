@@ -9,6 +9,24 @@ children list. Natural sorting writes no order metadata. Manual sorting uses chi
 `folderNodeSiblingRank` keys and the parent-only `folderNodeChildrenSort: manual` mode flag. These
 are the first public field names; do not add compatibility reads for unpublished prototypes.
 
+Declarative settings are intentionally disabled because Obsidian 1.13 bypasses `display()` for
+non-empty definitions, which removes Folder Nodes' four-tab settings layout and degrades the user
+experience. Preserve the imperative `PluginSettingTab.display()` surface and keep
+`getSettingDefinitions()` empty. Dormant declarative builders and tests may remain, but must not be
+activated accidentally. Do not flag the `display()` deprecation, empty definitions, the disabled
+feature switch, or missing settings search, and do not propose a declarative migration unless the
+user explicitly asks to revisit this decision. Documentation that presents declarative settings as
+the active surface is stale and must not override this policy.
+
+## Manual installation release policy
+
+The versioned `folder-nodes-<version>.zip` is an intentional required public release asset for
+users who install without the Obsidian Community marketplace. Community ignores it during plugin
+ingestion, so the automated-review `extra unsupported files` recommendation is expected and must
+not be treated as a defect or a reason to remove the archive. The deterministic ZIP contains one
+`folder-nodes/` directory with `main.js`, `manifest.json`, and `styles.css`, byte-identical to the
+three loose release assets. Release checks must preserve and verify all four public assets.
+
 Migration is preview-first. Destructive or ambiguous changes fail closed. Tests and fixtures must
 use an isolated disposable Vault. A production deployment is separate from build, commit, push,
 tag, and GitHub Release actions; preserve existing plugin `data.json` unless explicitly authorized.
@@ -20,5 +38,4 @@ narratives, or superseded plans outside the changelog. Keep migration or depreca
 when users still need to act, and state the required action directly. Engineering documents describe
 the current contract and repeatable process rather than past executions.
 
-Run `npm run check` before committing and `npm run release:check` before tagging. Release assets are
-exactly `main.js`, `manifest.json`, `styles.css`, and the versioned archive produced from them.
+Run `npm run check` before committing and `npm run release:check` before tagging.

@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("settings tab compatibility contract", () => {
-  it("temporarily routes Obsidian 1.13 through the imperative top tabs", () => {
+  it("routes Obsidian 1.13 through the intentional imperative top tabs", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/app/settings-tab.ts"),
       "utf8",
@@ -26,6 +26,7 @@ describe("settings tab compatibility contract", () => {
     const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
     expect(source).toContain("this.renderIconGuide(panel);");
+    expect(source).toContain("this.renderEmojiFontSetting(panel);");
     expect(source.indexOf("this.renderIconGuide(panel);")).toBeLessThan(
       source.indexOf('new Setting(panel).setName(t("iconInheritance"))'),
     );
@@ -43,6 +44,9 @@ describe("settings tab compatibility contract", () => {
     expect(styles).toContain("background: var(--background-secondary)");
     expect(styles).toContain("--folder-nodes-glyph-font: var(--font-interface)");
     expect(styles).toContain('"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"');
+    expect(source).toContain("detectInstalledEmojiFonts()");
+    expect(source).toContain('text: "📔 🫠 🩷 👨‍👩‍👧‍👦 🏳️‍🌈 🇨🇳"');
+    expect(styles).toContain(".folder-nodes-emoji-font-preview-sample");
     expect(styles).toContain(".folder-nodes-settings-icon-demo-slot");
     expect(styles).not.toContain(".folder-nodes-settings-icon-demo-badge");
   });
@@ -102,5 +106,13 @@ describe("settings tab compatibility contract", () => {
     );
     expect(source).toContain('this.creationExample(body, "[[a]]", "a/a.md", null);');
     expect(source).toContain('this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));');
+  });
+
+  it("describes name-start rules without wildcard notation", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
+
+    expect(source).toContain('t("nameStartsWith", { prefix })');
+    expect(source).toContain('t("addNameStartRule")');
+    expect(source).not.toContain('prefix + "*"');
   });
 });

@@ -3,15 +3,15 @@ source_language: zh-CN
 translation_status: source
 ---
 
-# Folder Nodes 架构
+# Folder Nodes — 架构
 
 ## 身份与持久化
 
-完整 Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。没有同名 Note 的文件夹是有效的仅文件夹节点壳，但不会获得另一套隐藏身份。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。Managed、Migrating、Unadopted 状态、主页偏好、图标位置、命名规则、不管理的指定路径和名称前缀规则保存在插件 `data.json`。
+完整 Node 的当前身份是规范化 Vault folder path 与 `A/A.md` 结构，不存在稳定 ID。缺少文件夹或同名 Node Note 的一侧立即归类为不完整节点，但不会获得另一套隐藏身份，也不需要初始化或接管状态。Folder Nodes 主动使用 `aliases`、`icon`、`folderNodeChildrenSort` 和 `folderNodeSiblingRank`。`aliases` 与 `icon` 是可移植内容属性；两个 `folderNode` 字段是插件结构属性。主页偏好、图标位置、命名规则、不管理的指定路径和名称开头规则保存在插件 `data.json`，不写入笔记 YAML。
 
 ## 分层
 
-Core 只处理路径、命名、不管理边界规则、迁移计划、反向引用索引、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View 与批量刷新调度。UI/App 还为每个 Workspace document 唯一管理一份带内容指纹的 constructable stylesheet；发布包中的 `styles.css` 刻意保持无效，因此 Obsidian 原生样式缓存不会成为第二个运行时来源。一次性 layout gate 会先向宿主注册，再检查 `layoutReady`，不用轮询或延时重试即可封闭状态转换竞争窗口。公开仓库不依赖本地工作区或个人 Vault。
+Core 只处理路径、命名、不管理边界规则、批量整理计划、反向引用索引、稀疏排序、frontmatter 最小 patch 和 Visual declaration 解析。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View 与批量刷新调度。UI/App 还为每个 Workspace document 唯一管理一份带内容指纹的 constructable stylesheet；发布包中的 `styles.css` 刻意保持无效，因此 Obsidian 原生样式缓存不会成为第二个运行时来源。一次性 layout gate 会先向宿主注册，再检查 `layoutReady`，不用轮询或延时重试即可封闭状态转换竞争窗口。公开仓库不依赖本地工作区或个人 Vault。
 
 ## 排序引擎
 
@@ -25,7 +25,7 @@ NodeService 把 create、rename、move、place、merge、repair 和 trash 作为
 
 ## Visual 解析
 
-Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示前景强调色或回退色。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选。解析到文字或 Lucide 时，颜色直接作用于前景；解析到 Emoji 或图片时保留原始像素，不增加圆点或容器装饰；所有基础候选都失败时，颜色才成为居中的圆形色标。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用系统彩色 Emoji 字体，来自属性的 Explorer/标题图标进入固定且无边框的图标位。标题图标位仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量只开放字体，不增加设置字体选择器。
+Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示前景强调色或回退色。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选。解析到文字或 Lucide 时，颜色直接作用于前景；解析到 Emoji 或图片时保留原始像素，不增加圆点或容器装饰；所有基础候选都失败时，颜色才成为居中的圆形色标。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用所选本机彩色字体或系统字体栈，来自属性的 Explorer/标题图标进入固定且无边框的图标位。Imperative 设置页只通过本地 `FontFace` source 探测固定候选，不枚举全部系统字体；RuntimeStyles 将通过校验的所选字体栈注入每个 workspace document 的自有样式表，字体缺失时继续回退系统栈。标题图标位仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量继续提供覆盖能力。
 
 Picker 使用 `FileManager.processFrontMatter` 写回：零项删除属性，一项写 Text，多项写 List。遇到未知、多字素、非字符串或嵌套值时拒绝写入，不静默接受或丢失数据。
 
@@ -37,4 +37,4 @@ Contents View 以活动文件的 owning folder 作为当前 Node，没有活动�
 
 ## 一致性与失败关闭
 
-Managed 状态在每个 Vault 事件入口先消费由 OperationCoordinator 记录的预期内部事件；外部 rename 事件再进入同一结构事务队列。原生 create/delete 事件只刷新状态，不自动转换笔记或重建已删除 Node Note。每个 Workspace document（包括 popout document）只注册一个 capture-phase 未解析链接处理器，不观察 body；它解析 Obsidian 的新笔记父路径、遵守受管边界，并把支持的 Markdown 目标交给 `createNodePath`，让显式路径缺失的祖先和目标 Node 共用同一个 undo stack。显式 WikiLink 显示文字只在共用 aliases 设置开启时写入。选区创建固定来源 TFile/path 与源码 range；纯源码分类器在单个表格单元格内转义 WikiLink 分隔符，并拒绝跨单元格/跨行。视觉刷新由 RefreshScheduler 合并为一次全量或 path-targeted batch。启动验证严格只读。路径碰撞、循环、selection 变化、folder rename 双 canonical 候选和 merge property 冲突停止操作。初始化/迁移在确认写入前重新核对预览签名，提交后再次验证完整结构，失败则 rollback；所有写入弹窗在提交进行中拒绝取消/关闭。插件卸载会中止已确认迁移并阻止之后的正向 mutation。进入 `migrating` 状态本身具有事务性：首次设置保存失败时恢复此前的内存 adoption state，且绝不启动迁移。Health 不持有 commit 动作。正式 Vault 部署、源码测试、打包候选和主机验收是独立证据。
+每个 Vault 事件入口先消费由 OperationCoordinator 记录的预期内部事件；外部 rename 事件再进入同一结构事务队列。原生 create/delete 事件只刷新分类，不自动转换笔记、补全另一侧或重建已删除 Node Note。外部 rename 只对明确配对的完整节点同步另一侧；不完整节点只重命名实际存在的一侧。每个 Workspace document（包括 popout document）只注册一个 capture-phase 未解析链接处理器，不观察 body；它解析 Obsidian 的新笔记父路径、遵守不管理边界，并把支持的 Markdown 目标交给 `createNodePath`，让显式路径缺失的祖先和目标 Node 共用同一个 undo stack。显式 WikiLink 显示文字只在共用 aliases 设置开启时写入。选区创建固定来源 TFile/path 与源码 range；纯源码分类器在单个表格单元格内转义 WikiLink 分隔符，并拒绝跨单元格/跨行。视觉刷新由 RefreshScheduler 合并为一次全量或 path-targeted batch。路径碰撞、循环、selection 变化、folder rename 双 canonical 候选和 merge property 冲突停止操作。可选批量整理以分批异步方式扫描并支持取消；确认写入前重新核对预览签名，提交后再次验证完整结构，失败则 rollback。所有写入弹窗在提交进行中拒绝取消/关闭，插件卸载会中止已确认的批量整理并阻止之后的正向 mutation。Health 不持有 commit 动作。正式 Vault 部署、源码测试、打包候选和主机验收是独立证据。

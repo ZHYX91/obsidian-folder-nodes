@@ -4,7 +4,7 @@ translation_of: release.zh-CN.md
 translation_status: synced
 ---
 
-# Folder Nodes release procedure
+# Folder Nodes — Release procedure
 
 ## Version and candidate
 
@@ -34,4 +34,4 @@ Before deployment, confirm the exact Vault, plugin ID, and Obsidian process stat
 
 ## Release content
 
-Release notes list only implemented and verified behavior, migration instructions, the property contract, compatibility, and known limitations. `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank` are the first public contract; unpublished prototypes receive no compatibility claim. Screenshots come from an accepted Obsidian host and contain no private Vault information.
+Release notes list only implemented and verified behavior, migration instructions, the supported property contract, compatibility, and known limitations. The supported property contract comprises `aliases`, `icon`, `folderNodeChildrenSort`, and `folderNodeSiblingRank`. Screenshots come from an accepted Obsidian host and contain no private Vault information.

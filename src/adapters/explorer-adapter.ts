@@ -1,4 +1,4 @@
-import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile } from "obsidian";
+import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
 
 import { alignNoteTitleIcon, ensureExplorerIconPosition, ensureExplorerRootRow, ensureNoteTitleIcon, explorerMarkerPlacement, isFolderCollapseControl, removeNoteTitleIcon, syncExplorerNodeOrder } from "./explorer-events";
 import type { NodeService } from "./node-service";
@@ -34,10 +34,11 @@ export class ExplorerAdapter extends Component {
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
     private readonly getRootLabels: () => {
-      createNode: string; missingNodeFolder: string; missingNodeNote: string; missingNoteShort: string;
-      node: string; nodeConflict: string; root: string;
+      createNode: string; incompleteNode: string; missingNodeFolder: string; missingNodeNote: string;
+      node: string; nodeConflict: string; root: string; unmanaged: string;
     },
     private readonly createNode: (parentPath: string) => void,
+    private readonly completeNode: (entry: TFile | TFolder) => void,
     private readonly notifyChanged: () => void,
     private readonly reportError: (error: unknown) => void,
   ) { super(); }
@@ -172,45 +173,75 @@ export class ExplorerAdapter extends Component {
       const identity = file instanceof TFile && parent !== null ? classifyFileIdentity({
         canonicalNodeNote: canonical,
         counterpartNodeExists: counterpart !== null && this.service.getCanonicalFile(counterpart.path) !== null,
-        ignored: !managedParent,
+        parentUnmanaged: !managedParent,
         leafExempt: this.service.isLeafNoteExempt(file.path),
         markdown: file.extension.toLocaleLowerCase() === "md",
       }) : "ordinary";
-      const problem = this.getSettings().adoptionState === "managed" && (identity === "missing-folder" || identity === "conflict");
-      element.toggleClass("folder-nodes-missing-folder-note", problem);
-      let status = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-status-icon");
-      if (!problem) {
-        status?.remove();
+      const labelled = identity === "incomplete" || identity === "conflict" || identity === "unmanaged";
+      element.toggleClass("folder-nodes-missing-folder-note", identity === "incomplete" || identity === "conflict");
+      let badge = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-problem-badge");
+      let repair = element.querySelector<HTMLButtonElement>(":scope > .folder-nodes-explorer-repair");
+      element.querySelector(":scope > .folder-nodes-explorer-status-icon")?.remove();
+      if (!labelled) {
+        badge?.remove();
+        repair?.remove();
         continue;
       }
-      if (status === null) status = ownedSpan(element.ownerDocument, "folder-nodes-explorer-status-icon is-warning");
-      const title = element.querySelector<HTMLElement>(":scope > .nav-file-title-content");
-      ensureExplorerIconPosition(element, status, title, "before");
-      if (status.childElementCount === 0) setIcon(status, "file-warning");
-      const label = identity === "conflict" ? this.getRootLabels().nodeConflict : this.getRootLabels().missingNodeFolder;
-      status.setAttr("aria-label", label);
-      status.setAttr("title", label);
+      if (badge === null) {
+        badge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
+        element.append(badge);
+      }
+      badge.removeClass("is-conflict", "is-incomplete", "is-unmanaged");
+      const label = identity === "conflict" ? this.getRootLabels().nodeConflict : identity === "unmanaged" ? this.getRootLabels().unmanaged : this.getRootLabels().incompleteNode;
+      const detail = identity === "incomplete" ? `${this.getRootLabels().incompleteNode}: ${this.service.notePathForFolder(counterpartPath)}` : label;
+      badge.addClass(identity === "conflict" ? "is-conflict" : identity === "unmanaged" ? "is-unmanaged" : "is-incomplete");
+      badge.setText(label);
+      badge.setAttr("title", detail);
+      if (identity === "incomplete" && file instanceof TFile) {
+        if (repair === null) repair = this.createRepairButton(element, file.path, "folder-plus", this.getRootLabels().missingNodeFolder);
+        repair.dataset.path = file.path;
+      } else repair?.remove();
     }
 
     for (const element of root.querySelectorAll<HTMLElement>(".nav-folder-title[data-path]")) {
       const path = element.dataset.path;
       const folder = path === undefined ? null : this.service.getFolder(path);
       if (folder === null) continue;
-      const identity = classifyFolderIdentity(this.service.isIgnoredPath(folder.path), this.service.getCanonicalFile(folder.path) !== null);
+      const identity = classifyFolderIdentity(
+        this.service.isIgnoredPath(folder.path),
+        this.service.isIgnoredRootPath(folder.path),
+        this.service.getCanonicalFile(folder.path) !== null,
+      );
       if (identity === "ordinary") {
         element.querySelector(":scope > .folder-nodes-explorer-icon")?.remove();
         element.querySelector(":scope > .folder-nodes-explorer-problem-badge")?.remove();
+        element.querySelector(":scope > .folder-nodes-explorer-repair")?.remove();
         element.removeClass("folder-nodes-node", "folder-nodes-missing-note");
         restoreOwnedDraggable(element);
         continue;
       }
       element.toggleClass("folder-nodes-node", identity === "node");
-      element.toggleClass("folder-nodes-missing-note", identity === "missing-note");
+      element.toggleClass("folder-nodes-missing-note", identity === "incomplete");
       let icon = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-icon");
-      if (icon === null) icon = ownedSpan(element.ownerDocument, "folder-nodes-explorer-icon");
       let problemBadge = element.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-problem-badge");
+      let repair = element.querySelector<HTMLButtonElement>(":scope > .folder-nodes-explorer-repair");
       const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
-      if (identity === "missing-note") {
+      if (identity === "unmanaged") {
+        icon?.remove();
+        repair?.remove();
+        restoreOwnedDraggable(element);
+        if (problemBadge === null) {
+          problemBadge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
+          element.append(problemBadge);
+        }
+        problemBadge.removeClass("is-conflict", "is-incomplete");
+        problemBadge.addClass("is-unmanaged");
+        problemBadge.setText(this.getRootLabels().unmanaged);
+        problemBadge.setAttr("title", this.getRootLabels().unmanaged);
+        continue;
+      }
+      if (icon === null) icon = ownedSpan(element.ownerDocument, "folder-nodes-explorer-icon");
+      if (identity === "incomplete") {
         restoreOwnedDraggable(element);
         icon.addClass("is-default-node");
         icon.removeClass("is-warning");
@@ -220,12 +251,16 @@ export class ExplorerAdapter extends Component {
           problemBadge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
           element.append(problemBadge);
         }
-        problemBadge.addClass("is-folder-only");
-        problemBadge.setText(this.getRootLabels().missingNoteShort);
+        problemBadge.removeClass("is-conflict", "is-unmanaged");
+        problemBadge.addClass("is-incomplete");
+        problemBadge.setText(this.getRootLabels().incompleteNode);
         problemBadge.setAttr("title", this.getRootLabels().missingNodeNote);
+        if (repair === null) repair = this.createRepairButton(element, folder.path, "file-plus", this.getRootLabels().missingNodeNote);
+        repair.dataset.path = folder.path;
         continue;
       }
       problemBadge?.remove();
+      repair?.remove();
       setOwnedDraggable(element);
       const resolved = this.visuals.resolve(folder);
       const marker = explorerMarkerPlacement(this.getSettings().explorerIconPosition, resolved.kind === "fallback");
@@ -241,7 +276,7 @@ export class ExplorerAdapter extends Component {
     const labels = this.getRootLabels();
     const parentPath = this.createParentPath();
     const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
-    const managed = this.getSettings().adoptionState === "managed" && parent !== null && !this.service.isIgnoredPath(parent.path);
+    const managed = parent !== null && !this.service.isIgnoredPath(parent.path);
     const containers = new Set<HTMLElement>();
     for (const files of root.querySelectorAll<HTMLElement>(".nav-files-container")) {
       const actions = files.closest<HTMLElement>(".workspace-leaf-content")?.querySelector<HTMLElement>(".nav-header .nav-buttons-container");
@@ -265,6 +300,26 @@ export class ExplorerAdapter extends Component {
       button.setAttribute("title", labels.createNode);
       button.classList.toggle("is-hidden", !managed);
     }
+  }
+
+  private createRepairButton(container: HTMLElement, path: string, icon: string, label: string): HTMLButtonElement {
+    const button = container.ownerDocument.createElement("button");
+    button.type = "button";
+    button.className = "clickable-icon folder-nodes-explorer-repair";
+    button.dataset.path = path;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+    setIcon(button, icon);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const targetPath = button.dataset.path;
+      if (targetPath === undefined) return;
+      const entry = this.service.getFolder(targetPath) ?? this.service.getFile(targetPath);
+      if (entry !== null) this.completeNode(entry);
+    });
+    container.append(button);
+    return button;
   }
 
   private createParentPath(): string {
@@ -457,7 +512,7 @@ export class ExplorerAdapter extends Component {
       element.removeClass("folder-nodes-canonical-note", "folder-nodes-missing-folder-note", "folder-nodes-node", "folder-nodes-missing-note");
       restoreOwnedDraggable(element);
     }
-    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge")) element.remove();
+    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge, .folder-nodes-explorer-repair")) element.remove();
   }
 
   private cleanupNoteTitleSurface(root: HTMLElement): void {

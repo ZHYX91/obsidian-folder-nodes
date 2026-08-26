@@ -3,7 +3,7 @@ source_language: zh-CN
 translation_status: source
 ---
 
-# Folder Nodes 发布流程
+# Folder Nodes — 发布流程
 
 ## 版本与候选
 
@@ -30,4 +30,4 @@ handoff，公共 Release 固定为三个 loose assets 与版本化 ZIP。
 
 ## 发布内容
 
-Release notes 只列实际实现且已验证的功能、迁移说明、属性契约、兼容性和已知限制。`aliases`、`icon`、`folderNodeChildrenSort`、`folderNodeSiblingRank` 是首个公开契约，不为未发布原型提供兼容声明。截图必须来自已验收 Obsidian 主机且不得包含私人 Vault 信息。
+Release notes 只列实际实现且已验证的功能、迁移说明、受支持属性契约、兼容性和已知限制。受支持属性契约包括 `aliases`、`icon`、`folderNodeChildrenSort`、`folderNodeSiblingRank`。截图必须来自已验收 Obsidian 主机且不得包含私人 Vault 信息。

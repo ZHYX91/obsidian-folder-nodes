@@ -1,4 +1,5 @@
-export type AdoptionState = "unadopted" | "migrating" | "managed";
+import type { EmojiFontPreference } from "./emoji-font";
+
 export type SortMode = "natural" | "manual";
 export type NodeDropZone = "before" | "into" | "after";
 export type InterfaceLanguage = "auto" | "zh-CN" | "en";
@@ -12,11 +13,11 @@ export interface NamingPart {
 }
 
 export interface FolderNodesSettings {
-  adoptionState: AdoptionState;
   language: InterfaceLanguage;
   homepageEnabled: boolean;
   openHomepageOnStartup: boolean;
   iconInheritance: boolean;
+  emojiFont: EmojiFontPreference;
   explorerIconPosition: ExplorerIconPosition;
   showIconInNoteTitle: boolean;
   leafNoteExemptions: string[];

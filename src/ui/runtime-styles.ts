@@ -1,10 +1,23 @@
 export class RuntimeStyles {
   private readonly sheets = new Map<Document, CSSStyleSheet>();
-  private readonly source: string;
+  private readonly bodyProperties = new Map<string, string>();
+  private readonly css: string;
 
   public constructor(css: string) {
     if (css.trim() === "") throw new Error("Folder Nodes stylesheet must not be empty");
-    this.source = `:root { --folder-nodes-runtime-style: "${fingerprint(css)}"; }\n${css}`;
+    this.css = css;
+  }
+
+  public setBodyProperty(name: string, value: string | null): boolean {
+    if (!/^--folder-nodes-[a-z0-9-]+$/u.test(name)) throw new Error(`Invalid Folder Nodes style property: ${name}`);
+    if (value !== null && /[;{}\r\n]/u.test(value)) throw new Error(`Invalid Folder Nodes style value: ${name}`);
+    const previous = this.bodyProperties.get(name) ?? null;
+    if (previous === value) return false;
+    if (value === null) this.bodyProperties.delete(name);
+    else this.bodyProperties.set(name, value);
+    const source = this.source();
+    for (const sheet of this.sheets.values()) sheet.replaceSync(source);
+    return true;
   }
 
   public install(document: Document): boolean {
@@ -13,7 +26,7 @@ export class RuntimeStyles {
 
     const current = this.sheets.get(document);
     if (current !== undefined) {
-      current.replaceSync(this.source);
+      current.replaceSync(this.source());
       const wasAdopted = document.adoptedStyleSheets.includes(current);
       document.adoptedStyleSheets = [
         ...document.adoptedStyleSheets.filter((candidate) => candidate !== current),
@@ -23,7 +36,7 @@ export class RuntimeStyles {
     }
 
     const sheet = new view.CSSStyleSheet();
-    sheet.replaceSync(this.source);
+    sheet.replaceSync(this.source());
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
     this.sheets.set(document, sheet);
     return true;
@@ -36,6 +49,15 @@ export class RuntimeStyles {
       );
     }
     this.sheets.clear();
+  }
+
+  private source(): string {
+    const properties = [...this.bodyProperties]
+      .map(([name, value]) => `${name}: ${value};`)
+      .join(" ");
+    const overrides = properties === "" ? "" : `\nbody { ${properties} }`;
+    const content = `${this.css}${overrides}`;
+    return `:root { --folder-nodes-runtime-style: "${fingerprint(content)}"; }\n${content}`;
   }
 }
 

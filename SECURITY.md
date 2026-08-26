@@ -1,9 +1,12 @@
 # Security Policy
 
-Folder Nodes reads local Vault metadata and source text to produce diagnostics. It does not need
-an account, upload Vault content, check external URLs, modify notes, or persist its derived graph.
-A vulnerability that breaks those boundaries, exposes private content, permits unsafe file access,
-or compromises distributed plugin assets should be reported privately.
+Folder Nodes runs locally and reads Vault metadata, paths, and source text. Health scans and
+bulk-organization previews inventory Vault paths; documented user actions can create, modify, move, rename,
+merge, or trash notes and folders. Explicit copy actions can write generated Markdown links to the
+system clipboard, but the plugin never reads the clipboard. It does not need an account, upload
+Vault content, check external URLs, or make network requests. A vulnerability that breaks those
+boundaries, performs an unintended or unsafe Vault change, exposes private content, or compromises
+distributed plugin assets should be reported privately.
 
 ## Reporting a vulnerability
 

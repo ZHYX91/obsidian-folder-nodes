@@ -1,20 +1,21 @@
-export type FolderIdentity = "missing-note" | "node" | "ordinary";
-export type FileIdentity = "conflict" | "missing-folder" | "node-note" | "ordinary";
+export type FolderIdentity = "incomplete" | "node" | "ordinary" | "unmanaged";
+export type FileIdentity = "conflict" | "incomplete" | "node-note" | "ordinary" | "unmanaged";
 
-export function classifyFolderIdentity(ignored: boolean, nodeNoteExists: boolean): FolderIdentity {
-  if (ignored) return "ordinary";
-  return nodeNoteExists ? "node" : "missing-note";
+export function classifyFolderIdentity(ignored: boolean, unmanagedRoot: boolean, nodeNoteExists: boolean): FolderIdentity {
+  if (ignored) return unmanagedRoot ? "unmanaged" : "ordinary";
+  return nodeNoteExists ? "node" : "incomplete";
 }
 
 export function classifyFileIdentity(options: {
   canonicalNodeNote: boolean;
   counterpartNodeExists: boolean;
-  ignored: boolean;
+  parentUnmanaged: boolean;
   leafExempt: boolean;
   markdown: boolean;
 }): FileIdentity {
-  if (options.ignored) return "ordinary";
+  if (options.parentUnmanaged) return "ordinary";
   if (options.canonicalNodeNote) return "node-note";
-  if (!options.markdown || options.leafExempt) return "ordinary";
-  return options.counterpartNodeExists ? "conflict" : "ordinary";
+  if (!options.markdown) return "ordinary";
+  if (options.leafExempt) return "unmanaged";
+  return options.counterpartNodeExists ? "conflict" : "incomplete";
 }

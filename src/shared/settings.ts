@@ -1,11 +1,12 @@
+import { isEmojiFontPreference } from "../core/emoji-font";
 import type { FolderNodesSettings, NamingPart } from "../core/types";
 
 export const DEFAULT_SETTINGS: FolderNodesSettings = {
-  adoptionState: "unadopted",
   language: "auto",
   homepageEnabled: false,
   openHomepageOnStartup: false,
   iconInheritance: true,
+  emojiFont: "system",
   explorerIconPosition: "before",
   showIconInNoteTitle: false,
   leafNoteExemptions: ["AGENTS.md", "CLAUDE.md"],
@@ -35,11 +36,11 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     ? input.explorerIconPosition
     : "before";
   return {
-    adoptionState: input.adoptionState === "managed" ? "managed" : "unadopted",
     language,
     homepageEnabled: input.homepageEnabled === true,
     openHomepageOnStartup: input.openHomepageOnStartup === true,
     iconInheritance: input.iconInheritance !== false,
+    emojiFont: isEmojiFontPreference(input.emojiFont) ? input.emojiFont : "system",
     explorerIconPosition,
     showIconInNoteTitle: input.showIconInNoteTitle === true,
     leafNoteExemptions: normalizePaths(input.leafNoteExemptions, DEFAULT_SETTINGS.leafNoteExemptions),
