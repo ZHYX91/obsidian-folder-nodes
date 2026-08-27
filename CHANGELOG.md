@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replaced the icon-versus-file-name guide's unexplained numeric examples with neutral `Project`, `A Project`, and `📓 Project` comparisons.
 - Removed the initialization gate: Folder Nodes now classifies managed folders and Markdown continuously, synchronizes unambiguous complete pairs immediately, and keeps native creation non-destructive.
 - Added neutral Incomplete node and gray Unmanaged states for both folder and Markdown halves, with explicit complete, convert, Set as unmanaged, and Manage again actions.
 - Kept New node beside Obsidian's native New note and New folder actions so users can create a complete pair atomically or complete either native half later.
