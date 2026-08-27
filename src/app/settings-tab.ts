@@ -367,10 +367,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     body.createEl("p", { text: t("iconColorBehavior") });
     body.createEl("p", { text: t("iconDistinctionDesc") });
     const comparison = body.createDiv({ cls: "folder-nodes-icon-comparison", attr: { "aria-label": t("iconDistinctionTitle") } });
-    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "A", "1994", true);
-    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "A1994", false);
-    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "1994", true);
-    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓1994", false);
+    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "A", "Project", true);
+    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "A Project", false);
+    this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "Project", true);
+    this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓 Project", false);
     body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("iconGuideRootNote") });
   }
 

@@ -33,8 +33,11 @@ describe("settings tab compatibility contract", () => {
     expect(source).toContain('text: "icon: 💰"');
     expect(source).toContain('t("iconColorBehavior")');
     expect(source).toContain("this.renderIconComparisonRow");
-    expect(source).toContain('t("iconFromProperty"), "A", "1994", true');
-    expect(source).toContain('t("characterInFilename"), "", "A1994", false');
+    expect(source).toContain('t("iconFromProperty"), "A", "Project", true');
+    expect(source).toContain('t("characterInFilename"), "", "A Project", false');
+    expect(source).toContain('t("iconFromProperty"), "📓", "Project", true');
+    expect(source).toContain('t("characterInFilename"), "", "📓 Project", false');
+    expect(source).not.toContain("1994");
     expect(source).not.toContain('t("iconFromProperty"), "想"');
     expect(source).toContain('t("iconDistinctionDesc")');
     expect(styles).toContain(".folder-nodes-settings-guide");

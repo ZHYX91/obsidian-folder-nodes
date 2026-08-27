@@ -20,7 +20,7 @@ Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. Prop
 
 ### Icons & appearance
 
-The settings card explains where icons come from and directly compares `icon: 想` or `icon: 📓` with the same character at the start of a file name.
+The settings card explains where icons come from and directly compares `icon: A` or `icon: 📓` with the same character at the start of a file name.
 
 ### Node Note title icon
 
