@@ -21,8 +21,8 @@ export function assertPackageVersionContract(manifest, packageJson, versions) {
   if (manifest?.name !== "Folder Nodes") {
     throw new Error("manifest name must be Folder Nodes");
   }
-  if (manifest?.isDesktopOnly !== true) {
-    throw new Error("Folder Nodes 0.1.x must remain desktop-only until mobile acceptance exists");
+  if (manifest?.isDesktopOnly !== false) {
+    throw new Error("Folder Nodes 0.6.x and later must retain Android availability");
   }
   return version;
 }

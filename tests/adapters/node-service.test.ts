@@ -578,6 +578,26 @@ describe("NodeService structural safety", () => {
     expect(fake.requireFile("Archive/loose.md")).toBeDefined();
   });
 
+  it("assigns a fresh target-parent rank after a native cross-parent node move", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFolder("Parent");
+    fake.addFile("Parent/Parent.md", "", { folderNodeChildrenSort: "manual" });
+    fake.addFolder("Parent/Existing");
+    fake.addFile("Parent/Existing/Existing.md", "", { folderNodeSiblingRank: 4096 });
+    const child = fake.addFolder("Child");
+    fake.addFile("Child/Child.md", "", { folderNodeSiblingRank: 4096 });
+    await fake.rename(child, "Parent/Child");
+
+    await service(fake).reconcileRenamed(fake.requireFolder("Parent/Child"), "Child");
+
+    expect(fake.frontmatters.get("Parent/Child/Child.md")?.folderNodeSiblingRank).toBe(5120);
+    expect(service(fake).children("Parent").map(({ childPath }) => childPath)).toEqual([
+      "Parent/Existing",
+      "Parent/Child",
+    ]);
+  });
+
   it("renames an existing Node Note but leaves an incomplete folder note-free", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");

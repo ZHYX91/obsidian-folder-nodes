@@ -38,8 +38,8 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 - Keep Obsidian's native New note and New folder actions beside New node. Native creation produces an incomplete folder or Markdown half; New node creates the complete pair atomically. File Explorer folder actions operate the whole folder, while tab actions move, delete, or merge only the Node Note. Renaming either half keeps an existing folder/Node Note pair synchronized, and explicitly labelled containing-node actions remain available from a Node Note tab.
 - Create a child node from selected editor text through the command palette or editor context menu, preview the exact `A/A.md`, alias, and wikilink, then write the selection into the new note and replace the source selection with that wikilink. Inside one Markdown table cell, the generated alias separator is escaped as `\|`; cross-cell and cross-row selections stop without writing.
 - In managed scope, click an uncreated internal link to create the complete Node directly. `[[a]]` creates `a/a.md`; with aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
-- Navigate the global Node Tree through File Explorer: use the pinned, non-collapsible Root row; click a folder name to open its Node Note; keep disclosure arrows for ordinary nodes; hide duplicate canonical notes; and drag before, into, or after another node.
-- Browse the current node through independently paged Nodes, static Album, and compact Files sections with 200-item batches. Every entry has context-menu and keyboard menu access; child nodes support before/into/after placement, while one ordinary file may move only into a node or breadcrumb folder. Multi-selection inserts or copies links; a multi-selected drag exports links without partially moving files. GIFs use still thumbnails; video and audio never receive inline playback controls.
+- Navigate the global Node Tree through File Explorer: use the pinned, non-collapsible Root row; click a folder name to open its Node Note; keep disclosure arrows for ordinary nodes; and hide duplicate canonical notes. Desktop adds before/into/after drag placement; Android uses Obsidian's native folder move plus Folder Nodes' Move, Move up, and Move down actions.
+- Browse the current node through independently paged Nodes, static Album, and compact Files sections with 200-item batches. Every entry has menu access; desktop supports child-node and single-file drag placement, while Android uses the equivalent move/reorder menus. Multi-selection inserts or copies links. GIFs use still thumbnails; video and audio never receive inline playback controls.
 - Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` value, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed frameless slot; glyph weight, size, and color distinguish them from file-name characters, while emoji retain the selected installed color-font or platform appearance.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Recognize complete and incomplete nodes immediately without initialization. Optional bulk organization uses a responsive exact-path preview, blocks collisions, and leaves Health strictly read-only.
@@ -52,7 +52,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 ## Requirements and compatibility
 
 - Obsidian 1.12.7 or later.
-- Desktop Obsidian only.
+- Desktop Obsidian and Android Obsidian. Current-candidate Android emulator acceptance is required separately from desktop acceptance; physical-device behavior remains a separate claim.
 - A complete structural node still uses exactly one same-named Node Note. A managed folder or Markdown without its counterpart is an incomplete node; unmanaged Markdown and folder rules define explicit boundaries for plugin-owned structural actions.
 
 ## Installation
@@ -77,7 +77,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 4. Select editor text and choose **Create Folder Node from selection** from the editor context menu or command palette. Confirm the name, alias, and wikilink preview before creation.
 5. In managed scope, click an uncreated `[[a]]` or `[[a|b]]` link to create and open its complete Folder Node directly.
 6. Open **Node contents** for child nodes, a static image/video Album, and compact ordinary files. Right-click an entry, use its More actions button, or press Shift+F10 for the same menu.
-7. Drag a Folder Node before, into, or after another node to reorder or reparent it. Drag an Album or Files item into a child node, the current-node header, or a breadcrumb to move the file. The drop marker shows the resulting placement before the write.
+7. On desktop, drag a Folder Node before, into, or after another node to reorder or reparent it, or drag one Album/Files item into a node or breadcrumb. On Android, use Obsidian's native folder move or Folder Nodes' Move, Move up, and Move down menu actions instead.
 8. Use Obsidian's native file/folder actions when you mean the selected file or folder. From a Node Note tab, choose **Move/Delete/Merge containing node** only when the whole folder subtree is intended.
 
 ## Settings
@@ -108,7 +108,7 @@ The picker loads the complete current list and supports add, remove, reorder, pr
 ## Limitations
 
 - Structural identity is the current normalized Vault path, not a permanent ID. An external delete followed by an unrelated create is not guessed to be a rename.
-- Mobile Obsidian is not supported because Folder Nodes integrates with desktop File Explorer behavior.
+- HTML5 drag-and-drop is desktop-only. Android intentionally exposes no draggable handles or drop targets; use native folder move and the plugin's move/reorder actions.
 - Node visuals support Vault images and a lightweight semantic icon slot, but do not fetch remote images, recolor inline SVG, infer initials from node names, accept nested `icon` objects, render PDF first pages, preview HEIC/HEIF, generate video frames, animate GIFs, or provide video/audio playback.
 - The Contents View can move one ordinary file at a time into a displayed node or breadcrumb folder and can select multiple files for link insertion/copying, but it does not independently order files, transactionally move multiple files, accept cross-view internal drops, or become a second complete Vault tree.
 - Merge fails closed on path or frontmatter conflicts instead of presenting a complex conflict-resolution UI.

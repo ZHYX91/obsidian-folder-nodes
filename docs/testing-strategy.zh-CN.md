@@ -7,7 +7,7 @@ translation_status: source
 
 ## 自动化门禁
 
-`npm run check` 固定 Node/npm 版本，执行 lint、格式、双语文档契约、严格 TypeScript、覆盖率、生产 bundle 与发布布局检查。Core、Settings 和关键结构适配层的覆盖率门禁为 statements 80%、lines 80%、functions 75%、branches 70%。测试覆盖路径与 Windows 保留名/字素安全截断、选区命名、表格单元格 alias 安全转义、跨单元格拒绝、未解析链接目标与显示 alias 规划、Visual、frontmatter 非法边界、批量整理中的非 Markdown 碰撞、指定路径/名称开头不管理规则、系统目录保护、设置深层规范化、固定 Emoji 字体候选校验与回退栈、属性契约、稀疏排序和增量反向引用。NodeService 使用内存 Vault/FileManager 进行行为测试，覆盖串行 create、显式路径 Node 的事务创建与 rollback、link-safe rename/move、仅移动/删除节点笔记、文件夹与 canonical note 同步重命名、文件夹侧与 Markdown 侧的不完整节点、无需初始化的持续分类、忽略子树移入、批量整理 TOCTOU、commit 后验证、merge 冲突、各类 rollback 及 in-flight 写入后的 lifecycle abort。同步与异步扫描器必须产生等价计划，取消不能写入。VaultOperationCoordinator 单测锁定失败后继续串行、递归事件归属和 TTL。UI/运行时测试锁定 Explorer surface start/stop 清理、保留原生创建控件和新增节点控件、不完整/不管理/冲突状态、标题图标位于可编辑标题之外、标题图标测量对齐、不同 visual 类型的字体 class、本机 Emoji 字体探测失败、跨 document 运行时字体更新、disclosure selector、before/into/after zone、drag payload、Shift+F10/Menu 键和设置层级/说明卡片；源码架构契约禁止全局 body observer、`vault.rename` 和 Contents 全量 `resolvedLinks` 扫描。
+`npm run check` 固定 Node/npm 版本，执行 lint、格式、双语文档契约、严格 TypeScript、覆盖率、生产 bundle 与发布布局检查。Core、Settings 和关键结构适配层的覆盖率门禁为 statements 80%、lines 80%、functions 75%、branches 70%。测试覆盖路径与 Windows 保留名/字素安全截断、选区命名、表格单元格 alias 安全转义、跨单元格拒绝、未解析链接目标与显示 alias 规划、Visual、frontmatter 非法边界、批量整理中的非 Markdown 碰撞、指定路径/名称开头不管理规则、系统目录保护、设置深层规范化、固定 Emoji 字体候选校验与回退栈、属性契约、稀疏排序和增量反向引用。NodeService 使用内存 Vault/FileManager 进行行为测试，覆盖串行 create、显式路径 Node 的事务创建与 rollback、link-safe rename/move、原生跨父级移动后的目标 rank 调和、仅移动/删除节点笔记、文件夹与 canonical note 同步重命名、文件夹侧与 Markdown 侧的不完整节点、无需初始化的持续分类、忽略子树移入、批量整理 TOCTOU、commit 后验证、merge 冲突、各类 rollback 及 in-flight 写入后的 lifecycle abort。同步与异步扫描器必须产生等价计划，取消不能写入。VaultOperationCoordinator 单测锁定失败后继续串行、递归事件归属和 TTL。UI/运行时测试锁定 Explorer surface start/stop 清理、移动端不声明 draggable、保留原生创建控件和新增节点控件、不完整/不管理/冲突状态、标题图标位于可编辑标题之外、标题图标测量对齐、不同 visual 类型的字体 class、本机 Emoji 字体探测失败、跨 document 运行时字体更新、disclosure selector、before/into/after zone、drag payload、Shift+F10/Menu 键和设置层级/说明卡片；源码架构契约禁止全局 body observer、`vault.rename` 和 Contents 全量 `resolvedLinks` 扫描。
 
 回归测试还会注入 closed file 同期编辑、未保存的 open editor、同路径 TFile replacement，以及 rollback 期间的同路径 folder replacement。设置保存测试通过延迟和拒绝较早的持久化调用，证明快照隔离、顺序和 queued latest state 的恢复。
 
@@ -22,6 +22,10 @@ Quick 门槛验证 10,000 个、large 门槛验证 100,000 个直接 Child Nodes
 ## 主题与可访问性
 
 至少检查默认浅色、默认深色和一个第三方主题。键盘检查四个设置 tabs、Modal buttons、Contents cards/rows、More actions、context-menu keys 和 breadcrumb；拖拽必须有 menu move/reorder 等价操作，粗指针目标为 44px。中英文不得截断关键按钮和节点标题，“跟随 Obsidian”必须与 Obsidian 当前的界面语言一致，图片应有空装饰 alt 或文件名 alt，Root 行需检查单次幂等插入、无 disclosure control、键盘打开和选中状态；Explorer 与标题图标需在多种 UI 缩放下检查“不完整节点”“不管理”“冲突”badge 对比度、glyph/中文/emoji 字体回退、尺寸、纵横对齐和名称间距。
+
+## Android 移动端验收
+
+每个 `isDesktopOnly: false` 候选必须在当前 Android 15/API 35 模拟器和一次性 Vault 上单独验收：插件加载、File Explorer/Contents 装饰与打开、原生移动文件夹、Move/Move up/Move down、跨父级手动排序 rank、创建/补全/不管理、菜单、选区创建、设置与重启持久化、窄屏布局、触摸目标、系统回收站和停用清理。断言 Explorer 与 Contents 均没有 Folder Nodes 自有 `draggable`、drag handle 或 drop marker。模拟器证据不等于真机或 iOS；重大触摸、输入、存储或平台边界变化时另存真机证据，iOS 在本流程中为范围外。
 
 ## 正式部署
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Android support while keeping HTML5 node/file drag-and-drop desktop-only; mobile retains native folder moves plus plugin Move, Move up, and Move down actions.
+- Reconciled child-owned sparse rank metadata after a folder is moved natively across parents, preventing a stale source-parent rank from disturbing a manual target order.
 - Replaced the icon-versus-file-name guide's unexplained numeric examples with neutral `Project`, `A Project`, and `📓 Project` comparisons.
 - Removed the initialization gate: Folder Nodes now classifies managed folders and Markdown continuously, synchronizes unambiguous complete pairs immediately, and keeps native creation non-destructive.
 - Added neutral Incomplete node and gray Unmanaged states for both folder and Markdown halves, with explicit complete, convert, Set as unmanaged, and Manage again actions.

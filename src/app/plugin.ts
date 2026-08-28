@@ -1,4 +1,4 @@
-import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
+import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
 
 import PLUGIN_STYLES from "../ui/styles.css";
 
@@ -79,6 +79,7 @@ export default class FolderNodesPlugin extends Plugin {
       },
       () => this.refreshVisuals(),
       (error) => new Notice(formatError(error), 8000),
+      Platform.isDesktopApp,
     );
     this.refreshScheduler = new RefreshScheduler((batch) => this.applyRefresh(batch));
     this.addChild(this.explorer);
@@ -93,7 +94,7 @@ export default class FolderNodesPlugin extends Plugin {
       homepageEnabled: () => this.settings.homepageEnabled,
       refresh: () => this.refreshVisuals(),
       reportError: (error) => new Notice(formatError(error), 8000),
-    }));
+    }, Platform.isDesktopApp));
     this.addSettingTab(new FolderNodesSettingTab(this.app, this));
     this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
     this.registerCommands();

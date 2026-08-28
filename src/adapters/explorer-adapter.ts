@@ -41,6 +41,7 @@ export class ExplorerAdapter extends Component {
     private readonly completeNode: (entry: TFile | TFolder) => void,
     private readonly notifyChanged: () => void,
     private readonly reportError: (error: unknown) => void,
+    private readonly dragEnabled = true,
   ) { super(); }
 
   public start(): void {
@@ -99,10 +100,12 @@ export class ExplorerAdapter extends Component {
       observer.observe(root, { childList: true, subtree: true });
       root.addEventListener("click", (event) => this.onClick(event), { capture: true, signal: abort.signal });
       root.addEventListener("keydown", (event) => this.onKeyDown(event), { capture: true, signal: abort.signal });
-      root.addEventListener("dragstart", (event) => this.onDragStart(event), { capture: true, signal: abort.signal });
-      root.addEventListener("dragover", (event) => this.onDragOver(event), { capture: true, signal: abort.signal });
-      root.addEventListener("drop", (event) => this.onDrop(event), { capture: true, signal: abort.signal });
-      root.addEventListener("dragend", () => this.clearDrop(), { capture: true, signal: abort.signal });
+      if (this.dragEnabled) {
+        root.addEventListener("dragstart", (event) => this.onDragStart(event), { capture: true, signal: abort.signal });
+        root.addEventListener("dragover", (event) => this.onDragOver(event), { capture: true, signal: abort.signal });
+        root.addEventListener("drop", (event) => this.onDrop(event), { capture: true, signal: abort.signal });
+        root.addEventListener("dragend", () => this.clearDrop(), { capture: true, signal: abort.signal });
+      }
       this.surfaces.set(root, { abort, observer, root });
     }
     for (const [root, surface] of this.surfaces) {
@@ -261,7 +264,8 @@ export class ExplorerAdapter extends Component {
       }
       problemBadge?.remove();
       repair?.remove();
-      setOwnedDraggable(element);
+      if (this.dragEnabled) setOwnedDraggable(element);
+      else restoreOwnedDraggable(element);
       const resolved = this.visuals.resolve(folder);
       const marker = explorerMarkerPlacement(this.getSettings().explorerIconPosition, resolved.kind === "fallback");
       const visual: NodeVisual = marker.useDefault ? { kind: "lucide", value: "folder-tree", accent: null, inheritedFrom: null } : resolved;

@@ -7,6 +7,74 @@ import type { VisualService } from "../../src/adapters/visual-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 
 describe("ExplorerAdapter lifecycle", () => {
+  it("keeps Explorer decoration but does not claim draggable ownership on mobile", () => {
+    const root = document.createElement("div");
+    root.createDiv({ cls: "nav-files-container" });
+    const title = root.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Node" } });
+    title.createSpan({ cls: "nav-folder-title-content", text: "Node" });
+    document.body.append(root);
+    const folder = Object.assign(new TFolder(), { name: "Node", path: "Node" });
+    const file = Object.assign(new TFile(), {
+      basename: "Node",
+      extension: "md",
+      name: "Node.md",
+      parent: folder,
+      path: "Node/Node.md",
+    });
+    const app = {
+      vault: {
+        getName: () => "Vault",
+        getRoot: () => ({ path: "" }),
+        getAbstractFileByPath: (path: string) => path === folder.path ? folder : null,
+      },
+      workspace: {
+        getActiveFile: () => null,
+        getLeavesOfType: (type: string) => type === "file-explorer"
+          ? [{ view: { containerEl: root } }]
+          : [],
+      },
+    } as unknown as App;
+    const service = {
+      children: () => [],
+      getFolder: (path: string) => path === folder.path ? folder : null,
+      getFile: () => null,
+      getCanonicalFile: (path: string) => path === folder.path ? file : null,
+      isCanonicalFile: () => false,
+      isIgnoredPath: () => false,
+      isIgnoredRootPath: () => false,
+      isLeafNoteExempt: () => false,
+      notePathForFolder: () => "Vault.md",
+      openFolderNode: async () => undefined,
+      placeNodeRelative: async () => folder,
+      rootNotePath: () => "Vault.md",
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app,
+      service,
+      { resolve: () => ({
+        kind: "lucide",
+        value: "folder-tree",
+        accent: null,
+        inheritedFrom: null,
+      }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined,
+      () => undefined,
+      () => undefined,
+      () => undefined,
+      false,
+    );
+
+    adapter.start();
+    expect(title.classList.contains("folder-nodes-node")).toBe(true);
+    expect(title.hasAttribute("draggable")).toBe(false);
+    expect(title.dataset.folderNodesOriginalDraggable).toBeUndefined();
+
+    adapter.stop();
+    root.remove();
+  });
+
   it("decorates only registered Explorer surfaces and removes all owned DOM on stop", () => {
     const root = document.createElement("div");
     root.className = "workspace-leaf-content";

@@ -12,7 +12,7 @@ translation_status: synced
 
 ## Release gates
 
-Before candidacy, run `npm ci`, `npm run check`, `npm run release:check`, and the large-directory benchmark. Isolated-Vault host acceptance binds to the exact candidate. The four settings pages, homepage, Explorer/title icons, disclosure arrow, Explorer/Contents Node drag, all three Contents menus and keyboard access, ordinary-file into moves and conflict rejection, selection context menus, Visuals, static Album, both exemptions, detailed maintenance preview, read-only Health, and deletion are not claimed as host-verified in README or release notes without dated evidence. Acceptance separately confirms Folder Nodes creates no GIF, video, or audio playback controls.
+Before candidacy, run `npm ci`, `npm run check`, `npm run release:check`, and the large-directory benchmark. Isolated-Vault host acceptance binds to the exact candidate. Desktop covers the four settings pages, homepage, Explorer/title icons, disclosure arrow, Explorer/Contents Node drag, all three Contents menus and keyboard access, ordinary-file into moves and conflict rejection, selection context menus, Visuals, static Album, both exemptions, detailed maintenance preview, read-only Health, and deletion. A mobile candidate separately requires current emulator product evidence for no draggable/drag handles, native folder move, Move/Move up/Move down, target-rank reconciliation, touch menus, narrow layout, and restart. Emulator, physical-device, and iOS claims do not substitute for one another. Acceptance separately confirms Folder Nodes creates no GIF, video, or audio playback controls.
 
 ## Git and GitHub
 

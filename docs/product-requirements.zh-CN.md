@@ -15,7 +15,7 @@ translation_status: source
 
 ## 节点操作
 
-用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。Explorer 与 Contents 子节点卡片的拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder。所有结构写入必须串行，rename/move 必须使用 Obsidian FileManager；多步写入必须预检查并在失败时 rollback。冲突、循环移动和有歧义的 merge 必须失败关闭。Obsidian 原生“新建文件夹”和“新建笔记”与“新建节点”保持可见：前两者创建不完整的文件夹侧或 Markdown 侧，“新建节点”原子创建完整配对。文件列表中的文件夹移动/删除作用于整个子树；Node Note 标签页的移动/删除/合并只作用于 Markdown，可以留下不完整文件夹。重命名是同步例外：重命名已有 Node Note 或其文件夹都会更新另一侧。标签页另有明确标为“所在节点”的整节点动作。Root 不允许作为完整节点被重命名、移动或删除。Folder Nodes 创建空白 Node Note；内容模板交给专用模板插件。
+用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。桌面端 Explorer 与 Contents 子节点卡片的拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder；Android 不启用 HTML5 拖放，使用 Obsidian 原生移动文件夹和插件的 Move/Move up/Move down 动作。原生跨父级移动完成后，插件会为手动排序的目标父级重新分配该子节点的稀疏 rank，不能把来源父级的旧 rank 直接带入。所有结构写入必须串行，rename/move 必须使用 Obsidian FileManager；多步写入必须预检查并在失败时 rollback。冲突、循环移动和有歧义的 merge 必须失败关闭。Obsidian 原生“新建文件夹”和“新建笔记”与“新建节点”保持可见：前两者创建不完整的文件夹侧或 Markdown 侧，“新建节点”原子创建完整配对。文件列表中的文件夹移动/删除作用于整个子树；Node Note 标签页的移动/删除/合并只作用于 Markdown，可以留下不完整文件夹。重命名是同步例外：重命名已有 Node Note 或其文件夹都会更新另一侧。标签页另有明确标为“所在节点”的整节点动作。Root 不允许作为完整节点被重命名、移动或删除。Folder Nodes 创建空白 Node Note；内容模板交给专用模板插件。
 
 ## 选区创建
 
@@ -29,7 +29,7 @@ Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符�
 
 ## Node Visual 与 Contents View
 
-`icon` 是唯一 Node Visual 属性，使用 Obsidian Properties 可表达的 Text 或扁平 Text List，不接受嵌套对象。列表中的基础候选可以是 Vault 图片 WikiLink、已知 Lucide、一个可见扩展字素（文字、符号或 Emoji）；按顺序使用第一个实际可显示的基础候选，缺失图片会继续尝试本节点后续项。第一个有效 `color:` 项直接为 Lucide/文字前景着色。Emoji/位图/SVG 保留原像素，不增加圆点、背景或边框；只有所有基础候选都失败时，颜色才成为居中的实心圆形色标。未知项或多字素项会被诊断，不能通过 Picker 保存；多个颜色以第一个为准。只有当前节点的整组声明都无法显示时才继承最近祖先，不把当前颜色与祖先图标组合。属性图标统一放入固定且无边框的图标位，并以文字的字重、大小和颜色与文件名开头的相同字符区分。File Explorer 图标可位于名称前、名称后或隐藏，也可作为 Node Note 可编辑标题之外的独立图标显示。文字图标继承 Obsidian 界面字体；Emoji 默认使用系统彩色字体栈，“图标与外观”只显示从 Segoe UI Emoji、Apple Color Emoji、Noto Color Emoji、Twemoji Mozilla、OpenMoji 固定集合中检测到的字体，提供复杂序列预览，并在已保存字体不可用时安全回退。高级用户仍可覆盖字体 CSS 变量。File Explorer 是唯一全局 Node Tree，并以置顶 Root 行开始。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files，三段分别分页。三类条目都提供右键、More actions 与 Shift+F10 菜单入口。Node 可按 before/into/after 排序或换父级；Album/Files 中的单个普通文件只能拖入 Node、当前节点或 breadcrumb 目录并执行真实文件移动，不产生文件排序属性。内容多选用于插入或复制 WikiLink；拖动多个已选条目只导出链接，不执行部分文件移动。无有效 visual 的子节点不绘制大 fallback 图标；GIF 只提取静态帧，视频只显示类型 tile，音频留在 Files。插件不在侧栏中提供动图、视频或音频播放。
+`icon` 是唯一 Node Visual 属性，使用 Obsidian Properties 可表达的 Text 或扁平 Text List，不接受嵌套对象。列表中的基础候选可以是 Vault 图片 WikiLink、已知 Lucide、一个可见扩展字素（文字、符号或 Emoji）；按顺序使用第一个实际可显示的基础候选，缺失图片会继续尝试本节点后续项。第一个有效 `color:` 项直接为 Lucide/文字前景着色。Emoji/位图/SVG 保留原像素，不增加圆点、背景或边框；只有所有基础候选都失败时，颜色才成为居中的实心圆形色标。未知项或多字素项会被诊断，不能通过 Picker 保存；多个颜色以第一个为准。只有当前节点的整组声明都无法显示时才继承最近祖先，不把当前颜色与祖先图标组合。属性图标统一放入固定且无边框的图标位，并以文字的字重、大小和颜色与文件名开头的相同字符区分。File Explorer 图标可位于名称前、名称后或隐藏，也可作为 Node Note 可编辑标题之外的独立图标显示。文字图标继承 Obsidian 界面字体；Emoji 默认使用系统彩色字体栈，“图标与外观”只显示从 Segoe UI Emoji、Apple Color Emoji、Noto Color Emoji、Twemoji Mozilla、OpenMoji 固定集合中检测到的字体，提供复杂序列预览，并在已保存字体不可用时安全回退。高级用户仍可覆盖字体 CSS 变量。File Explorer 是唯一全局 Node Tree，并以置顶 Root 行开始。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files，三段分别分页。三类条目都提供右键、More actions 与 Shift+F10 菜单入口。桌面端 Node 可用 before/into/after 拖放排序或换父级，单个 Album/Files 条目可拖入 Node、当前节点或 breadcrumb；Android 仅通过菜单/原生移动执行相同写操作，不暴露 draggable。内容多选用于插入或复制 WikiLink。无有效 visual 的子节点不绘制大 fallback 图标；GIF 只提取静态帧，视频只显示类型 tile，音频留在 Files。插件不在侧栏中提供动图、视频或音频播放。
 
 ## 结构安全
 

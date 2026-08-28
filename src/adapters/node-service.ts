@@ -445,6 +445,7 @@ export class NodeService {
       if (this.isIgnoredPath(entryScope)) return;
       if (entry instanceof TFolder) {
         if (this.isIgnoredPath(oldScope)) return;
+        const parentChanged = !isSameVaultPath(dirname(entry.path), dirname(oldPath));
         const canonicalPath = nodeNotePath(entry.path);
         const previousName = basename(oldPath);
         const candidates = [...new Set([
@@ -458,6 +459,15 @@ export class NodeService {
           await this.assertAvailable(canonicalPath, candidate);
           this.expectEvent("rename", canonicalPath, candidate.path);
           await this.app.fileManager.renameFile(candidate, canonicalPath);
+        }
+        const canonical = this.getCanonicalFile(entry.path);
+        if (parentChanged && canonical !== null) {
+          const undos: Undo[] = [];
+          try {
+            await this.appendRankIfManual(dirname(entry.path), canonical, undos);
+          } catch (error) {
+            await this.rollback(undos, error);
+          }
         }
         return;
       }

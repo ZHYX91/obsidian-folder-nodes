@@ -88,6 +88,7 @@ export class FolderNodeContentsView extends ItemView {
     private readonly visuals: ContentsVisuals,
     private readonly references: ReferenceIndex,
     private readonly actions: ContentsActions,
+    private readonly dragEnabled = true,
   ) {
     super(leaf);
     this.registerDomEvent(this.containerEl.ownerDocument, "keydown", (event) => {
@@ -188,12 +189,12 @@ export class FolderNodeContentsView extends ItemView {
           text: item.label,
           attr: { "aria-current": "page" },
         });
-        this.bindContentDropTarget(current, item.path);
+        if (this.dragEnabled) this.bindContentDropTarget(current, item.path);
         continue;
       }
       const button = breadcrumb.createEl("button", { text: item.label });
       button.addEventListener("click", () => this.setFolder(item.path));
-      this.bindContentDropTarget(button, item.path);
+      if (this.dragEnabled) this.bindContentDropTarget(button, item.path);
     }
   }
 
@@ -204,7 +205,7 @@ export class FolderNodeContentsView extends ItemView {
     const identity = managedNode
       ? header.createEl("button", { cls: "folder-nodes-current", attr: { "aria-label": t("openCurrentNodeNote") } })
       : header.createDiv({ cls: "folder-nodes-current" });
-    this.bindContentDropTarget(identity, folderPath);
+    if (this.dragEnabled) this.bindContentDropTarget(identity, folderPath);
     const resolved = managedNode ? this.visuals.resolve(folder) : null;
     if (resolved !== null && resolved.kind !== "fallback") {
       const visual = identity.createSpan({ cls: "folder-nodes-current-visual" });
@@ -276,19 +277,21 @@ export class FolderNodeContentsView extends ItemView {
         else this.runAction(this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry));
       });
       if (item.kind === "healthy" && entry instanceof TFolder) {
-        this.bindContentDropTarget(card, entry.path);
         this.bindMenu(shell, card, entry, (anchor) => this.actions.nodeMenu(anchor, entry));
-        const handle = shell.createEl("button", {
-          cls: "folder-nodes-node-drag-handle clickable-icon",
-          attr: { "aria-label": t("reorderNode", { name: entry.name }), draggable: "true" },
-        });
-        setIcon(handle, "grip-vertical");
-        handle.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        });
-        this.bindNodeReorderSource(handle, shell, entry.path);
-        this.bindNodeReorderTarget(shell, entry, parentPath);
+        if (this.dragEnabled) {
+          this.bindContentDropTarget(card, entry.path);
+          const handle = shell.createEl("button", {
+            cls: "folder-nodes-node-drag-handle clickable-icon",
+            attr: { "aria-label": t("reorderNode", { name: entry.name }), draggable: "true" },
+          });
+          setIcon(handle, "grip-vertical");
+          handle.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+          this.bindNodeReorderSource(handle, shell, entry.path);
+          this.bindNodeReorderTarget(shell, entry, parentPath);
+        }
       } else {
         this.bindMenu(shell, card, entry, (anchor) => this.actions.problemMenu(anchor, entry));
       }
@@ -332,7 +335,7 @@ export class FolderNodeContentsView extends ItemView {
       });
       const sourceFolder = entry.parent ?? this.app.vault.getRoot();
       this.bindMenu(shell, card, entry, (anchor) => this.actions.entryMenu(anchor, entry, sourceFolder));
-      this.bindContentDragSource(card, entry, "media");
+      if (this.dragEnabled) this.bindContentDragSource(card, entry, "media");
     }
     this.more(section, entries.length, "album");
   }
@@ -373,7 +376,9 @@ export class FolderNodeContentsView extends ItemView {
         else this.runAction(this.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(entry));
       });
       this.bindMenu(shell, row, entry, (anchor) => this.actions.entryMenu(anchor, entry, folderForEntry(entry, this.app.vault.getRoot())));
-      if (entry instanceof TFile) this.bindContentDragSource(row, entry, "file");
+      if (this.dragEnabled && entry instanceof TFile) {
+        this.bindContentDragSource(row, entry, "file");
+      }
     }
     this.more(section, entries.length, "files");
   }
