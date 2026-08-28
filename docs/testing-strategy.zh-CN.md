@@ -25,7 +25,7 @@ Quick 门槛验证 10,000 个、large 门槛验证 100,000 个直接 Child Nodes
 
 ## Android 移动端验收
 
-每个 `isDesktopOnly: false` 候选必须在当前 Android 15/API 35 模拟器和一次性 Vault 上单独验收：插件加载、File Explorer/Contents 装饰与打开、原生移动文件夹、Move/Move up/Move down、跨父级手动排序 rank、创建/补全/不管理、菜单、选区创建、设置与重启持久化、窄屏布局、触摸目标、系统回收站和停用清理。断言 Explorer 与 Contents 均没有 Folder Nodes 自有 `draggable`、drag handle 或 drop marker。模拟器证据不等于真机或 iOS；重大触摸、输入、存储或平台边界变化时另存真机证据，iOS 在本流程中为范围外。
+每个 `isDesktopOnly: false` 候选必须在当前 Android 15/API 35 模拟器和一次性 Vault 上单独验收：插件加载、File Explorer/Contents 装饰与打开、原生移动文件夹、Move/Move up/Move down、跨父级手动排序 rank、创建/补全/不管理、菜单、选区创建、设置与重启持久化、窄屏布局、触摸目标、系统回收站和停用清理。断言 Explorer 与 Contents 均没有 Folder Nodes 自有 `draggable`、drag handle 或 drop marker。模拟器证据不等于真机或 iOS。重大触摸、输入、存储或平台边界变化时可以另存真机增强证据；缺失时不阻断共享发布闭环，也不能升级为插件专属前置条件。iOS 在本流程中为范围外。
 
 ## 正式部署
 

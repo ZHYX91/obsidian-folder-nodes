@@ -26,7 +26,7 @@ Check at least default light, default dark, and one third-party theme. Keyboard 
 
 ## Android mobile acceptance
 
-Every `isDesktopOnly: false` candidate receives separate current Android 15/API 35 emulator evidence in a disposable Vault. Cover plugin load, File Explorer/Contents decoration and opening, native folder move, Move/Move up/Move down, cross-parent manual-rank reconciliation, create/complete/unmanaged actions, menus, selection creation, settings and restart persistence, narrow layout, touch targets, system trash, and disable cleanup. Assert that Explorer and Contents expose no Folder Nodes-owned `draggable`, drag handle, or drop marker. Emulator evidence is not physical-device or iOS evidence; retain a separate physical-device run when touch, input, storage, or another platform boundary changes materially. iOS is out of scope for this workflow.
+Every `isDesktopOnly: false` candidate receives separate current Android 15/API 35 emulator evidence in a disposable Vault. Cover plugin load, File Explorer/Contents decoration and opening, native folder move, Move/Move up/Move down, cross-parent manual-rank reconciliation, create/complete/unmanaged actions, menus, selection creation, settings and restart persistence, narrow layout, touch targets, system trash, and disable cleanup. Assert that Explorer and Contents expose no Folder Nodes-owned `draggable`, drag handle, or drop marker. Emulator evidence is not physical-device or iOS evidence. A physical-device run is optional enhanced evidence when touch, input, storage, or another platform boundary changes materially; its absence does not block the shared release closure and it cannot become a plugin-specific prerequisite. iOS is out of scope for this workflow.
 
 ## Production deployment
 
