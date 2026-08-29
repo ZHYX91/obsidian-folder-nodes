@@ -35,6 +35,7 @@ const DEFAULT_SPACING_Y = 140;
 const DEFAULT_SPACING_Z = 260;
 const NODE_HALF_WIDTH = 90;
 const NODE_HALF_HEIGHT = 23;
+const MIN_CAMERA_ZOOM = 0.005;
 
 export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOptions = {}): readonly NodeGraphPoint3D[] {
   const spacingX = positive(options.spacingX, DEFAULT_SPACING_X);
@@ -58,12 +59,17 @@ export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOpt
         id,
         x: (column - (columns - 1) / 2) * spacingX,
         y: (row - (rows - 1) / 2) * spacingY,
-        z: depth * spacingZ,
+        z: compressedDepth(depth) * spacingZ,
         depth,
       });
     }
   }
   return points;
+}
+
+function compressedDepth(depth: number): number {
+  if (depth <= 0) return 0;
+  return Math.log2(depth + 1);
 }
 
 export function projectNodeGraph3D(
@@ -78,7 +84,7 @@ export function projectNodeGraph3D(
   const sy = Math.sin(camera.yaw);
   const cp = Math.cos(camera.pitch);
   const sp = Math.sin(camera.pitch);
-  const zoom = clamp(camera.zoom, 0.2, 4);
+  const zoom = clamp(camera.zoom, MIN_CAMERA_ZOOM, 4);
   const focal = Math.max(width, height) * 1.4;
   return points.map((point) => {
     const yawX = point.x * cy - point.z * sy;
@@ -118,7 +124,7 @@ export function fitNodeGraphCamera(
   const zoom = clamp(Math.min(
     availableWidth / Math.max(1, neutralBounds.width),
     availableHeight / Math.max(1, neutralBounds.height),
-  ), 0.2, 4);
+  ), MIN_CAMERA_ZOOM, 4);
   const fitted = { ...camera, zoom, panX: 0, panY: 0 };
   const fittedBounds = projectedBounds(projectNodeGraph3D(points, fitted, width, height));
   return {
@@ -142,7 +148,7 @@ export function panNodeGraphCamera(camera: NodeGraphCamera, deltaX: number, delt
 
 export function zoomNodeGraphCamera(camera: NodeGraphCamera, deltaY: number): NodeGraphCamera {
   const factor = Math.exp(-deltaY * 0.0015);
-  return { ...camera, zoom: clamp(camera.zoom * factor, 0.2, 4) };
+  return { ...camera, zoom: clamp(camera.zoom * factor, MIN_CAMERA_ZOOM, 4) };
 }
 
 function projectedBounds(points: readonly NodeGraphProjectedPoint[]): {

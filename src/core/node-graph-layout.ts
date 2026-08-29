@@ -57,21 +57,37 @@ export function layoutNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOpt
   let nextLeafX = padding;
   let maxDepth = 0;
   let maxRight = padding + nodeWidth;
-
-  const place = (node: NodeGraphTree, depth: number): NodeGraphLayoutNode => {
+  const positions = new Map<string, NodeGraphLayoutNode>();
+  const pending: Array<{ readonly depth: number; readonly node: NodeGraphTree; readonly visited: boolean }> = [
+    { depth: 0, node: root, visited: false },
+  ];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === undefined) break;
+    const { depth, node, visited } = current;
+    const children = [...node.children].sort((left, right) => left.id.localeCompare(right.id, "en"));
+    if (!visited) {
+      pending.push({ depth, node, visited: true });
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        const child = children[index];
+        if (child !== undefined) pending.push({ depth: depth + 1, node: child, visited: false });
+      }
+      continue;
+    }
     maxDepth = Math.max(maxDepth, depth);
-    const children = node.children.map((child) => {
-      const placed = place(child, depth + 1);
+    const placedChildren = children.map((child) => {
+      const placed = positions.get(child.id);
+      if (placed === undefined) throw new Error(`Node Graph layout lost child position: ${child.id}`);
       edges.push({ source: node.id, target: child.id });
       return placed;
     });
     let x: number;
-    if (children.length === 0) {
+    if (placedChildren.length === 0) {
       x = nextLeafX;
       nextLeafX += nodeWidth + horizontalGap;
     } else {
-      const first = children[0];
-      const last = children[children.length - 1];
+      const first = placedChildren[0];
+      const last = placedChildren[placedChildren.length - 1];
       if (first === undefined || last === undefined) throw new Error("Node Graph layout lost a child position");
       x = (first.x + last.x) / 2;
     }
@@ -82,11 +98,9 @@ export function layoutNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOpt
       depth,
     };
     nodes.push(placed);
+    positions.set(node.id, placed);
     maxRight = Math.max(maxRight, x + nodeWidth);
-    return placed;
-  };
-
-  place(root, 0);
+  }
   return {
     nodes,
     edges,

@@ -63,4 +63,25 @@ describe("node graph layout", () => {
       offsetY: 0,
     });
   });
+
+  it("lays out a 20k-deep chain iteratively without overflowing the stack", () => {
+    type MutableTree = { id: string; children: MutableTree[] };
+    const deep: MutableTree = { id: "0", children: [] };
+    let cursor = deep;
+    for (let index = 1; index < 20_000; index += 1) {
+      const child: MutableTree = { id: String(index), children: [] };
+      cursor.children.push(child);
+      cursor = child;
+    }
+    const layout = layoutNodeGraph(deep);
+    expect(layout.nodes).toHaveLength(20_000);
+    expect(layout.edges).toHaveLength(19_999);
+    expect(Math.max(...layout.nodes.map(({ depth }) => depth))).toBe(19_999);
+  });
+
+  it("sorts siblings before placement so enumeration order cannot move nodes", () => {
+    const forward = layoutNodeGraph({ id: "", children: [{ id: "A", children: [] }, { id: "B", children: [] }] });
+    const reversed = layoutNodeGraph({ id: "", children: [{ id: "B", children: [] }, { id: "A", children: [] }] });
+    expect(reversed).toEqual(forward);
+  });
 });

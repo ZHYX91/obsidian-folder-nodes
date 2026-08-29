@@ -121,4 +121,65 @@ describe("Node Graph view interactions", () => {
     view.setFocus("B");
     expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-focused")).toBe(true);
   });
+
+  it("uses a constant-DOM canvas path above the large-graph threshold", async () => {
+    const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
+    const folders = new Map<string, TFolder>();
+    for (let index = 0; index < 501; index += 1) {
+      const path = `N${String(index).padStart(3, "0")}`;
+      folders.set(path, Object.assign(new TFolder(), {
+        children: [] as Array<TFile | TFolder>,
+        name: path,
+        parent: root,
+        path,
+      }));
+    }
+    const openFolderNode = vi.fn(async () => undefined);
+    const app = {
+      vault: { getName: () => "Large Vault", getRoot: () => root },
+      metadataCache: { resolvedLinks: {} },
+    };
+    const service = {
+      children: (path: string) => path === "" ? [...folders.keys()].map((childPath) => ({ childPath })) : [],
+      getCanonicalFile: () => null,
+      getFolder: (path: string) => folders.get(path) ?? null,
+      openFolderNode,
+    };
+    const visuals = {
+      resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const,
+    };
+    const context = {
+      arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
+      lineTo: vi.fn(), moveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
+      stroke: vi.fn(), strokeRect: vi.fn(),
+    };
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const view = new FolderNodeGraphView({ app } as never, service, visuals);
+    await view.onOpen();
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges line")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-focus-overlay")).toHaveLength(1);
+
+    view.setFocus("N500");
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+    const focus = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay");
+    expect(focus?.dataset.nodePath).toBe("N500");
+    focus?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(openFolderNode).toHaveBeenCalledWith("N500", false);
+
+    const threeD = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+      .find((button) => button.textContent === "3D");
+    threeD?.click();
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
+    view.refresh();
+    view.refresh();
+    await view.onClose();
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
+    getContext.mockRestore();
+  });
 });

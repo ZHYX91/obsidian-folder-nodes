@@ -9,6 +9,8 @@ describe("Node Graph integration contract", () => {
   const plugin = source("src/app/plugin.ts");
   const graphPlugin = source("src/app/node-graph-plugin.ts");
   const graphView = source("src/ui/node-graph-view.ts");
+  const canvasRenderer = source("src/ui/node-graph-canvas-renderer.ts");
+  const polishedView = source("src/ui/node-graph-polish-view.ts");
 
   it("refreshes through the existing coalescing Metadata Cache and refresh path", () => {
     expect(plugin).toContain("this.refreshExtensionViews(batch)");
@@ -29,7 +31,7 @@ describe("Node Graph integration contract", () => {
     expect(graphView).toContain('["structure", "links", "hybrid"]');
     expect(graphView).toContain('["2d", "3d"]');
     expect(graphView).toContain("buildNodeGraphModel(tree, links)");
-    expect(graphView).toContain("layoutNodeGraph3D(data.model)");
+    expect(graphView).toContain("points3D: layoutNodeGraph3D(model)");
   });
 
   it("preserves Enter opening, 2D fit, and interactive 3D projection", () => {
@@ -40,5 +42,15 @@ describe("Node Graph integration contract", () => {
     expect(graphView).toContain('surface.addEventListener("pointermove"');
     expect(graphView).toContain('surface.addEventListener("wheel"');
     expect(graphView).toContain("this.update3DProjection()");
+  });
+
+  it("switches large graphs to constant-DOM Canvas rendering with explicit teardown", () => {
+    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length)");
+    expect(graphView).toContain("new NodeGraphCanvasRenderer");
+    expect(canvasRenderer).toContain('surface.createEl("canvas"');
+    expect(canvasRenderer).toContain("this.cancelFrame()");
+    expect(canvasRenderer).toContain("this.unbindEvents()");
+    expect(canvasRenderer).not.toContain('createSvg("line"');
+    expect(polishedView).not.toContain("MutationObserver");
   });
 });

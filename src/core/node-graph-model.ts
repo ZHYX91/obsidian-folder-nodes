@@ -26,17 +26,23 @@ export function buildNodeGraphModel(
   const nodes: NodeGraphModelNode[] = [];
   const nodeIds = new Set<string>();
   const edges = new Map<string, MutableEdge>();
-
-  const visit = (node: NodeGraphTree, depth: number): void => {
+  const pending: Array<{ readonly depth: number; readonly node: NodeGraphTree }> = [{ depth: 0, node: root }];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === undefined) break;
+    const { depth, node } = current;
     if (nodeIds.has(node.id)) throw new Error(`Duplicate Node Graph id: ${node.id}`);
     nodeIds.add(node.id);
     nodes.push({ id: node.id, depth });
-    for (const child of node.children) {
+    const children = [...node.children].sort((left, right) => left.id.localeCompare(right.id, "en"));
+    for (const child of children) {
       mergeEdge(edges, node.id, child.id, "structure");
-      visit(child, depth + 1);
     }
-  };
-  visit(root, 0);
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const child = children[index];
+      if (child !== undefined) pending.push({ depth: depth + 1, node: child });
+    }
+  }
 
   for (const [source, targets] of linksBySource) {
     if (!nodeIds.has(source)) continue;

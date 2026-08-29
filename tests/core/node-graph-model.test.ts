@@ -35,4 +35,22 @@ describe("Node Graph relation model", () => {
     ]);
     expect(edgesForMode(model, "hybrid")).toHaveLength(4);
   });
+
+  it("builds a deep graph iteratively and sorts sibling identity", () => {
+    type MutableTree = { id: string; children: MutableTree[] };
+    const deep: MutableTree = { id: "0", children: [] };
+    let cursor = deep;
+    for (let index = 1; index < 20_000; index += 1) {
+      const child: MutableTree = { id: String(index), children: [] };
+      cursor.children.push(child);
+      cursor = child;
+    }
+    expect(buildNodeGraphModel(deep).nodes).toHaveLength(20_000);
+
+    const reversed = buildNodeGraphModel({
+      id: "",
+      children: [{ id: "B", children: [] }, { id: "A", children: [] }],
+    });
+    expect(reversed.nodes.map(({ id }) => id)).toEqual(["", "A", "B"]);
+  });
 });

@@ -41,14 +41,24 @@ describe("Node Graph 3D layout", () => {
     expect(rotated.pitch).not.toBe(camera.pitch);
     expect(panNodeGraphCamera(camera, 12, -8)).toMatchObject({ panX: 12, panY: -8 });
     expect(zoomNodeGraphCamera(camera, -500).zoom).toBeGreaterThan(camera.zoom);
-    expect(zoomNodeGraphCamera(camera, 100000).zoom).toBe(0.2);
+    expect(zoomNodeGraphCamera(camera, 100000).zoom).toBe(0.005);
     const fitted = fitNodeGraphCamera(points, { ...camera, zoom: 4, panX: 100, panY: -80 }, 800, 600, 48);
-    expect(fitted.zoom).toBeGreaterThanOrEqual(0.2);
+    expect(fitted.zoom).toBeGreaterThanOrEqual(0.005);
     expect(fitted.zoom).toBeLessThanOrEqual(4);
     const projection = projectNodeGraph3D(points, fitted, 800, 600);
     expect(Math.min(...projection.map(({ x }) => x))).toBeGreaterThan(0);
     expect(Math.max(...projection.map(({ x }) => x))).toBeLessThan(800);
     expect(Math.min(...projection.map(({ y }) => y))).toBeGreaterThan(0);
     expect(Math.max(...projection.map(({ y }) => y))).toBeLessThan(600);
+  });
+
+  it("compresses very deep structural levels into a bounded monotonic Z range", () => {
+    const deepModel = {
+      nodes: Array.from({ length: 20_000 }, (_, depth) => ({ id: String(depth), depth })),
+      edges: [],
+    };
+    const points = layoutNodeGraph3D(deepModel);
+    expect(points[1]?.z).toBeGreaterThan(points[0]?.z ?? -1);
+    expect(points.at(-1)?.z).toBeLessThan(4_000);
   });
 });

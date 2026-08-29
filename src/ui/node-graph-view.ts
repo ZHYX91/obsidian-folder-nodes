@@ -12,13 +12,18 @@ import {
   type NodeGraphPoint3D,
   type NodeGraphProjectedPoint,
 } from "../core/node-graph-3d";
+import { shouldUseNodeGraphCanvas } from "../core/node-graph-canvas";
 import { normalizeNodeGraphLinks } from "../core/node-graph-links";
-import { fitNodeGraphViewport, layoutNodeGraph, type NodeGraphTree } from "../core/node-graph-layout";
+import { fitNodeGraphViewport, layoutNodeGraph, type NodeGraphLayout, type NodeGraphTree } from "../core/node-graph-layout";
 import { buildNodeGraphModel, edgesForMode, type NodeGraphModel, type NodeGraphModelEdge, type NodeGraphRelationMode } from "../core/node-graph-model";
 import { normalizeVaultPath } from "../core/paths";
 import type { NodeVisual } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { resolvedLanguage } from "./i18n";
+import {
+  NodeGraphCanvasRenderer,
+  type NodeGraphCanvasRecord,
+} from "./node-graph-canvas-renderer";
 
 interface NodeGraphService {
   getFolder(path: string): TFolder | null;
@@ -31,17 +36,16 @@ interface NodeGraphVisuals {
   resolve(folder: TFolder): NodeVisual;
 }
 
-interface GraphRecord {
-  readonly path: string;
-  readonly label: string;
-  readonly folder: TFolder;
-  readonly note: TFile | null;
+interface GraphRecord extends NodeGraphCanvasRecord {
+  readonly notePath: string | null;
 }
 
 interface GraphData {
+  readonly layout: NodeGraphLayout;
   readonly tree: NodeGraphTree;
   readonly records: ReadonlyMap<string, GraphRecord>;
   readonly model: NodeGraphModel;
+  readonly points3D: readonly NodeGraphPoint3D[];
 }
 
 type NodeGraphDimension = "2d" | "3d";
@@ -76,6 +80,10 @@ export class FolderNodeGraphView extends ItemView {
   private threeDSurface: HTMLElement | null = null;
   private threeDSvg: SVGSVGElement | null = null;
   private threeDViewport: { width: number; height: number } | null = null;
+  private canvasRenderer: NodeGraphCanvasRenderer | null = null;
+  private graphData: GraphData | null = null;
+  private refreshGeneration = 0;
+  private refreshTimer: number | null = null;
 
   public constructor(
     leaf: WorkspaceLeaf,
@@ -90,9 +98,18 @@ export class FolderNodeGraphView extends ItemView {
   public override getIcon(): string { return "git-fork"; }
   public override async onOpen(): Promise<void> { this.render(); }
   public override onResize(): void {
+    this.canvasRenderer?.resize();
     this.resize3DViewport();
   }
   public override async onClose(): Promise<void> {
+    this.refreshGeneration += 1;
+    if (this.refreshTimer !== null) {
+      (this.contentEl.ownerDocument.defaultView ?? window).clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    this.canvasRenderer?.destroy();
+    this.canvasRenderer = null;
+    this.graphData = null;
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
@@ -106,13 +123,26 @@ export class FolderNodeGraphView extends ItemView {
 
   public setFocus(path: string | null): void {
     this.focusPath = path === null ? null : normalizeVaultPath(path);
-    if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
+    if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
+    else if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
     else this.applyFocus(true);
   }
 
-  public refresh(): void { this.render(); }
+  public refresh(): void {
+    const generation = ++this.refreshGeneration;
+    const ownerWindow = this.contentEl.ownerDocument.defaultView ?? window;
+    if (this.refreshTimer !== null) ownerWindow.clearTimeout(this.refreshTimer);
+    this.refreshTimer = ownerWindow.setTimeout(() => {
+      this.refreshTimer = null;
+      if (generation !== this.refreshGeneration) return;
+      this.graphData = null;
+      this.render();
+    }, 50);
+  }
 
   private render(): void {
+    this.canvasRenderer?.destroy();
+    this.canvasRenderer = null;
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
@@ -124,21 +154,40 @@ export class FolderNodeGraphView extends ItemView {
     this.pointers.clear();
     this.contentEl.empty();
     this.contentEl.addClass("folder-nodes-node-graph-view");
+    this.contentEl.removeClass("is-canvas-graph");
     this.contentEl.toggleClass("is-3d", this.dimension === "3d");
 
-    const data = this.buildGraphData(this.app.vault.getRoot());
+    const data = this.graphData ?? this.buildGraphData(this.app.vault.getRoot());
+    this.graphData = data;
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
-    if (this.dimension === "2d") this.render2D(surface, data, fit);
+    if (shouldUseNodeGraphCanvas(data.model.nodes.length)) this.renderCanvas(surface, data, fit);
+    else if (this.dimension === "2d") this.render2D(surface, data, fit);
     else this.render3D(surface, data, fit);
-    this.applyFocus(this.dimension === "2d");
+    if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
+    this.didRender();
   }
+
+  protected didRender(): void {}
+
+  protected currentGraphModel(): NodeGraphModel | null { return this.graphData?.model ?? null; }
+  protected currentRelationMode(): NodeGraphRelationMode { return this.relationMode; }
+  protected currentDimension(): NodeGraphDimension { return this.dimension; }
+  protected isCanvasGraph(): boolean { return this.canvasRenderer !== null; }
+  protected setCanvasSearchQuery(query: string): void { this.canvasRenderer?.setSearchQuery(query); }
+  protected graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
+    return this.graphData === null ? [] : [...this.graphData.records.values()];
+  }
+  protected onNodeSelected(_path: string): void {}
 
   private renderToolbar(): HTMLElement {
     const toolbar = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-toolbar" });
     toolbar.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
-    const relation = toolbar.createDiv({ cls: "folder-nodes-node-graph-switch", attr: { "aria-label": label("relationship") } });
+    const relation = toolbar.createDiv({
+      cls: "folder-nodes-node-graph-switch",
+      attr: { "aria-label": label("relationship"), "data-node-graph-switch": "relation" },
+    });
     for (const mode of ["structure", "links", "hybrid"] as const) {
       this.switchButton(relation, relationLabel(mode), this.relationMode === mode, () => {
         if (this.relationMode === mode) return;
@@ -146,7 +195,10 @@ export class FolderNodeGraphView extends ItemView {
         this.render();
       });
     }
-    const dimension = toolbar.createDiv({ cls: "folder-nodes-node-graph-switch", attr: { "aria-label": label("dimension") } });
+    const dimension = toolbar.createDiv({
+      cls: "folder-nodes-node-graph-switch",
+      attr: { "aria-label": label("dimension"), "data-node-graph-switch": "dimension" },
+    });
     for (const mode of ["2d", "3d"] as const) {
       this.switchButton(dimension, mode.toUpperCase(), this.dimension === mode, () => {
         if (this.dimension === mode) return;
@@ -174,31 +226,51 @@ export class FolderNodeGraphView extends ItemView {
 
   private buildGraphData(root: TFolder): GraphData {
     const records = new Map<string, GraphRecord>();
-    const build = (folder: TFolder): NodeGraphTree => {
+    type MutableTree = { readonly id: string; readonly children: MutableTree[] };
+    const tree: MutableTree = { id: normalizeVaultPath(root.path), children: [] };
+    const pending: Array<{ readonly folder: TFolder; readonly tree: MutableTree }> = [{ folder: root, tree }];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (current === undefined) break;
+      const { folder, tree: currentTree } = current;
       const path = normalizeVaultPath(folder.path);
+      const note = this.service.getCanonicalFile(path);
       records.set(path, {
         path,
         label: path === "" ? this.app.vault.getName() : folder.name,
-        folder,
-        note: this.service.getCanonicalFile(path),
+        notePath: note?.path ?? null,
+        visual: this.visuals.resolve(folder),
       });
-      return {
-        id: path,
-        children: this.service.children(path).flatMap(({ childPath }) => {
+      const children = this.service.children(path)
+        .flatMap(({ childPath }) => {
           const child = this.service.getFolder(childPath);
-          return child === null ? [] : [build(child)];
-        }),
-      };
-    };
-    const tree = build(root);
-    const sources = [...records.values()].flatMap((record) => record.note === null ? [] : [{ nodeId: record.path, notePath: record.note.path }]);
+          return child === null ? [] : [child];
+        })
+        .sort((left, right) => left.path.localeCompare(right.path, "en"));
+      for (const child of children) currentTree.children.push({ id: normalizeVaultPath(child.path), children: [] });
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        const child = children[index];
+        const childTree = currentTree.children[index];
+        if (child !== undefined && childTree !== undefined) pending.push({ folder: child, tree: childTree });
+      }
+    }
+    const sources = [...records.values()].flatMap((record) => record.notePath === null
+      ? []
+      : [{ nodeId: record.path, notePath: record.notePath }]);
     const notePathToNodeId = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
     const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, notePathToNodeId);
-    return { tree, records, model: buildNodeGraphModel(tree, links) };
+    const model = buildNodeGraphModel(tree, links);
+    return {
+      tree,
+      records,
+      model,
+      layout: layoutNodeGraph(tree),
+      points3D: layoutNodeGraph3D(model),
+    };
   }
 
   private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
-    const layout = layoutNodeGraph(data.tree);
+    const layout = data.layout;
     const stage = surface.createDiv({ cls: "folder-nodes-node-graph-stage" });
     stage.style.width = `${layout.width}px`;
     stage.style.height = `${layout.height}px`;
@@ -237,7 +309,7 @@ export class FolderNodeGraphView extends ItemView {
     const height = Math.max(1, surface.clientHeight || this.contentEl.clientHeight - 44 || 600);
     this.threeDViewport = { width, height };
     this.threeDSurface = surface;
-    this.threeDPoints = layoutNodeGraph3D(data.model);
+    this.threeDPoints = data.points3D;
     const canvas = surface.createDiv({ cls: "folder-nodes-node-graph-canvas folder-nodes-node-graph-canvas-3d" });
     this.threeDCanvas = canvas;
     canvas.style.width = `${width}px`;
@@ -269,6 +341,32 @@ export class FolderNodeGraphView extends ItemView {
       );
       this.update3DProjection();
     });
+  }
+
+  private renderCanvas(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+    this.contentEl.addClass("is-canvas-graph");
+    this.canvasRenderer = new NodeGraphCanvasRenderer(
+      surface,
+      {
+        layout: data.layout,
+        model: data.model,
+        points3D: data.points3D,
+        records: data.records,
+      },
+      this.dimension,
+      this.relationMode,
+      this.focusPath,
+      {
+        label: (key) => label(key),
+        onOpen: (path, newLeaf) => void this.service.openFolderNode(path, newLeaf),
+        onSelect: (path) => {
+          this.focusPath = path;
+          this.onNodeSelected(path);
+        },
+        relationSummary,
+      },
+    );
+    fit?.addEventListener("click", () => this.canvasRenderer?.fit());
   }
 
   private edgeLayer(canvas: HTMLElement, width: number, height: number): SVGSVGElement {
@@ -323,7 +421,7 @@ export class FolderNodeGraphView extends ItemView {
       cls: "folder-nodes-node-graph-node",
       attr: { "data-node-path": record.path, title: record.path === "" ? this.app.vault.getName() : record.path },
     });
-    const visual = this.visuals.resolve(record.folder);
+    const visual = record.visual;
     if (visual.kind !== "fallback") {
       const icon = node.createSpan({ cls: "folder-nodes-node-graph-icon" });
       renderVisual(icon, visual, record.label);
@@ -332,6 +430,7 @@ export class FolderNodeGraphView extends ItemView {
     node.addEventListener("click", () => {
       this.focusPath = record.path;
       this.applyFocus(false);
+      this.onNodeSelected(record.path);
     });
     node.addEventListener("dblclick", (event) => {
       void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
@@ -523,9 +622,16 @@ function relationLabel(mode: NodeGraphRelationMode): string {
   return zh ? "混合" : "Hybrid";
 }
 
-function label(key: "dimension" | "fitGraph" | "nodeGraph" | "relationship"): string {
+function relationSummary(structure: number, links: number): string {
+  return resolvedLanguage() === "zh-CN"
+    ? `结构 ${structure} · 链接 ${links}`
+    : `Structure ${structure} · Links ${links}`;
+}
+
+function label(key: "dimension" | "fitGraph" | "largeGraph" | "nodeGraph" | "relationship"): string {
   const zh = resolvedLanguage() === "zh-CN";
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
+  if (key === "largeGraph") return zh ? "大型节点图谱；拖动平移或旋转，滚轮缩放，回车打开所选节点" : "Large Node Graph; drag to pan or rotate, wheel to zoom, Enter to open the selected node";
   if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";
   if (key === "relationship") return zh ? "关系模式" : "Relationship mode";
   return zh ? "维度" : "Dimension";

@@ -5,7 +5,6 @@ import { resolvedLanguage } from "./i18n";
 import { FolderNodeGraphView } from "./node-graph-view";
 
 export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
-  private observer: MutationObserver | null = null;
   private selectedPath: string | null = null;
   private searchQuery = "";
   private decorating = false;
@@ -24,16 +23,20 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
     await super.onOpen();
     this.contentEl.addClass("is-polished");
     this.contentEl.addEventListener("click", this.handleGraphClick);
-    this.observer = new MutationObserver(() => this.decorate());
-    this.observer.observe(this.contentEl, { childList: true, subtree: true });
-    this.decorate();
   }
 
   public override async onClose(): Promise<void> {
-    this.observer?.disconnect();
-    this.observer = null;
     this.contentEl.removeEventListener("click", this.handleGraphClick);
     await super.onClose();
+  }
+
+  protected override didRender(): void {
+    this.decorate();
+  }
+
+  protected override onNodeSelected(path: string): void {
+    this.selectedPath = normalizeVaultPath(path);
+    this.applyNeighborhood();
   }
 
   public override setFocus(path: string | null): void {
@@ -55,6 +58,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
       this.ensure3DHint();
       this.highlightSearch(this.searchQuery);
       this.applyNeighborhood();
+      this.onResize();
     } finally {
       this.decorating = false;
     }
@@ -63,9 +67,8 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   private decorateToolbar(toolbar: HTMLElement): void {
     if (toolbar.dataset.nodeGraphPolished === "true") return;
     const title = toolbar.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-title");
-    const switches = [...toolbar.querySelectorAll<HTMLElement>(":scope > .folder-nodes-node-graph-switch")];
-    const relation = switches[0] ?? null;
-    const dimension = switches[1] ?? null;
+    const relation = toolbar.querySelector<HTMLElement>(":scope > [data-node-graph-switch='relation']");
+    const dimension = toolbar.querySelector<HTMLElement>(":scope > [data-node-graph-switch='dimension']");
     const fit = toolbar.querySelector<HTMLElement>(":scope > [data-node-graph-action='fit']");
     if (title === null || relation === null || dimension === null || fit === null) return;
 
@@ -113,6 +116,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private decorateNodes(): void {
+    if (this.isCanvasGraph()) return;
     const lines = [...this.contentEl.querySelectorAll<SVGLineElement>(".folder-nodes-node-graph-edges line")];
     const relationCounts = new Map<string, { links: number; structure: number }>();
     for (const line of lines) {
@@ -137,8 +141,10 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensureLegend(): void {
-    const hasStructure = this.contentEl.querySelector("line.is-structure") !== null;
-    const hasLinks = this.contentEl.querySelector("line.is-link") !== null;
+    const edges = this.currentGraphModel()?.edges ?? [];
+    const mode = this.currentRelationMode();
+    const hasStructure = mode !== "links" && edges.some((edge) => edge.structure);
+    const hasLinks = mode !== "structure" && edges.some((edge) => edge.link);
     const state = `${hasStructure ? "s" : ""}${hasLinks ? "l" : ""}`;
     const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-legend");
     if (state === "") {
@@ -160,8 +166,8 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensureEmptyState(): void {
-    const active = this.activeRelationMode();
-    const shouldShow = active === "links" && this.contentEl.querySelector("line.is-link") === null;
+    const shouldShow = this.currentRelationMode() === "links"
+      && !(this.currentGraphModel()?.edges.some((edge) => edge.link) ?? false);
     const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-empty");
     if (!shouldShow) {
       existing?.remove();
@@ -174,7 +180,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensure3DHint(): void {
-    const shouldShow = this.contentEl.classList.contains("is-3d");
+    const shouldShow = this.currentDimension() === "3d";
     const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-3d-hint");
     if (!shouldShow) {
       existing?.remove();
@@ -185,6 +191,10 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private applyNeighborhood(): void {
+    if (this.isCanvasGraph()) {
+      super.setFocus(this.selectedPath);
+      return;
+    }
     const selected = this.selectedPath;
     const lines = [...this.contentEl.querySelectorAll<SVGLineElement>(".folder-nodes-node-graph-edges line")];
     const neighbors = new Set<string>();
@@ -210,6 +220,10 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private highlightSearch(rawQuery: string): void {
+    if (this.isCanvasGraph()) {
+      this.setCanvasSearchQuery(rawQuery);
+      return;
+    }
     const query = rawQuery.trim().toLocaleLowerCase();
     for (const node of this.graphNodeElements()) {
       const path = node.dataset.nodePath ?? "";
@@ -222,6 +236,17 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   private firstSearchMatch(rawQuery: string): string | null {
     const query = rawQuery.trim().toLocaleLowerCase();
     if (query === "") return null;
+    if (this.isCanvasGraph()) {
+      const candidates = this.graphSearchRecords().flatMap(({ label, path }) => {
+        const normalizedLabel = label.toLocaleLowerCase();
+        const normalizedPath = path.toLocaleLowerCase();
+        if (!normalizedLabel.includes(query) && !normalizedPath.includes(query)) return [];
+        const rank = normalizedLabel === query ? 0 : normalizedLabel.startsWith(query) ? 1 : normalizedPath.startsWith(query) ? 2 : 3;
+        return [{ path, rank, label: normalizedLabel }];
+      });
+      candidates.sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label, "en"));
+      return candidates[0]?.path ?? null;
+    }
     const candidates = this.graphNodeElements().flatMap((node) => {
       const path = node.dataset.nodePath;
       if (path === undefined) return [];
@@ -234,16 +259,6 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
     });
     candidates.sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label, "en"));
     return candidates[0]?.path ?? null;
-  }
-
-  private activeRelationMode(): "hybrid" | "links" | "structure" | null {
-    const secondary = this.contentEl.querySelector(".folder-nodes-node-graph-toolbar-secondary");
-    const active = secondary?.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-switch-button.is-active");
-    const value = active?.textContent?.trim().toLocaleLowerCase() ?? "";
-    if (value === "links" || value === "链接") return "links";
-    if (value === "hybrid" || value === "混合") return "hybrid";
-    if (value === "structure" || value === "结构") return "structure";
-    return null;
   }
 
   private graphNodeElements(): HTMLElement[] {
