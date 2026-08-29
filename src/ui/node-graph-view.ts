@@ -1,4 +1,4 @@
-import { ItemView, setIcon, TFolder, WorkspaceLeaf } from "obsidian";
+import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
 import { layoutNodeGraph, type NodeGraphTree } from "../core/node-graph-layout";
 import type { NodeVisual } from "../core/types";
@@ -8,7 +8,7 @@ import { resolvedLanguage } from "./i18n";
 
 interface NodeGraphService {
   getFolder(path: string): TFolder | null;
-  getCanonicalFile(folderPath: string): unknown | null;
+  getCanonicalFile(folderPath: string): TFile | null;
   children(path: string): readonly { readonly childPath: string }[];
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
 }
@@ -181,7 +181,7 @@ function applyViewStyles(container: HTMLElement): void {
   const style = doc.createElement("style");
   style.setAttribute("data-folder-nodes-node-graph", "true");
   style.textContent = `
-.folder-nodes-node-graph-view{padding:0!important;overflow:hidden}.folder-nodes-node-graph-toolbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--background-modifier-border)}.folder-nodes-node-graph-title{font-weight:600;flex:1}.folder-nodes-node-graph-scroll{position:absolute;inset:44px 0 0;overflow:auto;background:var(--background-primary)}.folder-nodes-node-graph-canvas{position:relative;min-width:100%;min-height:100%}.folder-nodes-node-graph-edges{position:absolute;inset:0;overflow:visible;pointer-events:none}.folder-nodes-node-graph-edges line{stroke:var(--background-modifier-border-hover);stroke-width:1.5}.folder-nodes-node-graph-node{position:absolute;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border:1px solid var(--background-modifier-border);border-radius:10px;background:var(--background-secondary);color:var(--text-normal);box-shadow:var(--shadow-s);overflow:hidden}.folder-nodes-node-graph-node:hover{background:var(--background-modifier-hover)}.folder-nodes-node-graph-node.is-focused{border-color:var(--interactive-accent);box-shadow:0 0 0 2px var(--background-modifier-border-focus)}.folder-nodes-node-graph-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.folder-nodes-node-graph-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:20px;height:20px}
+.folder-nodes-node-graph-view{position:relative;padding:0!important;overflow:hidden}.folder-nodes-node-graph-toolbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--background-modifier-border)}.folder-nodes-node-graph-title{font-weight:600;flex:1}.folder-nodes-node-graph-scroll{position:absolute;inset:44px 0 0;overflow:auto;background:var(--background-primary)}.folder-nodes-node-graph-canvas{position:relative;min-width:100%;min-height:100%}.folder-nodes-node-graph-edges{position:absolute;inset:0;overflow:visible;pointer-events:none}.folder-nodes-node-graph-edges line{stroke:var(--background-modifier-border-hover);stroke-width:1.5}.folder-nodes-node-graph-node{position:absolute;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border:1px solid var(--background-modifier-border);border-radius:10px;background:var(--background-secondary);color:var(--text-normal);box-shadow:var(--shadow-s);overflow:hidden}.folder-nodes-node-graph-node:hover{background:var(--background-modifier-hover)}.folder-nodes-node-graph-node.is-focused{border-color:var(--interactive-accent);box-shadow:0 0 0 2px var(--background-modifier-border-focus)}.folder-nodes-node-graph-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.folder-nodes-node-graph-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:20px;height:20px}
 `;
   doc.head.append(style);
 }
