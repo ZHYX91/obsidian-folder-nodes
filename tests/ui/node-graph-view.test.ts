@@ -182,4 +182,64 @@ describe("Node Graph view interactions", () => {
     expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
     getContext.mockRestore();
   });
+
+  it("uses Canvas for a link-dense graph below the node threshold", async () => {
+    const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
+    const folders = new Map<string, TFolder>();
+    const notes = new Map<string, TFile>();
+    for (let index = 0; index < 40; index += 1) {
+      const path = `D${String(index).padStart(2, "0")}`;
+      const folder = Object.assign(new TFolder(), {
+        children: [] as Array<TFile | TFolder>,
+        name: path,
+        parent: root,
+        path,
+      });
+      const note = Object.assign(new TFile(), {
+        basename: path,
+        extension: "md",
+        name: `${path}.md`,
+        parent: folder,
+        path: `${path}/${path}.md`,
+      });
+      folder.children = [note];
+      folders.set(path, folder);
+      notes.set(path, note);
+    }
+    const resolvedLinks = Object.fromEntries([...notes.values()].map((source) => [
+      source.path,
+      Object.fromEntries([...notes.values()]
+        .filter((target) => target.path !== source.path)
+        .map((target) => [target.path, 1])),
+    ]));
+    const app = {
+      vault: { getName: () => "Dense Vault", getRoot: () => root },
+      metadataCache: { resolvedLinks },
+    };
+    const service = {
+      children: (path: string) => path === "" ? [...folders.keys()].map((childPath) => ({ childPath })) : [],
+      getCanonicalFile: (path: string) => notes.get(path) ?? null,
+      getFolder: (path: string) => folders.get(path) ?? null,
+      openFolderNode: vi.fn(async () => undefined),
+    };
+    const visuals = {
+      resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const,
+    };
+    const context = {
+      arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
+      lineTo: vi.fn(), moveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
+      stroke: vi.fn(), strokeRect: vi.fn(),
+    };
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const view = new FolderNodeGraphView({ app } as never, service, visuals);
+    await view.onOpen();
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges line")).toHaveLength(0);
+
+    await view.onClose();
+    getContext.mockRestore();
+  });
 });

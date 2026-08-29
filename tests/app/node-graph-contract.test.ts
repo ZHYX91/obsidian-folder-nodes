@@ -45,7 +45,7 @@ describe("Node Graph integration contract", () => {
   });
 
   it("switches large graphs to constant-DOM Canvas rendering with explicit teardown", () => {
-    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length)");
+    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length, data.model.edges.length)");
     expect(graphView).toContain("new NodeGraphCanvasRenderer");
     expect(canvasRenderer).toContain('surface.createEl("canvas"');
     expect(canvasRenderer).toContain("this.cancelFrame()");

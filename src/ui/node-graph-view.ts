@@ -162,7 +162,7 @@ export class FolderNodeGraphView extends ItemView {
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
-    if (shouldUseNodeGraphCanvas(data.model.nodes.length)) this.renderCanvas(surface, data, fit);
+    if (shouldUseNodeGraphCanvas(data.model.nodes.length, data.model.edges.length)) this.renderCanvas(surface, data, fit);
     else if (this.dimension === "2d") this.render2D(surface, data, fit);
     else this.render3D(surface, data, fit);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
@@ -176,6 +176,7 @@ export class FolderNodeGraphView extends ItemView {
   protected currentDimension(): NodeGraphDimension { return this.dimension; }
   protected isCanvasGraph(): boolean { return this.canvasRenderer !== null; }
   protected setCanvasSearchQuery(query: string): void { this.canvasRenderer?.setSearchQuery(query); }
+  protected setCanvasSelectionFocus(path: string | null): void { this.canvasRenderer?.setFocus(path, false); }
   protected graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
     return this.graphData === null ? [] : [...this.graphData.records.values()];
   }

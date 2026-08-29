@@ -192,7 +192,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
   private applyNeighborhood(): void {
     if (this.isCanvasGraph()) {
-      super.setFocus(this.selectedPath);
+      this.setCanvasSelectionFocus(this.selectedPath);
       return;
     }
     const selected = this.selectedPath;

@@ -60,4 +60,45 @@ describe("large Node Graph canvas renderer", () => {
     surface.remove();
     getContext.mockRestore();
   });
+
+  it("can update selection focus without recentering the 3D camera", async () => {
+    const tree: NodeGraphTree = {
+      id: "",
+      children: [{ id: "A", children: [] }, { id: "B", children: [] }],
+    };
+    const model = buildNodeGraphModel(tree);
+    const layout = layoutNodeGraph(tree);
+    const records = new Map(model.nodes.map(({ id }) => [id, {
+      label: id === "" ? "Vault" : id,
+      path: id,
+      visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
+    }]));
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(fakeContext() as never);
+    const surface = document.body.createDiv();
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 600 },
+      clientWidth: { configurable: true, value: 1_000 },
+    });
+    const renderer = new NodeGraphCanvasRenderer(
+      surface,
+      { layout, model, points3D: layoutNodeGraph3D(model), records },
+      "3d",
+      "structure",
+      null,
+      {
+        label: () => "Large Node Graph",
+        onOpen: vi.fn(),
+        onSelect: vi.fn(),
+        relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
+      },
+    );
+    renderer.setFocus("A", true);
+    const cameraBeforeSelection = { ...(renderer as unknown as { camera3D: Record<string, number> }).camera3D };
+    renderer.setFocus("B", false);
+    expect((renderer as unknown as { camera3D: Record<string, number> }).camera3D).toEqual(cameraBeforeSelection);
+
+    renderer.destroy();
+    surface.remove();
+    getContext.mockRestore();
+  });
 });

@@ -18,8 +18,13 @@ export interface NodeGraphCanvasSize {
 
 export const LARGE_NODE_GRAPH_THRESHOLD = 500;
 
-export function shouldUseNodeGraphCanvas(nodeCount: number, threshold = LARGE_NODE_GRAPH_THRESHOLD): boolean {
-  return Math.max(0, nodeCount) > Math.max(0, threshold);
+export function shouldUseNodeGraphCanvas(
+  nodeCount: number,
+  edgeCount = 0,
+  threshold = LARGE_NODE_GRAPH_THRESHOLD,
+): boolean {
+  const limit = Math.max(0, threshold);
+  return Math.max(0, nodeCount) > limit || Math.max(0, edgeCount) > limit;
 }
 
 export function fitNodeGraphCanvasCamera(
@@ -90,19 +95,17 @@ export function hitTestNodeGraphCanvas(
   halfWidth: number,
   halfHeight: number,
 ): string | null {
-  let best: { readonly distance: number; readonly id: string } | null = null;
-  for (const point of points) {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const point = points[index];
+    if (point === undefined) continue;
     const width = Math.max(4, halfWidth * point.scale);
     const height = Math.max(4, halfHeight * point.scale);
     const dx = Math.abs(x - point.x);
     const dy = Math.abs(y - point.y);
     if (dx > width || dy > height) continue;
-    const distance = dx * dx + dy * dy;
-    if (best === null || distance < best.distance || (distance === best.distance && point.id.localeCompare(best.id, "en") < 0)) {
-      best = { distance, id: point.id };
-    }
+    return point.id;
   }
-  return best?.id ?? null;
+  return null;
 }
 
 function positive(value: number, fallback: number): number {

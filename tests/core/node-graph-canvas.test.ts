@@ -13,7 +13,9 @@ describe("Node Graph canvas math", () => {
   it("uses a stable adaptive boundary", () => {
     expect(shouldUseNodeGraphCanvas(500)).toBe(false);
     expect(shouldUseNodeGraphCanvas(501)).toBe(true);
-    expect(shouldUseNodeGraphCanvas(11, 10)).toBe(true);
+    expect(shouldUseNodeGraphCanvas(400, 500)).toBe(false);
+    expect(shouldUseNodeGraphCanvas(400, 501)).toBe(true);
+    expect(shouldUseNodeGraphCanvas(11, 0, 10)).toBe(true);
   });
 
   it("fits, pans, and zooms around the pointer without losing the anchored world point", () => {
@@ -42,5 +44,11 @@ describe("Node Graph canvas math", () => {
     expect(pointIsVisible(points[1]!, { width: 100, height: 100 }, 20, 10)).toBe(false);
     expect(hitTestNodeGraphCanvas(points, 52, 48, 20, 10)).toBe("A");
     expect(hitTestNodeGraphCanvas(points, 200, 200, 20, 10)).toBeNull();
+  });
+
+  it("hit-tests the topmost drawn node when projections overlap", () => {
+    const back = { id: "back", x: 100, y: 100, scale: 0.65 };
+    const front = { id: "front", x: 101, y: 101, scale: 1.2 };
+    expect(hitTestNodeGraphCanvas([back, front], 100, 100, 20, 10)).toBe("front");
   });
 });

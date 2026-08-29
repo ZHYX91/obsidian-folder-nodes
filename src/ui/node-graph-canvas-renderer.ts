@@ -87,6 +87,7 @@ export class NodeGraphCanvasRenderer {
   private readonly tooltip: HTMLElement;
   private readonly layoutPositions: ReadonlyMap<string, { readonly x: number; readonly y: number }>;
   private readonly pointers = new Map<number, CanvasPointer>();
+  private readonly projectedById = new Map<string, NodeGraphCanvasPoint>();
   private camera2D: NodeGraphCanvasCamera = { panX: 0, panY: 0, zoom: 1 };
   private camera3D: NodeGraphCamera = defaultNodeGraphCamera();
   private destroyed = false;
@@ -145,6 +146,7 @@ export class NodeGraphCanvasRenderer {
     this.pointers.clear();
     this.drag = null;
     this.visiblePoints = [];
+    this.projectedById.clear();
     this.searchMatches.clear();
     this.neighbors.clear();
     this.relationCounts.clear();
@@ -377,13 +379,14 @@ export class NodeGraphCanvasRenderer {
     this.context.fillStyle = this.palette.background;
     this.context.fillRect(0, 0, this.width, this.height);
     const projected = this.dimension === "2d" ? this.project2D() : projectNodeGraph3D(this.data.points3D, this.camera3D, this.width, this.height);
-    const projectedById = new Map(projected.map((point) => [point.id, point]));
-    this.drawEdges(projectedById);
+    this.projectedById.clear();
+    for (const point of projected) this.projectedById.set(point.id, point);
+    this.drawEdges(this.projectedById);
     this.visiblePoints = projected
       .filter((point) => pointIsVisible(point, { width: this.width, height: this.height }, NODE_HALF_WIDTH, NODE_HALF_HEIGHT))
       .sort((left, right) => left.scale - right.scale || left.id.localeCompare(right.id, "en"));
     for (const point of this.visiblePoints) this.drawNode(point);
-    this.updateFocusOverlay(projectedById);
+    this.updateFocusOverlay(this.projectedById);
   }
 
   private project2D(): readonly NodeGraphCanvasPoint[] {
