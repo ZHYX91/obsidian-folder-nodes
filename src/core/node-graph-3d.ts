@@ -1,0 +1,125 @@
+import type { NodeGraphModel } from "./node-graph-model";
+
+export interface NodeGraphPoint3D {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly depth: number;
+}
+
+export interface NodeGraphCamera {
+  readonly yaw: number;
+  readonly pitch: number;
+  readonly zoom: number;
+  readonly panX: number;
+  readonly panY: number;
+}
+
+export interface NodeGraphProjectedPoint {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly scale: number;
+  readonly depth: number;
+}
+
+export interface NodeGraph3DOptions {
+  readonly spacingX?: number;
+  readonly spacingY?: number;
+  readonly spacingZ?: number;
+}
+
+const DEFAULT_SPACING_X = 220;
+const DEFAULT_SPACING_Y = 140;
+const DEFAULT_SPACING_Z = 260;
+
+export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOptions = {}): readonly NodeGraphPoint3D[] {
+  const spacingX = positive(options.spacingX, DEFAULT_SPACING_X);
+  const spacingY = positive(options.spacingY, DEFAULT_SPACING_Y);
+  const spacingZ = positive(options.spacingZ, DEFAULT_SPACING_Z);
+  const byDepth = new Map<number, string[]>();
+  for (const node of model.nodes) {
+    const level = byDepth.get(node.depth) ?? [];
+    level.push(node.id);
+    byDepth.set(node.depth, level);
+  }
+  const points: NodeGraphPoint3D[] = [];
+  for (const [depth, ids] of [...byDepth.entries()].sort(([a], [b]) => a - b)) {
+    ids.sort((a, b) => a.localeCompare(b, "en"));
+    const columns = Math.max(1, Math.ceil(Math.sqrt(ids.length)));
+    const rows = Math.max(1, Math.ceil(ids.length / columns));
+    for (const [index, id] of ids.entries()) {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      points.push({
+        id,
+        x: (column - (columns - 1) / 2) * spacingX,
+        y: (row - (rows - 1) / 2) * spacingY,
+        z: depth * spacingZ,
+        depth,
+      });
+    }
+  }
+  return points;
+}
+
+export function projectNodeGraph3D(
+  points: readonly NodeGraphPoint3D[],
+  camera: NodeGraphCamera,
+  viewportWidth: number,
+  viewportHeight: number,
+): readonly NodeGraphProjectedPoint[] {
+  const width = Math.max(1, viewportWidth);
+  const height = Math.max(1, viewportHeight);
+  const cy = Math.cos(camera.yaw);
+  const sy = Math.sin(camera.yaw);
+  const cp = Math.cos(camera.pitch);
+  const sp = Math.sin(camera.pitch);
+  const zoom = clamp(camera.zoom, 0.2, 4);
+  const focal = Math.max(width, height) * 1.4;
+  return points.map((point) => {
+    const yawX = point.x * cy - point.z * sy;
+    const yawZ = point.x * sy + point.z * cy;
+    const pitchY = point.y * cp - yawZ * sp;
+    const pitchZ = point.y * sp + yawZ * cp;
+    const perspective = focal / Math.max(focal * 0.35, focal + pitchZ);
+    const scale = perspective * zoom;
+    return {
+      id: point.id,
+      x: width / 2 + camera.panX + yawX * scale,
+      y: height / 2 + camera.panY + pitchY * scale,
+      scale,
+      depth: point.depth,
+    };
+  });
+}
+
+export function defaultNodeGraphCamera(): NodeGraphCamera {
+  return { yaw: -0.55, pitch: 0.38, zoom: 0.9, panX: 0, panY: 0 };
+}
+
+export function rotateNodeGraphCamera(camera: NodeGraphCamera, deltaX: number, deltaY: number): NodeGraphCamera {
+  return {
+    ...camera,
+    yaw: camera.yaw + deltaX * 0.006,
+    pitch: clamp(camera.pitch + deltaY * 0.006, -1.2, 1.2),
+  };
+}
+
+export function panNodeGraphCamera(camera: NodeGraphCamera, deltaX: number, deltaY: number): NodeGraphCamera {
+  return { ...camera, panX: camera.panX + deltaX, panY: camera.panY + deltaY };
+}
+
+export function zoomNodeGraphCamera(camera: NodeGraphCamera, deltaY: number): NodeGraphCamera {
+  const factor = Math.exp(-deltaY * 0.0015);
+  return { ...camera, zoom: clamp(camera.zoom * factor, 0.2, 4) };
+}
+
+function positive(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
