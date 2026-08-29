@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   defaultNodeGraphCamera,
+  fitNodeGraphCamera,
   layoutNodeGraph3D,
   panNodeGraphCamera,
   projectNodeGraph3D,
@@ -31,7 +32,7 @@ describe("Node Graph 3D layout", () => {
     expect(points.get("A")?.x).not.toBe(points.get("B")?.x);
   });
 
-  it("projects stably and supports bounded rotate, pan, and zoom camera changes", () => {
+  it("projects stably and supports bounded rotate, pan, zoom, and fit camera changes", () => {
     const points = layoutNodeGraph3D(model);
     const camera = defaultNodeGraphCamera();
     expect(projectNodeGraph3D(points, camera, 800, 600)).toEqual(projectNodeGraph3D(points, camera, 800, 600));
@@ -41,5 +42,13 @@ describe("Node Graph 3D layout", () => {
     expect(panNodeGraphCamera(camera, 12, -8)).toMatchObject({ panX: 12, panY: -8 });
     expect(zoomNodeGraphCamera(camera, -500).zoom).toBeGreaterThan(camera.zoom);
     expect(zoomNodeGraphCamera(camera, 100000).zoom).toBe(0.2);
+    const fitted = fitNodeGraphCamera(points, { ...camera, zoom: 4, panX: 100, panY: -80 }, 800, 600, 48);
+    expect(fitted.zoom).toBeGreaterThanOrEqual(0.2);
+    expect(fitted.zoom).toBeLessThanOrEqual(4);
+    const projection = projectNodeGraph3D(points, fitted, 800, 600);
+    expect(Math.min(...projection.map(({ x }) => x))).toBeGreaterThan(0);
+    expect(Math.max(...projection.map(({ x }) => x))).toBeLessThan(800);
+    expect(Math.min(...projection.map(({ y }) => y))).toBeGreaterThan(0);
+    expect(Math.max(...projection.map(({ y }) => y))).toBeLessThan(600);
   });
 });
