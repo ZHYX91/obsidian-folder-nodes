@@ -197,8 +197,8 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
     }
     for (const line of lines) {
       const connected = selected !== null && touches(line, selected);
-      line.toggleClass("is-connected", connected);
-      line.toggleClass("is-muted", selected !== null && !connected);
+      line.classList.toggle("is-connected", connected);
+      line.classList.toggle("is-muted", selected !== null && !connected);
     }
   }
 
