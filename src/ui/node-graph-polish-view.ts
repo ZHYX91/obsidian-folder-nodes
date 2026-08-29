@@ -114,7 +114,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
   private decorateNodes(): void {
     const lines = [...this.contentEl.querySelectorAll<SVGLineElement>(".folder-nodes-node-graph-edges line")];
-    for (const node of this.nodeElements()) {
+    for (const node of this.graphNodeElements()) {
       const path = node.dataset.nodePath;
       if (path === undefined) continue;
       const baseTitle = node.dataset.nodeGraphBaseTitle ?? node.getAttribute("title") ?? path;
@@ -172,7 +172,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
         else if (target === selected && source !== undefined) neighbors.add(source);
       }
     }
-    for (const node of this.nodeElements()) {
+    for (const node of this.graphNodeElements()) {
       const path = node.dataset.nodePath;
       const neighbor = path !== undefined && neighbors.has(path);
       node.toggleClass("is-neighbor", neighbor);
@@ -187,7 +187,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
   private highlightSearch(rawQuery: string): void {
     const query = rawQuery.trim().toLocaleLowerCase();
-    for (const node of this.nodeElements()) {
+    for (const node of this.graphNodeElements()) {
       const path = node.dataset.nodePath ?? "";
       const label = node.querySelector(".folder-nodes-node-graph-label")?.textContent ?? "";
       const match = query !== "" && `${label}\n${path}`.toLocaleLowerCase().includes(query);
@@ -198,7 +198,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   private firstSearchMatch(rawQuery: string): string | null {
     const query = rawQuery.trim().toLocaleLowerCase();
     if (query === "") return null;
-    const candidates = this.nodeElements().flatMap((node) => {
+    const candidates = this.graphNodeElements().flatMap((node) => {
       const path = node.dataset.nodePath;
       if (path === undefined) return [];
       const label = node.querySelector(".folder-nodes-node-graph-label")?.textContent ?? "";
@@ -222,7 +222,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
     return null;
   }
 
-  private nodeElements(): HTMLElement[] {
+  private graphNodeElements(): HTMLElement[] {
     return [...this.contentEl.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-node")];
   }
 }
