@@ -25,10 +25,16 @@
   background: var(--background-primary);
 }
 
-.folder-nodes-node-graph-canvas {
+.folder-nodes-node-graph-stage {
   position: relative;
   min-width: 100%;
   min-height: 100%;
+}
+
+.folder-nodes-node-graph-canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform-origin: top left;
 }
 
 .folder-nodes-node-graph-edges {

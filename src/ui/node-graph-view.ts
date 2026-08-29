@@ -1,6 +1,6 @@
 import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
-import { layoutNodeGraph, type NodeGraphTree } from "../core/node-graph-layout";
+import { fitNodeGraphViewport, layoutNodeGraph, type NodeGraphTree } from "../core/node-graph-layout";
 import type { NodeVisual } from "../core/types";
 import { normalizeVaultPath } from "../core/paths";
 import { renderVisual } from "../presentation/render-visual";
@@ -65,7 +65,10 @@ export class FolderNodeGraphView extends ItemView {
     const root = this.app.vault.getRoot();
     const graph = this.buildTree(root);
     const layout = layoutNodeGraph(graph);
-    const canvas = scroll.createDiv({ cls: "folder-nodes-node-graph-canvas" });
+    const stage = scroll.createDiv({ cls: "folder-nodes-node-graph-stage" });
+    stage.style.width = `${layout.width}px`;
+    stage.style.height = `${layout.height}px`;
+    const canvas = stage.createDiv({ cls: "folder-nodes-node-graph-canvas" });
     canvas.style.width = `${layout.width}px`;
     canvas.style.height = `${layout.height}px`;
 
@@ -118,10 +121,16 @@ export class FolderNodeGraphView extends ItemView {
       node.addEventListener("dblclick", (event) => {
         void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
       });
+      node.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        if (event.repeat) return;
+        void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
+      });
       this.nodeElements.set(record.path, node);
     }
 
-    fit.addEventListener("click", () => this.fit(scroll, layout.width, layout.height));
+    fit.addEventListener("click", () => this.fit(scroll, stage, canvas, layout.width, layout.height));
     this.applyFocus(true);
   }
 
@@ -160,10 +169,14 @@ export class FolderNodeGraphView extends ItemView {
     this.nodeElements.get(this.focusPath)?.scrollIntoView({ block: "center", inline: "center" });
   }
 
-  private fit(scroll: HTMLElement, width: number, height: number): void {
-    const left = Math.max(0, (width - scroll.clientWidth) / 2);
-    const top = Math.max(0, (height - scroll.clientHeight) / 2);
-    scroll.scrollTo({ left, top, behavior: "smooth" });
+  private fit(scroll: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
+    const fit = fitNodeGraphViewport(width, height, scroll.clientWidth, scroll.clientHeight);
+    stage.style.width = `${fit.stageWidth}px`;
+    stage.style.height = `${fit.stageHeight}px`;
+    canvas.style.left = `${fit.offsetX}px`;
+    canvas.style.top = `${fit.offsetY}px`;
+    canvas.style.transform = `scale(${fit.scale})`;
+    scroll.scrollTo({ left: 0, top: 0, behavior: "smooth" });
   }
 }
 

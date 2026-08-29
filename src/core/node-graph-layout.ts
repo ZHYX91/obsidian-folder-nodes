@@ -32,6 +32,14 @@ export interface NodeGraphLayout {
   readonly nodeHeight: number;
 }
 
+export interface NodeGraphViewportFit {
+  readonly scale: number;
+  readonly stageWidth: number;
+  readonly stageHeight: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+}
+
 const DEFAULT_NODE_WIDTH = 180;
 const DEFAULT_NODE_HEIGHT = 46;
 const DEFAULT_HORIZONTAL_GAP = 36;
@@ -86,6 +94,35 @@ export function layoutNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOpt
     height: padding * 2 + (maxDepth + 1) * nodeHeight + maxDepth * verticalGap,
     nodeWidth,
     nodeHeight,
+  };
+}
+
+export function fitNodeGraphViewport(
+  contentWidth: number,
+  contentHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  padding = 24,
+): NodeGraphViewportFit {
+  const width = positive(contentWidth, 1);
+  const height = positive(contentHeight, 1);
+  const availableWidth = nonNegative(viewportWidth, 0);
+  const availableHeight = nonNegative(viewportHeight, 0);
+  const inset = nonNegative(padding, 24);
+  if (availableWidth === 0 || availableHeight === 0) {
+    return { scale: 1, stageWidth: width, stageHeight: height, offsetX: 0, offsetY: 0 };
+  }
+  const scale = Math.min(
+    1,
+    Math.max(1, availableWidth - inset * 2) / width,
+    Math.max(1, availableHeight - inset * 2) / height,
+  );
+  return {
+    scale,
+    stageWidth: availableWidth,
+    stageHeight: availableHeight,
+    offsetX: (availableWidth - width * scale) / 2,
+    offsetY: (availableHeight - height * scale) / 2,
   };
 }
 

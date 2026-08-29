@@ -7,6 +7,7 @@ import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view
 import { normalizeVaultPath } from "../core/paths";
 import { resolvedLanguage } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
+import type { RefreshBatch } from "./refresh-scheduler";
 
 export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   private readonly nodeGraphStyles = new RuntimeStyles(NODE_GRAPH_STYLES);
@@ -37,11 +38,15 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     super.onunload();
   }
 
-  public override refreshVisuals(path?: string): void {
-    super.refreshVisuals(path);
+  protected override refreshExtensionViews(batch: RefreshBatch): void {
+    void batch;
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeGraphView) leaf.view.refresh();
     }
+  }
+
+  protected override addOwnedNodeMenuItems(menu: Menu, folder: TFolder): void {
+    this.addNodeGraphItem(menu, folder);
   }
 
   private async openNodeGraph(path: string | null = null): Promise<void> {
@@ -58,6 +63,10 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     const folder = this.graphFolder(entry);
     if (folder === null) return;
     menu.addSeparator();
+    this.addNodeGraphItem(menu, folder);
+  }
+
+  private addNodeGraphItem(menu: Menu, folder: TFolder): void {
     menu.addItem((item) => item
       .setTitle(label("openInGraph"))
       .setIcon("git-fork")
