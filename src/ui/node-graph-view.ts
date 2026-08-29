@@ -1,8 +1,20 @@
 import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
+import {
+  defaultNodeGraphCamera,
+  layoutNodeGraph3D,
+  panNodeGraphCamera,
+  projectNodeGraph3D,
+  rotateNodeGraphCamera,
+  zoomNodeGraphCamera,
+  type NodeGraphCamera,
+  type NodeGraphProjectedPoint,
+} from "../core/node-graph-3d";
+import { normalizeNodeGraphLinks } from "../core/node-graph-links";
 import { fitNodeGraphViewport, layoutNodeGraph, type NodeGraphTree } from "../core/node-graph-layout";
-import type { NodeVisual } from "../core/types";
+import { buildNodeGraphModel, edgesForMode, type NodeGraphModel, type NodeGraphModelEdge, type NodeGraphRelationMode } from "../core/node-graph-model";
 import { normalizeVaultPath } from "../core/paths";
+import type { NodeVisual } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { resolvedLanguage } from "./i18n";
 
@@ -21,13 +33,35 @@ interface GraphRecord {
   readonly path: string;
   readonly label: string;
   readonly folder: TFolder;
+  readonly note: TFile | null;
 }
+
+interface GraphData {
+  readonly tree: NodeGraphTree;
+  readonly records: ReadonlyMap<string, GraphRecord>;
+  readonly model: NodeGraphModel;
+}
+
+type NodeGraphDimension = "2d" | "3d";
+
+type GraphDrag = {
+  readonly pointerId: number;
+  readonly pan: boolean;
+  x: number;
+  y: number;
+};
 
 export const NODE_GRAPH_VIEW_TYPE = "folder-nodes-node-graph";
 
 export class FolderNodeGraphView extends ItemView {
   private focusPath: string | null = null;
+  private relationMode: NodeGraphRelationMode = "structure";
+  private dimension: NodeGraphDimension = "2d";
+  private camera: NodeGraphCamera = defaultNodeGraphCamera();
+  private drag: GraphDrag | null = null;
   private readonly nodeElements = new Map<string, HTMLElement>();
+  private projected3D = new Map<string, NodeGraphProjectedPoint>();
+  private threeDViewport: { width: number; height: number } | null = null;
 
   public constructor(
     leaf: WorkspaceLeaf,
@@ -41,126 +75,254 @@ export class FolderNodeGraphView extends ItemView {
   public override getDisplayText(): string { return label("nodeGraph"); }
   public override getIcon(): string { return "git-fork"; }
   public override async onOpen(): Promise<void> { this.render(); }
-  public override async onClose(): Promise<void> { this.nodeElements.clear(); }
+  public override async onClose(): Promise<void> {
+    this.nodeElements.clear();
+    this.projected3D.clear();
+    this.drag = null;
+  }
 
   public setFocus(path: string | null): void {
     this.focusPath = path === null ? null : normalizeVaultPath(path);
-    this.applyFocus(true);
+    if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
+    else this.applyFocus(true);
   }
 
   public refresh(): void { this.render(); }
 
   private render(): void {
     this.nodeElements.clear();
+    this.projected3D.clear();
+    this.drag = null;
     this.contentEl.empty();
     this.contentEl.addClass("folder-nodes-node-graph-view");
+    this.contentEl.toggleClass("is-3d", this.dimension === "3d");
 
-    const toolbar = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-toolbar" });
-    const title = toolbar.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
-    title.setAttr("title", label("structureOnly"));
-    const fit = toolbar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": label("fitGraph") } });
-    setIcon(fit, "maximize-2");
-
+    const data = this.buildGraphData(this.app.vault.getRoot());
+    const toolbar = this.renderToolbar();
+    const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const scroll = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
-    const root = this.app.vault.getRoot();
-    const graph = this.buildTree(root);
-    const layout = layoutNodeGraph(graph);
+    if (this.dimension === "2d") this.render2D(scroll, data, fit);
+    else this.render3D(scroll, data, fit);
+    this.applyFocus(this.dimension === "2d");
+  }
+
+  private renderToolbar(): HTMLElement {
+    const toolbar = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-toolbar" });
+    toolbar.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
+    const relation = toolbar.createDiv({ cls: "folder-nodes-node-graph-switch", attr: { "aria-label": label("relationship") } });
+    for (const mode of ["structure", "links", "hybrid"] as const) {
+      this.switchButton(relation, relationLabel(mode), this.relationMode === mode, () => {
+        if (this.relationMode === mode) return;
+        this.relationMode = mode;
+        this.render();
+      });
+    }
+    const dimension = toolbar.createDiv({ cls: "folder-nodes-node-graph-switch", attr: { "aria-label": label("dimension") } });
+    for (const mode of ["2d", "3d"] as const) {
+      this.switchButton(dimension, mode.toUpperCase(), this.dimension === mode, () => {
+        if (this.dimension === mode) return;
+        this.dimension = mode;
+        if (mode === "3d") this.camera = defaultNodeGraphCamera();
+        this.render();
+      });
+    }
+    const fit = toolbar.createEl("button", {
+      cls: "clickable-icon",
+      attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit" },
+    });
+    setIcon(fit, "maximize-2");
+    return toolbar;
+  }
+
+  private switchButton(container: HTMLElement, text: string, active: boolean, onClick: () => void): void {
+    const button = container.createEl("button", {
+      cls: `folder-nodes-node-graph-switch-button${active ? " is-active" : ""}`,
+      text,
+      attr: { "aria-pressed": String(active) },
+    });
+    button.addEventListener("click", onClick);
+  }
+
+  private buildGraphData(root: TFolder): GraphData {
+    const records = new Map<string, GraphRecord>();
+    const build = (folder: TFolder): NodeGraphTree => {
+      const path = normalizeVaultPath(folder.path);
+      records.set(path, {
+        path,
+        label: path === "" ? this.app.vault.getName() : folder.name,
+        folder,
+        note: this.service.getCanonicalFile(path),
+      });
+      return {
+        id: path,
+        children: this.service.children(path).flatMap(({ childPath }) => {
+          const child = this.service.getFolder(childPath);
+          return child === null ? [] : [build(child)];
+        }),
+      };
+    };
+    const tree = build(root);
+    const sources = [...records.values()].flatMap((record) => record.note === null ? [] : [{ nodeId: record.path, notePath: record.note.path }]);
+    const notePathToNodeId = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
+    const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, notePathToNodeId);
+    return { tree, records, model: buildNodeGraphModel(tree, links) };
+  }
+
+  private render2D(scroll: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+    const layout = layoutNodeGraph(data.tree);
     const stage = scroll.createDiv({ cls: "folder-nodes-node-graph-stage" });
     stage.style.width = `${layout.width}px`;
     stage.style.height = `${layout.height}px`;
     const canvas = stage.createDiv({ cls: "folder-nodes-node-graph-canvas" });
     canvas.style.width = `${layout.width}px`;
     canvas.style.height = `${layout.height}px`;
-
-    const svg = canvas.createSvg("svg", {
-      cls: "folder-nodes-node-graph-edges",
-      attr: {
-        width: String(layout.width),
-        height: String(layout.height),
-        viewBox: `0 0 ${layout.width} ${layout.height}`,
-        "aria-hidden": "true",
-      },
-    });
+    const svg = this.edgeLayer(canvas, layout.width, layout.height);
     const positions = new Map(layout.nodes.map((node) => [node.id, node]));
-    for (const edge of layout.edges) {
+    for (const edge of edgesForMode(data.model, this.relationMode)) {
       const source = positions.get(edge.source);
       const target = positions.get(edge.target);
       if (source === undefined || target === undefined) continue;
-      svg.createSvg("line", {
-        attr: {
-          x1: String(source.x + layout.nodeWidth / 2),
-          y1: String(source.y + layout.nodeHeight),
-          x2: String(target.x + layout.nodeWidth / 2),
-          y2: String(target.y),
-        },
-      });
+      const sourceX = source.x + layout.nodeWidth / 2;
+      const sourceY = source.y + layout.nodeHeight / 2;
+      const targetX = target.x + layout.nodeWidth / 2;
+      const targetY = target.y + layout.nodeHeight / 2;
+      this.renderRelationEdge(svg, edge, sourceX, sourceY, targetX, targetY);
     }
-
-    const records = this.collectRecords(root);
     for (const position of layout.nodes) {
-      const record = records.get(position.id);
+      const record = data.records.get(position.id);
       if (record === undefined) continue;
-      const node = canvas.createEl("button", {
-        cls: "folder-nodes-node-graph-node",
-        attr: { "data-node-path": record.path, title: record.path === "" ? this.app.vault.getName() : record.path },
-      });
+      const node = this.createNode(canvas, record);
       node.style.left = `${position.x}px`;
       node.style.top = `${position.y}px`;
       node.style.width = `${layout.nodeWidth}px`;
       node.style.height = `${layout.nodeHeight}px`;
-      const visual = this.visuals.resolve(record.folder);
-      if (visual.kind !== "fallback") {
-        const icon = node.createSpan({ cls: "folder-nodes-node-graph-icon" });
-        renderVisual(icon, visual, record.label);
-      }
-      node.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
-      node.addEventListener("click", () => {
-        this.focusPath = record.path;
-        this.applyFocus(false);
-      });
-      node.addEventListener("dblclick", (event) => {
-        void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
-      });
-      node.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        if (event.repeat) return;
-        void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
-      });
-      this.nodeElements.set(record.path, node);
     }
-
-    fit.addEventListener("click", () => this.fit(scroll, stage, canvas, layout.width, layout.height));
-    this.applyFocus(true);
+    fit?.addEventListener("click", () => this.fit2D(scroll, stage, canvas, layout.width, layout.height));
   }
 
-  private buildTree(folder: TFolder): NodeGraphTree {
-    const path = normalizeVaultPath(folder.path);
-    return {
-      id: path,
-      children: this.service.children(path).flatMap(({ childPath }) => {
-        const child = this.service.getFolder(childPath);
-        return child === null ? [] : [this.buildTree(child)];
-      }),
-    };
+  private render3D(scroll: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+    const width = Math.max(1, scroll.clientWidth || this.contentEl.clientWidth || 800);
+    const height = Math.max(1, scroll.clientHeight || this.contentEl.clientHeight - 44 || 600);
+    this.threeDViewport = { width, height };
+    const points = layoutNodeGraph3D(data.model);
+    const projected = projectNodeGraph3D(points, this.camera, width, height);
+    this.projected3D = new Map(projected.map((point) => [point.id, point]));
+    const canvas = scroll.createDiv({ cls: "folder-nodes-node-graph-canvas folder-nodes-node-graph-canvas-3d" });
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const svg = this.edgeLayer(canvas, width, height);
+    for (const edge of edgesForMode(data.model, this.relationMode)) {
+      const source = this.projected3D.get(edge.source);
+      const target = this.projected3D.get(edge.target);
+      if (source === undefined || target === undefined) continue;
+      this.renderRelationEdge(svg, edge, source.x, source.y, target.x, target.y);
+    }
+    const ordered = [...projected].sort((a, b) => a.scale - b.scale || a.id.localeCompare(b.id, "en"));
+    for (const point of ordered) {
+      const record = data.records.get(point.id);
+      if (record === undefined) continue;
+      const node = this.createNode(canvas, record);
+      node.addClass("is-3d");
+      node.style.left = `${point.x}px`;
+      node.style.top = `${point.y}px`;
+      node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));
+      node.style.transform = `translate(-50%, -50%) scale(${Math.max(0.65, Math.min(1.2, point.scale))})`;
+    }
+    this.bind3DInteraction(scroll);
+    fit?.addEventListener("click", () => {
+      this.camera = defaultNodeGraphCamera();
+      this.render();
+    });
   }
 
-  private collectRecords(root: TFolder): Map<string, GraphRecord> {
-    const records = new Map<string, GraphRecord>();
-    const visit = (folder: TFolder): void => {
-      const path = normalizeVaultPath(folder.path);
-      records.set(path, {
-        path,
-        label: path === "" ? this.app.vault.getName() : folder.name,
-        folder,
-      });
-      for (const { childPath } of this.service.children(path)) {
-        const child = this.service.getFolder(childPath);
-        if (child !== null) visit(child);
-      }
+  private edgeLayer(canvas: HTMLElement, width: number, height: number): SVGSVGElement {
+    return canvas.createSvg("svg", {
+      cls: "folder-nodes-node-graph-edges",
+      attr: { width: String(width), height: String(height), viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true" },
+    });
+  }
+
+  private renderRelationEdge(
+    svg: SVGSVGElement,
+    edge: NodeGraphModelEdge,
+    sourceX: number,
+    sourceY: number,
+    targetX: number,
+    targetY: number,
+  ): void {
+    if (this.relationMode !== "links" && edge.structure) {
+      this.line(svg, sourceX, sourceY, targetX, targetY, "is-structure");
+    }
+    if (this.relationMode !== "structure" && edge.link) {
+      const offset = this.relationMode === "hybrid" && edge.structure ? 4 : 0;
+      const shifted = offsetLine(sourceX, sourceY, targetX, targetY, offset);
+      this.line(svg, shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY, "is-link");
+    }
+  }
+
+  private line(svg: SVGSVGElement, x1: number, y1: number, x2: number, y2: number, kind: "is-link" | "is-structure"): void {
+    svg.createSvg("line", { cls: kind, attr: { x1: String(x1), y1: String(y1), x2: String(x2), y2: String(y2) } });
+  }
+
+  private createNode(canvas: HTMLElement, record: GraphRecord): HTMLButtonElement {
+    const node = canvas.createEl("button", {
+      cls: "folder-nodes-node-graph-node",
+      attr: { "data-node-path": record.path, title: record.path === "" ? this.app.vault.getName() : record.path },
+    });
+    const visual = this.visuals.resolve(record.folder);
+    if (visual.kind !== "fallback") {
+      const icon = node.createSpan({ cls: "folder-nodes-node-graph-icon" });
+      renderVisual(icon, visual, record.label);
+    }
+    node.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
+    node.addEventListener("click", () => {
+      this.focusPath = record.path;
+      this.applyFocus(false);
+    });
+    node.addEventListener("dblclick", (event) => {
+      void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
+    });
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      if (event.repeat) return;
+      void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
+    });
+    this.nodeElements.set(record.path, node);
+    return node;
+  }
+
+  private bind3DInteraction(surface: HTMLElement): void {
+    surface.addEventListener("pointerdown", (event) => {
+      const target = event.target as Element | null;
+      if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
+      this.drag = { pointerId: event.pointerId, pan: event.shiftKey || event.button === 1, x: event.clientX, y: event.clientY };
+      surface.setPointerCapture(event.pointerId);
+      surface.addClass("is-dragging");
+    });
+    surface.addEventListener("pointermove", (event) => {
+      if (this.drag === null || event.pointerId !== this.drag.pointerId) return;
+      const deltaX = event.clientX - this.drag.x;
+      const deltaY = event.clientY - this.drag.y;
+      this.drag.x = event.clientX;
+      this.drag.y = event.clientY;
+      this.camera = this.drag.pan
+        ? panNodeGraphCamera(this.camera, deltaX, deltaY)
+        : rotateNodeGraphCamera(this.camera, deltaX, deltaY);
+      this.render();
+    });
+    const finish = (event: PointerEvent): void => {
+      if (this.drag === null || event.pointerId !== this.drag.pointerId) return;
+      this.drag = null;
+      surface.removeClass("is-dragging");
     };
-    visit(root);
-    return records;
+    surface.addEventListener("pointerup", finish);
+    surface.addEventListener("pointercancel", finish);
+    surface.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      this.camera = zoomNodeGraphCamera(this.camera, event.deltaY);
+      this.render();
+    }, { passive: false });
   }
 
   private applyFocus(scrollIntoView: boolean): void {
@@ -169,7 +331,25 @@ export class FolderNodeGraphView extends ItemView {
     this.nodeElements.get(this.focusPath)?.scrollIntoView({ block: "center", inline: "center" });
   }
 
-  private fit(scroll: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
+  private center3DOnFocus(): void {
+    if (this.focusPath === null || this.threeDViewport === null) {
+      this.applyFocus(false);
+      return;
+    }
+    const point = this.projected3D.get(this.focusPath);
+    if (point === undefined) {
+      this.applyFocus(false);
+      return;
+    }
+    this.camera = panNodeGraphCamera(
+      this.camera,
+      this.threeDViewport.width / 2 - point.x,
+      this.threeDViewport.height / 2 - point.y,
+    );
+    this.render();
+  }
+
+  private fit2D(scroll: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
     const fit = fitNodeGraphViewport(width, height, scroll.clientWidth, scroll.clientHeight);
     stage.style.width = `${fit.stageWidth}px`;
     stage.style.height = `${fit.stageHeight}px`;
@@ -180,9 +360,37 @@ export class FolderNodeGraphView extends ItemView {
   }
 }
 
-function label(key: "fitGraph" | "nodeGraph" | "structureOnly"): string {
+function relationLabel(mode: NodeGraphRelationMode): string {
+  const zh = resolvedLanguage() === "zh-CN";
+  if (mode === "structure") return zh ? "结构" : "Structure";
+  if (mode === "links") return zh ? "链接" : "Links";
+  return zh ? "混合" : "Hybrid";
+}
+
+function label(key: "dimension" | "fitGraph" | "nodeGraph" | "relationship"): string {
   const zh = resolvedLanguage() === "zh-CN";
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
   if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";
-  return zh ? "Folder Node 结构视图" : "Folder Node structure view";
+  if (key === "relationship") return zh ? "关系模式" : "Relationship mode";
+  return zh ? "维度" : "Dimension";
+}
+
+function offsetLine(sourceX: number, sourceY: number, targetX: number, targetY: number, offset: number): {
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly targetX: number;
+  readonly targetY: number;
+} {
+  if (offset === 0) return { sourceX, sourceY, targetX, targetY };
+  const dx = targetX - sourceX;
+  const dy = targetY - sourceY;
+  const length = Math.hypot(dx, dy) || 1;
+  const offsetX = -dy / length * offset;
+  const offsetY = dx / length * offset;
+  return {
+    sourceX: sourceX + offsetX,
+    sourceY: sourceY + offsetY,
+    targetX: targetX + offsetX,
+    targetY: targetY + offsetY,
+  };
 }
