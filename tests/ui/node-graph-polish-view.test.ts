@@ -50,7 +50,10 @@ describe("Node Graph UI polish", () => {
 
     const search = view.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search-input");
     expect(search).not.toBeNull();
-    if (search === null) return;
+    if (search === null) {
+      await view.onClose();
+      return;
+    }
     search.value = "B";
     search.dispatchEvent(new Event("input", { bubbles: true }));
     expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-search-match")).toBe(true);
@@ -62,6 +65,7 @@ describe("Node Graph UI polish", () => {
     expect(view.contentEl.querySelector("[data-node-path='']")?.classList.contains("is-neighbor")).toBe(true);
     expect(view.contentEl.querySelector("line.is-connected")).not.toBeNull();
     expect(view.contentEl.querySelector<HTMLElement>("[data-node-path='B']")?.title).toContain("Structure");
+    await view.onClose();
   });
 
   it("explains an empty Links view and adds 3D depth/gesture cues", async () => {
@@ -82,5 +86,6 @@ describe("Node Graph UI polish", () => {
     expect(view.contentEl.querySelector(".folder-nodes-node-graph-3d-hint")).not.toBeNull();
     const depthCued = view.contentEl.querySelector(".folder-nodes-node-graph-node.is-depth-near, .folder-nodes-node-graph-node.is-depth-mid, .folder-nodes-node-graph-node.is-depth-far");
     expect(depthCued).not.toBeNull();
+    await view.onClose();
   });
 });
