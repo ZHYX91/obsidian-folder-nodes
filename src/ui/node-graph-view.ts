@@ -8,6 +8,7 @@ import {
   rotateNodeGraphCamera,
   zoomNodeGraphCamera,
   type NodeGraphCamera,
+  type NodeGraphPoint3D,
   type NodeGraphProjectedPoint,
 } from "../core/node-graph-3d";
 import { normalizeNodeGraphLinks } from "../core/node-graph-links";
@@ -61,6 +62,8 @@ export class FolderNodeGraphView extends ItemView {
   private drag: GraphDrag | null = null;
   private readonly nodeElements = new Map<string, HTMLElement>();
   private projected3D = new Map<string, NodeGraphProjectedPoint>();
+  private threeDPoints: readonly NodeGraphPoint3D[] = [];
+  private threeDSvg: SVGSVGElement | null = null;
   private threeDViewport: { width: number; height: number } | null = null;
 
   public constructor(
@@ -78,6 +81,8 @@ export class FolderNodeGraphView extends ItemView {
   public override async onClose(): Promise<void> {
     this.nodeElements.clear();
     this.projected3D.clear();
+    this.threeDPoints = [];
+    this.threeDSvg = null;
     this.drag = null;
   }
 
@@ -92,6 +97,8 @@ export class FolderNodeGraphView extends ItemView {
   private render(): void {
     this.nodeElements.clear();
     this.projected3D.clear();
+    this.threeDPoints = [];
+    this.threeDSvg = null;
     this.drag = null;
     this.contentEl.empty();
     this.contentEl.addClass("folder-nodes-node-graph-view");
@@ -100,9 +107,9 @@ export class FolderNodeGraphView extends ItemView {
     const data = this.buildGraphData(this.app.vault.getRoot());
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
-    const scroll = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
-    if (this.dimension === "2d") this.render2D(scroll, data, fit);
-    else this.render3D(scroll, data, fit);
+    const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
+    if (this.dimension === "2d") this.render2D(surface, data, fit);
+    else this.render3D(surface, data, fit);
     this.applyFocus(this.dimension === "2d");
   }
 
@@ -168,9 +175,9 @@ export class FolderNodeGraphView extends ItemView {
     return { tree, records, model: buildNodeGraphModel(tree, links) };
   }
 
-  private render2D(scroll: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
     const layout = layoutNodeGraph(data.tree);
-    const stage = scroll.createDiv({ cls: "folder-nodes-node-graph-stage" });
+    const stage = surface.createDiv({ cls: "folder-nodes-node-graph-stage" });
     stage.style.width = `${layout.width}px`;
     stage.style.height = `${layout.height}px`;
     const canvas = stage.createDiv({ cls: "folder-nodes-node-graph-canvas" });
@@ -182,11 +189,14 @@ export class FolderNodeGraphView extends ItemView {
       const source = positions.get(edge.source);
       const target = positions.get(edge.target);
       if (source === undefined || target === undefined) continue;
-      const sourceX = source.x + layout.nodeWidth / 2;
-      const sourceY = source.y + layout.nodeHeight / 2;
-      const targetX = target.x + layout.nodeWidth / 2;
-      const targetY = target.y + layout.nodeHeight / 2;
-      this.renderRelationEdge(svg, edge, sourceX, sourceY, targetX, targetY);
+      this.renderRelationEdge(
+        svg,
+        edge,
+        source.x + layout.nodeWidth / 2,
+        source.y + layout.nodeHeight / 2,
+        target.x + layout.nodeWidth / 2,
+        target.y + layout.nodeHeight / 2,
+      );
     }
     for (const position of layout.nodes) {
       const record = data.records.get(position.id);
@@ -197,41 +207,37 @@ export class FolderNodeGraphView extends ItemView {
       node.style.width = `${layout.nodeWidth}px`;
       node.style.height = `${layout.nodeHeight}px`;
     }
-    fit?.addEventListener("click", () => this.fit2D(scroll, stage, canvas, layout.width, layout.height));
+    fit?.addEventListener("click", () => this.fit2D(surface, stage, canvas, layout.width, layout.height));
   }
 
-  private render3D(scroll: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
-    const width = Math.max(1, scroll.clientWidth || this.contentEl.clientWidth || 800);
-    const height = Math.max(1, scroll.clientHeight || this.contentEl.clientHeight - 44 || 600);
+  private render3D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+    const width = Math.max(1, surface.clientWidth || this.contentEl.clientWidth || 800);
+    const height = Math.max(1, surface.clientHeight || this.contentEl.clientHeight - 44 || 600);
     this.threeDViewport = { width, height };
-    const points = layoutNodeGraph3D(data.model);
-    const projected = projectNodeGraph3D(points, this.camera, width, height);
-    this.projected3D = new Map(projected.map((point) => [point.id, point]));
-    const canvas = scroll.createDiv({ cls: "folder-nodes-node-graph-canvas folder-nodes-node-graph-canvas-3d" });
+    this.threeDPoints = layoutNodeGraph3D(data.model);
+    const canvas = surface.createDiv({ cls: "folder-nodes-node-graph-canvas folder-nodes-node-graph-canvas-3d" });
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    const svg = this.edgeLayer(canvas, width, height);
+    this.threeDSvg = this.edgeLayer(canvas, width, height);
+    const projected = projectNodeGraph3D(this.threeDPoints, this.camera, width, height);
+    this.projected3D = new Map(projected.map((point) => [point.id, point]));
     for (const edge of edgesForMode(data.model, this.relationMode)) {
       const source = this.projected3D.get(edge.source);
       const target = this.projected3D.get(edge.target);
       if (source === undefined || target === undefined) continue;
-      this.renderRelationEdge(svg, edge, source.x, source.y, target.x, target.y);
+      this.renderRelationEdge(this.threeDSvg, edge, source.x, source.y, target.x, target.y);
     }
-    const ordered = [...projected].sort((a, b) => a.scale - b.scale || a.id.localeCompare(b.id, "en"));
-    for (const point of ordered) {
+    for (const point of [...projected].sort((a, b) => a.scale - b.scale || a.id.localeCompare(b.id, "en"))) {
       const record = data.records.get(point.id);
       if (record === undefined) continue;
       const node = this.createNode(canvas, record);
       node.addClass("is-3d");
-      node.style.left = `${point.x}px`;
-      node.style.top = `${point.y}px`;
-      node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));
-      node.style.transform = `translate(-50%, -50%) scale(${Math.max(0.65, Math.min(1.2, point.scale))})`;
+      this.position3DNode(node, point);
     }
-    this.bind3DInteraction(scroll);
+    this.bind3DInteraction(surface);
     fit?.addEventListener("click", () => {
       this.camera = defaultNodeGraphCamera();
-      this.render();
+      this.update3DProjection();
     });
   }
 
@@ -251,17 +257,35 @@ export class FolderNodeGraphView extends ItemView {
     targetY: number,
   ): void {
     if (this.relationMode !== "links" && edge.structure) {
-      this.line(svg, sourceX, sourceY, targetX, targetY, "is-structure");
+      this.line(svg, edge.source, edge.target, sourceX, sourceY, targetX, targetY, "is-structure", 0);
     }
     if (this.relationMode !== "structure" && edge.link) {
       const offset = this.relationMode === "hybrid" && edge.structure ? 4 : 0;
       const shifted = offsetLine(sourceX, sourceY, targetX, targetY, offset);
-      this.line(svg, shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY, "is-link");
+      this.line(svg, edge.source, edge.target, shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY, "is-link", offset);
     }
   }
 
-  private line(svg: SVGSVGElement, x1: number, y1: number, x2: number, y2: number, kind: "is-link" | "is-structure"): void {
-    svg.createSvg("line", { cls: kind, attr: { x1: String(x1), y1: String(y1), x2: String(x2), y2: String(y2) } });
+  private line(
+    svg: SVGSVGElement,
+    source: string,
+    target: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    kind: "is-link" | "is-structure",
+    offset: number,
+  ): void {
+    svg.createSvg("line", {
+      cls: kind,
+      attr: {
+        x1: String(x1), y1: String(y1), x2: String(x2), y2: String(y2),
+        "data-edge-source": source,
+        "data-edge-target": target,
+        "data-edge-offset": String(offset),
+      },
+    });
   }
 
   private createNode(canvas: HTMLElement, record: GraphRecord): HTMLButtonElement {
@@ -297,7 +321,7 @@ export class FolderNodeGraphView extends ItemView {
       const target = event.target as Element | null;
       if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
       this.drag = { pointerId: event.pointerId, pan: event.shiftKey || event.button === 1, x: event.clientX, y: event.clientY };
-      surface.setPointerCapture(event.pointerId);
+      surface.setPointerCapture?.(event.pointerId);
       surface.addClass("is-dragging");
     });
     surface.addEventListener("pointermove", (event) => {
@@ -309,7 +333,7 @@ export class FolderNodeGraphView extends ItemView {
       this.camera = this.drag.pan
         ? panNodeGraphCamera(this.camera, deltaX, deltaY)
         : rotateNodeGraphCamera(this.camera, deltaX, deltaY);
-      this.render();
+      this.update3DProjection();
     });
     const finish = (event: PointerEvent): void => {
       if (this.drag === null || event.pointerId !== this.drag.pointerId) return;
@@ -321,8 +345,40 @@ export class FolderNodeGraphView extends ItemView {
     surface.addEventListener("wheel", (event) => {
       event.preventDefault();
       this.camera = zoomNodeGraphCamera(this.camera, event.deltaY);
-      this.render();
+      this.update3DProjection();
     }, { passive: false });
+  }
+
+  private update3DProjection(): void {
+    if (this.threeDViewport === null || this.threeDSvg === null) return;
+    const projected = projectNodeGraph3D(this.threeDPoints, this.camera, this.threeDViewport.width, this.threeDViewport.height);
+    this.projected3D = new Map(projected.map((point) => [point.id, point]));
+    for (const point of projected) {
+      const node = this.nodeElements.get(point.id);
+      if (node !== undefined) this.position3DNode(node, point);
+    }
+    for (const line of this.threeDSvg.querySelectorAll<SVGLineElement>("line[data-edge-source][data-edge-target]")) {
+      const sourceId = line.dataset.edgeSource;
+      const targetId = line.dataset.edgeTarget;
+      if (sourceId === undefined || targetId === undefined) continue;
+      const source = this.projected3D.get(sourceId);
+      const target = this.projected3D.get(targetId);
+      if (source === undefined || target === undefined) continue;
+      const offset = Number(line.dataset.edgeOffset ?? 0);
+      const shifted = offsetLine(source.x, source.y, target.x, target.y, Number.isFinite(offset) ? offset : 0);
+      line.setAttribute("x1", String(shifted.sourceX));
+      line.setAttribute("y1", String(shifted.sourceY));
+      line.setAttribute("x2", String(shifted.targetX));
+      line.setAttribute("y2", String(shifted.targetY));
+    }
+    this.applyFocus(false);
+  }
+
+  private position3DNode(node: HTMLElement, point: NodeGraphProjectedPoint): void {
+    node.style.left = `${point.x}px`;
+    node.style.top = `${point.y}px`;
+    node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));
+    node.style.transform = `translate(-50%, -50%) scale(${Math.max(0.65, Math.min(1.2, point.scale))})`;
   }
 
   private applyFocus(scrollIntoView: boolean): void {
@@ -346,17 +402,17 @@ export class FolderNodeGraphView extends ItemView {
       this.threeDViewport.width / 2 - point.x,
       this.threeDViewport.height / 2 - point.y,
     );
-    this.render();
+    this.update3DProjection();
   }
 
-  private fit2D(scroll: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
-    const fit = fitNodeGraphViewport(width, height, scroll.clientWidth, scroll.clientHeight);
+  private fit2D(surface: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
+    const fit = fitNodeGraphViewport(width, height, surface.clientWidth, surface.clientHeight);
     stage.style.width = `${fit.stageWidth}px`;
     stage.style.height = `${fit.stageHeight}px`;
     canvas.style.left = `${fit.offsetX}px`;
     canvas.style.top = `${fit.offsetY}px`;
     canvas.style.transform = `scale(${fit.scale})`;
-    scroll.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+    surface.scrollTo({ left: 0, top: 0, behavior: "smooth" });
   }
 }
 
