@@ -3,6 +3,7 @@ import { Menu, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
 import NODE_GRAPH_STYLES from "../ui/node-graph.css";
 import FolderNodesPlugin from "./plugin";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
+import { PolishedFolderNodeGraphView } from "../ui/node-graph-polish-view";
 import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view";
 import { normalizeVaultPath } from "../core/paths";
 import { resolvedLanguage } from "../ui/i18n";
@@ -15,7 +16,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   public override async onload(): Promise<void> {
     await super.onload();
     this.registerView(NODE_GRAPH_VIEW_TYPE, (leaf) => {
-      const view = new FolderNodeGraphView(leaf, this.service, this.visuals);
+      const view = new PolishedFolderNodeGraphView(leaf, this.service, this.visuals);
       this.nodeGraphStyles.install(view.containerEl.ownerDocument);
       return view;
     });
