@@ -25,7 +25,10 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
     const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    for (const document of documents) document.querySelector("style[data-folder-nodes-node-graph]")?.remove();
+    for (const document of documents) {
+      document.querySelector("style[data-folder-nodes-node-graph]")?.remove();
+      document.querySelector("style[data-folder-nodes-node-graph-entry]")?.remove();
+    }
     super.onunload();
   }
 
@@ -82,20 +85,15 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   private ensureContentsEntry(view: FolderNodeContentsView): void {
     if (view.contentEl.querySelector(":scope > .folder-nodes-node-graph-entry") !== null) return;
+    ensureEntryStyles(view.contentEl.ownerDocument);
     const entry = view.contentEl.ownerDocument.createElement("div");
     entry.className = "folder-nodes-node-graph-entry";
-    entry.style.display = "flex";
-    entry.style.justifyContent = "flex-end";
-    entry.style.padding = "8px 12px 0";
     const button = entry.createEl("button", {
-      cls: "clickable-icon",
+      cls: "clickable-icon folder-nodes-node-graph-entry-button",
       attr: { "aria-label": label("openGraph") },
     });
     setIcon(button, "git-fork");
-    const text = button.createSpan({ text: label("nodeGraph") });
-    text.style.marginInlineStart = "6px";
-    button.style.width = "auto";
-    button.style.paddingInline = "8px";
+    button.createSpan({ cls: "folder-nodes-node-graph-entry-label", text: label("nodeGraph") });
     button.addEventListener("click", () => {
       const active = this.app.workspace.getActiveFile();
       const folder = active === null ? null : this.service.folderForFile(active);
@@ -113,4 +111,14 @@ function label(key: "nodeGraph" | "openGraph" | "openInGraph"): string {
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
   if (key === "openInGraph") return zh ? "在节点图谱中打开" : "Open in Node Graph";
   return zh ? "打开节点图谱" : "Open Node Graph";
+}
+
+function ensureEntryStyles(document: Document): void {
+  if (document.querySelector("style[data-folder-nodes-node-graph-entry]") !== null) return;
+  const style = document.createElement("style");
+  style.setAttribute("data-folder-nodes-node-graph-entry", "true");
+  style.textContent = `
+.folder-nodes-node-graph-entry{display:flex;justify-content:flex-end;padding:8px 12px 0}.folder-nodes-node-graph-entry-button{width:auto;padding-inline:8px}.folder-nodes-node-graph-entry-label{margin-inline-start:6px}
+`;
+  document.head.append(style);
 }
