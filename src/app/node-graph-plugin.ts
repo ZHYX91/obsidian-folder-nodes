@@ -1,15 +1,23 @@
 import { Menu, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
 
+import NODE_GRAPH_STYLES from "../ui/node-graph.css";
 import FolderNodesPlugin from "./plugin";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
 import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view";
 import { normalizeVaultPath } from "../core/paths";
 import { resolvedLanguage } from "../ui/i18n";
+import { RuntimeStyles } from "../ui/runtime-styles";
 
 export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
+  private readonly nodeGraphStyles = new RuntimeStyles(NODE_GRAPH_STYLES);
+
   public override async onload(): Promise<void> {
     await super.onload();
-    this.registerView(NODE_GRAPH_VIEW_TYPE, (leaf) => new FolderNodeGraphView(leaf, this.service, this.visuals));
+    this.registerView(NODE_GRAPH_VIEW_TYPE, (leaf) => {
+      const view = new FolderNodeGraphView(leaf, this.service, this.visuals);
+      this.nodeGraphStyles.install(view.containerEl.ownerDocument);
+      return view;
+    });
     this.addCommand({
       id: "open-node-graph",
       name: label("openGraph"),
@@ -18,17 +26,14 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     this.registerEvent(this.app.workspace.on("file-menu", (menu, entry) => this.addNodeGraphMenu(menu, entry)));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.decorateContentsViews()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.decorateContentsViews()));
+    this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, window) => this.nodeGraphStyles.install(window.document)));
+    this.nodeGraphStyles.install(this.app.workspace.rootSplit.win.document);
     this.decorateContentsViews();
   }
 
   public override onunload(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
-    const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
-    this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    for (const document of documents) {
-      document.querySelector("style[data-folder-nodes-node-graph]")?.remove();
-      document.querySelector("style[data-folder-nodes-node-graph-entry]")?.remove();
-    }
+    this.nodeGraphStyles.removeAll();
     super.onunload();
   }
 
@@ -74,6 +79,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
       if (!(leaf.view instanceof FolderNodeContentsView)) continue;
       const view = leaf.view;
+      this.nodeGraphStyles.install(view.contentEl.ownerDocument);
       this.ensureContentsEntry(view);
       if (view.contentEl.dataset.nodeGraphObserver === "true") continue;
       view.contentEl.dataset.nodeGraphObserver = "true";
@@ -85,7 +91,6 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   private ensureContentsEntry(view: FolderNodeContentsView): void {
     if (view.contentEl.querySelector(":scope > .folder-nodes-node-graph-entry") !== null) return;
-    ensureEntryStyles(view.contentEl.ownerDocument);
     const entry = view.contentEl.ownerDocument.createElement("div");
     entry.className = "folder-nodes-node-graph-entry";
     const button = entry.createEl("button", {
@@ -111,14 +116,4 @@ function label(key: "nodeGraph" | "openGraph" | "openInGraph"): string {
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
   if (key === "openInGraph") return zh ? "在节点图谱中打开" : "Open in Node Graph";
   return zh ? "打开节点图谱" : "Open Node Graph";
-}
-
-function ensureEntryStyles(document: Document): void {
-  if (document.querySelector("style[data-folder-nodes-node-graph-entry]") !== null) return;
-  const style = document.createElement("style");
-  style.setAttribute("data-folder-nodes-node-graph-entry", "true");
-  style.textContent = `
-.folder-nodes-node-graph-entry{display:flex;justify-content:flex-end;padding:8px 12px 0}.folder-nodes-node-graph-entry-button{width:auto;padding-inline:8px}.folder-nodes-node-graph-entry-label{margin-inline-start:6px}
-`;
-  document.head.append(style);
 }
