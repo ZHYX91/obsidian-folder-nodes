@@ -130,11 +130,18 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensureLegend(): void {
-    this.contentEl.querySelector(":scope > .folder-nodes-node-graph-legend")?.remove();
     const hasStructure = this.contentEl.querySelector("line.is-structure") !== null;
     const hasLinks = this.contentEl.querySelector("line.is-link") !== null;
-    if (!hasStructure && !hasLinks) return;
-    const legend = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-legend", attr: { "aria-label": text("legend") } });
+    const state = `${hasStructure ? "s" : ""}${hasLinks ? "l" : ""}`;
+    const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-legend");
+    if (state === "") {
+      existing?.remove();
+      return;
+    }
+    if (existing?.dataset.legendState === state) return;
+    const legend = existing ?? this.contentEl.createDiv({ cls: "folder-nodes-node-graph-legend", attr: { "aria-label": text("legend") } });
+    legend.dataset.legendState = state;
+    legend.empty();
     if (hasStructure) this.legendItem(legend, "is-structure", text("structure"));
     if (hasLinks) this.legendItem(legend, "is-link", text("links"));
   }
@@ -146,17 +153,27 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensureEmptyState(): void {
-    this.contentEl.querySelector(":scope > .folder-nodes-node-graph-empty")?.remove();
     const active = this.activeRelationMode();
-    if (active !== "links" || this.contentEl.querySelector("line.is-link") !== null) return;
+    const shouldShow = active === "links" && this.contentEl.querySelector("line.is-link") === null;
+    const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-empty");
+    if (!shouldShow) {
+      existing?.remove();
+      return;
+    }
+    if (existing !== null) return;
     const empty = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-empty" });
     empty.createDiv({ cls: "folder-nodes-node-graph-empty-title", text: text("noLinks") });
     empty.createDiv({ cls: "folder-nodes-node-graph-empty-description", text: text("noLinksDesc") });
   }
 
   private ensure3DHint(): void {
-    this.contentEl.querySelector(":scope > .folder-nodes-node-graph-3d-hint")?.remove();
-    if (!this.contentEl.hasClass("is-3d")) return;
+    const shouldShow = this.contentEl.hasClass("is-3d");
+    const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-3d-hint");
+    if (!shouldShow) {
+      existing?.remove();
+      return;
+    }
+    if (existing !== null) return;
     this.contentEl.createDiv({ cls: "folder-nodes-node-graph-3d-hint", text: text("threeDHint") });
   }
 
