@@ -2,6 +2,7 @@ import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
 import {
   defaultNodeGraphCamera,
+  fitNodeGraphCamera,
   layoutNodeGraph3D,
   panNodeGraphCamera,
   projectNodeGraph3D,
@@ -236,7 +237,13 @@ export class FolderNodeGraphView extends ItemView {
     }
     this.bind3DInteraction(surface);
     fit?.addEventListener("click", () => {
-      this.camera = defaultNodeGraphCamera();
+      if (this.threeDViewport === null) return;
+      this.camera = fitNodeGraphCamera(
+        this.threeDPoints,
+        this.camera,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+      );
       this.update3DProjection();
     });
   }
