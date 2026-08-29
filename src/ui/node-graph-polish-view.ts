@@ -167,7 +167,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensure3DHint(): void {
-    const shouldShow = this.contentEl.hasClass("is-3d");
+    const shouldShow = this.contentEl.classList.contains("is-3d");
     const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-3d-hint");
     if (!shouldShow) {
       existing?.remove();
