@@ -33,6 +33,8 @@ export interface NodeGraph3DOptions {
 const DEFAULT_SPACING_X = 220;
 const DEFAULT_SPACING_Y = 140;
 const DEFAULT_SPACING_Z = 260;
+const NODE_HALF_WIDTH = 90;
+const NODE_HALF_HEIGHT = 23;
 
 export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOptions = {}): readonly NodeGraphPoint3D[] {
   const spacingX = positive(options.spacingX, DEFAULT_SPACING_X);
@@ -99,6 +101,33 @@ export function defaultNodeGraphCamera(): NodeGraphCamera {
   return { yaw: -0.55, pitch: 0.38, zoom: 0.9, panX: 0, panY: 0 };
 }
 
+export function fitNodeGraphCamera(
+  points: readonly NodeGraphPoint3D[],
+  camera: NodeGraphCamera,
+  viewportWidth: number,
+  viewportHeight: number,
+  padding = 48,
+): NodeGraphCamera {
+  const width = Math.max(1, viewportWidth);
+  const height = Math.max(1, viewportHeight);
+  if (points.length === 0) return { ...camera, panX: 0, panY: 0 };
+  const neutral = { ...camera, zoom: 1, panX: 0, panY: 0 };
+  const neutralBounds = projectedBounds(projectNodeGraph3D(points, neutral, width, height));
+  const availableWidth = Math.max(1, width - Math.max(0, padding) * 2);
+  const availableHeight = Math.max(1, height - Math.max(0, padding) * 2);
+  const zoom = clamp(Math.min(
+    availableWidth / Math.max(1, neutralBounds.width),
+    availableHeight / Math.max(1, neutralBounds.height),
+  ), 0.2, 4);
+  const fitted = { ...camera, zoom, panX: 0, panY: 0 };
+  const fittedBounds = projectedBounds(projectNodeGraph3D(points, fitted, width, height));
+  return {
+    ...fitted,
+    panX: width / 2 - fittedBounds.centerX,
+    panY: height / 2 - fittedBounds.centerY,
+  };
+}
+
 export function rotateNodeGraphCamera(camera: NodeGraphCamera, deltaX: number, deltaY: number): NodeGraphCamera {
   return {
     ...camera,
@@ -114,6 +143,31 @@ export function panNodeGraphCamera(camera: NodeGraphCamera, deltaX: number, delt
 export function zoomNodeGraphCamera(camera: NodeGraphCamera, deltaY: number): NodeGraphCamera {
   const factor = Math.exp(-deltaY * 0.0015);
   return { ...camera, zoom: clamp(camera.zoom * factor, 0.2, 4) };
+}
+
+function projectedBounds(points: readonly NodeGraphProjectedPoint[]): {
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly height: number;
+  readonly width: number;
+} {
+  let left = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    const scale = Math.max(0.65, Math.min(1.2, point.scale));
+    left = Math.min(left, point.x - NODE_HALF_WIDTH * scale);
+    right = Math.max(right, point.x + NODE_HALF_WIDTH * scale);
+    top = Math.min(top, point.y - NODE_HALF_HEIGHT * scale);
+    bottom = Math.max(bottom, point.y + NODE_HALF_HEIGHT * scale);
+  }
+  return {
+    centerX: (left + right) / 2,
+    centerY: (top + bottom) / 2,
+    width: right - left,
+    height: bottom - top,
+  };
 }
 
 function positive(value: number | undefined, fallback: number): number {
