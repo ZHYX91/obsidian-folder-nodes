@@ -15,7 +15,37 @@
 
 .folder-nodes-node-graph-title {
   flex: 1;
+  min-width: 80px;
   font-weight: 600;
+}
+
+.folder-nodes-node-graph-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+}
+
+.folder-nodes-node-graph-switch-button {
+  padding: 3px 7px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+}
+
+.folder-nodes-node-graph-switch-button:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.folder-nodes-node-graph-switch-button.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
 }
 
 .folder-nodes-node-graph-scroll {
@@ -23,6 +53,17 @@
   inset: 44px 0 0;
   overflow: auto;
   background: var(--background-primary);
+}
+
+.folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll {
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll.is-dragging {
+  cursor: grabbing;
 }
 
 .folder-nodes-node-graph-stage {
@@ -37,6 +78,10 @@
   transform-origin: top left;
 }
 
+.folder-nodes-node-graph-canvas-3d {
+  inset: 0;
+}
+
 .folder-nodes-node-graph-edges {
   position: absolute;
   inset: 0;
@@ -45,8 +90,20 @@
 }
 
 .folder-nodes-node-graph-edges line {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-nodes-node-graph-edges line.is-structure {
   stroke: var(--background-modifier-border-hover);
+  stroke-width: 1.75;
+}
+
+.folder-nodes-node-graph-edges line.is-link {
+  stroke: var(--interactive-accent);
   stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+  opacity: 0.85;
 }
 
 .folder-nodes-node-graph-node {
@@ -62,6 +119,12 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
   box-shadow: var(--shadow-s);
+}
+
+.folder-nodes-node-graph-node.is-3d {
+  width: 180px;
+  min-height: 46px;
+  transform-origin: center;
 }
 
 .folder-nodes-node-graph-node:hover {
@@ -101,4 +164,19 @@
 
 .folder-nodes-node-graph-entry-label {
   margin-inline-start: 6px;
+}
+
+@media (max-width: 700px) {
+  .folder-nodes-node-graph-toolbar {
+    gap: 4px;
+    padding-inline: 6px;
+  }
+
+  .folder-nodes-node-graph-title {
+    display: none;
+  }
+
+  .folder-nodes-node-graph-switch-button {
+    padding-inline: 5px;
+  }
 }
