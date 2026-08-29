@@ -54,7 +54,6 @@ export class FolderNodeGraphView extends ItemView {
     this.nodeElements.clear();
     this.contentEl.empty();
     this.contentEl.addClass("folder-nodes-node-graph-view");
-    applyViewStyles(this.contentEl);
 
     const toolbar = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-toolbar" });
     const title = toolbar.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
@@ -173,15 +172,4 @@ function label(key: "fitGraph" | "nodeGraph" | "structureOnly"): string {
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
   if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";
   return zh ? "Folder Node 结构视图" : "Folder Node structure view";
-}
-
-function applyViewStyles(container: HTMLElement): void {
-  const doc = container.ownerDocument;
-  if (doc.querySelector("style[data-folder-nodes-node-graph]") !== null) return;
-  const style = doc.createElement("style");
-  style.setAttribute("data-folder-nodes-node-graph", "true");
-  style.textContent = `
-.folder-nodes-node-graph-view{position:relative;padding:0!important;overflow:hidden}.folder-nodes-node-graph-toolbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--background-modifier-border)}.folder-nodes-node-graph-title{font-weight:600;flex:1}.folder-nodes-node-graph-scroll{position:absolute;inset:44px 0 0;overflow:auto;background:var(--background-primary)}.folder-nodes-node-graph-canvas{position:relative;min-width:100%;min-height:100%}.folder-nodes-node-graph-edges{position:absolute;inset:0;overflow:visible;pointer-events:none}.folder-nodes-node-graph-edges line{stroke:var(--background-modifier-border-hover);stroke-width:1.5}.folder-nodes-node-graph-node{position:absolute;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border:1px solid var(--background-modifier-border);border-radius:10px;background:var(--background-secondary);color:var(--text-normal);box-shadow:var(--shadow-s);overflow:hidden}.folder-nodes-node-graph-node:hover{background:var(--background-modifier-hover)}.folder-nodes-node-graph-node.is-focused{border-color:var(--interactive-accent);box-shadow:0 0 0 2px var(--background-modifier-border-focus)}.folder-nodes-node-graph-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.folder-nodes-node-graph-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:20px;height:20px}
-`;
-  doc.head.append(style);
 }
