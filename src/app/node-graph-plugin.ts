@@ -90,12 +90,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       if (!(leaf.view instanceof FolderNodeContentsView)) continue;
       const view = leaf.view;
       this.nodeGraphStyles.install(view.contentEl.ownerDocument);
-      this.ensureContentsEntry(view);
-      if (view.contentEl.dataset.nodeGraphObserver === "true") continue;
-      view.contentEl.dataset.nodeGraphObserver = "true";
-      const observer = new MutationObserver(() => this.ensureContentsEntry(view));
-      observer.observe(view.contentEl, { childList: true });
-      this.register(() => observer.disconnect());
+      view.setRenderExtension("node-graph", () => this.ensureContentsEntry(view));
     }
   }
 

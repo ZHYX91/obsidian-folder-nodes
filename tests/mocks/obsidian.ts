@@ -24,11 +24,26 @@ export class ItemView {
   public readonly app: unknown;
   public readonly containerEl = document.createElement("div");
   public readonly contentEl = this.containerEl.createDiv();
+  private readonly cleanups: Array<() => void> = [];
 
   public constructor(public readonly leaf: { readonly app: unknown }) {
     this.app = leaf.app;
   }
+
+  public register(cleanup: () => void): void { this.cleanups.push(cleanup); }
+  public registerDomEvent<K extends keyof DocumentEventMap>(
+    target: Document | HTMLElement,
+    type: K,
+    callback: (event: DocumentEventMap[K]) => void,
+  ): void {
+    target.addEventListener(type, callback as EventListener);
+    this.register(() => target.removeEventListener(type, callback as EventListener));
+  }
+  public unload(): void {
+    for (const cleanup of this.cleanups.splice(0).reverse()) cleanup();
+  }
 }
+export class Notice { public constructor(_message: string, _timeout?: number) {} }
 export class Modal {
   public closeCount = 0;
   public close(): void { this.closeCount += 1; }

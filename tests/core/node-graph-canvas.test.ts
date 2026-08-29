@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   fitNodeGraphCanvasCamera,
   hitTestNodeGraphCanvas,
+  nodeGraphCanvasGeometry,
   panNodeGraphCanvasCamera,
   pointIsVisible,
+  selectNodeGraphCanvasOverviewEdges,
   shouldUseNodeGraphCanvas,
   zoomNodeGraphCanvasCamera,
 } from "../../src/core/node-graph-canvas";
@@ -40,15 +42,33 @@ describe("Node Graph canvas math", () => {
       { id: "A", x: 50, y: 50, scale: 1 },
       { id: "B", x: 500, y: 500, scale: 1 },
     ];
-    expect(pointIsVisible(points[0]!, { width: 100, height: 100 }, 20, 10)).toBe(true);
-    expect(pointIsVisible(points[1]!, { width: 100, height: 100 }, 20, 10)).toBe(false);
-    expect(hitTestNodeGraphCanvas(points, 52, 48, 20, 10)).toBe("A");
-    expect(hitTestNodeGraphCanvas(points, 200, 200, 20, 10)).toBeNull();
+    expect(pointIsVisible(points[0]!, { width: 100, height: 100 })).toBe(true);
+    expect(pointIsVisible(points[1]!, { width: 100, height: 100 })).toBe(false);
+    expect(hitTestNodeGraphCanvas(points, 52, 48)).toBe("A");
+    expect(hitTestNodeGraphCanvas(points, 200, 200)).toBeNull();
   });
 
   it("hit-tests the topmost drawn node when projections overlap", () => {
     const back = { id: "back", x: 100, y: 100, scale: 0.65 };
     const front = { id: "front", x: 101, y: 101, scale: 1.2 };
-    expect(hitTestNodeGraphCanvas([back, front], 100, 100, 20, 10)).toBe("front");
+    expect(hitTestNodeGraphCanvas([back, front], 100, 100)).toBe("front");
+  });
+
+  it("uses the same low-detail geometry for drawing bounds, culling, and hit testing", () => {
+    const far = { id: "far", x: -2, y: 50, scale: 0.01 };
+    expect(nodeGraphCanvasGeometry(far.scale)).toMatchObject({ kind: "dot", label: false, radius: 4 });
+    expect(pointIsVisible(far, { width: 100, height: 100 }, 0)).toBe(true);
+    expect(hitTestNodeGraphCanvas([far], 1, 50)).toBe("far");
+    expect(hitTestNodeGraphCanvas([far], 3, 50)).toBeNull();
+  });
+
+  it("selects a deterministic bounded overview from an edge-dense model", () => {
+    const edges = Array.from({ length: 124_750 }, (_, index) => index);
+    const overview = selectNodeGraphCanvasOverviewEdges(edges);
+    expect(overview).toHaveLength(5_941);
+    expect(overview[0]).toBe(0);
+    expect(overview[1]).toBe(21);
+    expect(overview.at(-1)).toBe(124_740);
+    expect(selectNodeGraphCanvasOverviewEdges([1, 2, 3], 3)).toEqual([1, 2, 3]);
   });
 });

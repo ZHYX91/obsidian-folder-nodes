@@ -629,10 +629,11 @@ function relationSummary(structure: number, links: number): string {
     : `Structure ${structure} · Links ${links}`;
 }
 
-function label(key: "dimension" | "fitGraph" | "largeGraph" | "nodeGraph" | "relationship"): string {
+function label(key: "denseEdges" | "dimension" | "fitGraph" | "largeGraph" | "nodeGraph" | "relationship"): string {
   const zh = resolvedLanguage() === "zh-CN";
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
   if (key === "largeGraph") return zh ? "大型节点图谱；拖动平移或旋转，滚轮缩放，回车打开所选节点" : "Large Node Graph; drag to pan or rotate, wheel to zoom, Enter to open the selected node";
+  if (key === "denseEdges") return zh ? "稠密关系概览 · 聚焦节点以显示其全部关系" : "Dense relation overview · focus a node to show all of its relations";
   if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";
   if (key === "relationship") return zh ? "关系模式" : "Relationship mode";
   return zh ? "维度" : "Dimension";

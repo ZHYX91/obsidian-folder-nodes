@@ -50,7 +50,11 @@ describe("Node Graph integration contract", () => {
     expect(canvasRenderer).toContain('surface.createEl("canvas"');
     expect(canvasRenderer).toContain("this.cancelFrame()");
     expect(canvasRenderer).toContain("this.unbindEvents()");
+    expect(canvasRenderer).toContain("selectNodeGraphCanvasOverviewEdges");
+    expect(canvasRenderer).toContain("strokeEdgeBatch");
     expect(canvasRenderer).not.toContain('createSvg("line"');
     expect(polishedView).not.toContain("MutationObserver");
+    expect(graphPlugin).not.toContain("MutationObserver");
+    expect(graphPlugin).toContain('view.setRenderExtension("node-graph"');
   });
 });

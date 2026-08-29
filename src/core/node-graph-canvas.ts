@@ -16,7 +16,51 @@ export interface NodeGraphCanvasSize {
   readonly width: number;
 }
 
+export interface NodeGraphCanvasGeometry {
+  readonly halfHeight: number;
+  readonly halfWidth: number;
+  readonly kind: "card" | "dot";
+  readonly label: boolean;
+  readonly radius: number;
+  readonly scale: number;
+}
+
 export const LARGE_NODE_GRAPH_THRESHOLD = 500;
+export const NODE_GRAPH_CANVAS_NODE_WIDTH = 180;
+export const NODE_GRAPH_CANVAS_NODE_HEIGHT = 46;
+export const NODE_GRAPH_CANVAS_OVERVIEW_EDGE_LIMIT = 6_000;
+
+export function nodeGraphCanvasGeometry(projectedScale: number): NodeGraphCanvasGeometry {
+  const scale = clamp(Number.isFinite(projectedScale) ? projectedScale : 0, 0, 1.2);
+  if (scale < 0.08) {
+    return { halfHeight: 4, halfWidth: 4, kind: "dot", label: false, radius: 4, scale };
+  }
+  const width = Math.max(12, NODE_GRAPH_CANVAS_NODE_WIDTH * scale);
+  const height = Math.max(7, NODE_GRAPH_CANVAS_NODE_HEIGHT * scale);
+  return {
+    halfHeight: height / 2,
+    halfWidth: width / 2,
+    kind: "card",
+    label: scale >= 0.38,
+    radius: 0,
+    scale,
+  };
+}
+
+export function selectNodeGraphCanvasOverviewEdges<T>(
+  edges: readonly T[],
+  limit = NODE_GRAPH_CANVAS_OVERVIEW_EDGE_LIMIT,
+): readonly T[] {
+  const boundedLimit = Math.max(1, Math.floor(limit));
+  if (edges.length <= boundedLimit) return edges;
+  const stride = Math.ceil(edges.length / boundedLimit);
+  const selected: T[] = [];
+  for (let index = 0; index < edges.length && selected.length < boundedLimit; index += stride) {
+    const edge = edges[index];
+    if (edge !== undefined) selected.push(edge);
+  }
+  return selected;
+}
 
 export function shouldUseNodeGraphCanvas(
   nodeCount: number,
@@ -74,35 +118,29 @@ export function zoomNodeGraphCanvasCamera(
 export function pointIsVisible(
   point: NodeGraphCanvasPoint,
   viewport: NodeGraphCanvasSize,
-  halfWidth: number,
-  halfHeight: number,
   padding = 24,
 ): boolean {
   const width = Math.max(1, viewport.width);
   const height = Math.max(1, viewport.height);
-  const nodeHalfWidth = Math.max(2, halfWidth * point.scale);
-  const nodeHalfHeight = Math.max(2, halfHeight * point.scale);
-  return point.x + nodeHalfWidth >= -padding
-    && point.x - nodeHalfWidth <= width + padding
-    && point.y + nodeHalfHeight >= -padding
-    && point.y - nodeHalfHeight <= height + padding;
+  const geometry = nodeGraphCanvasGeometry(point.scale);
+  return point.x + geometry.halfWidth >= -padding
+    && point.x - geometry.halfWidth <= width + padding
+    && point.y + geometry.halfHeight >= -padding
+    && point.y - geometry.halfHeight <= height + padding;
 }
 
 export function hitTestNodeGraphCanvas(
   points: readonly NodeGraphCanvasPoint[],
   x: number,
   y: number,
-  halfWidth: number,
-  halfHeight: number,
 ): string | null {
   for (let index = points.length - 1; index >= 0; index -= 1) {
     const point = points[index];
     if (point === undefined) continue;
-    const width = Math.max(4, halfWidth * point.scale);
-    const height = Math.max(4, halfHeight * point.scale);
+    const geometry = nodeGraphCanvasGeometry(point.scale);
     const dx = Math.abs(x - point.x);
     const dy = Math.abs(y - point.y);
-    if (dx > width || dy > height) continue;
+    if (dx > geometry.halfWidth || dy > geometry.halfHeight) continue;
     return point.id;
   }
   return null;

@@ -186,6 +186,24 @@
   pointer-events: none;
 }
 
+.folder-nodes-node-graph-edge-lod {
+  position: absolute;
+  z-index: 14;
+  bottom: 12px;
+  left: 50%;
+  max-width: min(480px, calc(100% - 32px));
+  padding: 6px 9px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-s);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll.is-dragging {
   cursor: grabbing;
 }

@@ -67,6 +67,7 @@ export const CONTENTS_VIEW_TYPE = "folder-nodes-contents";
 
 export class FolderNodeContentsView extends ItemView {
   private folderPath = "";
+  private readonly renderExtensions = new Map<string, () => void>();
   private visibleLimits: Record<ContentsSection, number> = { album: 200, files: 200, nodes: 200 };
   private selectionMode = false;
   private selectedContent = new Map<string, "file" | "media">();
@@ -115,8 +116,13 @@ export class FolderNodeContentsView extends ItemView {
     if (paths !== undefined && !this.isAffected(paths)) return;
     this.render();
   }
+  public setRenderExtension(key: string, extension: () => void): void {
+    this.renderExtensions.set(key, extension);
+    extension();
+  }
   public override async onOpen(): Promise<void> { this.render(); }
   public override async onClose(): Promise<void> {
+    this.renderExtensions.clear();
     this.cancelPendingImages();
     this.clearAllDrag();
   }
@@ -131,6 +137,7 @@ export class FolderNodeContentsView extends ItemView {
     const folder = normalizeVaultPath(this.folderPath) === "" ? this.app.vault.getRoot() : this.service.getFolder(this.folderPath);
     if (folder === null) {
       container.createEl("p", { cls: "setting-item-description", text: t("noCurrentNode") });
+      this.runRenderExtensions();
       return;
     }
     const folderPath = normalizeVaultPath(folder.path);
@@ -175,6 +182,11 @@ export class FolderNodeContentsView extends ItemView {
     this.renderNodes(container, nodeEntries, folderPath);
     this.renderAlbum(container, album);
     this.renderFiles(container, ordinaryFiles);
+    this.runRenderExtensions();
+  }
+
+  private runRenderExtensions(): void {
+    for (const extension of this.renderExtensions.values()) extension();
   }
 
   private renderBreadcrumb(container: HTMLElement, folder: TFolder): void {

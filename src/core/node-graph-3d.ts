@@ -1,4 +1,5 @@
 import type { NodeGraphModel } from "./node-graph-model";
+import { nodeGraphCanvasGeometry } from "./node-graph-canvas";
 
 export interface NodeGraphPoint3D {
   readonly id: string;
@@ -33,8 +34,6 @@ export interface NodeGraph3DOptions {
 const DEFAULT_SPACING_X = 220;
 const DEFAULT_SPACING_Y = 140;
 const DEFAULT_SPACING_Z = 260;
-const NODE_HALF_WIDTH = 90;
-const NODE_HALF_HEIGHT = 23;
 const MIN_CAMERA_ZOOM = 0.005;
 
 export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOptions = {}): readonly NodeGraphPoint3D[] {
@@ -162,11 +161,11 @@ function projectedBounds(points: readonly NodeGraphProjectedPoint[]): {
   let top = Number.POSITIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
   for (const point of points) {
-    const scale = Math.max(0.65, Math.min(1.2, point.scale));
-    left = Math.min(left, point.x - NODE_HALF_WIDTH * scale);
-    right = Math.max(right, point.x + NODE_HALF_WIDTH * scale);
-    top = Math.min(top, point.y - NODE_HALF_HEIGHT * scale);
-    bottom = Math.max(bottom, point.y + NODE_HALF_HEIGHT * scale);
+    const geometry = nodeGraphCanvasGeometry(point.scale);
+    left = Math.min(left, point.x - geometry.halfWidth);
+    right = Math.max(right, point.x + geometry.halfWidth);
+    top = Math.min(top, point.y - geometry.halfHeight);
+    bottom = Math.max(bottom, point.y + geometry.halfHeight);
   }
   return {
     centerX: (left + right) / 2,

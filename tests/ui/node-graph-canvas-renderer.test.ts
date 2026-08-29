@@ -61,6 +61,121 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
+  it("renders the fitted 20k 3D overview as dots while keeping one full focus control", async () => {
+    const children = Array.from({ length: 19_999 }, (_, index): NodeGraphTree => ({
+      id: `N${String(index).padStart(5, "0")}`,
+      children: [],
+    }));
+    const tree: NodeGraphTree = { id: "", children };
+    const model = buildNodeGraphModel(tree);
+    const layout = layoutNodeGraph(tree);
+    const records = new Map(model.nodes.map(({ id }) => [id, {
+      label: id === "" ? "Large Vault" : id,
+      path: id,
+      visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
+    }]));
+    const context = fakeContext();
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const surface = document.body.createDiv();
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 600 },
+      clientWidth: { configurable: true, value: 1_000 },
+    });
+    const renderer = new NodeGraphCanvasRenderer(
+      surface,
+      { layout, model, points3D: layoutNodeGraph3D(model), records },
+      "3d",
+      "structure",
+      null,
+      {
+        label: (key) => key,
+        onOpen: vi.fn(),
+        onSelect: vi.fn(),
+        relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
+      },
+    );
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+
+    expect(context.arc).toHaveBeenCalledTimes(20_000);
+    expect(context.fillText).not.toHaveBeenCalled();
+    renderer.setFocus("N19998", true);
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    const overlay = surface.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay");
+    expect(overlay?.hidden).toBe(false);
+    expect(overlay?.dataset.nodePath).toBe("N19998");
+
+    renderer.destroy();
+    surface.remove();
+    getContext.mockRestore();
+  });
+
+  it("batches a realistic 125k-edge overview and restores every incident edge on focus", async () => {
+    const children = Array.from({ length: 499 }, (_, index): NodeGraphTree => ({
+      id: `N${String(index).padStart(3, "0")}`,
+      children: [],
+    }));
+    const tree: NodeGraphTree = { id: "", children };
+    const nodes = [{ id: "", depth: 0 }, ...children.map(({ id }) => ({ id, depth: 1 }))];
+    const edges = children.map(({ id }) => ({ source: "", target: id, structure: true, link: false }));
+    for (let left = 0; left < children.length; left += 1) {
+      for (let right = left + 1; right < children.length; right += 1) {
+        edges.push({
+          source: children[left]?.id ?? "",
+          target: children[right]?.id ?? "",
+          structure: false,
+          link: true,
+        });
+      }
+    }
+    const model = { nodes, edges };
+    const layout = layoutNodeGraph(tree);
+    const records = new Map(nodes.map(({ id }) => [id, {
+      label: id === "" ? "Dense Vault" : id,
+      path: id,
+      visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
+    }]));
+    const context = fakeContext();
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const surface = document.body.createDiv();
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 600 },
+      clientWidth: { configurable: true, value: 1_000 },
+    });
+    const renderer = new NodeGraphCanvasRenderer(
+      surface,
+      { layout, model, points3D: layoutNodeGraph3D(model), records },
+      "2d",
+      "hybrid",
+      null,
+      {
+        label: (key) => key,
+        onOpen: vi.fn(),
+        onSelect: vi.fn(),
+        relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
+      },
+    );
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+
+    expect(model.nodes).toHaveLength(500);
+    expect(model.edges).toHaveLength(124_750);
+    expect(surface.dataset.nodeGraphEdgeLod).toBe("overview");
+    expect(surface.querySelector<HTMLElement>(".folder-nodes-node-graph-edge-lod")?.hidden).toBe(false);
+    expect(context.stroke.mock.calls.length).toBeLessThanOrEqual(6);
+    expect(context.lineTo.mock.calls.length).toBeLessThanOrEqual(6_000);
+
+    context.lineTo.mockClear();
+    context.stroke.mockClear();
+    renderer.setFocus("N000", false);
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    expect(context.stroke.mock.calls.length).toBeLessThanOrEqual(6);
+    expect(context.lineTo.mock.calls.length).toBeGreaterThan(5_941);
+    expect(context.lineTo.mock.calls.length).toBeLessThanOrEqual(6_440);
+
+    renderer.destroy();
+    surface.remove();
+    getContext.mockRestore();
+  });
+
   it("can update selection focus without recentering the 3D camera", async () => {
     const tree: NodeGraphTree = {
       id: "",
@@ -73,6 +188,7 @@ describe("large Node Graph canvas renderer", () => {
       path: id,
       visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
     }]));
+    const onSelect = vi.fn();
     const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(fakeContext() as never);
     const surface = document.body.createDiv();
     Object.defineProperties(surface, {
@@ -88,7 +204,7 @@ describe("large Node Graph canvas renderer", () => {
       {
         label: () => "Large Node Graph",
         onOpen: vi.fn(),
-        onSelect: vi.fn(),
+        onSelect,
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
@@ -96,6 +212,15 @@ describe("large Node Graph canvas renderer", () => {
     const cameraBeforeSelection = { ...(renderer as unknown as { camera3D: Record<string, number> }).camera3D };
     renderer.setFocus("B", false);
     expect((renderer as unknown as { camera3D: Record<string, number> }).camera3D).toEqual(cameraBeforeSelection);
+
+    const canvas = surface.querySelector<HTMLCanvasElement>("canvas");
+    canvas?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1, pointerType: "mouse" }));
+    canvas?.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerId: 1, pointerType: "mouse" }));
+    expect(onSelect).not.toHaveBeenCalled();
+
+    surface.style.setProperty("--background-primary", "#fefefe");
+    renderer.refreshPalette();
+    expect((renderer as unknown as { palette: { background: string } }).palette.background).toBe("#fefefe");
 
     renderer.destroy();
     surface.remove();
