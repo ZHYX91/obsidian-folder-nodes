@@ -53,6 +53,13 @@ type GraphDrag = {
   y: number;
 };
 
+type GraphPointer = {
+  readonly pan: boolean;
+  readonly pointerType: string;
+  x: number;
+  y: number;
+};
+
 export const NODE_GRAPH_VIEW_TYPE = "folder-nodes-node-graph";
 
 export class FolderNodeGraphView extends ItemView {
@@ -61,9 +68,12 @@ export class FolderNodeGraphView extends ItemView {
   private dimension: NodeGraphDimension = "2d";
   private camera: NodeGraphCamera = defaultNodeGraphCamera();
   private drag: GraphDrag | null = null;
+  private readonly pointers = new Map<number, GraphPointer>();
   private readonly nodeElements = new Map<string, HTMLElement>();
   private projected3D = new Map<string, NodeGraphProjectedPoint>();
   private threeDPoints: readonly NodeGraphPoint3D[] = [];
+  private threeDCanvas: HTMLElement | null = null;
+  private threeDSurface: HTMLElement | null = null;
   private threeDSvg: SVGSVGElement | null = null;
   private threeDViewport: { width: number; height: number } | null = null;
 
@@ -79,12 +89,19 @@ export class FolderNodeGraphView extends ItemView {
   public override getDisplayText(): string { return label("nodeGraph"); }
   public override getIcon(): string { return "git-fork"; }
   public override async onOpen(): Promise<void> { this.render(); }
+  public override onResize(): void {
+    this.resize3DViewport();
+  }
   public override async onClose(): Promise<void> {
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
+    this.threeDCanvas = null;
+    this.threeDSurface = null;
     this.threeDSvg = null;
+    this.threeDViewport = null;
     this.drag = null;
+    this.pointers.clear();
   }
 
   public setFocus(path: string | null): void {
@@ -99,8 +116,12 @@ export class FolderNodeGraphView extends ItemView {
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
+    this.threeDCanvas = null;
+    this.threeDSurface = null;
     this.threeDSvg = null;
+    this.threeDViewport = null;
     this.drag = null;
+    this.pointers.clear();
     this.contentEl.empty();
     this.contentEl.addClass("folder-nodes-node-graph-view");
     this.contentEl.toggleClass("is-3d", this.dimension === "3d");
@@ -215,8 +236,10 @@ export class FolderNodeGraphView extends ItemView {
     const width = Math.max(1, surface.clientWidth || this.contentEl.clientWidth || 800);
     const height = Math.max(1, surface.clientHeight || this.contentEl.clientHeight - 44 || 600);
     this.threeDViewport = { width, height };
+    this.threeDSurface = surface;
     this.threeDPoints = layoutNodeGraph3D(data.model);
     const canvas = surface.createDiv({ cls: "folder-nodes-node-graph-canvas folder-nodes-node-graph-canvas-3d" });
+    this.threeDCanvas = canvas;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     this.threeDSvg = this.edgeLayer(canvas, width, height);
@@ -326,26 +349,65 @@ export class FolderNodeGraphView extends ItemView {
   private bind3DInteraction(surface: HTMLElement): void {
     surface.addEventListener("pointerdown", (event) => {
       const target = event.target as Element | null;
-      if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
+      const startsOnNode = target?.closest(".folder-nodes-node-graph-node") !== null;
+      if (startsOnNode && !(event.pointerType === "touch" && this.pointers.size > 0)) return;
+      const pan = event.shiftKey || event.button === 1;
+      this.pointers.set(event.pointerId, {
+        pan,
+        pointerType: event.pointerType,
+        x: event.clientX,
+        y: event.clientY,
+      });
       this.drag = { pointerId: event.pointerId, pan: event.shiftKey || event.button === 1, x: event.clientX, y: event.clientY };
+      if (event.pointerType === "touch" && this.pointers.size > 1) this.drag = null;
       surface.setPointerCapture?.(event.pointerId);
       surface.addClass("is-dragging");
     });
     surface.addEventListener("pointermove", (event) => {
+      const pointer = this.pointers.get(event.pointerId);
+      if (pointer?.pointerType === "touch" && this.pointers.size > 1) {
+        const before = touchGesture(this.pointers.values());
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        const after = touchGesture(this.pointers.values());
+        if (before !== null && after !== null) {
+          this.camera = panNodeGraphCamera(this.camera, after.centerX - before.centerX, after.centerY - before.centerY);
+          if (before.distance > 0 && after.distance > 0) {
+            const factor = after.distance / before.distance;
+            this.camera = zoomNodeGraphCamera(this.camera, -Math.log(factor) / 0.0015);
+          }
+          this.update3DProjection();
+        }
+        return;
+      }
       if (this.drag === null || event.pointerId !== this.drag.pointerId) return;
       const deltaX = event.clientX - this.drag.x;
       const deltaY = event.clientY - this.drag.y;
       this.drag.x = event.clientX;
       this.drag.y = event.clientY;
+      if (pointer !== undefined) {
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+      }
       this.camera = this.drag.pan
         ? panNodeGraphCamera(this.camera, deltaX, deltaY)
         : rotateNodeGraphCamera(this.camera, deltaX, deltaY);
       this.update3DProjection();
     });
     const finish = (event: PointerEvent): void => {
-      if (this.drag === null || event.pointerId !== this.drag.pointerId) return;
-      this.drag = null;
-      surface.removeClass("is-dragging");
+      if (!this.pointers.delete(event.pointerId)) return;
+      if (this.pointers.size === 0) {
+        this.drag = null;
+        surface.removeClass("is-dragging");
+        return;
+      }
+      const remaining = this.pointers.entries().next().value;
+      this.drag = remaining === undefined ? null : {
+        pointerId: remaining[0],
+        pan: remaining[1].pan,
+        x: remaining[1].x,
+        y: remaining[1].y,
+      };
     };
     surface.addEventListener("pointerup", finish);
     surface.addEventListener("pointercancel", finish);
@@ -381,11 +443,28 @@ export class FolderNodeGraphView extends ItemView {
     this.applyFocus(false);
   }
 
+  private resize3DViewport(): void {
+    if (this.dimension !== "3d" || this.threeDSurface === null || this.threeDCanvas === null || this.threeDSvg === null) return;
+    const width = Math.max(1, this.threeDSurface.clientWidth || this.contentEl.clientWidth || 800);
+    const height = Math.max(1, this.threeDSurface.clientHeight || this.contentEl.clientHeight - 76 || 600);
+    if (this.threeDViewport?.width === width && this.threeDViewport.height === height) return;
+    this.threeDViewport = { width, height };
+    this.threeDCanvas.style.width = `${width}px`;
+    this.threeDCanvas.style.height = `${height}px`;
+    this.threeDSvg.setAttribute("width", String(width));
+    this.threeDSvg.setAttribute("height", String(height));
+    this.threeDSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    this.update3DProjection();
+  }
+
   private position3DNode(node: HTMLElement, point: NodeGraphProjectedPoint): void {
+    const scale = Math.max(0.65, Math.min(1.2, point.scale));
     node.style.left = `${point.x}px`;
     node.style.top = `${point.y}px`;
     node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));
-    node.style.transform = `translate(-50%, -50%) scale(${Math.max(0.65, Math.min(1.2, point.scale))})`;
+    node.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    node.removeClass("is-depth-near", "is-depth-mid", "is-depth-far");
+    node.addClass(scale >= 1.02 ? "is-depth-near" : scale >= 0.82 ? "is-depth-mid" : "is-depth-far");
   }
 
   private applyFocus(scrollIntoView: boolean): void {
@@ -421,6 +500,20 @@ export class FolderNodeGraphView extends ItemView {
     canvas.style.transform = `scale(${fit.scale})`;
     surface.scrollTo({ left: 0, top: 0, behavior: "smooth" });
   }
+}
+
+function touchGesture(pointers: Iterable<GraphPointer>): {
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly distance: number;
+} | null {
+  const [first, second] = [...pointers].filter(({ pointerType }) => pointerType === "touch");
+  if (first === undefined || second === undefined) return null;
+  return {
+    centerX: (first.x + second.x) / 2,
+    centerY: (first.y + second.y) / 2,
+    distance: Math.hypot(second.x - first.x, second.y - first.y),
+  };
 }
 
 function relationLabel(mode: NodeGraphRelationMode): string {

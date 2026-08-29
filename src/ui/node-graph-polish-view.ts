@@ -114,18 +114,25 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
   private decorateNodes(): void {
     const lines = [...this.contentEl.querySelectorAll<SVGLineElement>(".folder-nodes-node-graph-edges line")];
+    const relationCounts = new Map<string, { links: number; structure: number }>();
+    for (const line of lines) {
+      const structure = line.classList.contains("is-structure") ? 1 : 0;
+      const links = line.classList.contains("is-link") ? 1 : 0;
+      for (const path of [line.dataset.edgeSource, line.dataset.edgeTarget]) {
+        if (path === undefined) continue;
+        const counts = relationCounts.get(path) ?? { links: 0, structure: 0 };
+        counts.structure += structure;
+        counts.links += links;
+        relationCounts.set(path, counts);
+      }
+    }
     for (const node of this.graphNodeElements()) {
       const path = node.dataset.nodePath;
       if (path === undefined) continue;
       const baseTitle = node.dataset.nodeGraphBaseTitle ?? node.getAttribute("title") ?? path;
       node.dataset.nodeGraphBaseTitle = baseTitle;
-      const structure = lines.filter((line) => line.classList.contains("is-structure") && touches(line, path)).length;
-      const links = lines.filter((line) => line.classList.contains("is-link") && touches(line, path)).length;
-      node.setAttribute("title", `${baseTitle}\n${text("structureCount", structure)} · ${text("linkCount", links)}`);
-      if (!node.classList.contains("is-3d")) continue;
-      node.removeClass("is-depth-near", "is-depth-mid", "is-depth-far");
-      const scale = parseScale(node.style.transform);
-      node.addClass(scale >= 1.02 ? "is-depth-near" : scale >= 0.82 ? "is-depth-mid" : "is-depth-far");
+      const counts = relationCounts.get(path) ?? { links: 0, structure: 0 };
+      node.setAttribute("title", `${baseTitle}\n${text("structureCount", counts.structure)} · ${text("linkCount", counts.links)}`);
     }
   }
 
@@ -246,12 +253,6 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
 function touches(line: SVGLineElement, path: string): boolean {
   return line.dataset.edgeSource === path || line.dataset.edgeTarget === path;
-}
-
-function parseScale(transform: string): number {
-  const match = /scale\(([-+0-9.eE]+)\)/u.exec(transform);
-  const scale = Number(match?.[1] ?? 1);
-  return Number.isFinite(scale) ? scale : 1;
 }
 
 function text(

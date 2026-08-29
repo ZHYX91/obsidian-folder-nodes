@@ -64,7 +64,7 @@ describe("Node Graph UI polish", () => {
     expect(view.contentEl.querySelector("[data-node-path='A']")?.classList.contains("is-muted")).toBe(true);
     expect(view.contentEl.querySelector("[data-node-path='']")?.classList.contains("is-neighbor")).toBe(true);
     expect(view.contentEl.querySelector("line.is-connected")).not.toBeNull();
-    expect(view.contentEl.querySelector<HTMLElement>("[data-node-path='B']")?.title).toContain("Structure");
+    expect(view.contentEl.querySelector<HTMLElement>("[data-node-path='B']")?.title).toContain("Structure 1 · Links 0");
     await view.onClose();
   });
 

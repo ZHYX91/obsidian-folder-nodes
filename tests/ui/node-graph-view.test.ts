@@ -82,6 +82,39 @@ describe("Node Graph view interactions", () => {
     const node = view.contentEl.querySelector<HTMLButtonElement>("[data-node-path='A']");
     expect(node?.classList.contains("is-3d")).toBe(true);
     expect(node?.style.transform).toContain("translate(-50%, -50%) scale(");
+
+    const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    const canvas = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-3d");
+    const edges = view.contentEl.querySelector<SVGSVGElement>(".folder-nodes-node-graph-edges");
+    expect(surface).not.toBeNull();
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 360 },
+      clientWidth: { configurable: true, value: 640 },
+    });
+    view.onResize();
+    expect(canvas?.style.width).toBe("640px");
+    expect(canvas?.style.height).toBe("360px");
+    expect(edges?.getAttribute("viewBox")).toBe("0 0 640 360");
+
+    const transformsBeforeTouch = [...view.contentEl.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-node")]
+      .map((element) => element.style.transform);
+    surface?.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, clientX: 100, clientY: 100, pointerId: 1, pointerType: "touch",
+    }));
+    surface?.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, clientX: 200, clientY: 100, pointerId: 2, pointerType: "touch",
+    }));
+    surface?.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 150, clientY: 110, pointerId: 2, pointerType: "touch",
+    }));
+    const transformsAfterTouch = [...view.contentEl.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-node")]
+      .map((element) => element.style.transform);
+    expect(transformsAfterTouch).not.toEqual(transformsBeforeTouch);
+    surface?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 2, pointerType: "touch" }));
+    surface?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, pointerType: "touch" }));
+
+    surface?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100_000 }));
+    expect(node?.classList.contains("is-depth-far")).toBe(true);
     node?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(openFolderNode).toHaveBeenCalledWith("A", false);
 
