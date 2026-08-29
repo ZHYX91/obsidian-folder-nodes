@@ -220,9 +220,15 @@ export default class FolderNodesPlugin extends Plugin {
     menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => this.runAction(this.service.openFolderNode(folder.path, true))));
     menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(folder))));
     menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(folder))));
+    this.addOwnedNodeMenuItems(menu, folder);
     menu.addSeparator();
     this.addNodeMenuItems(menu, folder, false, "owned");
     this.showMenu(menu, anchor);
+  }
+
+  protected addOwnedNodeMenuItems(menu: Menu, folder: TFolder): void {
+    void menu;
+    void folder;
   }
 
   public promptVisual(folder: TFolder): void {
@@ -791,6 +797,11 @@ export default class FolderNodesPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeContentsView) leaf.view.refresh(batch.full ? undefined : batch.paths);
     }
+    this.refreshExtensionViews(batch);
+  }
+
+  protected refreshExtensionViews(batch: RefreshBatch): void {
+    void batch;
   }
 }
 

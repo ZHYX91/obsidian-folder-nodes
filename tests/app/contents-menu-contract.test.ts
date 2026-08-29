@@ -23,6 +23,7 @@ describe("Node Contents menu boundary", () => {
     expect(nodeMenu).not.toContain('workspace.trigger("file-menu"');
     expect(problemMenu).toContain('t("revealInExplorer")');
     expect(nodeMenu).toContain('t("revealInExplorer")');
+    expect(nodeMenu).toContain("this.addOwnedNodeMenuItems(menu, folder)");
   });
 
   it("continues to expose ordinary Files entries to other plugins", () => {

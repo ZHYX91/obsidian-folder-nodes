@@ -19,6 +19,16 @@ export class TFolder extends TAbstractFile {
 
 export class App {}
 export class Component { public onunload(): void {} }
+export class WorkspaceLeaf {}
+export class ItemView {
+  public readonly app: unknown;
+  public readonly containerEl = document.createElement("div");
+  public readonly contentEl = this.containerEl.createDiv();
+
+  public constructor(public readonly leaf: { readonly app: unknown }) {
+    this.app = leaf.app;
+  }
+}
 export class Modal {
   public closeCount = 0;
   public close(): void { this.closeCount += 1; }
