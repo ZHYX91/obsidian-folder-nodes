@@ -78,7 +78,7 @@ describe("Node Graph view interactions", () => {
       .find((button) => button.textContent === "3D");
     threeD?.click();
 
-    expect(view.contentEl.hasClass("is-3d")).toBe(true);
+    expect(view.contentEl.classList.contains("is-3d")).toBe(true);
     const node = view.contentEl.querySelector<HTMLButtonElement>("[data-node-path='A']");
     expect(node?.classList.contains("is-3d")).toBe(true);
     expect(node?.style.transform).toContain("translate(-50%, -50%) scale(");
