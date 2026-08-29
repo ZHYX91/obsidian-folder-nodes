@@ -10,10 +10,13 @@ describe("Node Graph integration contract", () => {
   const graphPlugin = source("src/app/node-graph-plugin.ts");
   const graphView = source("src/ui/node-graph-view.ts");
 
-  it("refreshes through the existing coalescing refresh path", () => {
+  it("refreshes through the existing coalescing Metadata Cache and refresh path", () => {
     expect(plugin).toContain("this.refreshExtensionViews(batch)");
+    expect(plugin).toContain('this.app.metadataCache.on("changed"');
+    expect(plugin).toContain('this.app.metadataCache.on("resolved"');
     expect(graphPlugin).toContain("protected override refreshExtensionViews");
     expect(graphPlugin).not.toContain("override refreshVisuals");
+    expect(graphView).toContain("this.app.metadataCache.resolvedLinks");
   });
 
   it("extends the owned Node Contents menu without exposing it as a generic file menu", () => {
@@ -22,10 +25,20 @@ describe("Node Graph integration contract", () => {
     expect(graphPlugin).toContain("this.addNodeGraphItem(menu, folder)");
   });
 
-  it("opens graph nodes with Enter and performs a scaled viewport fit", () => {
+  it("keeps one Workspace View for relation and dimension modes", () => {
+    expect(graphView).toContain('["structure", "links", "hybrid"]');
+    expect(graphView).toContain('["2d", "3d"]');
+    expect(graphView).toContain("buildNodeGraphModel(tree, links)");
+    expect(graphView).toContain("layoutNodeGraph3D(data.model)");
+  });
+
+  it("preserves Enter opening, 2D fit, and interactive 3D projection", () => {
     expect(graphView).toContain('node.addEventListener("keydown"');
     expect(graphView).toContain('event.key !== "Enter"');
     expect(graphView).toContain("fitNodeGraphViewport");
     expect(graphView).toContain("canvas.style.transform = `scale(${fit.scale})`");
+    expect(graphView).toContain('surface.addEventListener("pointermove"');
+    expect(graphView).toContain('surface.addEventListener("wheel"');
+    expect(graphView).toContain("this.update3DProjection()");
   });
 });
