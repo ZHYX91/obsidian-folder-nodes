@@ -1,1 +1,1 @@
-export { default } from "./src/app/plugin";
+export { default } from "./src/app/node-graph-plugin";
