@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
 
 function graphFixture() {
-  const root = Object.assign(new TFolder(), { children: [], name: "", path: "" });
-  const a = Object.assign(new TFolder(), { children: [], name: "A", path: "A", parent: root });
-  const b = Object.assign(new TFolder(), { children: [], name: "B", path: "B", parent: root });
+  const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
+  const a = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "A", path: "A", parent: root });
+  const b = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "B", path: "B", parent: root });
   const aNote = Object.assign(new TFile(), { name: "A.md", basename: "A", extension: "md", path: "A/A.md", parent: a });
   const bNote = Object.assign(new TFile(), { name: "B.md", basename: "B", extension: "md", path: "B/B.md", parent: b });
   root.children = [a, b];
