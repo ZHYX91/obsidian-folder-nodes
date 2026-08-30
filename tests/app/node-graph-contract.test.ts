@@ -32,7 +32,7 @@ describe("Node Graph integration contract", () => {
     expect(graphView).toContain('["structure", "links", "hybrid"]');
     expect(graphView).toContain('["2d", "3d"]');
     expect(graphView).toContain("buildNodeGraphModelFromNodes(");
-    expect(graphView).toContain("layoutNodeGraphForest(forest)");
+    expect(graphView).toContain("layoutNodeGraphForest(forest, { direction: settings.layoutDirection })");
     expect(graphView).toContain("points3D: layoutNodeGraph3D(model)");
   });
 

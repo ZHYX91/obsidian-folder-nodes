@@ -57,6 +57,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       nodeGraphEnabled: settings.nodeGraph.enabled,
       nodeGraphDefaultDimension: settings.nodeGraph.defaultDimension,
       nodeGraphDefaultRelationMode: settings.nodeGraph.defaultRelationMode,
+      nodeGraphLayoutDirection: settings.nodeGraph.layoutDirection,
       nodeGraphLocalDepth: settings.nodeGraph.localDepth,
       nodeGraphShowBoundaryNodes: settings.nodeGraph.showBoundaryNodes,
       prefixEnabled: settings.prefix.enabled,
@@ -105,6 +106,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       case "nodeGraphDefaultRelationMode":
         if (value !== "structure" && value !== "links" && value !== "hybrid") throw new Error("Unsupported Node Graph relation mode");
         settings.nodeGraph.defaultRelationMode = value;
+        break;
+      case "nodeGraphLayoutDirection":
+        if (value !== "left-to-right" && value !== "top-to-bottom") throw new Error("Unsupported Node Graph layout direction");
+        settings.nodeGraph.layoutDirection = value;
+        reconcileNodeGraph = true;
         break;
       case "nodeGraphLocalDepth": settings.nodeGraph.localDepth = this.graphInteger(value, 1, 8, 2); reconcileNodeGraph = true; break;
       case "nodeGraphShowBoundaryNodes": settings.nodeGraph.showBoundaryNodes = Boolean(value); reconcileNodeGraph = true; break;
@@ -242,6 +248,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       { name: t("enableNodeGraph"), desc: t("enableNodeGraphDesc"), control: { type: "toggle", key: "nodeGraphEnabled", defaultValue: true } },
       { name: t("nodeGraphDefaultRelation"), control: { type: "dropdown", key: "nodeGraphDefaultRelationMode", defaultValue: "structure", options: { structure: t("nodeGraphStructure"), links: t("nodeGraphLinks"), hybrid: t("nodeGraphHybrid") } } },
       { name: t("nodeGraphDefaultDimension"), control: { type: "dropdown", key: "nodeGraphDefaultDimension", defaultValue: "2d", options: { "2d": "2D", "3d": "3D" } } },
+      { name: t("nodeGraphLayoutDirection"), desc: t("nodeGraphLayoutDirectionDesc"), control: { type: "dropdown", key: "nodeGraphLayoutDirection", defaultValue: "left-to-right", options: { "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") } } },
       { name: t("nodeGraphLocalDepth"), desc: t("nodeGraphLocalDepthDesc"), control: { type: "slider", key: "nodeGraphLocalDepth", min: 1, max: 8, step: 1 } },
       { name: t("nodeGraphBoundaryNodes"), desc: t("nodeGraphBoundaryNodesDesc"), control: { type: "toggle", key: "nodeGraphShowBoundaryNodes", defaultValue: false } },
     ];
@@ -467,6 +474,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         if (value !== "2d" && value !== "3d") return;
         settings.defaultDimension = value;
         await this.saveNodeGraphSettings(false);
+      }));
+    new Setting(panel).setName(t("nodeGraphLayoutDirection")).setDesc(t("nodeGraphLayoutDirectionDesc")).addDropdown((dropdown) => dropdown
+      .addOptions({ "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") })
+      .setValue(settings.layoutDirection)
+      .onChange(async (value) => {
+        if (value !== "left-to-right" && value !== "top-to-bottom") return;
+        settings.layoutDirection = value;
+        await this.saveNodeGraphSettings(true);
       }));
     new Setting(panel).setName(t("nodeGraphLocalDepth")).setDesc(t("nodeGraphLocalDepthDesc")).addSlider((slider) => slider
       .setLimits(1, 8, 1)

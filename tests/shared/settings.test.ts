@@ -54,6 +54,7 @@ describe("settings", () => {
         enabled: false,
         defaultDimension: "3d",
         defaultRelationMode: "hybrid",
+        layoutDirection: "top-to-bottom",
         includedSubtrees: ["/Work/", "Work"],
         excludedNodes: ["Work/Private"],
         localDepth: 99,
@@ -65,6 +66,7 @@ describe("settings", () => {
       enabled: false,
       defaultDimension: "3d",
       defaultRelationMode: "hybrid",
+      layoutDirection: "top-to-bottom",
       includedSubtrees: ["Work"],
       excludedNodes: ["Work/Private"],
       localDepth: 8,
@@ -72,5 +74,6 @@ describe("settings", () => {
       overviewEdgeLimit: 100_000,
     });
     expect(normalizeSettings({ nodeGraph: "broken" }).nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
+    expect(normalizeSettings({ nodeGraph: { layoutDirection: "broken" } }).nodeGraph.layoutDirection).toBe("left-to-right");
   });
 });

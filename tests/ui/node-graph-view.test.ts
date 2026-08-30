@@ -48,6 +48,8 @@ describe("Node Graph view interactions", () => {
     await view.onOpen();
 
     const node = view.contentEl.querySelector<HTMLButtonElement>("[data-node-path='A']");
+    const rootNode = view.contentEl.querySelector<HTMLElement>("[data-node-path='']");
+    expect(Number.parseFloat(rootNode?.style.left ?? "0")).toBeLessThan(Number.parseFloat(node?.style.left ?? "0"));
     node?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
     expect(openFolderNode).toHaveBeenCalledWith("A", true);
 
@@ -72,6 +74,25 @@ describe("Node Graph view interactions", () => {
     hybridButton?.click();
     expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(1);
     expect(view.contentEl.querySelectorAll("line.is-structure")).toHaveLength(2);
+  });
+
+  it("switches the shared 2D graph between left-to-right and top-to-bottom settings", async () => {
+    const { app, service, visuals } = graphFixture();
+    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
+    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
+    await view.onOpen();
+
+    const initialRoot = view.contentEl.querySelector<HTMLElement>("[data-node-path='']");
+    const initialA = view.contentEl.querySelector<HTMLElement>("[data-node-path='A']");
+    expect(Number.parseFloat(initialRoot?.style.left ?? "0")).toBeLessThan(Number.parseFloat(initialA?.style.left ?? "0"));
+
+    graphSettings.layoutDirection = "top-to-bottom";
+    view.refresh();
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    const updatedRoot = view.contentEl.querySelector<HTMLElement>("[data-node-path='']");
+    const updatedA = view.contentEl.querySelector<HTMLElement>("[data-node-path='A']");
+    expect(Number.parseFloat(updatedRoot?.style.top ?? "0")).toBeLessThan(Number.parseFloat(updatedA?.style.top ?? "0"));
+    await view.onClose();
   });
 
   it("switches the same graph model into 3D and keeps focus/open interactions", async () => {

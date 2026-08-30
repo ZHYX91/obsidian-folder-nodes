@@ -11,7 +11,7 @@ describe("node graph layout", () => {
     ],
   };
 
-  it("places parents above children with deterministic coordinates", () => {
+  it("places parents left of children by default with deterministic coordinates", () => {
     const first = layoutNodeGraph(tree);
     const second = layoutNodeGraph(tree);
     expect(second).toEqual(first);
@@ -19,6 +19,15 @@ describe("node graph layout", () => {
     expect(positions.get("")?.depth).toBe(0);
     expect(positions.get("A")?.depth).toBe(1);
     expect(positions.get("A/C")?.depth).toBe(2);
+    expect(first.direction).toBe("left-to-right");
+    expect((positions.get("")?.x ?? 0) < (positions.get("A")?.x ?? 0)).toBe(true);
+    expect((positions.get("A")?.x ?? 0) < (positions.get("A/C")?.x ?? 0)).toBe(true);
+  });
+
+  it("can preserve the original top-to-bottom hierarchy", () => {
+    const layout = layoutNodeGraph(tree, { direction: "top-to-bottom" });
+    const positions = new Map(layout.nodes.map((node) => [node.id, node]));
+    expect(layout.direction).toBe("top-to-bottom");
     expect((positions.get("")?.y ?? 0) < (positions.get("A")?.y ?? 0)).toBe(true);
     expect((positions.get("A")?.y ?? 0) < (positions.get("A/C")?.y ?? 0)).toBe(true);
   });
@@ -93,5 +102,8 @@ describe("node graph layout", () => {
     expect(layout.nodes.map(({ id }) => id).sort()).toEqual(["External", "Work", "Work/A"]);
     expect(layout.nodes.some(({ id }) => id.includes("forest-root"))).toBe(false);
     expect(layout.edges).toEqual([{ source: "Work", target: "Work/A" }]);
+    expect(layout.direction).toBe("left-to-right");
+    const positions = new Map(layout.nodes.map((node) => [node.id, node]));
+    expect((positions.get("Work")?.x ?? 0) < (positions.get("Work/A")?.x ?? 0)).toBe(true);
   });
 });

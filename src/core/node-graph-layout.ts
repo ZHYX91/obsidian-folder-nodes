@@ -1,3 +1,5 @@
+import type { NodeGraphLayoutDirection } from "./types";
+
 export interface NodeGraphTree {
   readonly id: string;
   readonly children: readonly NodeGraphTree[];
@@ -9,6 +11,7 @@ export interface NodeGraphLayoutOptions {
   readonly horizontalGap?: number;
   readonly verticalGap?: number;
   readonly padding?: number;
+  readonly direction?: NodeGraphLayoutDirection;
 }
 
 export interface NodeGraphLayoutNode {
@@ -30,6 +33,7 @@ export interface NodeGraphLayout {
   readonly height: number;
   readonly nodeWidth: number;
   readonly nodeHeight: number;
+  readonly direction: NodeGraphLayoutDirection;
 }
 
 export interface NodeGraphViewportFit {
@@ -42,8 +46,10 @@ export interface NodeGraphViewportFit {
 
 const DEFAULT_NODE_WIDTH = 180;
 const DEFAULT_NODE_HEIGHT = 46;
-const DEFAULT_HORIZONTAL_GAP = 36;
-const DEFAULT_VERTICAL_GAP = 64;
+const DEFAULT_LEFT_TO_RIGHT_HORIZONTAL_GAP = 72;
+const DEFAULT_LEFT_TO_RIGHT_VERTICAL_GAP = 18;
+const DEFAULT_TOP_TO_BOTTOM_HORIZONTAL_GAP = 36;
+const DEFAULT_TOP_TO_BOTTOM_VERTICAL_GAP = 64;
 const DEFAULT_PADDING = 32;
 
 export function layoutNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOptions = {}): NodeGraphLayout {
@@ -55,7 +61,8 @@ export function layoutNodeGraphForest(roots: readonly NodeGraphTree[], options: 
     const nodeWidth = positive(options.nodeWidth, DEFAULT_NODE_WIDTH);
     const nodeHeight = positive(options.nodeHeight, DEFAULT_NODE_HEIGHT);
     const padding = nonNegative(options.padding, DEFAULT_PADDING);
-    return { nodes: [], edges: [], width: nodeWidth + padding * 2, height: nodeHeight + padding * 2, nodeWidth, nodeHeight };
+    const direction = layoutDirection(options.direction);
+    return { nodes: [], edges: [], width: nodeWidth + padding * 2, height: nodeHeight + padding * 2, nodeWidth, nodeHeight, direction };
   }
   if (roots.length === 1) {
     const root = roots[0];
@@ -64,26 +71,37 @@ export function layoutNodeGraphForest(roots: readonly NodeGraphTree[], options: 
   }
   const virtualRoot = "\u0000folder-nodes-forest-root";
   const base = layoutSingleNodeGraph({ id: virtualRoot, children: roots }, options);
-  const verticalStep = base.nodeHeight + nonNegative(options.verticalGap, DEFAULT_VERTICAL_GAP);
+  const horizontalGap = nonNegative(options.horizontalGap, defaultHorizontalGap(base.direction));
+  const verticalGap = nonNegative(options.verticalGap, defaultVerticalGap(base.direction));
+  const depthStep = base.direction === "left-to-right"
+    ? base.nodeWidth + horizontalGap
+    : base.nodeHeight + verticalGap;
   return {
     ...base,
-    nodes: base.nodes.filter(({ id }) => id !== virtualRoot).map((node) => ({ ...node, depth: node.depth - 1, y: node.y - verticalStep })),
+    nodes: base.nodes.filter(({ id }) => id !== virtualRoot).map((node) => ({
+      ...node,
+      depth: node.depth - 1,
+      x: base.direction === "left-to-right" ? node.x - depthStep : node.x,
+      y: base.direction === "top-to-bottom" ? node.y - depthStep : node.y,
+    })),
     edges: base.edges.filter(({ source }) => source !== virtualRoot),
-    height: Math.max(base.nodeHeight, base.height - verticalStep),
+    width: base.direction === "left-to-right" ? Math.max(base.nodeWidth, base.width - depthStep) : base.width,
+    height: base.direction === "top-to-bottom" ? Math.max(base.nodeHeight, base.height - depthStep) : base.height,
   };
 }
 
 function layoutSingleNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOptions): NodeGraphLayout {
   const nodeWidth = positive(options.nodeWidth, DEFAULT_NODE_WIDTH);
   const nodeHeight = positive(options.nodeHeight, DEFAULT_NODE_HEIGHT);
-  const horizontalGap = nonNegative(options.horizontalGap, DEFAULT_HORIZONTAL_GAP);
-  const verticalGap = nonNegative(options.verticalGap, DEFAULT_VERTICAL_GAP);
+  const direction = layoutDirection(options.direction);
+  const horizontalGap = nonNegative(options.horizontalGap, defaultHorizontalGap(direction));
+  const verticalGap = nonNegative(options.verticalGap, defaultVerticalGap(direction));
   const padding = nonNegative(options.padding, DEFAULT_PADDING);
   const nodes: NodeGraphLayoutNode[] = [];
   const edges: NodeGraphLayoutEdge[] = [];
-  let nextLeafX = padding;
+  let nextLeafPosition = padding;
   let maxDepth = 0;
-  let maxRight = padding + nodeWidth;
+  let maxBreadth = padding + (direction === "left-to-right" ? nodeHeight : nodeWidth);
   const positions = new Map<string, NodeGraphLayoutNode>();
   const pending: Array<{ readonly depth: number; readonly node: NodeGraphTree; readonly visited: boolean }> = [
     { depth: 0, node: root, visited: false },
@@ -108,34 +126,55 @@ function layoutSingleNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOpti
       edges.push({ source: node.id, target: child.id });
       return placed;
     });
-    let x: number;
+    let breadthPosition: number;
     if (placedChildren.length === 0) {
-      x = nextLeafX;
-      nextLeafX += nodeWidth + horizontalGap;
+      breadthPosition = nextLeafPosition;
+      nextLeafPosition += direction === "left-to-right"
+        ? nodeHeight + verticalGap
+        : nodeWidth + horizontalGap;
     } else {
       const first = placedChildren[0];
       const last = placedChildren[placedChildren.length - 1];
       if (first === undefined || last === undefined) throw new Error("Node Graph layout lost a child position");
-      x = (first.x + last.x) / 2;
+      breadthPosition = direction === "left-to-right"
+        ? (first.y + last.y) / 2
+        : (first.x + last.x) / 2;
     }
     const placed: NodeGraphLayoutNode = {
       id: node.id,
-      x,
-      y: padding + depth * (nodeHeight + verticalGap),
+      x: direction === "left-to-right" ? padding + depth * (nodeWidth + horizontalGap) : breadthPosition,
+      y: direction === "left-to-right" ? breadthPosition : padding + depth * (nodeHeight + verticalGap),
       depth,
     };
     nodes.push(placed);
     positions.set(node.id, placed);
-    maxRight = Math.max(maxRight, x + nodeWidth);
+    maxBreadth = Math.max(maxBreadth, breadthPosition + (direction === "left-to-right" ? nodeHeight : nodeWidth));
   }
   return {
     nodes,
     edges,
-    width: Math.max(nodeWidth + padding * 2, maxRight + padding),
-    height: padding * 2 + (maxDepth + 1) * nodeHeight + maxDepth * verticalGap,
+    width: direction === "left-to-right"
+      ? padding * 2 + (maxDepth + 1) * nodeWidth + maxDepth * horizontalGap
+      : Math.max(nodeWidth + padding * 2, maxBreadth + padding),
+    height: direction === "left-to-right"
+      ? Math.max(nodeHeight + padding * 2, maxBreadth + padding)
+      : padding * 2 + (maxDepth + 1) * nodeHeight + maxDepth * verticalGap,
     nodeWidth,
     nodeHeight,
+    direction,
   };
+}
+
+function layoutDirection(value: NodeGraphLayoutDirection | undefined): NodeGraphLayoutDirection {
+  return value === "top-to-bottom" ? "top-to-bottom" : "left-to-right";
+}
+
+function defaultHorizontalGap(direction: NodeGraphLayoutDirection): number {
+  return direction === "left-to-right" ? DEFAULT_LEFT_TO_RIGHT_HORIZONTAL_GAP : DEFAULT_TOP_TO_BOTTOM_HORIZONTAL_GAP;
+}
+
+function defaultVerticalGap(direction: NodeGraphLayoutDirection): number {
+  return direction === "left-to-right" ? DEFAULT_LEFT_TO_RIGHT_VERTICAL_GAP : DEFAULT_TOP_TO_BOTTOM_VERTICAL_GAP;
 }
 
 export function fitNodeGraphViewport(

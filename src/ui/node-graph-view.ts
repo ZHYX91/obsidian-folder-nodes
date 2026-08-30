@@ -350,7 +350,7 @@ export class FolderNodeGraphView extends ItemView {
     return {
       records,
       model,
-      layout: layoutNodeGraphForest(forest),
+      layout: layoutNodeGraphForest(forest, { direction: settings.layoutDirection }),
       points3D: layoutNodeGraph3D(model),
     };
   }
