@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 
 import { normalizeVaultPath } from "../core/paths";
+import { bestNodeGraphSearchPaths, nodeGraphSearchResults } from "../core/node-graph-search";
 import { resolvedLanguage } from "./i18n";
 import { FolderNodeGraphView } from "./node-graph-view";
 
@@ -118,7 +119,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
   private decorateNodes(): void {
     if (this.isCanvasGraph()) return;
-    const lines = [...this.contentEl.querySelectorAll<SVGLineElement>(".folder-nodes-node-graph-edges line")];
+    const lines = [...this.contentEl.querySelectorAll<SVGElement>(".folder-nodes-node-graph-edges [data-edge-source][data-edge-target]")];
     const relationCounts = new Map<string, { links: number; structure: number }>();
     for (const line of lines) {
       const structure = line.classList.contains("is-structure") ? 1 : 0;
@@ -198,7 +199,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
       return;
     }
     const selected = this.selectedPath;
-    const lines = [...this.contentEl.querySelectorAll<SVGLineElement>(".folder-nodes-node-graph-edges line")];
+    const lines = [...this.contentEl.querySelectorAll<SVGElement>(".folder-nodes-node-graph-edges [data-edge-source][data-edge-target]")];
     const neighbors = new Set<string>();
     if (selected !== null) {
       for (const line of lines) {
@@ -226,41 +227,15 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
       this.setCanvasSearchQuery(rawQuery);
       return;
     }
-    const query = rawQuery.trim().toLocaleLowerCase();
+    const matches = bestNodeGraphSearchPaths(this.graphSearchRecords(), rawQuery);
     for (const node of this.graphNodeElements()) {
       const path = node.dataset.nodePath ?? "";
-      const label = node.querySelector(".folder-nodes-node-graph-label")?.textContent ?? "";
-      const match = query !== "" && `${label}\n${path}`.toLocaleLowerCase().includes(query);
-      node.toggleClass("is-search-match", match);
+      node.toggleClass("is-search-match", matches.has(path));
     }
   }
 
   private firstSearchMatch(rawQuery: string): string | null {
-    const query = rawQuery.trim().toLocaleLowerCase();
-    if (query === "") return null;
-    if (this.isCanvasGraph()) {
-      const candidates = this.graphSearchRecords().flatMap(({ label, path }) => {
-        const normalizedLabel = label.toLocaleLowerCase();
-        const normalizedPath = path.toLocaleLowerCase();
-        if (!normalizedLabel.includes(query) && !normalizedPath.includes(query)) return [];
-        const rank = normalizedLabel === query ? 0 : normalizedLabel.startsWith(query) ? 1 : normalizedPath.startsWith(query) ? 2 : 3;
-        return [{ path, rank, label: normalizedLabel }];
-      });
-      candidates.sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label, "en"));
-      return candidates[0]?.path ?? null;
-    }
-    const candidates = this.graphNodeElements().flatMap((node) => {
-      const path = node.dataset.nodePath;
-      if (path === undefined) return [];
-      const label = node.querySelector(".folder-nodes-node-graph-label")?.textContent ?? "";
-      const normalizedLabel = label.toLocaleLowerCase();
-      const normalizedPath = path.toLocaleLowerCase();
-      if (!normalizedLabel.includes(query) && !normalizedPath.includes(query)) return [];
-      const rank = normalizedLabel === query ? 0 : normalizedLabel.startsWith(query) ? 1 : normalizedPath.startsWith(query) ? 2 : 3;
-      return [{ path, rank, label: normalizedLabel }];
-    });
-    candidates.sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label, "en"));
-    return candidates[0]?.path ?? null;
+    return nodeGraphSearchResults(this.graphSearchRecords(), rawQuery)[0]?.path ?? null;
   }
 
   private graphNodeElements(): HTMLElement[] {
@@ -268,7 +243,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 }
 
-function touches(line: SVGLineElement, path: string): boolean {
+function touches(line: SVGElement, path: string): boolean {
   return line.dataset.edgeSource === path || line.dataset.edgeTarget === path;
 }
 

@@ -27,6 +27,7 @@ import {
   type NodeGraphRelationMode,
 } from "../core/node-graph-model";
 import type { NodeVisual } from "../core/types";
+import { bestNodeGraphSearchPaths } from "../core/node-graph-search";
 import { renderVisual } from "../presentation/render-visual";
 
 export type NodeGraphCanvasDimension = "2d" | "3d";
@@ -46,7 +47,7 @@ export interface NodeGraphCanvasData {
 }
 
 interface NodeGraphCanvasCallbacks {
-  readonly label: (key: "boundaryNode" | "denseEdges" | "largeGraph" | "nodeGraph") => string;
+  readonly label: (key: "boundaryNode" | "denseEdges" | "largeGraph" | "nodeGraph" | "readableFit") => string;
   readonly onOpen: (path: string, newLeaf: boolean) => void;
   readonly onSelect: (path: string) => void;
   readonly overviewEdgeLimit?: number;
@@ -87,6 +88,10 @@ type EdgeBatchKey =
   | "structure-active"
   | "structure-muted";
 
+const MIN_READABLE_2D_ZOOM = 0.22;
+const MIN_READABLE_3D_ZOOM = 0.32;
+const DENSE_3D_DOT_THRESHOLD = 48;
+
 export class NodeGraphCanvasRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D | null;
@@ -123,6 +128,7 @@ export class NodeGraphCanvasRenderer {
   private overlayPath: string | null = null;
   private palette: CanvasPalette;
   private readonly relationCounts = new Map<string, { readonly links: number; readonly structure: number }>();
+  private readableFit = false;
   private searchMatches = new Set<string>();
   private visiblePoints: readonly NodeGraphCanvasPoint[] = [];
   private width = 1;
@@ -195,14 +201,29 @@ export class NodeGraphCanvasRenderer {
   }
 
   public fit(): void {
+    const targetPath = this.focusPath ?? [...this.data.model.nodes]
+      .sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id, "en"))[0]?.id ?? null;
     if (this.dimension === "2d") {
-      this.camera2D = fitNodeGraphCanvasCamera(
+      const target = targetPath === null ? undefined : this.layoutPositions.get(targetPath);
+      const fitted = fitNodeGraphCanvasCamera(
         { width: this.data.layout.width, height: this.data.layout.height },
         { width: this.width, height: this.height },
       );
+      this.readableFit = fitted.zoom < MIN_READABLE_2D_ZOOM;
+      this.camera2D = fitNodeGraphCanvasCamera(
+        { width: this.data.layout.width, height: this.data.layout.height },
+        { width: this.width, height: this.height },
+        32,
+        MIN_READABLE_2D_ZOOM,
+        target,
+      );
     } else {
-      this.camera3D = fitNodeGraphCamera(this.data.points3D, this.camera3D, this.width, this.height);
+      const fitted = fitNodeGraphCamera(this.data.points3D, this.camera3D, this.width, this.height);
+      this.readableFit = fitted.zoom < MIN_READABLE_3D_ZOOM;
+      this.camera3D = this.readableFit ? { ...fitted, zoom: MIN_READABLE_3D_ZOOM } : fitted;
+      if (this.readableFit && targetPath !== null) this.centerOn(targetPath);
     }
+    this.updateNotice();
     this.scheduleDraw();
   }
 
@@ -239,13 +260,7 @@ export class NodeGraphCanvasRenderer {
   }
 
   public setSearchQuery(rawQuery: string): void {
-    const query = rawQuery.trim().toLocaleLowerCase();
-    this.searchMatches.clear();
-    if (query !== "") {
-      for (const record of this.data.records.values()) {
-        if (`${record.label}\n${record.path}`.toLocaleLowerCase().includes(query)) this.searchMatches.add(record.path);
-      }
-    }
+    this.searchMatches = new Set(bestNodeGraphSearchPaths([...this.data.records.values()], rawQuery));
     this.scheduleDraw();
   }
 
@@ -265,6 +280,10 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
+    if (this.readableFit) {
+      this.readableFit = false;
+      this.updateNotice();
+    }
     this.pointers.set(event.pointerId, { pointerType: event.pointerType, x: event.clientX, y: event.clientY });
     const pan = this.dimension === "2d" || event.shiftKey || event.button === 1;
     this.drag = { moved: false, pan, pointerId: event.pointerId, travel: 0, x: event.clientX, y: event.clientY };
@@ -372,6 +391,10 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
+    if (this.readableFit) {
+      this.readableFit = false;
+      this.updateNotice();
+    }
     if (this.dimension === "2d") {
       this.camera2D = zoomNodeGraphCanvasCamera(this.camera2D, event.deltaY, event.offsetX, event.offsetY);
     } else {
@@ -489,6 +512,18 @@ export class NodeGraphCanvasRenderer {
     offset: number,
   ): void {
     const shifted = offsetLine(source.x, source.y, target.x, target.y, offset);
+    if (key.startsWith("link")) {
+      const control = linkControlPoint(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY);
+      this.edgeBatches[key].push(
+        shifted.sourceX,
+        shifted.sourceY,
+        control.x,
+        control.y,
+        shifted.targetX,
+        shifted.targetY,
+      );
+      return;
+    }
     this.edgeBatches[key].push(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY);
   }
 
@@ -502,9 +537,19 @@ export class NodeGraphCanvasRenderer {
     this.context.lineWidth = alpha === 1 ? 1.7 : 1;
     this.context.setLineDash(dashed ? [6, 5] : []);
     this.context.beginPath();
-    for (let index = 0; index < segments.length; index += 4) {
+    const curved = key.startsWith("link");
+    const stride = curved ? 6 : 4;
+    for (let index = 0; index < segments.length; index += stride) {
       this.context.moveTo(segments[index] ?? 0, segments[index + 1] ?? 0);
-      this.context.lineTo(segments[index + 2] ?? 0, segments[index + 3] ?? 0);
+      if (curved) {
+        this.context.quadraticCurveTo(
+          segments[index + 2] ?? 0,
+          segments[index + 3] ?? 0,
+          segments[index + 4] ?? 0,
+          segments[index + 5] ?? 0,
+        );
+      }
+      else this.context.lineTo(segments[index + 2] ?? 0, segments[index + 3] ?? 0);
     }
     this.context.stroke();
     this.context.restore();
@@ -526,14 +571,19 @@ export class NodeGraphCanvasRenderer {
     const match = this.searchMatches.has(point.id);
     const unrelated = this.focusPath !== null && !focused && !neighbor;
     const geometry = nodeGraphCanvasGeometry(point.scale);
+    const densityDot = this.dimension === "3d"
+      && this.data.model.nodes.length > DENSE_3D_DOT_THRESHOLD
+      && !focused
+      && !match
+      && point.id !== this.hoveredPath;
     const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, geometry.scale)) : 1;
     const alpha = unrelated ? 0.22 : (record.boundary === true ? 0.62 : 1) * depthAlpha;
     this.context.save();
     this.context.globalAlpha = alpha;
-    if (geometry.kind === "dot") {
+    if (geometry.kind === "dot" || densityDot) {
       this.context.fillStyle = focused || match ? this.palette.accent : record.visual.accent ?? this.palette.border;
       this.context.beginPath();
-      this.context.arc(point.x, point.y, geometry.radius, 0, Math.PI * 2);
+      this.context.arc(point.x, point.y, densityDot ? 4 : geometry.radius, 0, Math.PI * 2);
       this.context.fill();
       this.context.restore();
       return;
@@ -592,6 +642,11 @@ export class NodeGraphCanvasRenderer {
     for (const edge of this.incidentEdges.get(this.focusPath) ?? []) {
       this.neighbors.add(edge.source === this.focusPath ? edge.target : edge.source);
     }
+  }
+
+  private updateNotice(): void {
+    this.edgeLodNotice.setText(this.readableFit ? this.callbacks.label("readableFit") : this.callbacks.label("denseEdges"));
+    this.edgeLodNotice.hidden = !this.readableFit && !this.denseEdgeOverview;
   }
 
   private centerOn(path: string): void {
@@ -701,6 +756,20 @@ function lineMightBeVisible(
     && Math.min(source.x, target.x) <= width + padding
     && Math.max(source.y, target.y) >= -padding
     && Math.min(source.y, target.y) <= height + padding;
+}
+
+function linkControlPoint(sourceX: number, sourceY: number, targetX: number, targetY: number): {
+  readonly x: number;
+  readonly y: number;
+} {
+  const dx = targetX - sourceX;
+  const dy = targetY - sourceY;
+  const length = Math.hypot(dx, dy) || 1;
+  const bend = Math.min(96, Math.max(24, length * 0.14));
+  return {
+    x: (sourceX + targetX) / 2 - dy / length * bend,
+    y: (sourceY + targetY) / 2 + dx / length * bend,
+  };
 }
 
 function offsetLine(sourceX: number, sourceY: number, targetX: number, targetY: number, offset: number): {

@@ -66,14 +66,16 @@ describe("Node Graph view interactions", () => {
     const linksButton = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
       .find((button) => button.textContent === "Links");
     linksButton?.click();
-    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll("line.is-structure")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(0);
 
     const hybridButton = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
       .find((button) => button.textContent === "Hybrid");
     hybridButton?.click();
-    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll("line.is-structure")).toHaveLength(2);
+    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(2);
+    expect(view.contentEl.querySelector("path.is-link")?.getAttribute("d")).toContain(" Q ");
+    expect(view.contentEl.querySelector("path.is-structure")?.getAttribute("d")).toContain(" C ");
   });
 
   it("switches the shared 2D graph between left-to-right and top-to-bottom settings", async () => {
@@ -161,6 +163,11 @@ describe("Node Graph view interactions", () => {
     view.setGraphScope({ mode: "local", rootPath: "A" });
     expect(view.contentEl.querySelector("[data-node-path='']")).not.toBeNull();
     expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
+    expect(view.contentEl.querySelector("[data-node-path='B']")).toBeNull();
+
+    const links = [...view.contentEl.querySelectorAll<HTMLButtonElement>("[data-node-graph-switch='relation'] button")]
+      .find((button) => button.textContent === "Links");
+    links?.click();
     expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-boundary")).toBe(true);
 
     graphSettings.excludedNodes = ["A"];
@@ -178,14 +185,14 @@ describe("Node Graph view interactions", () => {
 
     expect(view.contentEl.querySelector("[data-node-path='A']")?.classList.contains("is-focused")).toBe(true);
     expect(view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-scope-action='local']")?.disabled).toBe(false);
-    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(0);
 
     view.setGraphScope({ mode: "global" });
-    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(1);
     (app.metadataCache.resolvedLinks as Record<string, Record<string, number>>)["A/A.md"] = {};
     view.refresh();
     await new Promise((resolve) => window.setTimeout(resolve, 80));
-    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(0);
   });
 
   it("starts traversal at configured include roots instead of scanning unrelated branches", async () => {
@@ -216,7 +223,7 @@ describe("Node Graph view interactions", () => {
     expect(view.contentEl.querySelector(".folder-nodes-node-graph-toolbar")).toBeNull();
   });
 
-  it("uses a constant-DOM canvas path above the large-graph threshold", async () => {
+  it("compacts a dense branch first and keeps the constant-DOM Canvas fallback for show-all", async () => {
     const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
     const folders = new Map<string, TFolder>();
     for (let index = 0; index < 501; index += 1) {
@@ -244,7 +251,7 @@ describe("Node Graph view interactions", () => {
     };
     const context = {
       arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-      lineTo: vi.fn(), moveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
+      lineTo: vi.fn(), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
       stroke: vi.fn(), strokeRect: vi.fn(),
     };
     const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
@@ -252,9 +259,15 @@ describe("Node Graph view interactions", () => {
     await view.onOpen();
     await new Promise((resolve) => window.setTimeout(resolve, 20));
 
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(17);
+    expect(view.contentEl.querySelector(".folder-nodes-node-graph-density-notice")?.textContent).toContain("485");
+    view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-density-action")?.click();
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+
     expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
     expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges line")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges path")).toHaveLength(0);
     expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-focus-overlay")).toHaveLength(1);
 
     view.setFocus("N500");
@@ -321,7 +334,7 @@ describe("Node Graph view interactions", () => {
     };
     const context = {
       arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-      lineTo: vi.fn(), moveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
+      lineTo: vi.fn(), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
       stroke: vi.fn(), strokeRect: vi.fn(),
     };
     const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
@@ -337,7 +350,7 @@ describe("Node Graph view interactions", () => {
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
     expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges line")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges path")).toHaveLength(0);
 
     await view.onClose();
     getContext.mockRestore();

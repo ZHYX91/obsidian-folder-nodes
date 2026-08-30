@@ -75,16 +75,26 @@ export function fitNodeGraphCanvasCamera(
   content: NodeGraphCanvasSize,
   viewport: NodeGraphCanvasSize,
   padding = 32,
+  minimumZoom = 0,
+  focus?: { readonly x: number; readonly y: number },
 ): NodeGraphCanvasCamera {
   const contentWidth = positive(content.width, 1);
   const contentHeight = positive(content.height, 1);
   const viewportWidth = positive(viewport.width, 1);
   const viewportHeight = positive(viewport.height, 1);
   const inset = Math.max(0, padding);
-  const zoom = clamp(Math.min(
+  const fittedZoom = clamp(Math.min(
     Math.max(1, viewportWidth - inset * 2) / contentWidth,
     Math.max(1, viewportHeight - inset * 2) / contentHeight,
   ), 0.000_01, 8);
+  const zoom = clamp(Math.max(fittedZoom, minimumZoom), 0.000_01, 8);
+  if (focus !== undefined && zoom > fittedZoom) {
+    return {
+      zoom,
+      panX: viewportWidth / 2 - focus.x * zoom,
+      panY: viewportHeight / 2 - focus.y * zoom,
+    };
+  }
   return {
     zoom,
     panX: (viewportWidth - contentWidth * zoom) / 2,

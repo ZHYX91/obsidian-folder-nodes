@@ -8,7 +8,7 @@ import { NodeGraphCanvasRenderer } from "../../src/ui/node-graph-canvas-renderer
 function fakeContext() {
   return {
     arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-    lineTo: vi.fn(), moveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
+    lineTo: vi.fn(), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
     stroke: vi.fn(), strokeRect: vi.fn(),
   };
 }
@@ -51,9 +51,11 @@ describe("large Node Graph canvas renderer", () => {
 
     expect(model.nodes).toHaveLength(20_000);
     expect(surface.querySelectorAll("canvas")).toHaveLength(1);
-    expect(surface.querySelectorAll("svg, line")).toHaveLength(0);
+    expect(surface.querySelectorAll("svg, line, path")).toHaveLength(0);
     expect(surface.querySelectorAll("button")).toHaveLength(1);
-    expect(context.fill).toHaveBeenCalled();
+    expect(context.fillRect).toHaveBeenCalled();
+    expect((renderer as unknown as { camera2D: { zoom: number } }).camera2D.zoom).toBeGreaterThanOrEqual(0.22);
+    expect(surface.querySelector<HTMLElement>(".folder-nodes-node-graph-edge-lod")?.hidden).toBe(false);
 
     renderer.destroy();
     expect(surface.querySelectorAll("canvas, button")).toHaveLength(0);
@@ -96,7 +98,8 @@ describe("large Node Graph canvas renderer", () => {
     );
     await new Promise((resolve) => window.setTimeout(resolve, 30));
 
-    expect(context.arc).toHaveBeenCalledTimes(20_000);
+    expect(context.arc.mock.calls.length).toBeGreaterThan(0);
+    expect(context.arc.mock.calls.length).toBeLessThan(20_000);
     expect(context.fillText).not.toHaveBeenCalled();
     renderer.setFocus("N19998", true);
     await new Promise((resolve) => window.setTimeout(resolve, 30));
@@ -161,15 +164,17 @@ describe("large Node Graph canvas renderer", () => {
     expect(surface.dataset.nodeGraphEdgeLod).toBe("overview");
     expect(surface.querySelector<HTMLElement>(".folder-nodes-node-graph-edge-lod")?.hidden).toBe(false);
     expect(context.stroke.mock.calls.length).toBeLessThanOrEqual(6);
-    expect(context.lineTo.mock.calls.length).toBeLessThanOrEqual(6_000);
+    expect(context.lineTo.mock.calls.length + context.quadraticCurveTo.mock.calls.length).toBeLessThanOrEqual(6_000);
+    const overviewCount = (renderer as unknown as { drawnEdges: () => readonly unknown[] }).drawnEdges().length;
 
     context.lineTo.mockClear();
+    context.quadraticCurveTo.mockClear();
     context.stroke.mockClear();
     renderer.setFocus("N000", false);
     await new Promise((resolve) => window.setTimeout(resolve, 30));
     expect(context.stroke.mock.calls.length).toBeLessThanOrEqual(6);
-    expect(context.lineTo.mock.calls.length).toBeGreaterThan(5_941);
-    expect(context.lineTo.mock.calls.length).toBeLessThanOrEqual(6_440);
+    expect((renderer as unknown as { drawnEdges: () => readonly unknown[] }).drawnEdges().length).toBeGreaterThan(overviewCount);
+    expect((renderer as unknown as { drawnEdges: () => readonly unknown[] }).drawnEdges().length).toBeLessThanOrEqual(overviewCount + 499);
 
     renderer.destroy();
     surface.remove();

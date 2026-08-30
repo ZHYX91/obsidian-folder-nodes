@@ -274,30 +274,31 @@
   pointer-events: none;
 }
 
-.folder-nodes-node-graph-edges line {
+.folder-nodes-node-graph-edges line,
+.folder-nodes-node-graph-edges path {
   fill: none;
   vector-effect: non-scaling-stroke;
   transition: opacity 120ms ease, stroke-width 120ms ease;
 }
 
-.folder-nodes-node-graph-edges line.is-structure {
+.folder-nodes-node-graph-edges .is-structure {
   stroke: var(--background-modifier-border-hover);
   stroke-width: 1.75;
 }
 
-.folder-nodes-node-graph-edges line.is-link {
+.folder-nodes-node-graph-edges .is-link {
   stroke: var(--interactive-accent);
   stroke-width: 1.5;
   stroke-dasharray: 6 5;
   opacity: 0.85;
 }
 
-.folder-nodes-node-graph-edges line.is-connected {
+.folder-nodes-node-graph-edges .is-connected {
   stroke-width: 2.5;
   opacity: 1;
 }
 
-.folder-nodes-node-graph-edges line.is-muted {
+.folder-nodes-node-graph-edges .is-muted {
   opacity: 0.08;
 }
 
@@ -335,6 +336,31 @@
 .folder-nodes-node-graph-node.is-3d.is-depth-far {
   opacity: 0.72;
   box-shadow: none;
+}
+
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:not(.is-focused):not(:hover) {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  gap: 0;
+  background: var(--background-modifier-border-hover);
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:not(.is-focused):not(:hover) .folder-nodes-node-graph-icon,
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:not(.is-focused):not(:hover) .folder-nodes-node-graph-label {
+  display: none;
+}
+
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:hover {
+  z-index: 10000 !important;
+  width: 180px;
+  min-height: 46px;
+  background: var(--background-secondary);
+  border-radius: 10px;
+  box-shadow: var(--shadow-l);
 }
 
 .folder-nodes-node-graph-node:hover {
@@ -453,6 +479,40 @@
   font-size: var(--font-ui-smaller);
 }
 
+.folder-nodes-node-graph-density-notice {
+  position: absolute;
+  z-index: 22;
+  top: 88px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 6px 9px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-s);
+  transform: translateX(-50%);
+}
+
+.folder-nodes-node-graph-density-action {
+  flex: none;
+  width: auto;
+  padding: 2px 7px;
+  color: var(--text-accent);
+  font-size: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.folder-nodes-node-graph-density-action:hover {
+  background: var(--background-modifier-hover);
+}
+
 .folder-nodes-node-graph-entry {
   display: flex;
   justify-content: flex-end;
@@ -500,5 +560,10 @@
 
   .folder-nodes-node-graph-3d-hint {
     display: none;
+  }
+
+  .folder-nodes-node-graph-density-notice {
+    max-width: calc(100% - 12px);
+    white-space: normal;
   }
 }

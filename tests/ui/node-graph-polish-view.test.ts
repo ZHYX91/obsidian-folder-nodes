@@ -63,7 +63,7 @@ describe("Node Graph UI polish", () => {
     expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-focused")).toBe(true);
     expect(view.contentEl.querySelector("[data-node-path='A']")?.classList.contains("is-muted")).toBe(true);
     expect(view.contentEl.querySelector("[data-node-path='']")?.classList.contains("is-neighbor")).toBe(true);
-    expect(view.contentEl.querySelector("line.is-connected")).not.toBeNull();
+    expect(view.contentEl.querySelector("path.is-connected")).not.toBeNull();
     expect(view.contentEl.querySelector<HTMLElement>("[data-node-path='B']")?.title).toContain("Structure 1 · Links 0");
     await view.onClose();
   });
@@ -89,7 +89,7 @@ describe("Node Graph UI polish", () => {
     await view.onClose();
   });
 
-  it("keeps search, focus, legend, and 3D switching on the large canvas path", async () => {
+  it("keeps search, focus, legend, and 3D switching in a compact large-graph overview", async () => {
     const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
     const folders = new Map<string, TFolder>();
     for (let index = 0; index < 501; index += 1) {
@@ -106,12 +106,6 @@ describe("Node Graph UI polish", () => {
       openFolderNode: vi.fn(async () => undefined),
     };
     const visuals = { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const };
-    const context = {
-      arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-      lineTo: vi.fn(), moveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
-      stroke: vi.fn(), strokeRect: vi.fn(),
-    };
-    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
     const view = new PolishedFolderNodeGraphView({ app } as never, service, visuals);
     await view.onOpen();
     const search = view.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search-input");
@@ -122,15 +116,16 @@ describe("Node Graph UI polish", () => {
       search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     }
     await new Promise((resolve) => window.setTimeout(resolve, 20));
-    expect(view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay")?.dataset.nodePath).toBe("N500");
+    expect(view.contentEl.querySelector("[data-node-path='N500']")?.classList.contains("is-focused")).toBe(true);
+    expect(view.contentEl.querySelector(".folder-nodes-node-graph-density-notice")).not.toBeNull();
     expect(view.contentEl.querySelector(".folder-nodes-node-graph-legend-line.is-structure")).not.toBeNull();
 
     const threeD = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-toolbar-primary .folder-nodes-node-graph-switch-button")]
       .find((button) => button.textContent === "3D");
     threeD?.click();
     expect(view.contentEl.classList.contains("is-3d")).toBe(true);
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node.is-3d")).toHaveLength(17);
     await view.onClose();
-    getContext.mockRestore();
   });
 });

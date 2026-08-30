@@ -13,6 +13,10 @@ import {
   type NodeGraphProjectedPoint,
 } from "../core/node-graph-3d";
 import { shouldUseNodeGraphCanvas } from "../core/node-graph-canvas";
+import {
+  NODE_GRAPH_DENSITY_THRESHOLD,
+  nodeGraphDensityOverview,
+} from "../core/node-graph-density";
 import { normalizeNodeGraphLinks } from "../core/node-graph-links";
 import { fitNodeGraphViewport, layoutNodeGraphForest, type NodeGraphLayout, type NodeGraphTree } from "../core/node-graph-layout";
 import { buildNodeGraphModelFromNodes, edgesForMode, type NodeGraphModel, type NodeGraphModelEdge } from "../core/node-graph-model";
@@ -83,6 +87,8 @@ type GraphPointer = {
 
 export const NODE_GRAPH_VIEW_TYPE = "folder-nodes-node-graph";
 const NODE_GRAPH_DOM_MIN_SCALE = 0.65;
+const NODE_GRAPH_DENSE_3D_THRESHOLD = 24;
+const NODE_GRAPH_DENSE_3D_FIT_SCALE = 0.16;
 
 export class FolderNodeGraphView extends ItemView {
   private focusPath: string | null = null;
@@ -101,6 +107,10 @@ export class FolderNodeGraphView extends ItemView {
   private threeDViewport: { width: number; height: number } | null = null;
   private canvasRenderer: NodeGraphCanvasRenderer | null = null;
   private graphData: GraphData | null = null;
+  private displayGraphData: GraphData | null = null;
+  private showAllDensityNodes = false;
+  private hiddenBranchCount = 0;
+  private denseThreeD = false;
   private refreshGeneration = 0;
   private refreshTimer: number | null = null;
 
@@ -148,6 +158,7 @@ export class FolderNodeGraphView extends ItemView {
     this.canvasRenderer?.destroy();
     this.canvasRenderer = null;
     this.graphData = null;
+    this.displayGraphData = null;
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
@@ -161,6 +172,15 @@ export class FolderNodeGraphView extends ItemView {
 
   public setFocus(path: string | null): void {
     this.focusPath = path === null ? null : normalizeVaultPath(path);
+    if (this.focusPath !== null
+      && this.graphData?.records.has(this.focusPath) === true
+      && this.displayGraphData?.records.has(this.focusPath) === false) {
+      this.render();
+      if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
+      else if (this.dimension === "3d") this.center3DOnFocus();
+      else this.applyFocus(true);
+      return;
+    }
     if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
     else if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
     else this.applyFocus(true);
@@ -172,6 +192,8 @@ export class FolderNodeGraphView extends ItemView {
     if (JSON.stringify(normalized) === JSON.stringify(this.graphScope)) return;
     this.graphScope = normalized;
     this.graphData = null;
+    this.displayGraphData = null;
+    this.showAllDensityNodes = false;
     if (normalized.mode !== "global") this.focusPath = normalized.rootPath;
     this.render();
   }
@@ -184,6 +206,7 @@ export class FolderNodeGraphView extends ItemView {
       this.refreshTimer = null;
       if (generation !== this.refreshGeneration) return;
       this.graphData = null;
+      this.displayGraphData = null;
       this.render();
     }, 50);
   }
@@ -191,6 +214,9 @@ export class FolderNodeGraphView extends ItemView {
   private render(): void {
     this.canvasRenderer?.destroy();
     this.canvasRenderer = null;
+    this.displayGraphData = null;
+    this.hiddenBranchCount = 0;
+    this.denseThreeD = false;
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
@@ -211,8 +237,12 @@ export class FolderNodeGraphView extends ItemView {
       return;
     }
 
-    const data = this.graphData ?? this.buildGraphData();
-    this.graphData = data;
+    const sourceData = this.graphData ?? this.buildGraphData();
+    this.graphData = sourceData;
+    const data = this.buildDisplayGraphData(sourceData);
+    this.displayGraphData = data;
+    this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
+    this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
@@ -222,13 +252,14 @@ export class FolderNodeGraphView extends ItemView {
     }
     else if (this.dimension === "2d") this.render2D(surface, data, fit);
     else this.render3D(surface, data, fit);
+    this.renderDensityNotice(sourceData.records.size);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
     this.didRender();
   }
 
   protected didRender(): void {}
 
-  protected currentGraphModel(): NodeGraphModel | null { return this.graphData?.model ?? null; }
+  protected currentGraphModel(): NodeGraphModel | null { return this.displayGraphData?.model ?? null; }
   protected currentRelationMode(): NodeGraphRelationMode { return this.relationMode; }
   protected currentDimension(): NodeGraphDimension { return this.dimension; }
   protected currentGraphScope(): NodeGraphScope { return this.graphScope; }
@@ -236,7 +267,9 @@ export class FolderNodeGraphView extends ItemView {
   protected setCanvasSearchQuery(query: string): void { this.canvasRenderer?.setSearchQuery(query); }
   protected setCanvasSelectionFocus(path: string | null): void { this.canvasRenderer?.setFocus(path, false); }
   protected graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
-    return this.graphData === null ? [] : [...this.graphData.records.values()];
+    if (this.graphData === null) return [];
+    return [...this.graphData.records.values()]
+      .filter((record) => this.relationMode !== "structure" || !record.boundary);
   }
   protected onNodeSelected(_path: string): void {}
 
@@ -330,6 +363,10 @@ export class FolderNodeGraphView extends ItemView {
     }
     if (this.graphScope.mode === "local" || settings.showBoundaryNodes) this.addLinkNeighborRecords(records, settings);
 
+    return this.graphDataFromRecords(records);
+  }
+
+  private graphDataFromRecords(records: ReadonlyMap<string, GraphRecord>): GraphData {
     const sources = [...records.values()].flatMap((record) => record.notePath === null
       ? []
       : [{ nodeId: record.path, notePath: record.notePath }]);
@@ -350,9 +387,46 @@ export class FolderNodeGraphView extends ItemView {
     return {
       records,
       model,
-      layout: layoutNodeGraphForest(forest, { direction: settings.layoutDirection }),
+      layout: layoutNodeGraphForest(forest, { direction: this.settings().layoutDirection }),
       points3D: layoutNodeGraph3D(model),
     };
+  }
+
+  private buildDisplayGraphData(source: GraphData): GraphData {
+    this.hiddenBranchCount = 0;
+    const relationSource = this.relationMode === "structure" && [...source.records.values()].some((record) => record.boundary)
+      ? this.graphDataFromRecords(new Map([...source.records].filter(([, record]) => !record.boundary)))
+      : source;
+    if (this.showAllDensityNodes || relationSource.records.size <= NODE_GRAPH_DENSITY_THRESHOLD) return relationSource;
+    const overview = nodeGraphDensityOverview(
+      [...relationSource.records.values()].map(({ path, parentPath }) => ({ id: path, parentId: parentPath })),
+      this.focusPath,
+      new Set<string>(),
+      this.graphScope.mode === "global" ? 16 : 12,
+      this.graphScope.mode === "global" ? 1 : 2,
+      16,
+    );
+    this.hiddenBranchCount = overview.hiddenBranchCount;
+    if (overview.hiddenBranchCount === 0) return relationSource;
+    const visibleRecords = new Map([...relationSource.records].filter(([path]) => overview.visibleIds.has(path)));
+    return this.graphDataFromRecords(visibleRecords);
+  }
+
+  private renderDensityNotice(sourceNodeCount: number): void {
+    if (sourceNodeCount <= NODE_GRAPH_DENSITY_THRESHOLD) return;
+    const compact = !this.showAllDensityNodes && this.hiddenBranchCount > 0;
+    if (!compact && !this.showAllDensityNodes) return;
+    const notice = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-density-notice", attr: { role: "status" } });
+    notice.createSpan({ text: densityMessage(compact, this.hiddenBranchCount) });
+    const button = notice.createEl("button", {
+      cls: "folder-nodes-node-graph-density-action",
+      text: densityAction(compact),
+      attr: { type: "button" },
+    });
+    button.addEventListener("click", () => {
+      this.showAllDensityNodes = compact;
+      this.render();
+    });
   }
 
   private collectLocalRecords(records: Map<string, GraphRecord>, settings: NodeGraphSettings): void {
@@ -467,14 +541,7 @@ export class FolderNodeGraphView extends ItemView {
       const source = positions.get(edge.source);
       const target = positions.get(edge.target);
       if (source === undefined || target === undefined) continue;
-      this.renderRelationEdge(
-        svg,
-        edge,
-        source.x + layout.nodeWidth / 2,
-        source.y + layout.nodeHeight / 2,
-        target.x + layout.nodeWidth / 2,
-        target.y + layout.nodeHeight / 2,
-      );
+      this.render2DRelationEdge(svg, edge, source, target, layout);
     }
     for (const position of layout.nodes) {
       const record = data.records.get(position.id);
@@ -523,7 +590,7 @@ export class FolderNodeGraphView extends ItemView {
         this.threeDViewport.width,
         this.threeDViewport.height,
         48,
-        NODE_GRAPH_DOM_MIN_SCALE,
+        this.denseThreeD ? NODE_GRAPH_DENSE_3D_FIT_SCALE : NODE_GRAPH_DOM_MIN_SCALE,
       );
       this.update3DProjection();
     });
@@ -573,30 +640,69 @@ export class FolderNodeGraphView extends ItemView {
     targetY: number,
   ): void {
     if (this.relationMode !== "links" && edge.structure) {
-      this.line(svg, edge.source, edge.target, sourceX, sourceY, targetX, targetY, "is-structure", 0);
+      this.path(svg, edge.source, edge.target, straightEdgePath(sourceX, sourceY, targetX, targetY), "is-structure", 0);
     }
     if (this.relationMode !== "structure" && edge.link) {
       const offset = this.relationMode === "hybrid" && edge.structure ? 4 : 0;
       const shifted = offsetLine(sourceX, sourceY, targetX, targetY, offset);
-      this.line(svg, edge.source, edge.target, shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY, "is-link", offset);
+      this.path(
+        svg,
+        edge.source,
+        edge.target,
+        linkedEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY),
+        "is-link",
+        offset,
+      );
     }
   }
 
-  private line(
+  private render2DRelationEdge(
+    svg: SVGSVGElement,
+    edge: NodeGraphModelEdge,
+    source: NodeGraphLayout["nodes"][number],
+    target: NodeGraphLayout["nodes"][number],
+    layout: NodeGraphLayout,
+  ): void {
+    const sourceX = source.x + layout.nodeWidth / 2;
+    const sourceY = source.y + layout.nodeHeight / 2;
+    const targetX = target.x + layout.nodeWidth / 2;
+    const targetY = target.y + layout.nodeHeight / 2;
+    if (this.relationMode !== "links" && edge.structure) {
+      this.path(
+        svg,
+        edge.source,
+        edge.target,
+        hierarchyEdgePath(sourceX, sourceY, targetX, targetY, layout),
+        "is-structure",
+        0,
+      );
+    }
+    if (this.relationMode !== "structure" && edge.link) {
+      const offset = this.relationMode === "hybrid" && edge.structure ? 7 : 0;
+      const shifted = offsetLine(sourceX, sourceY, targetX, targetY, offset);
+      this.path(
+        svg,
+        edge.source,
+        edge.target,
+        linkedEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY),
+        "is-link",
+        offset,
+      );
+    }
+  }
+
+  private path(
     svg: SVGSVGElement,
     source: string,
     target: string,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
+    pathData: string,
     kind: "is-link" | "is-structure",
     offset: number,
   ): void {
-    svg.createSvg("line", {
+    svg.createSvg("path", {
       cls: kind,
       attr: {
-        x1: String(x1), y1: String(y1), x2: String(x2), y2: String(y2),
+        d: pathData,
         "data-edge-source": source,
         "data-edge-target": target,
         "data-edge-offset": String(offset),
@@ -716,19 +822,18 @@ export class FolderNodeGraphView extends ItemView {
       const node = this.nodeElements.get(point.id);
       if (node !== undefined) this.position3DNode(node, point);
     }
-    for (const line of this.threeDSvg.querySelectorAll<SVGLineElement>("line[data-edge-source][data-edge-target]")) {
-      const sourceId = line.dataset.edgeSource;
-      const targetId = line.dataset.edgeTarget;
+    for (const edgeElement of this.threeDSvg.querySelectorAll<SVGPathElement>("path[data-edge-source][data-edge-target]")) {
+      const sourceId = edgeElement.dataset.edgeSource;
+      const targetId = edgeElement.dataset.edgeTarget;
       if (sourceId === undefined || targetId === undefined) continue;
       const source = this.projected3D.get(sourceId);
       const target = this.projected3D.get(targetId);
       if (source === undefined || target === undefined) continue;
-      const offset = Number(line.dataset.edgeOffset ?? 0);
+      const offset = Number(edgeElement.dataset.edgeOffset ?? 0);
       const shifted = offsetLine(source.x, source.y, target.x, target.y, Number.isFinite(offset) ? offset : 0);
-      line.setAttribute("x1", String(shifted.sourceX));
-      line.setAttribute("y1", String(shifted.sourceY));
-      line.setAttribute("x2", String(shifted.targetX));
-      line.setAttribute("y2", String(shifted.targetY));
+      edgeElement.setAttribute("d", edgeElement.classList.contains("is-link")
+        ? linkedEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY)
+        : straightEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY));
     }
     this.applyFocus(false);
   }
@@ -819,8 +924,22 @@ function relationSummary(structure: number, links: number): string {
     : `Structure ${structure} · Links ${links}`;
 }
 
+function densityMessage(compact: boolean, hiddenBranchCount: number): string {
+  const zh = resolvedLanguage() === "zh-CN";
+  if (!compact) return zh ? "当前显示全部节点" : "Showing all nodes";
+  return zh
+    ? `大型图谱已保持可读比例，收起 ${hiddenBranchCount} 个分支`
+    : `Large graph kept readable with ${hiddenBranchCount} branches collapsed`;
+}
+
+function densityAction(compact: boolean): string {
+  const zh = resolvedLanguage() === "zh-CN";
+  if (compact) return zh ? "显示全部" : "Show all";
+  return zh ? "恢复精简" : "Restore overview";
+}
+
 function label(
-  key: "allNodes" | "boundaryNode" | "denseEdges" | "dimension" | "disabledGraph" | "fitGraph" | "globalScope" | "largeGraph" | "localScope" | "nodeGraph" | "relationship" | "scope" | "subtreeScope",
+  key: "allNodes" | "boundaryNode" | "denseEdges" | "dimension" | "disabledGraph" | "fitGraph" | "globalScope" | "largeGraph" | "localScope" | "nodeGraph" | "readableFit" | "relationship" | "scope" | "subtreeScope",
 ): string {
   const zh = resolvedLanguage() === "zh-CN";
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
@@ -833,9 +952,43 @@ function label(
   if (key === "scope") return zh ? "图谱范围" : "Graph scope";
   if (key === "largeGraph") return zh ? "大型节点图谱；拖动平移或旋转，滚轮缩放，回车打开所选节点" : "Large Node Graph; drag to pan or rotate, wheel to zoom, Enter to open the selected node";
   if (key === "denseEdges") return zh ? "稠密关系概览 · 聚焦节点以显示其全部关系" : "Dense relation overview · focus a node to show all of its relations";
+  if (key === "readableFit") return zh ? "图谱过大，已保持可读比例并聚焦当前节点" : "Graph is too large to fit legibly; keeping a readable scale around the focused node";
   if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";
   if (key === "relationship") return zh ? "关系模式" : "Relationship mode";
   return zh ? "维度" : "Dimension";
+}
+
+function straightEdgePath(sourceX: number, sourceY: number, targetX: number, targetY: number): string {
+  return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+}
+
+function hierarchyEdgePath(
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+  layout: NodeGraphLayout,
+): string {
+  if (layout.direction === "left-to-right") {
+    const startX = sourceX + layout.nodeWidth / 2;
+    const endX = targetX - layout.nodeWidth / 2;
+    const middleX = (startX + endX) / 2;
+    return `M ${startX} ${sourceY} C ${middleX} ${sourceY}, ${middleX} ${targetY}, ${endX} ${targetY}`;
+  }
+  const startY = sourceY + layout.nodeHeight / 2;
+  const endY = targetY - layout.nodeHeight / 2;
+  const middleY = (startY + endY) / 2;
+  return `M ${sourceX} ${startY} C ${sourceX} ${middleY}, ${targetX} ${middleY}, ${targetX} ${endY}`;
+}
+
+function linkedEdgePath(sourceX: number, sourceY: number, targetX: number, targetY: number): string {
+  const dx = targetX - sourceX;
+  const dy = targetY - sourceY;
+  const length = Math.hypot(dx, dy) || 1;
+  const bend = Math.min(96, Math.max(24, length * 0.14));
+  const controlX = (sourceX + targetX) / 2 - dy / length * bend;
+  const controlY = (sourceY + targetY) / 2 + dx / length * bend;
+  return `M ${sourceX} ${sourceY} Q ${controlX} ${controlY}, ${targetX} ${targetY}`;
 }
 
 function offsetLine(sourceX: number, sourceY: number, targetX: number, targetY: number, offset: number): {
