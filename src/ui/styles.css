@@ -144,6 +144,42 @@ body {
 
 .folder-nodes-settings-guide-note { color: var(--text-faint); }
 
+.folder-nodes-node-graph-settings-tree {
+  max-block-size: 420px;
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+}
+
+.folder-nodes-node-graph-settings-row {
+  display: flex;
+  align-items: center;
+  min-block-size: 36px;
+  padding-inline: calc(8px + var(--folder-nodes-node-depth, 0) * 14px) 6px;
+  border-block-end: 1px solid var(--background-modifier-border-hover);
+}
+
+.folder-nodes-node-graph-settings-row:last-child { border-block-end: 0; }
+
+.folder-nodes-node-graph-settings-path {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-nodes-node-graph-settings-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.folder-nodes-node-graph-settings-actions .clickable-icon.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
 .folder-nodes-icon-comparison {
   display: grid;
   grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr);

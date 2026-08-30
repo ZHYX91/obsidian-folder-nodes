@@ -31,6 +31,16 @@ Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符�
 
 `icon` 是唯一 Node Visual 属性，使用 Obsidian Properties 可表达的 Text 或扁平 Text List，不接受嵌套对象。列表中的基础候选可以是 Vault 图片 WikiLink、已知 Lucide、一个可见扩展字素（文字、符号或 Emoji）；按顺序使用第一个实际可显示的基础候选，缺失图片会继续尝试本节点后续项。第一个有效 `color:` 项直接为 Lucide/文字前景着色。Emoji/位图/SVG 保留原像素，不增加圆点、背景或边框；只有所有基础候选都失败时，颜色才成为居中的实心圆形色标。未知项或多字素项会被诊断，不能通过 Picker 保存；多个颜色以第一个为准。只有当前节点的整组声明都无法显示时才继承最近祖先，不把当前颜色与祖先图标组合。属性图标统一放入固定且无边框的图标位，并以文字的字重、大小和颜色与文件名开头的相同字符区分。File Explorer 图标可位于名称前、名称后或隐藏，也可作为 Node Note 可编辑标题之外的独立图标显示。文字图标继承 Obsidian 界面字体；Emoji 默认使用系统彩色字体栈，“图标与外观”只显示从 Segoe UI Emoji、Apple Color Emoji、Noto Color Emoji、Twemoji Mozilla、OpenMoji 固定集合中检测到的字体，提供复杂序列预览，并在已保存字体不可用时安全回退。高级用户仍可覆盖字体 CSS 变量。File Explorer 是唯一全局 Node Tree，并以置顶 Root 行开始。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files，三段分别分页。三类条目都提供右键、More actions 与 Shift+F10 菜单入口。桌面端 Node 可用 before/into/after 拖放排序或换父级，单个 Album/Files 条目可拖入 Node、当前节点或 breadcrumb；Android 仅通过菜单/原生移动执行相同写操作，不暴露 draggable。内容多选用于插入或复制 WikiLink。无有效 visual 的子节点不绘制大 fallback 图标；GIF 只提取静态帧，视频只显示类型 tile，音频留在 Files。插件不在侧栏中提供动图、视频或音频播放。
 
+## 节点图谱
+
+节点图谱是插件自有 workspace view，不修改 Obsidian 原生 Graph View。结构始终是有方向的父子骨架；“显示链接”是独立叠加，新建视图默认关闭。旧 workspace 的 Structure 状态迁移为关闭，Links/Hybrid 迁移为开启。已解析 canonical-note 链接使用独立视觉，不改变结构布局；只有链接叠加开启时，局部范围才加入直接链接邻居。稳定的从左到右或从上到下 2D 与按深度分层的 3D 共用同一份过滤场景。
+
+可见性在布局前按渐进展开计算。全局默认 Root 与一级；子树默认选中节点与直接子级；局部额外加入一个父级作为上下文，默认选中节点与直接子级，并且只允许在当前选中节点的完整子树内继续向下展开。用户可以同时保留多个已展开分支，通过节点把手切换直接子级，使用 Alt 展开整支，也可从当前范围锚点展开 1/2/3 层或全部后代并收回一级。全部展开不再二次确认。范围、焦点、维度和“显示链接”写入 workspace state；每个范围的分支展开与活动搜索快照只在会话内存在，重启后重置。
+
+每个节点都有规范化 visual/父级把手、负责选择并打开 canonical Node Note 的主体，以及叶子隐藏、其他节点显示子级数量和状态的子级把手。自身 visual、继承 visual、Folder 回退与 Root Home 回退共用同一固定图标位。搜索使用 Obsidian 原生 SearchComponent；内部或外部聚焦时展开隐藏祖先并居中，清除后恢复搜索前的展开、焦点与镜头快照。所有控件都有 Tooltip、键盘入口、明确 accessible name 和至少 44px 的粗指针命中区。
+
+完整图谱目录只构建一次，再根据 Node、Metadata Cache、反向引用与 refresh batch 增量刷新。范围、展开、搜索、维度和链接显示只过滤该目录，不重复扫描 Vault。大图使用常量 DOM 的 Canvas 场景，保留所有可见结构边，只限制可选链接叠加；2D 保持可读最小缩放，3D 把远处节点显示为圆点并只在聚焦或悬停时显示完整卡片。密集状态只出现在工具栏或状态区，不覆盖图谱。
+
 ## 结构安全
 
 Folder Nodes 不使用初始化或接管状态；启用后立即识别完整、不完整、不管理和冲突结构，并只对明确配对的完整节点执行自动重命名同步。原生创建不自动补全或移动内容。文件夹侧与 Markdown 侧缺失时都显示中性的“不完整节点”，提供显式补全和“设为不管理”；真正的配对冲突才使用警告。可选批量整理使用可取消的分批只读扫描，逐路径显示将创建、移动、跳过和阻止的内容；提交前重新核对预览，提交后验证结构，任一步失败都 rollback。Health 严格只读，不显示写入按钮。完整节点删除使用系统回收站。插件不联网。

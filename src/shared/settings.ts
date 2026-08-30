@@ -1,5 +1,16 @@
 import { isEmojiFontPreference } from "../core/emoji-font";
-import type { FolderNodesSettings, NamingPart } from "../core/types";
+import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core/types";
+
+export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = {
+  enabled: true,
+  defaultDimension: "2d",
+  layoutDirection: "left-to-right",
+  includedSubtrees: [],
+  excludedNodes: [],
+  excludedSubtrees: [],
+  largeGraphThreshold: 500,
+  overviewEdgeLimit: 6_000,
+};
 
 export const DEFAULT_SETTINGS: FolderNodesSettings = {
   language: "auto",
@@ -14,6 +25,7 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = {
   leafNotePrefixes: [".", "_"],
   ignoredFolderPrefixes: [".", "_"],
   addSelectionAlias: true,
+  nodeGraph: structuredClone(DEFAULT_NODE_GRAPH_SETTINGS),
   prefix: {
     enabled: false,
     source: "current-file",
@@ -48,10 +60,31 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     leafNotePrefixes: normalizePrefixes(input.leafNotePrefixes, DEFAULT_SETTINGS.leafNotePrefixes),
     ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes, DEFAULT_SETTINGS.ignoredFolderPrefixes),
     addSelectionAlias: input.addSelectionAlias !== false,
+    nodeGraph: normalizeNodeGraphSettings(input.nodeGraph),
     prefix: normalizeNamingPart(input.prefix, DEFAULT_SETTINGS.prefix),
     suffix: normalizeNamingPart(input.suffix, DEFAULT_SETTINGS.suffix),
     timestampFormat: typeof input.timestampFormat === "string" ? input.timestampFormat : DEFAULT_SETTINGS.timestampFormat,
   };
+}
+
+function normalizeNodeGraphSettings(value: unknown): NodeGraphSettings {
+  const input = typeof value === "object" && value !== null ? value as Partial<NodeGraphSettings> : {};
+  return {
+    enabled: input.enabled !== false,
+    defaultDimension: input.defaultDimension === "3d" ? "3d" : "2d",
+    layoutDirection: input.layoutDirection === "top-to-bottom" ? "top-to-bottom" : "left-to-right",
+    includedSubtrees: normalizePaths(input.includedSubtrees, DEFAULT_NODE_GRAPH_SETTINGS.includedSubtrees),
+    excludedNodes: normalizePaths(input.excludedNodes, DEFAULT_NODE_GRAPH_SETTINGS.excludedNodes),
+    excludedSubtrees: normalizePaths(input.excludedSubtrees, DEFAULT_NODE_GRAPH_SETTINGS.excludedSubtrees),
+    largeGraphThreshold: normalizeInteger(input.largeGraphThreshold, 50, 10_000, DEFAULT_NODE_GRAPH_SETTINGS.largeGraphThreshold),
+    overviewEdgeLimit: normalizeInteger(input.overviewEdgeLimit, 100, 100_000, DEFAULT_NODE_GRAPH_SETTINGS.overviewEdgeLimit),
+  };
+}
+
+function normalizeInteger(value: unknown, minimum: number, maximum: number, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(minimum, Math.min(maximum, Math.round(value)))
+    : fallback;
 }
 
 function normalizeNamingPart(value: unknown, fallback: NamingPart): NamingPart {

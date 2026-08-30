@@ -2,16 +2,19 @@ import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinition
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
+import { normalizeNodeGraphLinks } from "../core/node-graph-links";
+import { nodeGraphParentPath, nodeGraphPathDepth, nodeGraphPathIsConfigured } from "../core/node-graph-scope";
 import type { NamingPart } from "../core/types";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { setLanguage, t } from "../ui/i18n";
 import { renderVisual } from "../presentation/render-visual";
 
-type TabId = "general" | "homepage" | "icons" | "naming";
+type TabId = "general" | "homepage" | "icons" | "naming" | "nodeGraph";
 type ExemptionKind = "leaf" | "folder";
+type NodeGraphRuleKind = "excludedNodes" | "excludedSubtrees" | "includedSubtrees";
 
-const TABS: TabId[] = ["general", "homepage", "icons", "naming"];
+const TABS: TabId[] = ["general", "homepage", "icons", "naming", "nodeGraph"];
 
 // Declarative settings are intentionally inactive. Obsidian 1.13 bypasses
 // display() for non-empty definitions, removing the established top-tab surface
@@ -36,6 +39,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       { type: "page", name: t("homepage"), items: this.homepageDefinitions() },
       { type: "page", name: t("icons"), items: this.iconDefinitions() },
       { type: "page", name: t("naming"), items: this.namingDefinitions() },
+      { type: "page", name: t("nodeGraph"), items: this.nodeGraphDefinitions() },
     ];
   }
 
@@ -50,6 +54,9 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       explorerIconPosition: settings.explorerIconPosition,
       showIconInNoteTitle: settings.showIconInNoteTitle,
       addSelectionAlias: settings.addSelectionAlias,
+      nodeGraphEnabled: settings.nodeGraph.enabled,
+      nodeGraphDefaultDimension: settings.nodeGraph.defaultDimension,
+      nodeGraphLayoutDirection: settings.nodeGraph.layoutDirection,
       prefixEnabled: settings.prefix.enabled,
       prefixSource: settings.prefix.source,
       prefixSeparator: settings.prefix.separator,
@@ -65,6 +72,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   public override async setControlValue(key: string, value: unknown): Promise<void> {
     const settings = this.plugin.settings;
+    let reconcileNodeGraph = false;
     switch (key) {
       case "language":
         if (value !== "auto" && value !== "zh-CN" && value !== "en") throw new Error("Unsupported language");
@@ -87,6 +95,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         break;
       case "showIconInNoteTitle": settings.showIconInNoteTitle = Boolean(value); this.plugin.refreshVisuals(); break;
       case "addSelectionAlias": settings.addSelectionAlias = Boolean(value); break;
+      case "nodeGraphEnabled": settings.nodeGraph.enabled = Boolean(value); reconcileNodeGraph = true; break;
+      case "nodeGraphDefaultDimension":
+        if (value !== "2d" && value !== "3d") throw new Error("Unsupported Node Graph dimension");
+        settings.nodeGraph.defaultDimension = value;
+        break;
+      case "nodeGraphLayoutDirection":
+        if (value !== "left-to-right" && value !== "top-to-bottom") throw new Error("Unsupported Node Graph layout direction");
+        settings.nodeGraph.layoutDirection = value;
+        reconcileNodeGraph = true;
+        break;
       case "prefixEnabled": settings.prefix.enabled = Boolean(value); break;
       case "prefixSource": settings.prefix.source = this.namingSource(value); break;
       case "prefixSeparator": settings.prefix.separator = String(value); break;
@@ -99,6 +117,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       default: throw new Error(`Unsupported Folder Nodes setting: ${key}`);
     }
     await this.plugin.saveSettings();
+    if (reconcileNodeGraph) await this.plugin.reconcileSettingsChange();
     updateDeclarativeSettingTab(this);
   }
 
@@ -118,7 +137,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     if (this.activeTab === "general") this.renderGeneral(panel);
     else if (this.activeTab === "homepage") this.renderHomepage(panel);
     else if (this.activeTab === "icons") this.renderIcons(panel);
-    else this.renderNaming(panel);
+    else if (this.activeTab === "naming") this.renderNaming(panel);
+    else this.renderNodeGraph(panel);
     this.revealActiveTab(tabs);
   }
 
@@ -156,7 +176,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private tabLabel(id: TabId): string {
-    return id === "general" ? t("general") : id === "homepage" ? t("homepage") : id === "icons" ? t("icons") : t("naming");
+    return id === "general" ? t("general")
+      : id === "homepage" ? t("homepage")
+        : id === "icons" ? t("icons")
+          : id === "naming" ? t("naming") : t("nodeGraph");
   }
   private tabId(id: TabId): string { return `folder-nodes-settings-tab-${id}`; }
   private panelId(id: TabId): string { return `folder-nodes-settings-panel-${id}`; }
@@ -208,6 +231,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       { name: `${t("suffix")}: ${t("customText")}`, visible: settings.suffix.enabled && settings.suffix.source === "custom", control: { type: "text", key: "suffixCustomText" } },
       { name: t("timestampFormat"), desc: t("timestampFormatDesc"), control: { type: "text", key: "timestampFormat" } },
       { name: t("preview"), desc: this.plugin.previewSelectionName(t("sampleSelection")), searchable: false },
+    ];
+  }
+
+  private nodeGraphDefinitions(): SettingDefinitionItem[] {
+    return [
+      { name: t("enableNodeGraph"), desc: t("enableNodeGraphDesc"), control: { type: "toggle", key: "nodeGraphEnabled", defaultValue: true } },
+      { name: t("nodeGraphDefaultDimension"), control: { type: "dropdown", key: "nodeGraphDefaultDimension", defaultValue: "2d", options: { "2d": "2D", "3d": "3D" } } },
+      { name: t("nodeGraphLayoutDirection"), desc: t("nodeGraphLayoutDirectionDesc"), control: { type: "dropdown", key: "nodeGraphLayoutDirection", defaultValue: "left-to-right", options: { "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") } } },
     ];
   }
 
@@ -398,6 +429,226 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const preview = panel.createDiv({ cls: "folder-nodes-name-preview" });
     preview.createEl("strong", { text: `${t("preview")}: ` });
     preview.createSpan({ cls: "folder-nodes-name-preview-value", text: this.plugin.previewSelectionName(t("sampleSelection")) });
+  }
+
+  private renderNodeGraph(panel: HTMLElement): void {
+    const settings = this.plugin.settings.nodeGraph;
+    new Setting(panel)
+      .setName(t("enableNodeGraph"))
+      .setDesc(t("enableNodeGraphDesc"))
+      .addToggle((toggle) => toggle.setValue(settings.enabled).onChange(async (value) => {
+        settings.enabled = value;
+        await this.saveNodeGraphSettings(true);
+        this.display();
+      }));
+    if (!settings.enabled) {
+      panel.createEl("p", { cls: "setting-item-description", text: t("nodeGraphDisabledDesc") });
+      return;
+    }
+
+    new Setting(panel).setName(t("nodeGraphDefaults")).setDesc(t("nodeGraphDefaultsDesc")).setHeading();
+    new Setting(panel).setName(t("nodeGraphDefaultDimension")).addDropdown((dropdown) => dropdown
+      .addOptions({ "2d": "2D", "3d": "3D" })
+      .setValue(settings.defaultDimension)
+      .onChange(async (value) => {
+        if (value !== "2d" && value !== "3d") return;
+        settings.defaultDimension = value;
+        await this.saveNodeGraphSettings(false);
+      }));
+    new Setting(panel).setName(t("nodeGraphLayoutDirection")).setDesc(t("nodeGraphLayoutDirectionDesc")).addDropdown((dropdown) => dropdown
+      .addOptions({ "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") })
+      .setValue(settings.layoutDirection)
+      .onChange(async (value) => {
+        if (value !== "left-to-right" && value !== "top-to-bottom") return;
+        settings.layoutDirection = value;
+        await this.saveNodeGraphSettings(true);
+      }));
+    new Setting(panel).setName(t("nodeGraphPerformance")).setDesc(t("nodeGraphPerformanceDesc")).setHeading();
+    this.renderGraphNumberSetting(panel, "largeGraphThreshold", t("nodeGraphCanvasThreshold"), t("nodeGraphCanvasThresholdDesc"), 50, 10_000);
+    this.renderGraphNumberSetting(panel, "overviewEdgeLimit", t("nodeGraphEdgeLimit"), t("nodeGraphEdgeLimitDesc"), 100, 100_000);
+
+    const managedPaths = this.managedNodePaths();
+    const summary = this.nodeGraphSummary(managedPaths);
+    new Setting(panel)
+      .setName(t("nodeGraphCurrentScope"))
+      .setDesc(t("nodeGraphCurrentScopeDesc", { nodes: summary.nodes, edges: summary.edges }));
+
+    new Setting(panel).setName(t("nodeGraphScopeRules")).setDesc(t("nodeGraphScopeRulesDesc")).setHeading();
+    this.renderNodeGraphRuleList(panel, "includedSubtrees", t("nodeGraphIncludedSubtrees"), t("nodeGraphIncludedSubtreesDesc"));
+    this.renderNodeGraphRuleList(panel, "excludedNodes", t("nodeGraphExcludedNodes"), t("nodeGraphExcludedNodesDesc"));
+    this.renderNodeGraphRuleList(panel, "excludedSubtrees", t("nodeGraphExcludedSubtrees"), t("nodeGraphExcludedSubtreesDesc"));
+    this.renderNodeGraphTree(panel, managedPaths);
+  }
+
+  private renderGraphNumberSetting(
+    panel: HTMLElement,
+    key: "largeGraphThreshold" | "overviewEdgeLimit",
+    name: string,
+    description: string,
+    minimum: number,
+    maximum: number,
+  ): void {
+    new Setting(panel).setName(name).setDesc(description).addText((text) => {
+      text.inputEl.type = "number";
+      text.inputEl.min = String(minimum);
+      text.inputEl.max = String(maximum);
+      text.setValue(String(this.plugin.settings.nodeGraph[key])).onChange(async (value) => {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return;
+        this.plugin.settings.nodeGraph[key] = this.graphInteger(parsed, minimum, maximum, this.plugin.settings.nodeGraph[key]);
+        await this.saveNodeGraphSettings(true);
+      });
+    });
+  }
+
+  private renderNodeGraphRuleList(panel: HTMLElement, kind: NodeGraphRuleKind, name: string, description: string): void {
+    const paths = this.plugin.settings.nodeGraph[kind];
+    new Setting(panel).setName(name).setDesc(description).addButton((button) => button
+      .setButtonText(t("addPathRule"))
+      .onClick(() => this.promptNodeGraphRule(kind)));
+    if (paths.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("nodeGraphNoRules") });
+    for (const path of paths) new Setting(panel)
+      .setName(path)
+      .addExtraButton((button) => button
+        .setIcon("trash-2")
+        .setTooltip(t("remove"))
+        .onClick(() => void this.removeNodeGraphRule(kind, path)));
+  }
+
+  private renderNodeGraphTree(panel: HTMLElement, paths: readonly string[]): void {
+    const controls = new Setting(panel).setName(t("nodeGraphNodePicker")).setDesc(t("nodeGraphNodePickerDesc"));
+    const tree = panel.createDiv({ cls: "folder-nodes-node-graph-settings-tree", attr: { role: "tree" } });
+    const render = (query: string): void => {
+      tree.empty();
+      const normalizedQuery = query.trim().toLocaleLowerCase();
+      const matches = paths.filter((path) => normalizedQuery === "" || path.toLocaleLowerCase().includes(normalizedQuery));
+      const visible = matches.slice(0, 200);
+      for (const path of visible) this.renderNodeGraphTreeRow(tree, path);
+      if (visible.length === 0) tree.createDiv({ cls: "setting-item-description", text: t("nodeGraphNoMatchingNodes") });
+      else if (visible.length < matches.length) {
+        tree.createDiv({ cls: "setting-item-description", text: t("nodeGraphMoreMatches") });
+      }
+    };
+    controls.addSearch((search) => search.setPlaceholder(t("nodeGraphFindNode")).onChange(render));
+    render("");
+  }
+
+  private renderNodeGraphTreeRow(container: HTMLElement, path: string): void {
+    const settings = this.plugin.settings.nodeGraph;
+    const row = container.createDiv({ cls: "folder-nodes-node-graph-settings-row" });
+    row.setAttribute("role", "treeitem");
+    row.setAttribute("aria-level", String(Math.max(1, nodeGraphPathDepth(path))));
+    row.style.setProperty("--folder-nodes-node-depth", String(Math.max(0, nodeGraphPathDepth(path) - 1)));
+    row.createSpan({ cls: "folder-nodes-node-graph-settings-path", text: path });
+    const actions = row.createDiv({ cls: "folder-nodes-node-graph-settings-actions" });
+    this.graphRuleButton(actions, "list-tree", t("nodeGraphIncludeSubtree"), settings.includedSubtrees.includes(path), () => {
+      void this.toggleNodeGraphRule("includedSubtrees", path);
+    });
+    this.graphRuleButton(actions, "eye-off", t("nodeGraphHideNode"), settings.excludedNodes.includes(path), () => {
+      void this.toggleNodeGraphRule("excludedNodes", path);
+    });
+    this.graphRuleButton(actions, "folder-x", t("nodeGraphHideSubtree"), settings.excludedSubtrees.includes(path), () => {
+      void this.toggleNodeGraphRule("excludedSubtrees", path);
+    });
+  }
+
+  private graphRuleButton(container: HTMLElement, iconName: string, title: string, active: boolean, action: () => void): void {
+    const button = container.createEl("button", {
+      cls: `clickable-icon${active ? " is-active" : ""}`,
+      attr: { "aria-label": title, "aria-pressed": String(active), title, type: "button" },
+    });
+    setIcon(button, iconName);
+    button.addEventListener("click", action);
+  }
+
+  private managedNodePaths(): string[] {
+    const paths: string[] = [];
+    const pending = [""];
+    const seen = new Set<string>();
+    while (pending.length > 0) {
+      const path = pending.pop();
+      if (path === undefined || seen.has(path)) continue;
+      seen.add(path);
+      if (path !== "") paths.push(path);
+      const children = this.plugin.service.children(path).map(({ childPath }) => childPath).sort((left, right) => right.localeCompare(left, "en"));
+      pending.push(...children);
+    }
+    return paths.sort((left, right) => left.localeCompare(right, "en"));
+  }
+
+  private nodeGraphSummary(managedPaths: readonly string[]): { readonly edges: number; readonly nodes: number } {
+    const settings = this.plugin.settings.nodeGraph;
+    const paths = [
+      ...(nodeGraphPathIsConfigured("", settings) ? [""] : []),
+      ...managedPaths.filter((path) => nodeGraphPathIsConfigured(path, settings)),
+    ];
+    const pathSet = new Set(paths);
+    const sources = paths.flatMap((path) => {
+      const note = this.plugin.service.getCanonicalFile(path);
+      return note === null ? [] : [{ nodeId: path, notePath: note.path }];
+    });
+    const noteToNode = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
+    const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, noteToNode);
+    const edges = new Set<string>();
+    for (const path of paths) {
+      const parent = nodeGraphParentPath(path);
+      if (parent !== null && pathSet.has(parent)) edges.add(this.graphEdgeKey(path, parent));
+    }
+    for (const [source, targets] of links) for (const target of targets) edges.add(this.graphEdgeKey(source, target));
+    return { nodes: paths.length, edges: edges.size };
+  }
+
+  private graphEdgeKey(left: string, right: string): string {
+    return left.localeCompare(right, "en") <= 0 ? `${left}\u0000${right}` : `${right}\u0000${left}`;
+  }
+
+  private promptNodeGraphRule(kind: NodeGraphRuleKind): void {
+    new PromptModal(this.app, t("nodeGraphAddRule"), "", t("add"), async (value) => {
+      const path = value.trim().replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "");
+      if (path === "") return;
+      if (this.plugin.service.getFolder(path) === null || this.plugin.service.isIgnoredPath(path)) {
+        new Notice(t("errorUnknownTarget", { path }));
+        return;
+      }
+      const paths = this.plugin.settings.nodeGraph[kind];
+      if (!paths.includes(path)) paths.push(path);
+      paths.sort((left, right) => left.localeCompare(right, "en"));
+      await this.saveNodeGraphSettings(true);
+      this.display();
+    }).open();
+  }
+
+  private async toggleNodeGraphRule(kind: NodeGraphRuleKind, path: string): Promise<void> {
+    const paths = this.plugin.settings.nodeGraph[kind];
+    const index = paths.indexOf(path);
+    if (index >= 0) paths.splice(index, 1);
+    else paths.push(path);
+    paths.sort((left, right) => left.localeCompare(right, "en"));
+    if (kind === "excludedNodes" && index < 0) {
+      this.plugin.settings.nodeGraph.excludedSubtrees = this.plugin.settings.nodeGraph.excludedSubtrees.filter((candidate) => candidate !== path);
+    }
+    if (kind === "excludedSubtrees" && index < 0) {
+      this.plugin.settings.nodeGraph.excludedNodes = this.plugin.settings.nodeGraph.excludedNodes.filter((candidate) => candidate !== path);
+    }
+    await this.saveNodeGraphSettings(true);
+    this.display();
+  }
+
+  private async removeNodeGraphRule(kind: NodeGraphRuleKind, path: string): Promise<void> {
+    this.plugin.settings.nodeGraph[kind] = this.plugin.settings.nodeGraph[kind].filter((candidate) => candidate !== path);
+    await this.saveNodeGraphSettings(true);
+    this.display();
+  }
+
+  private async saveNodeGraphSettings(refresh: boolean): Promise<void> {
+    await this.plugin.saveSettings();
+    if (refresh) await this.plugin.reconcileSettingsChange();
+    updateDeclarativeSettingTab(this);
+  }
+
+  private graphInteger(value: unknown, minimum: number, maximum: number, fallback: number): number {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, Math.round(parsed))) : fallback;
   }
 
   private renderNamingGuide(panel: HTMLElement): void {

@@ -1,28 +1,329 @@
 .folder-nodes-node-graph-view {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 0 !important;
   overflow: hidden;
 }
 
+.folder-nodes-node-graph-disabled {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  place-items: center;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .folder-nodes-node-graph-toolbar {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  z-index: 30;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-rows: auto auto;
+  background: var(--background-primary);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
+.folder-nodes-node-graph-toolbar-primary,
+.folder-nodes-node-graph-toolbar-secondary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 12px;
+}
+
+.folder-nodes-node-graph-toolbar-primary {
+  min-height: 44px;
+  flex-wrap: wrap;
+}
+
+.folder-nodes-node-graph-toolbar-secondary {
+  min-height: 36px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
 .folder-nodes-node-graph-title {
-  flex: 1;
+  flex: 1 1 112px;
+  min-width: 80px;
   font-weight: 600;
 }
 
-.folder-nodes-node-graph-scroll {
+.folder-nodes-node-graph-search {
+  flex: 0 1 240px;
+  min-width: 140px;
+}
+
+.folder-nodes-node-graph-search .search-input-container {
+  width: 100%;
+}
+
+.folder-nodes-node-graph-search input[type="search"] {
+  width: 100%;
+  height: 32px;
+  padding-inline-start: 30px;
+  padding-inline-end: 30px;
+}
+
+.folder-nodes-node-graph-search .search-input-clear-button {
+  inset-inline-end: 4px;
+}
+
+.folder-nodes-node-graph-links-toggle,
+.folder-nodes-node-graph-range-button,
+.folder-nodes-node-graph-scope-button,
+.folder-nodes-node-graph-switch-button {
+  width: auto;
+  min-height: 30px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.folder-nodes-node-graph-links-toggle,
+.folder-nodes-node-graph-range-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+}
+
+.folder-nodes-node-graph-links-toggle:hover,
+.folder-nodes-node-graph-range-button:hover,
+.folder-nodes-node-graph-scope-button:hover:not(:disabled),
+.folder-nodes-node-graph-switch-button:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.folder-nodes-node-graph-links-toggle.is-active {
+  color: var(--text-accent);
+}
+
+.folder-nodes-node-graph-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  background: var(--background-modifier-border-hover);
+  border-radius: 999px;
+  transition: background-color 120ms ease;
+}
+
+.folder-nodes-node-graph-toggle-track::after {
   position: absolute;
-  inset: 44px 0 0;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 12px;
+  height: 12px;
+  content: "";
+  background: var(--text-on-accent);
+  border-radius: 50%;
+  transition: transform 120ms ease;
+}
+
+.folder-nodes-node-graph-links-toggle.is-active .folder-nodes-node-graph-toggle-track {
+  background: var(--interactive-accent);
+}
+
+.folder-nodes-node-graph-links-toggle.is-active .folder-nodes-node-graph-toggle-track::after {
+  transform: translateX(12px);
+}
+
+[dir="rtl"] .folder-nodes-node-graph-links-toggle.is-active .folder-nodes-node-graph-toggle-track::after {
+  transform: translateX(-12px);
+}
+
+.folder-nodes-node-graph-link-summary {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-nodes-node-graph-link-swatch {
+  flex: 0 0 22px;
+  width: 22px;
+  border-top: 2px dashed var(--interactive-accent);
+}
+
+.folder-nodes-node-graph-link-summary.is-empty {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.folder-nodes-node-graph-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+}
+
+.folder-nodes-node-graph-switch-button {
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 5px;
+}
+
+.folder-nodes-node-graph-switch-button.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.folder-nodes-node-graph-scope {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.folder-nodes-node-graph-scope-path {
+  max-width: min(320px, 34vw);
+  margin-inline-end: auto;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-nodes-node-graph-scope-button {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+}
+
+.folder-nodes-node-graph-scope-button.is-active {
+  color: var(--text-accent);
+  background: var(--background-secondary);
+  border-color: var(--background-modifier-border);
+}
+
+.folder-nodes-node-graph-scope-button:disabled {
+  opacity: 0.45;
+}
+
+.folder-nodes-node-graph-range-chevron {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+}
+
+.folder-nodes-node-graph-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   overflow: auto;
   background: var(--background-primary);
+}
+
+.folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll,
+.folder-nodes-node-graph-scroll.folder-nodes-node-graph-canvas-surface {
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll.is-dragging,
+.folder-nodes-node-graph-scroll.folder-nodes-node-graph-canvas-surface.is-dragging {
+  cursor: grabbing;
+}
+
+.folder-nodes-node-graph-render-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  outline: none;
+}
+
+.folder-nodes-node-graph-render-canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.folder-nodes-node-graph-focus-overlay {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 180px;
+  max-width: calc(100% - 24px);
+  min-height: 46px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  border: 2px solid var(--interactive-accent);
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus), var(--shadow-l);
+  transform: translate(-50%, -50%);
+}
+
+.folder-nodes-node-graph-focus-overlay-body,
+.folder-nodes-node-graph-focus-overlay-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 44px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.folder-nodes-node-graph-focus-overlay-body {
+  flex: 1 1 auto;
+  gap: 7px;
+  padding-inline: 9px;
+  overflow: hidden;
+}
+
+.folder-nodes-node-graph-focus-overlay-toggle {
+  flex: 0 0 44px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  border-inline-start: 1px solid var(--background-modifier-border);
+}
+
+.folder-nodes-node-graph-focus-overlay-body:hover,
+.folder-nodes-node-graph-focus-overlay-toggle:hover {
+  background: var(--background-modifier-hover);
+}
+
+.folder-nodes-node-graph-focus-overlay[hidden] {
+  display: none;
+}
+
+.folder-nodes-node-graph-canvas-tooltip {
+  position: absolute;
+  z-index: 14;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 6px 9px;
+  white-space: pre-line;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 7px;
+  box-shadow: var(--shadow-s);
+  pointer-events: none;
 }
 
 .folder-nodes-node-graph-stage {
@@ -37,6 +338,10 @@
   transform-origin: top left;
 }
 
+.folder-nodes-node-graph-canvas-3d {
+  inset: 0;
+}
+
 .folder-nodes-node-graph-edges {
   position: absolute;
   inset: 0;
@@ -44,24 +349,198 @@
   pointer-events: none;
 }
 
-.folder-nodes-node-graph-edges line {
+.folder-nodes-node-graph-edges path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  transition: opacity 120ms ease, stroke-width 120ms ease;
+}
+
+.folder-nodes-node-graph-edges .is-structure {
   stroke: var(--background-modifier-border-hover);
+  stroke-width: 1.75;
+}
+
+.folder-nodes-node-graph-edges .is-link {
+  stroke: var(--interactive-accent);
   stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+  opacity: 0.85;
+}
+
+.folder-nodes-node-graph-edges .is-connected {
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+.folder-nodes-node-graph-edges .is-muted {
+  opacity: 0.08;
 }
 
 .folder-nodes-node-graph-node {
   position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 12px;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: stretch;
+  padding: 0;
+  overflow: visible;
   color: var(--text-normal);
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
   box-shadow: var(--shadow-s);
+  transition: opacity 120ms ease, border-color 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+.folder-nodes-node-graph-node-body,
+.folder-nodes-node-graph-node-icon-handle,
+.folder-nodes-node-graph-node-expand-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.folder-nodes-node-graph-node-body {
+  gap: 7px;
+  padding-inline: 6px;
+  overflow: hidden;
+}
+
+.folder-nodes-node-graph-node-icon-handle {
+  border-inline-end: 1px solid color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  border-radius: 9px 0 0 9px;
+}
+
+.folder-nodes-node-graph-node-expand-handle {
+  position: relative;
+  gap: 2px;
+  border-inline-start: 1px solid color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  border-radius: 0 9px 9px 0;
+}
+
+.folder-nodes-node-graph-node-body:hover,
+.folder-nodes-node-graph-node-icon-handle:hover,
+.folder-nodes-node-graph-node-expand-handle:hover {
+  background: var(--background-modifier-hover);
+}
+
+.folder-nodes-node-graph-node-body:focus-visible,
+.folder-nodes-node-graph-node-icon-handle:focus-visible,
+.folder-nodes-node-graph-node-expand-handle:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: -2px;
+}
+
+.folder-nodes-node-graph-node.is-leaf {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.folder-nodes-node-graph-node-child-count {
+  min-width: 16px;
+  padding: 0 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
+  background: var(--background-primary-alt);
+  border-radius: 999px;
+}
+
+.folder-nodes-node-graph-node-expand-handle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 120ms ease;
+}
+
+.folder-nodes-node-graph-node.is-expanded .folder-nodes-node-graph-node-expand-handle svg {
+  transform: rotate(90deg);
+}
+
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node {
+  display: block;
+}
+
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-body {
+  width: 100%;
+  height: 100%;
+  padding-inline: 28px;
+}
+
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle,
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  width: 30px;
+  height: 24px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle {
+  top: -12px;
+  background: var(--background-secondary);
+}
+
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
+  bottom: -12px;
+  background: var(--background-secondary);
+}
+
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node.is-expanded .folder-nodes-node-graph-node-expand-handle svg {
+  transform: rotate(180deg);
+}
+
+.folder-nodes-node-graph-node.is-3d {
+  width: var(--folder-nodes-node-graph-card-width, 180px);
+  min-height: 46px;
+  transform-origin: center;
+}
+
+.folder-nodes-node-graph-node.is-3d.is-depth-near {
+  filter: saturate(1.06);
+  box-shadow: var(--shadow-l);
+}
+
+.folder-nodes-node-graph-node.is-3d.is-depth-mid {
+  opacity: 0.9;
+}
+
+.folder-nodes-node-graph-node.is-3d.is-depth-far {
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:not(.is-focused):not(:hover) {
+  display: block;
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  background: var(--background-modifier-border-hover);
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:not(.is-focused):not(:hover) > * {
+  display: none;
+}
+
+.folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:hover {
+  z-index: 10000 !important;
+  width: var(--folder-nodes-node-graph-card-width, 180px);
+  min-height: 46px;
+  background: var(--background-secondary);
+  border-radius: 10px;
+  box-shadow: var(--shadow-l);
 }
 
 .folder-nodes-node-graph-node:hover {
@@ -69,11 +548,34 @@
 }
 
 .folder-nodes-node-graph-node.is-focused {
+  z-index: 9999 !important;
+  opacity: 1;
   border-color: var(--interactive-accent);
-  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus), var(--shadow-l);
+}
+
+.folder-nodes-node-graph-node.is-neighbor {
+  opacity: 1;
+  border-color: var(--background-modifier-border-focus);
+}
+
+.folder-nodes-node-graph-node.is-boundary:not(.is-focused) {
+  border-style: dashed;
+  opacity: 0.62;
+}
+
+.folder-nodes-node-graph-node.is-muted {
+  opacity: 0.24;
+  filter: saturate(0.45);
+}
+
+.folder-nodes-node-graph-node.is-search-match:not(.is-focused) {
+  border-color: var(--text-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
 .folder-nodes-node-graph-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -86,6 +588,30 @@
   justify-content: center;
   width: 20px;
   height: 20px;
+  overflow: hidden;
+}
+
+.folder-nodes-node-graph-icon .folder-nodes-visual,
+.folder-nodes-node-graph-icon .folder-nodes-visual-emoji,
+.folder-nodes-node-graph-icon .folder-nodes-visual-glyph,
+.folder-nodes-node-graph-node-icon-handle .folder-nodes-visual-emoji,
+.folder-nodes-node-graph-node-icon-handle .folder-nodes-visual-glyph,
+.folder-nodes-node-graph-node-icon-handle svg,
+.folder-nodes-node-graph-node-icon-handle img,
+.folder-nodes-node-graph-icon svg,
+.folder-nodes-node-graph-icon img {
+  width: 18px;
+  max-width: 18px;
+  height: 18px;
+  max-height: 18px;
+  font-size: 18px !important;
+  line-height: 18px;
+  object-fit: contain;
+}
+
+.folder-nodes-node-graph-node-icon-handle.folder-nodes-visual {
+  font-size: 18px !important;
+  line-height: 18px;
 }
 
 .folder-nodes-node-graph-entry {
@@ -101,4 +627,102 @@
 
 .folder-nodes-node-graph-entry-label {
   margin-inline-start: 6px;
+}
+
+.folder-nodes-node-graph-canvas-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 700px) {
+  .folder-nodes-node-graph-toolbar-primary,
+  .folder-nodes-node-graph-toolbar-secondary {
+    gap: 5px;
+    padding-inline: 7px;
+  }
+
+  .folder-nodes-node-graph-title {
+    display: none;
+  }
+
+  .folder-nodes-node-graph-search {
+    flex: 1 1 160px;
+  }
+
+  .folder-nodes-node-graph-scope-path {
+    max-width: min(180px, 30vw);
+  }
+
+  .folder-nodes-node-graph-link-summary {
+    max-width: 140px;
+  }
+}
+
+@media (max-width: 480px) {
+  .folder-nodes-node-graph-search {
+    flex-basis: 100%;
+    order: -1;
+  }
+
+  .folder-nodes-node-graph-toolbar-secondary {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .folder-nodes-node-graph-scope {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+
+  .folder-nodes-node-graph-scope-path {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .folder-nodes-node-graph-search input[type="search"],
+  .folder-nodes-node-graph-links-toggle,
+  .folder-nodes-node-graph-range-button,
+  .folder-nodes-node-graph-scope-button,
+  .folder-nodes-node-graph-switch-button,
+  .folder-nodes-node-graph-toolbar .clickable-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .folder-nodes-node-graph-node {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .folder-nodes-node-graph-node.is-leaf {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .folder-nodes-node-graph-node-icon-handle,
+  .folder-nodes-node-graph-node-expand-handle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle,
+  .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle {
+    top: -22px;
+  }
+
+  .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
+    bottom: -22px;
+  }
 }

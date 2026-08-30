@@ -55,7 +55,9 @@ describe("runtime architecture contract", () => {
     const settings = source("src/app/settings-tab.ts");
     const build = source("scripts/esbuild-options.mjs");
     const runtimeStyles = source("src/ui/runtime-styles.ts");
-    expect(plugin).toContain('import PLUGIN_STYLES from "../ui/styles.css"');
+    expect(plugin).toContain('import BASE_STYLES from "../ui/styles.css"');
+    expect(plugin).toContain('import NODE_GRAPH_STYLES from "../ui/node-graph.css"');
+    expect(plugin).toContain("const PLUGIN_STYLES = `${BASE_STYLES}\\n${NODE_GRAPH_STYLES}`");
     expect(plugin).toContain("new RuntimeStyles(PLUGIN_STYLES)");
     expect(plugin).not.toContain("adapter.read");
     expect(plugin).toContain("runtimeStyles.install(document)");

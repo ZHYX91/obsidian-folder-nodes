@@ -48,4 +48,36 @@ describe("settings", () => {
     expect(settings.leafNotePrefixes).toEqual(["_"]);
     expect(settings.ignoredFolderPrefixes).toEqual([".", "_"]);
   });
+  it("normalizes Node Graph defaults, paths, and performance bounds while dropping obsolete settings", () => {
+    const settings = normalizeSettings({
+      nodeGraph: {
+        enabled: false,
+        defaultDimension: "3d",
+        defaultRelationMode: "hybrid",
+        layoutDirection: "top-to-bottom",
+        includedSubtrees: ["/Work/", "Work"],
+        excludedNodes: ["Work/Private"],
+        excludedSubtrees: ["Work/Archive"],
+        localDepth: 99,
+        showBoundaryNodes: true,
+        largeGraphThreshold: 1,
+        overviewEdgeLimit: 1_000_000,
+      },
+    });
+    expect(settings.nodeGraph).toMatchObject({
+      enabled: false,
+      defaultDimension: "3d",
+      layoutDirection: "top-to-bottom",
+      includedSubtrees: ["Work"],
+      excludedNodes: ["Work/Private"],
+      excludedSubtrees: ["Work/Archive"],
+      largeGraphThreshold: 50,
+      overviewEdgeLimit: 100_000,
+    });
+    expect(settings.nodeGraph).not.toHaveProperty("defaultRelationMode");
+    expect(settings.nodeGraph).not.toHaveProperty("localDepth");
+    expect(settings.nodeGraph).not.toHaveProperty("showBoundaryNodes");
+    expect(normalizeSettings({ nodeGraph: "broken" }).nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
+    expect(normalizeSettings({ nodeGraph: { layoutDirection: "broken" } }).nodeGraph.layoutDirection).toBe("left-to-right");
+  });
 });
