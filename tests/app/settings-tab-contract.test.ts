@@ -16,6 +16,8 @@ describe("settings tab compatibility contract", () => {
     );
     expect(source).toContain("public getDeclarativeSettingDefinitions()");
     expect(source).toContain('attr: { role: "tablist"');
+    expect(source).toContain('"general", "homepage", "icons", "naming", "nodeGraph"');
+    expect(source).toContain('else this.renderNodeGraph(panel)');
   });
 
   it("places a themed icon guide before the appearance controls", () => {

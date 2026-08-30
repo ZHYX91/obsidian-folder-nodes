@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fitNodeGraphViewport, layoutNodeGraph } from "../../src/core/node-graph-layout";
+import { fitNodeGraphViewport, layoutNodeGraph, layoutNodeGraphForest } from "../../src/core/node-graph-layout";
 
 describe("node graph layout", () => {
   const tree = {
@@ -83,5 +83,15 @@ describe("node graph layout", () => {
     const forward = layoutNodeGraph({ id: "", children: [{ id: "A", children: [] }, { id: "B", children: [] }] });
     const reversed = layoutNodeGraph({ id: "", children: [{ id: "B", children: [] }, { id: "A", children: [] }] });
     expect(reversed).toEqual(forward);
+  });
+
+  it("lays out disconnected scoped roots without a visible synthetic node or edge", () => {
+    const layout = layoutNodeGraphForest([
+      { id: "Work", children: [{ id: "Work/A", children: [] }] },
+      { id: "External", children: [] },
+    ]);
+    expect(layout.nodes.map(({ id }) => id).sort()).toEqual(["External", "Work", "Work/A"]);
+    expect(layout.nodes.some(({ id }) => id.includes("forest-root"))).toBe(false);
+    expect(layout.edges).toEqual([{ source: "Work", target: "Work/A" }]);
   });
 });

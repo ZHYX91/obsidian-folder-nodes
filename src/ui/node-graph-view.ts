@@ -1,4 +1,4 @@
-import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf } from "obsidian";
+import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf, type ViewStateResult } from "obsidian";
 
 import {
   defaultNodeGraphCamera,
@@ -14,11 +14,22 @@ import {
 } from "../core/node-graph-3d";
 import { shouldUseNodeGraphCanvas } from "../core/node-graph-canvas";
 import { normalizeNodeGraphLinks } from "../core/node-graph-links";
-import { fitNodeGraphViewport, layoutNodeGraph, type NodeGraphLayout, type NodeGraphTree } from "../core/node-graph-layout";
-import { buildNodeGraphModel, edgesForMode, type NodeGraphModel, type NodeGraphModelEdge, type NodeGraphRelationMode } from "../core/node-graph-model";
+import { fitNodeGraphViewport, layoutNodeGraphForest, type NodeGraphLayout, type NodeGraphTree } from "../core/node-graph-layout";
+import { buildNodeGraphModelFromNodes, edgesForMode, type NodeGraphModel, type NodeGraphModelEdge } from "../core/node-graph-model";
+import {
+  GLOBAL_NODE_GRAPH_SCOPE,
+  nodeGraphParentPath,
+  nodeGraphPathDepth,
+  nodeGraphPathIsConfigured,
+  nodeGraphSubtreeIsExcluded,
+  nodeGraphTraversalRoots,
+  normalizeNodeGraphScope,
+  type NodeGraphScope,
+} from "../core/node-graph-scope";
 import { normalizeVaultPath } from "../core/paths";
-import type { NodeVisual } from "../core/types";
+import type { NodeGraphDimension, NodeGraphRelationMode, NodeGraphSettings, NodeVisual } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
+import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
 import { resolvedLanguage } from "./i18n";
 import {
   NodeGraphCanvasRenderer,
@@ -28,6 +39,8 @@ import {
 interface NodeGraphService {
   getFolder(path: string): TFolder | null;
   getCanonicalFile(folderPath: string): TFile | null;
+  isCanonicalFile?(file: TFile): boolean;
+  folderForFile?(file: TFile | null): TFolder | null;
   children(path: string): readonly { readonly childPath: string }[];
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
 }
@@ -37,18 +50,22 @@ interface NodeGraphVisuals {
 }
 
 interface GraphRecord extends NodeGraphCanvasRecord {
+  readonly boundary: boolean;
   readonly notePath: string | null;
+  readonly parentPath: string | null;
 }
 
 interface GraphData {
   readonly layout: NodeGraphLayout;
-  readonly tree: NodeGraphTree;
   readonly records: ReadonlyMap<string, GraphRecord>;
   readonly model: NodeGraphModel;
   readonly points3D: readonly NodeGraphPoint3D[];
 }
 
-type NodeGraphDimension = "2d" | "3d";
+interface NodeGraphViewOptions {
+  readonly getInboundSources?: (targetPath: string) => readonly string[];
+  readonly getSettings?: () => NodeGraphSettings;
+}
 
 type GraphDrag = {
   readonly pointerId: number;
@@ -69,8 +86,9 @@ const NODE_GRAPH_DOM_MIN_SCALE = 0.65;
 
 export class FolderNodeGraphView extends ItemView {
   private focusPath: string | null = null;
-  private relationMode: NodeGraphRelationMode = "structure";
-  private dimension: NodeGraphDimension = "2d";
+  private relationMode: NodeGraphRelationMode;
+  private dimension: NodeGraphDimension;
+  private graphScope: NodeGraphScope = GLOBAL_NODE_GRAPH_SCOPE;
   private camera: NodeGraphCamera = defaultNodeGraphCamera();
   private drag: GraphDrag | null = null;
   private readonly pointers = new Map<number, GraphPointer>();
@@ -90,14 +108,33 @@ export class FolderNodeGraphView extends ItemView {
     leaf: WorkspaceLeaf,
     private readonly service: NodeGraphService,
     private readonly visuals: NodeGraphVisuals,
+    private readonly options: NodeGraphViewOptions = {},
   ) {
     super(leaf);
+    const settings = this.settings();
+    this.relationMode = settings.defaultRelationMode;
+    this.dimension = settings.defaultDimension;
   }
 
   public override getViewType(): string { return NODE_GRAPH_VIEW_TYPE; }
   public override getDisplayText(): string { return label("nodeGraph"); }
   public override getIcon(): string { return "git-fork"; }
   public override async onOpen(): Promise<void> { this.render(); }
+  public override getState(): Record<string, unknown> {
+    return { dimension: this.dimension, relationMode: this.relationMode, scope: this.graphScope };
+  }
+  public override async setState(state: unknown, _result: ViewStateResult): Promise<void> {
+    if (typeof state === "object" && state !== null) {
+      const input = state as { readonly dimension?: unknown; readonly relationMode?: unknown; readonly scope?: unknown };
+      if (input.dimension === "2d" || input.dimension === "3d") this.dimension = input.dimension;
+      if (input.relationMode === "structure" || input.relationMode === "links" || input.relationMode === "hybrid") {
+        this.relationMode = input.relationMode;
+      }
+      this.graphScope = normalizeNodeGraphScope(input.scope);
+      this.focusPath = this.graphScope.mode === "global" ? null : this.graphScope.rootPath;
+    }
+    if (this.contentEl.isConnected) this.render();
+  }
   public override onResize(): void {
     this.canvasRenderer?.resize();
     this.resize3DViewport();
@@ -127,6 +164,16 @@ export class FolderNodeGraphView extends ItemView {
     if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
     else if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
     else this.applyFocus(true);
+    this.updateScopeControls();
+  }
+
+  public setGraphScope(scope: NodeGraphScope): void {
+    const normalized = normalizeNodeGraphScope(scope);
+    if (JSON.stringify(normalized) === JSON.stringify(this.graphScope)) return;
+    this.graphScope = normalized;
+    this.graphData = null;
+    if (normalized.mode !== "global") this.focusPath = normalized.rootPath;
+    this.render();
   }
 
   public refresh(): void {
@@ -158,13 +205,21 @@ export class FolderNodeGraphView extends ItemView {
     this.contentEl.removeClass("is-canvas-graph");
     this.contentEl.toggleClass("is-3d", this.dimension === "3d");
 
-    const data = this.graphData ?? this.buildGraphData(this.app.vault.getRoot());
+    if (!this.settings().enabled) {
+      this.contentEl.createDiv({ cls: "folder-nodes-node-graph-disabled", text: label("disabledGraph"), attr: { role: "status" } });
+      this.didRender();
+      return;
+    }
+
+    const data = this.graphData ?? this.buildGraphData();
     this.graphData = data;
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
     const visibleEdgeCount = edgesForMode(data.model, this.relationMode).length;
-    if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount)) this.renderCanvas(surface, data, fit);
+    if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
+      this.renderCanvas(surface, data, fit);
+    }
     else if (this.dimension === "2d") this.render2D(surface, data, fit);
     else this.render3D(surface, data, fit);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
@@ -176,6 +231,7 @@ export class FolderNodeGraphView extends ItemView {
   protected currentGraphModel(): NodeGraphModel | null { return this.graphData?.model ?? null; }
   protected currentRelationMode(): NodeGraphRelationMode { return this.relationMode; }
   protected currentDimension(): NodeGraphDimension { return this.dimension; }
+  protected currentGraphScope(): NodeGraphScope { return this.graphScope; }
   protected isCanvasGraph(): boolean { return this.canvasRenderer !== null; }
   protected setCanvasSearchQuery(query: string): void { this.canvasRenderer?.setSearchQuery(query); }
   protected setCanvasSelectionFocus(path: string | null): void { this.canvasRenderer?.setFocus(path, false); }
@@ -198,6 +254,18 @@ export class FolderNodeGraphView extends ItemView {
         this.render();
       });
     }
+    const scope = toolbar.createDiv({
+      cls: "folder-nodes-node-graph-scope",
+      attr: { "aria-label": label("scope"), "data-node-graph-scope": this.graphScope.mode },
+    });
+    scope.createSpan({ cls: "folder-nodes-node-graph-scope-path", text: this.scopeLabel() });
+    this.scopeButton(scope, label("globalScope"), this.graphScope.mode === "global", () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE));
+    this.scopeButton(scope, label("subtreeScope"), this.graphScope.mode === "subtree", () => {
+      if (this.focusPath !== null) this.setGraphScope({ mode: "subtree", rootPath: this.focusPath });
+    }, this.focusPath === null, "subtree");
+    this.scopeButton(scope, label("localScope"), this.graphScope.mode === "local", () => {
+      if (this.focusPath !== null) this.setGraphScope({ mode: "local", rootPath: this.focusPath });
+    }, this.focusPath === null, "local");
     const dimension = toolbar.createDiv({
       cls: "folder-nodes-node-graph-switch",
       attr: { "aria-label": label("dimension"), "data-node-graph-switch": "dimension" },
@@ -227,49 +295,162 @@ export class FolderNodeGraphView extends ItemView {
     button.addEventListener("click", onClick);
   }
 
-  private buildGraphData(root: TFolder): GraphData {
+  private scopeButton(
+    container: HTMLElement,
+    text: string,
+    active: boolean,
+    onClick: () => void,
+    disabled = false,
+    action: "local" | "subtree" | null = null,
+  ): void {
+    const button = container.createEl("button", {
+      cls: `folder-nodes-node-graph-scope-button${active ? " is-active" : ""}`,
+      text,
+      attr: { "aria-pressed": String(active), type: "button", ...(action === null ? {} : { "data-node-graph-scope-action": action }) },
+    });
+    button.disabled = disabled;
+    button.addEventListener("click", onClick);
+  }
+
+  private updateScopeControls(): void {
+    for (const button of this.contentEl.querySelectorAll<HTMLButtonElement>("[data-node-graph-scope-action]")) {
+      button.disabled = this.focusPath === null;
+    }
+  }
+
+  private buildGraphData(): GraphData {
+    const settings = this.settings();
     const records = new Map<string, GraphRecord>();
-    type MutableTree = { readonly id: string; readonly children: MutableTree[] };
-    const tree: MutableTree = { id: normalizeVaultPath(root.path), children: [] };
-    const pending: Array<{ readonly folder: TFolder; readonly tree: MutableTree }> = [{ folder: root, tree }];
+    if (this.graphScope.mode === "local") this.collectLocalRecords(records, settings);
+    else {
+      for (const rootPath of nodeGraphTraversalRoots(this.graphScope, settings)) {
+        const root = rootPath === "" ? this.app.vault.getRoot() : this.service.getFolder(rootPath);
+        if (root !== null) this.collectDescendantRecords(records, root, settings, Number.POSITIVE_INFINITY);
+      }
+    }
+    if (this.graphScope.mode === "local" || settings.showBoundaryNodes) this.addLinkNeighborRecords(records, settings);
+
+    const sources = [...records.values()].flatMap((record) => record.notePath === null
+      ? []
+      : [{ nodeId: record.path, notePath: record.notePath }]);
+    const notePathToNodeId = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
+    const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, notePathToNodeId);
+    const depths = [...records.keys()].map(nodeGraphPathDepth);
+    const minimumDepth = depths.length === 0 ? 0 : Math.min(...depths);
+    const structureEdges = [...records.values()].flatMap((record) =>
+      record.parentPath !== null && records.has(record.parentPath)
+        ? [{ source: record.parentPath, target: record.path }]
+        : []);
+    const model = buildNodeGraphModelFromNodes(
+      [...records.keys()].map((id) => ({ id, depth: nodeGraphPathDepth(id) - minimumDepth })),
+      structureEdges,
+      links,
+    );
+    const forest = this.buildForest(records);
+    return {
+      records,
+      model,
+      layout: layoutNodeGraphForest(forest),
+      points3D: layoutNodeGraph3D(model),
+    };
+  }
+
+  private collectLocalRecords(records: Map<string, GraphRecord>, settings: NodeGraphSettings): void {
+    if (this.graphScope.mode !== "local") return;
+    const root = this.service.getFolder(this.graphScope.rootPath);
+    if (root === null) return;
+    const parent = root.parent;
+    if (parent !== null && nodeGraphPathIsConfigured(parent.path, settings)) this.addRecord(records, parent, false);
+    this.collectDescendantRecords(records, root, settings, settings.localDepth);
+  }
+
+  private collectDescendantRecords(
+    records: Map<string, GraphRecord>,
+    root: TFolder,
+    settings: NodeGraphSettings,
+    maximumDepth: number,
+  ): void {
+    const pending: Array<{ readonly depth: number; readonly folder: TFolder }> = [{ depth: 0, folder: root }];
     while (pending.length > 0) {
       const current = pending.pop();
       if (current === undefined) break;
-      const { folder, tree: currentTree } = current;
+      const { depth, folder } = current;
       const path = normalizeVaultPath(folder.path);
-      const note = this.service.getCanonicalFile(path);
-      records.set(path, {
-        path,
-        label: path === "" ? this.app.vault.getName() : folder.name,
-        notePath: note?.path ?? null,
-        visual: this.visuals.resolve(folder),
-      });
+      if (nodeGraphSubtreeIsExcluded(path, settings)) continue;
+      if (nodeGraphPathIsConfigured(path, settings)) this.addRecord(records, folder, false);
+      if (depth >= maximumDepth) continue;
       const children = this.service.children(path)
         .flatMap(({ childPath }) => {
           const child = this.service.getFolder(childPath);
           return child === null ? [] : [child];
         })
         .sort((left, right) => left.path.localeCompare(right.path, "en"));
-      for (const child of children) currentTree.children.push({ id: normalizeVaultPath(child.path), children: [] });
       for (let index = children.length - 1; index >= 0; index -= 1) {
         const child = children[index];
-        const childTree = currentTree.children[index];
-        if (child !== undefined && childTree !== undefined) pending.push({ folder: child, tree: childTree });
+        if (child !== undefined) pending.push({ depth: depth + 1, folder: child });
       }
     }
-    const sources = [...records.values()].flatMap((record) => record.notePath === null
-      ? []
-      : [{ nodeId: record.path, notePath: record.notePath }]);
-    const notePathToNodeId = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
-    const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, notePathToNodeId);
-    const model = buildNodeGraphModel(tree, links);
-    return {
-      tree,
-      records,
-      model,
-      layout: layoutNodeGraph(tree),
-      points3D: layoutNodeGraph3D(model),
-    };
+  }
+
+  private addLinkNeighborRecords(records: Map<string, GraphRecord>, settings: NodeGraphSettings): void {
+    const seedNotePaths = new Set([...records.values()].flatMap(({ notePath }) => notePath === null ? [] : [notePath]));
+    if (seedNotePaths.size === 0) return;
+    const neighborNotePaths = new Set<string>();
+    for (const seed of seedNotePaths) {
+      for (const target of Object.keys(this.app.metadataCache.resolvedLinks[seed] ?? {})) neighborNotePaths.add(target);
+    }
+    for (const seed of seedNotePaths) {
+      for (const source of this.options.getInboundSources?.(seed) ?? []) neighborNotePaths.add(source);
+    }
+    for (const notePath of neighborNotePaths) {
+      const entry = this.app.vault.getAbstractFileByPath(notePath);
+      if (!(entry instanceof TFile)) continue;
+      const folder = this.service.folderForFile?.(entry) ?? entry.parent;
+      if (folder === null || !nodeGraphPathIsConfigured(folder.path, settings)) continue;
+      const canonical = this.service.isCanonicalFile?.(entry)
+        ?? this.service.getCanonicalFile(folder.path)?.path === entry.path;
+      if (!canonical) continue;
+      this.addRecord(records, folder, true);
+    }
+  }
+
+  private addRecord(records: Map<string, GraphRecord>, folder: TFolder, boundary: boolean): void {
+    const path = normalizeVaultPath(folder.path);
+    const previous = records.get(path);
+    const note = this.service.getCanonicalFile(path);
+    records.set(path, {
+      path,
+      label: path === "" ? this.app.vault.getName() : folder.name,
+      boundary: previous?.boundary === false ? false : boundary,
+      notePath: note?.path ?? null,
+      parentPath: nodeGraphParentPath(path),
+      visual: this.visuals.resolve(folder),
+    });
+  }
+
+  private buildForest(records: ReadonlyMap<string, GraphRecord>): NodeGraphTree[] {
+    type MutableTree = { readonly id: string; readonly children: MutableTree[] };
+    const trees = new Map<string, MutableTree>();
+    for (const path of records.keys()) trees.set(path, { id: path, children: [] });
+    const roots: MutableTree[] = [];
+    for (const record of records.values()) {
+      const tree = trees.get(record.path);
+      if (tree === undefined) continue;
+      const parent = record.parentPath === null ? undefined : trees.get(record.parentPath);
+      if (parent === undefined) roots.push(tree);
+      else parent.children.push(tree);
+    }
+    for (const tree of trees.values()) tree.children.sort((left, right) => left.id.localeCompare(right.id, "en"));
+    return roots.sort((left, right) => left.id.localeCompare(right.id, "en"));
+  }
+
+  private settings(): NodeGraphSettings {
+    return this.options.getSettings?.() ?? DEFAULT_NODE_GRAPH_SETTINGS;
+  }
+
+  private scopeLabel(): string {
+    if (this.graphScope.mode === "global") return label("allNodes");
+    return `${this.graphScope.mode === "subtree" ? label("subtreeScope") : label("localScope")} · ${this.graphScope.rootPath}`;
   }
 
   private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
@@ -366,8 +547,10 @@ export class FolderNodeGraphView extends ItemView {
         onOpen: (path, newLeaf) => void this.service.openFolderNode(path, newLeaf),
         onSelect: (path) => {
           this.focusPath = path;
+          this.updateScopeControls();
           this.onNodeSelected(path);
         },
+        overviewEdgeLimit: this.settings().overviewEdgeLimit,
         relationSummary,
       },
     );
@@ -422,9 +605,11 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private createNode(canvas: HTMLElement, record: GraphRecord): HTMLButtonElement {
+    const title = record.path === "" ? this.app.vault.getName() : record.path;
+    const accessibleTitle = record.boundary ? `${title}\n${label("boundaryNode")}` : title;
     const node = canvas.createEl("button", {
-      cls: "folder-nodes-node-graph-node",
-      attr: { "data-node-path": record.path, title: record.path === "" ? this.app.vault.getName() : record.path },
+      cls: `folder-nodes-node-graph-node${record.boundary ? " is-boundary" : ""}`,
+      attr: { "aria-label": accessibleTitle, "data-node-path": record.path, title: accessibleTitle },
     });
     const visual = record.visual;
     if (visual.kind !== "fallback") {
@@ -435,6 +620,7 @@ export class FolderNodeGraphView extends ItemView {
     node.addEventListener("click", () => {
       this.focusPath = record.path;
       this.applyFocus(false);
+      this.updateScopeControls();
       this.onNodeSelected(record.path);
     });
     node.addEventListener("dblclick", (event) => {
@@ -633,9 +819,18 @@ function relationSummary(structure: number, links: number): string {
     : `Structure ${structure} · Links ${links}`;
 }
 
-function label(key: "denseEdges" | "dimension" | "fitGraph" | "largeGraph" | "nodeGraph" | "relationship"): string {
+function label(
+  key: "allNodes" | "boundaryNode" | "denseEdges" | "dimension" | "disabledGraph" | "fitGraph" | "globalScope" | "largeGraph" | "localScope" | "nodeGraph" | "relationship" | "scope" | "subtreeScope",
+): string {
   const zh = resolvedLanguage() === "zh-CN";
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
+  if (key === "disabledGraph") return zh ? "节点图谱已在 Folder Nodes 设置中关闭。" : "Node Graph is disabled in Folder Nodes settings.";
+  if (key === "boundaryNode") return zh ? "范围外的链接边界节点" : "Linked boundary node outside the selected scope";
+  if (key === "allNodes") return zh ? "全部节点" : "All nodes";
+  if (key === "globalScope") return zh ? "全局" : "Global";
+  if (key === "subtreeScope") return zh ? "子树" : "Subtree";
+  if (key === "localScope") return zh ? "局部" : "Local";
+  if (key === "scope") return zh ? "图谱范围" : "Graph scope";
   if (key === "largeGraph") return zh ? "大型节点图谱；拖动平移或旋转，滚轮缩放，回车打开所选节点" : "Large Node Graph; drag to pan or rotate, wheel to zoom, Enter to open the selected node";
   if (key === "denseEdges") return zh ? "稠密关系概览 · 聚焦节点以显示其全部关系" : "Dense relation overview · focus a node to show all of its relations";
   if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";

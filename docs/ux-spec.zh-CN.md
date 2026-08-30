@@ -7,7 +7,7 @@ translation_status: source
 
 ## Obsidian 一致性
 
-界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。所有受支持 Obsidian 版本都使用 imperative 四页签设置界面：“常规”“主页”“图标与外观”“选区与命名”；声明式设置保持关闭，因为它会绕过这套布局。界面直接从页签行开始，既不在页签上方重复大型插件名称，也不在面板内重复当前页签名称。页签在主题覆盖下仍保持基线与强调色下划线，活动标签同时使用半粗字重，标签行与面板之间保留稳定间距；窄宽度可横向滚动，随大号界面字体增高，并支持符合文字方向的左右键以及 Home、End。语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
+界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。所有受支持 Obsidian 版本都使用 imperative 五页签设置界面：“常规”“主页”“图标与外观”“选区与命名”“节点图谱”；声明式设置保持关闭，因为它会绕过这套布局。界面直接从页签行开始，既不在页签上方重复大型插件名称，也不在面板内重复当前页签名称。页签在主题覆盖下仍保持基线与强调色下划线，活动标签同时使用半粗字重，标签行与面板之间保留稳定间距；窄宽度可横向滚动，随大号界面字体增高，并支持符合文字方向的左右键以及 Home、End。语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
 
 ## 主页
 
@@ -30,6 +30,12 @@ File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、�
 Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions 按钮以及 Shift+F10/菜单键打开同一个 Obsidian Menu。插件自有 Contents 菜单可以提供完整节点操作，因为那里没有原生文件树菜单需要避免重复。File Explorer 文件夹菜单保留原生 rename/move/delete，只增加不同的节点动作。Node Note 标签页保留原生的笔记级 move/delete/merge，Folder Nodes 额外提供措辞明确的“移动/合并/删除所在节点”；原生 rename 会同步明确配对的文件夹/Node Note。文件夹侧的不完整节点提供“补全节点”和“设为不管理”，Markdown 侧的不完整节点提供“转换为 Folder Node”和“设为不管理”；hover/focus 主动作与菜单动作一致，状态 badge 本身不响应双击。不管理项提供“纳入管理”，匹配名称开头规则或位于不管理文件夹内时提示用户调整规则。原生创建与删除只改变实际存在的一侧，不自动补全或重建；删除文件夹时，其子树（包括 canonical Node Note）由 Obsidian 一并删除。普通文件菜单包含打开、在新标签打开、在 File Explorer 中显示、复制链接、rename、move 和 trash；支持的图片还可设为当前 Node visual。普通文件、Album 条目和不管理文件夹仍可通过 `file-menu` 接收其他插件注入的动作。所有写入失败都显示失败关闭 Notice。
 
 桌面端 Node 卡片上方 25% 是 before line，中间 50% 是 into highlight，下方 25% 是 after line；普通文件与 Album 条目只有 into。节点不能放入自身或后代，文件重名冲突禁止写入，Escape、dragend、离开目标和失败都清理视觉状态。Android 不显示拖拽 handle 或 drop marker，改用 Obsidian 原生移动文件夹、Folder Nodes 的 Move/Move up/Move down 以及普通文件 Move 菜单。原生跨父级移动进入手动排序父级时，移动节点获得目标顺序末尾的新 rank。选择模式在两端都可多选 Album/Files 条目以插入或复制链接；跨视图内部 drop 不接受。
+
+## 节点图谱
+
+节点图谱是 Folder Nodes 自己的工作区视图，不修改 Obsidian 原生 Graph View。第一行工具栏包含标题、搜索、2D/3D 与适应视图；第二行包含“结构/链接/混合”和“全局/子树/局部”范围。Folder Node 与 canonical Node Note 菜单可打开并聚焦已有图谱标签，也可打开该节点的子树或局部邻域。子树范围包含选中的可显示 Folder Node 及其可显示后代；局部范围再加入可显示的父节点、设置深度内的后代，以及 canonical Node Note 的直接入链/出链邻居。当前范围写入工作区状态。所有关系与维度模式都支持 Enter 和双击打开 Node Note。
+
+“节点图谱”设置页包含总开关、默认模式、局部深度、可选边界节点扩展、Canvas 与密集总览阈值、当前配置的节点/边实时估算、可搜索的层级 Folder Node 规则、纳入子树、精确隐藏节点和隐藏子树。隐藏单个节点时仍可提升其可显示后代；隐藏子树会直接停止遍历。纳入列表非空时，图谱仅显示这些子树。文件夹重命名或移动会同步重映射规则，删除会清理失效规则。关闭总开关会移除插件自己的图谱入口并关闭已打开的图谱 leaf，但不会影响 Obsidian 原生 Graph。结构关系与已解析的 canonical-note 链接共用同一模型；2D 与稳定的层级深度 3D 共用同一份过滤数据。大图自动使用 Canvas、限制总览边，并在聚焦后保留 DOM 交互；不引入第二套 Vault 链接扫描或轮询。
 
 ## Visual Picker
 

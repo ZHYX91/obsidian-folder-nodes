@@ -47,6 +47,33 @@ const DEFAULT_VERTICAL_GAP = 64;
 const DEFAULT_PADDING = 32;
 
 export function layoutNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOptions = {}): NodeGraphLayout {
+  return layoutNodeGraphForest([root], options);
+}
+
+export function layoutNodeGraphForest(roots: readonly NodeGraphTree[], options: NodeGraphLayoutOptions = {}): NodeGraphLayout {
+  if (roots.length === 0) {
+    const nodeWidth = positive(options.nodeWidth, DEFAULT_NODE_WIDTH);
+    const nodeHeight = positive(options.nodeHeight, DEFAULT_NODE_HEIGHT);
+    const padding = nonNegative(options.padding, DEFAULT_PADDING);
+    return { nodes: [], edges: [], width: nodeWidth + padding * 2, height: nodeHeight + padding * 2, nodeWidth, nodeHeight };
+  }
+  if (roots.length === 1) {
+    const root = roots[0];
+    if (root === undefined) throw new Error("Node Graph forest lost its root");
+    return layoutSingleNodeGraph(root, options);
+  }
+  const virtualRoot = "\u0000folder-nodes-forest-root";
+  const base = layoutSingleNodeGraph({ id: virtualRoot, children: roots }, options);
+  const verticalStep = base.nodeHeight + nonNegative(options.verticalGap, DEFAULT_VERTICAL_GAP);
+  return {
+    ...base,
+    nodes: base.nodes.filter(({ id }) => id !== virtualRoot).map((node) => ({ ...node, depth: node.depth - 1, y: node.y - verticalStep })),
+    edges: base.edges.filter(({ source }) => source !== virtualRoot),
+    height: Math.max(base.nodeHeight, base.height - verticalStep),
+  };
+}
+
+function layoutSingleNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOptions): NodeGraphLayout {
   const nodeWidth = positive(options.nodeWidth, DEFAULT_NODE_WIDTH);
   const nodeHeight = positive(options.nodeHeight, DEFAULT_NODE_HEIGHT);
   const horizontalGap = nonNegative(options.horizontalGap, DEFAULT_HORIZONTAL_GAP);

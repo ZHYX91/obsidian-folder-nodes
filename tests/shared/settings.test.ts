@@ -48,4 +48,29 @@ describe("settings", () => {
     expect(settings.leafNotePrefixes).toEqual(["_"]);
     expect(settings.ignoredFolderPrefixes).toEqual([".", "_"]);
   });
+  it("normalizes Node Graph defaults, paths, and performance bounds", () => {
+    const settings = normalizeSettings({
+      nodeGraph: {
+        enabled: false,
+        defaultDimension: "3d",
+        defaultRelationMode: "hybrid",
+        includedSubtrees: ["/Work/", "Work"],
+        excludedNodes: ["Work/Private"],
+        localDepth: 99,
+        largeGraphThreshold: 1,
+        overviewEdgeLimit: 1_000_000,
+      },
+    });
+    expect(settings.nodeGraph).toMatchObject({
+      enabled: false,
+      defaultDimension: "3d",
+      defaultRelationMode: "hybrid",
+      includedSubtrees: ["Work"],
+      excludedNodes: ["Work/Private"],
+      localDepth: 8,
+      largeGraphThreshold: 50,
+      overviewEdgeLimit: 100_000,
+    });
+    expect(normalizeSettings({ nodeGraph: "broken" }).nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
+  });
 });

@@ -1,6 +1,7 @@
 import type { NodeGraphTree } from "./node-graph-layout";
+import type { NodeGraphRelationMode } from "./types";
 
-export type NodeGraphRelationMode = "structure" | "links" | "hybrid";
+export type { NodeGraphRelationMode } from "./types";
 
 export interface NodeGraphModelNode {
   readonly id: string;
@@ -54,6 +55,36 @@ export function buildNodeGraphModel(
 
   return {
     nodes,
+    edges: [...edges.values()]
+      .map(({ source, target, structure, link }) => ({ source, target, structure, link }))
+      .sort(compareEdges),
+  };
+}
+
+export function buildNodeGraphModelFromNodes(
+  nodes: readonly NodeGraphModelNode[],
+  structureEdges: readonly { readonly source: string; readonly target: string }[],
+  linksBySource: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
+): NodeGraphModel {
+  const nodeIds = new Set<string>();
+  for (const node of nodes) {
+    if (nodeIds.has(node.id)) throw new Error(`Duplicate Node Graph id: ${node.id}`);
+    nodeIds.add(node.id);
+  }
+  const edges = new Map<string, MutableEdge>();
+  for (const edge of structureEdges) {
+    if (edge.source === edge.target || !nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue;
+    mergeEdge(edges, edge.source, edge.target, "structure");
+  }
+  for (const [source, targets] of linksBySource) {
+    if (!nodeIds.has(source)) continue;
+    for (const target of targets) {
+      if (source === target || !nodeIds.has(target)) continue;
+      mergeEdge(edges, source, target, "link");
+    }
+  }
+  return {
+    nodes: [...nodes].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id, "en")),
     edges: [...edges.values()]
       .map(({ source, target, structure, link }) => ({ source, target, structure, link }))
       .sort(compareEdges),

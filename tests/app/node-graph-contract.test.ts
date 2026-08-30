@@ -31,7 +31,8 @@ describe("Node Graph integration contract", () => {
   it("keeps one Workspace View for relation and dimension modes", () => {
     expect(graphView).toContain('["structure", "links", "hybrid"]');
     expect(graphView).toContain('["2d", "3d"]');
-    expect(graphView).toContain("buildNodeGraphModel(tree, links)");
+    expect(graphView).toContain("buildNodeGraphModelFromNodes(");
+    expect(graphView).toContain("layoutNodeGraphForest(forest)");
     expect(graphView).toContain("points3D: layoutNodeGraph3D(model)");
   });
 
@@ -47,7 +48,7 @@ describe("Node Graph integration contract", () => {
 
   it("switches large graphs to constant-DOM Canvas rendering with explicit teardown", () => {
     expect(graphView).toContain("const visibleEdgeCount = edgesForMode(data.model, this.relationMode).length");
-    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount)");
+    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)");
     expect(graphView).toContain("new NodeGraphCanvasRenderer");
     expect(canvasRenderer).toContain('surface.createEl("canvas"');
     expect(canvasRenderer).toContain("this.cancelFrame()");
@@ -60,5 +61,17 @@ describe("Node Graph integration contract", () => {
     expect(graphPlugin).toContain('view.setRenderExtension("node-graph"');
     expect(graphStyles).toContain(".folder-nodes-node-graph-focus-overlay[hidden]");
     expect(graphStyles).toContain("display: none");
+  });
+
+  it("filters scope before model/layout and tears down disabled views", () => {
+    expect(graphView).toContain("nodeGraphTraversalRoots(this.graphScope, settings)");
+    expect(graphView).toContain("nodeGraphSubtreeIsExcluded(path, settings)");
+    expect(graphView).toContain("if (!this.settings().enabled)");
+    expect(graphView).toContain("this.canvasRenderer?.destroy()");
+    expect(graphPlugin).toContain("if (!this.settings.nodeGraph.enabled)");
+    expect(graphPlugin).toContain("leaf.detach()");
+    expect(graphPlugin).toContain('id: "open-node-graph-subtree"');
+    expect(graphPlugin).toContain('id: "open-node-graph-local"');
+    expect(graphPlugin).toContain("checkCallback:");
   });
 });

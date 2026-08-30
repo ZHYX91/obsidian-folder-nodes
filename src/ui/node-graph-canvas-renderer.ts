@@ -32,6 +32,7 @@ import { renderVisual } from "../presentation/render-visual";
 export type NodeGraphCanvasDimension = "2d" | "3d";
 
 export interface NodeGraphCanvasRecord {
+  readonly boundary?: boolean;
   readonly label: string;
   readonly path: string;
   readonly visual: NodeVisual;
@@ -45,9 +46,10 @@ export interface NodeGraphCanvasData {
 }
 
 interface NodeGraphCanvasCallbacks {
-  readonly label: (key: "denseEdges" | "largeGraph" | "nodeGraph") => string;
+  readonly label: (key: "boundaryNode" | "denseEdges" | "largeGraph" | "nodeGraph") => string;
   readonly onOpen: (path: string, newLeaf: boolean) => void;
   readonly onSelect: (path: string) => void;
+  readonly overviewEdgeLimit?: number;
   readonly relationSummary: (structure: number, links: number) => string;
 }
 
@@ -136,7 +138,7 @@ export class NodeGraphCanvasRenderer {
     this.focusPath = focusPath;
     this.edges = edgesForMode(data.model, relationMode);
     this.buildEdgeIndex();
-    this.overviewEdges = selectNodeGraphCanvasOverviewEdges(this.edges);
+    this.overviewEdges = selectNodeGraphCanvasOverviewEdges(this.edges, callbacks.overviewEdgeLimit);
     this.overviewEdgeSet = new Set(this.overviewEdges);
     this.denseEdgeOverview = this.overviewEdges.length < this.edges.length;
     this.layoutPositions = new Map(data.layout.nodes.map((node) => [
@@ -524,7 +526,8 @@ export class NodeGraphCanvasRenderer {
     const match = this.searchMatches.has(point.id);
     const unrelated = this.focusPath !== null && !focused && !neighbor;
     const geometry = nodeGraphCanvasGeometry(point.scale);
-    const alpha = unrelated ? 0.22 : this.dimension === "3d" ? Math.max(0.5, Math.min(1, geometry.scale)) : 1;
+    const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, geometry.scale)) : 1;
+    const alpha = unrelated ? 0.22 : (record.boundary === true ? 0.62 : 1) * depthAlpha;
     this.context.save();
     this.context.globalAlpha = alpha;
     if (geometry.kind === "dot") {
@@ -574,7 +577,10 @@ export class NodeGraphCanvasRenderer {
       this.focusOverlay.dataset.nodePath = path;
     }
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
-    this.focusOverlay.setAttribute("title", `${path}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`);
+    const boundary = record.boundary ? `\n${this.callbacks.label("boundaryNode")}` : "";
+    const title = `${path}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`;
+    this.focusOverlay.setAttribute("aria-label", title);
+    this.focusOverlay.setAttribute("title", title);
     this.focusOverlay.style.left = `${point.x}px`;
     this.focusOverlay.style.top = `${point.y}px`;
     this.focusOverlay.hidden = false;
@@ -622,7 +628,8 @@ export class NodeGraphCanvasRenderer {
     const record = this.data.records.get(path);
     if (record === undefined) return;
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
-    this.tooltip.setText(`${record.label}\n${path}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`);
+    const boundary = record.boundary ? `\n${this.callbacks.label("boundaryNode")}` : "";
+    this.tooltip.setText(`${record.label}\n${path}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`);
     this.tooltip.style.left = `${Math.min(this.width - 16, x + 12)}px`;
     this.tooltip.style.top = `${Math.min(this.height - 16, y + 12)}px`;
     this.tooltip.hidden = false;

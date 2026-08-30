@@ -9,6 +9,7 @@ import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
 import { configuredEmojiFontStack } from "../core/emoji-font";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
+import { isWithin, remapNodeGraphSettingPaths } from "../core/node-graph-scope";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
@@ -35,7 +36,7 @@ export default class FolderNodesPlugin extends Plugin {
   public service!: NodeService;
   public visuals!: VisualService;
   private explorer!: ExplorerAdapter;
-  private readonly references = new ReferenceIndex();
+  protected readonly references = new ReferenceIndex();
   private refreshScheduler: RefreshScheduler | null = null;
   private reconcileBatches = new Map<string, { timer: number; entries: Map<string, "create" | "delete"> }>();
   private reconciliationReady = false;
@@ -290,6 +291,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.scheduleReconcile(entry.path, "create");
     }));
     this.registerEvent(this.app.vault.on("delete", (entry) => {
+      if (entry instanceof TFolder) this.removeDeletedNodeGraphPaths(entry.path);
       const affected = this.references.removeSource(entry.path);
       for (const path of affected) this.refreshVisuals(path);
       if (this.service.consumeExpectedEvent("delete", entry.path)) { this.refreshVisuals(entry.path); return; }
@@ -612,6 +614,23 @@ export default class FolderNodesPlugin extends Plugin {
     };
     remap(this.settings.ignoredFolders);
     remap(this.settings.leafNoteExemptions);
+    changed = remapNodeGraphSettingPaths(this.settings.nodeGraph, previous, next, recursive) || changed;
+    if (changed) void this.saveSettings().catch((error) => this.reportReconcileError(error));
+  }
+
+  private removeDeletedNodeGraphPaths(path: string): void {
+    const normalized = normalizeVaultPath(path);
+    let changed = false;
+    for (const paths of [
+      this.settings.nodeGraph.includedSubtrees,
+      this.settings.nodeGraph.excludedNodes,
+      this.settings.nodeGraph.excludedSubtrees,
+    ]) {
+      const retained = paths.filter((candidate) => !isWithin(candidate, normalized));
+      if (retained.length === paths.length) continue;
+      paths.splice(0, paths.length, ...retained);
+      changed = true;
+    }
     if (changed) void this.saveSettings().catch((error) => this.reportReconcileError(error));
   }
 

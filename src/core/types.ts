@@ -4,6 +4,21 @@ export type SortMode = "natural" | "manual";
 export type NodeDropZone = "before" | "into" | "after";
 export type InterfaceLanguage = "auto" | "zh-CN" | "en";
 export type ExplorerIconPosition = "before" | "after" | "hidden";
+export type NodeGraphDimension = "2d" | "3d";
+export type NodeGraphRelationMode = "structure" | "links" | "hybrid";
+
+export interface NodeGraphSettings {
+  enabled: boolean;
+  defaultDimension: NodeGraphDimension;
+  defaultRelationMode: NodeGraphRelationMode;
+  includedSubtrees: string[];
+  excludedNodes: string[];
+  excludedSubtrees: string[];
+  localDepth: number;
+  showBoundaryNodes: boolean;
+  largeGraphThreshold: number;
+  overviewEdgeLimit: number;
+}
 
 export interface NamingPart {
   enabled: boolean;
@@ -25,6 +40,7 @@ export interface FolderNodesSettings {
   leafNotePrefixes: string[];
   ignoredFolderPrefixes: string[];
   addSelectionAlias: boolean;
+  nodeGraph: NodeGraphSettings;
   prefix: NamingPart;
   suffix: NamingPart;
   timestampFormat: string;

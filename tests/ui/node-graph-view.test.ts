@@ -2,6 +2,7 @@ import { TFile, TFolder } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
 import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
+import { DEFAULT_NODE_GRAPH_SETTINGS } from "../../src/shared/settings";
 
 function graphFixture() {
   const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
@@ -17,6 +18,7 @@ function graphFixture() {
     vault: {
       getName: () => "Test Vault",
       getRoot: () => root,
+      getAbstractFileByPath: (path: string) => path === aNote.path ? aNote : path === bNote.path ? bNote : null,
     },
     metadataCache: {
       resolvedLinks: {
@@ -29,6 +31,8 @@ function graphFixture() {
     children: (path: string) => path === "" ? [{ childPath: "A" }, { childPath: "B" }] : [],
     getCanonicalFile: (path: string) => path === "A" ? aNote : path === "B" ? bNote : null,
     getFolder: (path: string) => path === "A" ? a : path === "B" ? b : null,
+    folderForFile: (file: TFile | null) => file?.parent ?? null,
+    isCanonicalFile: (file: TFile) => file === aNote || file === bNote,
     openFolderNode,
   };
   const visuals = {
@@ -120,6 +124,75 @@ describe("Node Graph view interactions", () => {
 
     view.setFocus("B");
     expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-focused")).toBe(true);
+  });
+
+  it("persists global, subtree, and local scopes while filtering before layout", async () => {
+    const { app, service, visuals } = graphFixture();
+    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
+    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
+    await view.onOpen();
+
+    view.setGraphScope({ mode: "subtree", rootPath: "A" });
+    expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
+    expect(view.contentEl.querySelector("[data-node-path='B']")).toBeNull();
+    expect(view.getState().scope).toEqual({ mode: "subtree", rootPath: "A" });
+
+    view.setGraphScope({ mode: "local", rootPath: "A" });
+    expect(view.contentEl.querySelector("[data-node-path='']")).not.toBeNull();
+    expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
+    expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-boundary")).toBe(true);
+
+    graphSettings.excludedNodes = ["A"];
+    view.refresh();
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    expect(view.contentEl.querySelector("[data-node-path='A']")).toBeNull();
+    await view.onClose();
+  });
+
+  it("restores the scoped root as focus and rebuilds links after a coalesced refresh", async () => {
+    const { app, service, visuals } = graphFixture();
+    const view = new FolderNodeGraphView({ app } as never, service, visuals);
+    await view.setState({ relationMode: "links", scope: { mode: "subtree", rootPath: "A" } }, {} as never);
+    await view.onOpen();
+
+    expect(view.contentEl.querySelector("[data-node-path='A']")?.classList.contains("is-focused")).toBe(true);
+    expect(view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-scope-action='local']")?.disabled).toBe(false);
+    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(0);
+
+    view.setGraphScope({ mode: "global" });
+    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(1);
+    (app.metadataCache.resolvedLinks as Record<string, Record<string, number>>)["A/A.md"] = {};
+    view.refresh();
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    expect(view.contentEl.querySelectorAll("line.is-link")).toHaveLength(0);
+  });
+
+  it("starts traversal at configured include roots instead of scanning unrelated branches", async () => {
+    const { app, service, visuals } = graphFixture();
+    const children = vi.spyOn(service, "children");
+    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
+    graphSettings.includedSubtrees = ["A"];
+    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
+    await view.onOpen();
+
+    expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
+    expect(view.contentEl.querySelector("[data-node-path='B']")).toBeNull();
+    expect(children).not.toHaveBeenCalledWith("");
+    expect(children).toHaveBeenCalledWith("A");
+  });
+
+  it("does not build or traverse graph data when the total switch is off", async () => {
+    const { app, service, visuals } = graphFixture();
+    const children = vi.spyOn(service, "children");
+    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
+    graphSettings.enabled = false;
+    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
+    await view.onOpen();
+
+    expect(children).not.toHaveBeenCalled();
+    expect(view.contentEl.querySelector(".folder-nodes-node-graph-disabled")).not.toBeNull();
+    expect(view.contentEl.querySelector(".folder-nodes-node-graph-disabled")?.getAttribute("role")).toBe("status");
+    expect(view.contentEl.querySelector(".folder-nodes-node-graph-toolbar")).toBeNull();
   });
 
   it("uses a constant-DOM canvas path above the large-graph threshold", async () => {

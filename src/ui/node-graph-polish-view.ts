@@ -68,9 +68,10 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
     if (toolbar.dataset.nodeGraphPolished === "true") return;
     const title = toolbar.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-title");
     const relation = toolbar.querySelector<HTMLElement>(":scope > [data-node-graph-switch='relation']");
+    const scope = toolbar.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-scope");
     const dimension = toolbar.querySelector<HTMLElement>(":scope > [data-node-graph-switch='dimension']");
     const fit = toolbar.querySelector<HTMLElement>(":scope > [data-node-graph-action='fit']");
-    if (title === null || relation === null || dimension === null || fit === null) return;
+    if (title === null || relation === null || scope === null || dimension === null || fit === null) return;
 
     toolbar.dataset.nodeGraphPolished = "true";
     toolbar.addClass("is-polished");
@@ -112,7 +113,7 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
 
     primary.append(dimension, fit);
     secondary.createSpan({ cls: "folder-nodes-node-graph-toolbar-label", text: text("relationships") });
-    secondary.append(relation);
+    secondary.append(relation, scope);
   }
 
   private decorateNodes(): void {
@@ -166,17 +167,18 @@ export class PolishedFolderNodeGraphView extends FolderNodeGraphView {
   }
 
   private ensureEmptyState(): void {
-    const shouldShow = this.currentRelationMode() === "links"
-      && !(this.currentGraphModel()?.edges.some((edge) => edge.link) ?? false);
+    const noNodes = (this.currentGraphModel()?.nodes.length ?? 0) === 0;
+    const shouldShow = noNodes || (this.currentRelationMode() === "links"
+      && !(this.currentGraphModel()?.edges.some((edge) => edge.link) ?? false));
     const existing = this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-empty");
     if (!shouldShow) {
       existing?.remove();
       return;
     }
     if (existing !== null) return;
-    const empty = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-empty" });
-    empty.createDiv({ cls: "folder-nodes-node-graph-empty-title", text: text("noLinks") });
-    empty.createDiv({ cls: "folder-nodes-node-graph-empty-description", text: text("noLinksDesc") });
+    const empty = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-empty", attr: { role: "status" } });
+    empty.createDiv({ cls: "folder-nodes-node-graph-empty-title", text: text(noNodes ? "noNodes" : "noLinks") });
+    empty.createDiv({ cls: "folder-nodes-node-graph-empty-description", text: text(noNodes ? "noNodesDesc" : "noLinksDesc") });
   }
 
   private ensure3DHint(): void {
@@ -271,7 +273,7 @@ function touches(line: SVGLineElement, path: string): boolean {
 }
 
 function text(
-  key: "findNode" | "legend" | "links" | "noLinks" | "noLinksDesc" | "relationships" | "structure" | "threeDHint",
+  key: "findNode" | "legend" | "links" | "noLinks" | "noLinksDesc" | "noNodes" | "noNodesDesc" | "relationships" | "structure" | "threeDHint",
 ): string;
 function text(key: "linkCount" | "structureCount", count: number): string;
 function text(key: string, count?: number): string {
@@ -282,6 +284,8 @@ function text(key: string, count?: number): string {
     links: ["链接", "Links"],
     noLinks: ["没有 Folder Node 链接", "No links between Folder Nodes"],
     noLinksDesc: ["仅显示 canonical Node Note 之间可解析的链接。", "Only resolved links between canonical Node Notes appear here."],
+    noNodes: ["当前范围没有可显示的节点", "No nodes in the current scope"],
+    noNodesDesc: ["请返回全局图谱，或在设置中调整包含和忽略规则。", "Return to the global graph or adjust include and ignore rules in settings."],
     relationships: ["关系", "Relationships"],
     structure: ["结构", "Structure"],
     threeDHint: ["拖动旋转 · Shift/中键拖动平移 · 滚轮缩放", "Drag to rotate · Shift/middle drag to pan · Wheel to zoom"],

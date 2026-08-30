@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNodeGraphModel, edgesForMode } from "../../src/core/node-graph-model";
+import { buildNodeGraphModel, buildNodeGraphModelFromNodes, edgesForMode } from "../../src/core/node-graph-model";
 
 const tree = {
   id: "",
@@ -52,5 +52,17 @@ describe("Node Graph relation model", () => {
       children: [{ id: "B", children: [] }, { id: "A", children: [] }],
     });
     expect(reversed.nodes.map(({ id }) => id)).toEqual(["", "A", "B"]);
+  });
+
+  it("builds a shared model from a scoped forest without inventing structure edges", () => {
+    const model = buildNodeGraphModelFromNodes(
+      [{ id: "Work", depth: 0 }, { id: "Work/A", depth: 1 }, { id: "External", depth: 0 }],
+      [{ source: "Work", target: "Work/A" }],
+      new Map([["Work/A", new Set(["External"])]]),
+    );
+    expect(model.edges).toEqual([
+      { source: "External", target: "Work/A", structure: false, link: true },
+      { source: "Work", target: "Work/A", structure: true, link: false },
+    ]);
   });
 });

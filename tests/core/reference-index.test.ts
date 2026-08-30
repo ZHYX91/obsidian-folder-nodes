@@ -14,4 +14,19 @@ describe("ReferenceIndex", () => {
     expect(index.isReferenced("Assets/a.png")).toBe(false);
     expect(index.isReferenced("B.pdf")).toBe(false);
   });
+
+  it("tracks inbound source paths incrementally", () => {
+    const index = new ReferenceIndex();
+    index.rebuild({
+      "A/A.md": { "B/B.md": 1 },
+      "C/C.md": { "B/B.md": 2 },
+    });
+    expect([...index.sourcesForTarget("B/B.md")].sort()).toEqual(["A/A.md", "C/C.md"]);
+
+    index.updateSource("A/A.md", { "D/D.md": 1 });
+    expect(index.sourcesForTarget("B/B.md")).toEqual(["C/C.md"]);
+    expect(index.sourcesForTarget("D/D.md")).toEqual(["A/A.md"]);
+    index.removeSource("C/C.md");
+    expect(index.sourcesForTarget("B/B.md")).toEqual([]);
+  });
 });
