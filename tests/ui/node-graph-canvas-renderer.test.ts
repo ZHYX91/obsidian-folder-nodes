@@ -218,6 +218,27 @@ describe("large Node Graph canvas renderer", () => {
     canvas?.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerId: 1, pointerType: "mouse" }));
     expect(onSelect).not.toHaveBeenCalled();
 
+    canvas?.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, clientX: 10, clientY: 10, pointerId: 2, pointerType: "mouse",
+    }));
+    for (let offset = 1; offset <= 10; offset += 1) {
+      canvas?.dispatchEvent(new PointerEvent("pointermove", {
+        bubbles: true, clientX: 10 + offset, clientY: 10, pointerId: 2, pointerType: "mouse",
+      }));
+    }
+    expect((renderer as unknown as { drag: { moved: boolean } | null }).drag?.moved).toBe(true);
+    canvas?.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true, clientX: 20, clientY: 10, pointerId: 2, pointerType: "mouse",
+    }));
+    expect(onSelect).not.toHaveBeenCalled();
+
+    canvas?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 3, pointerType: "mouse" }));
+    canvas?.dispatchEvent(new PointerEvent("lostpointercapture", {
+      bubbles: true, pointerId: 3, pointerType: "mouse",
+    }));
+    expect((renderer as unknown as { drag: unknown }).drag).toBeNull();
+    expect(surface.classList.contains("is-dragging")).toBe(false);
+
     surface.style.setProperty("--background-primary", "#fefefe");
     renderer.refreshPalette();
     expect((renderer as unknown as { palette: { background: string } }).palette.background).toBe("#fefefe");

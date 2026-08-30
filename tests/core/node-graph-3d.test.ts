@@ -100,4 +100,32 @@ describe("Node Graph 3D layout", () => {
     expect(Math.max(...projected.map((point) => point.y + nodeGraphCanvasGeometry(point.scale).halfHeight)))
       .toBeLessThanOrEqual(height - padding + 0.001);
   });
+
+  it("fits the rotated depth-diverse 501-node Canvas counterexample without clipping", () => {
+    const nodes = [{ id: "", depth: 0 }];
+    for (let chain = 0; chain < 10; chain += 1) {
+      for (let depth = 1; depth <= 50; depth += 1) nodes.push({ id: `${chain}/${depth}`, depth });
+    }
+    const points = layoutNodeGraph3D({ nodes, edges: [] });
+    const width = 800;
+    const height = 600;
+    const padding = 48;
+    const fitted = fitNodeGraphCamera(
+      points,
+      { ...defaultNodeGraphCamera(), yaw: -Math.PI, pitch: -0.2 },
+      width,
+      height,
+      padding,
+    );
+    const projected = projectNodeGraph3D(points, fitted, width, height);
+    expect(projected).toHaveLength(501);
+    expect(Math.min(...projected.map((point) => point.x - nodeGraphCanvasGeometry(point.scale).halfWidth)))
+      .toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map((point) => point.x + nodeGraphCanvasGeometry(point.scale).halfWidth)))
+      .toBeLessThanOrEqual(width - padding + 0.001);
+    expect(Math.min(...projected.map((point) => point.y - nodeGraphCanvasGeometry(point.scale).halfHeight)))
+      .toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map((point) => point.y + nodeGraphCanvasGeometry(point.scale).halfHeight)))
+      .toBeLessThanOrEqual(height - padding + 0.001);
+  });
 });

@@ -55,6 +55,7 @@ interface CanvasDrag {
   readonly pan: boolean;
   readonly pointerId: number;
   moved: boolean;
+  travel: number;
   x: number;
   y: number;
 }
@@ -264,7 +265,7 @@ export class NodeGraphCanvasRenderer {
   private readonly handlePointerDown = (event: PointerEvent): void => {
     this.pointers.set(event.pointerId, { pointerType: event.pointerType, x: event.clientX, y: event.clientY });
     const pan = this.dimension === "2d" || event.shiftKey || event.button === 1;
-    this.drag = { moved: false, pan, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    this.drag = { moved: false, pan, pointerId: event.pointerId, travel: 0, x: event.clientX, y: event.clientY };
     if (event.pointerType === "touch" && this.pointers.size > 1) this.drag = null;
     this.canvas.setPointerCapture?.(event.pointerId);
     this.surface.addClass("is-dragging");
@@ -315,7 +316,8 @@ export class NodeGraphCanvasRenderer {
     const deltaY = event.clientY - this.drag.y;
     this.drag.x = event.clientX;
     this.drag.y = event.clientY;
-    if (Math.abs(deltaX) + Math.abs(deltaY) > 1) this.drag.moved = true;
+    this.drag.travel += Math.hypot(deltaX, deltaY);
+    if (this.drag.travel > 1) this.drag.moved = true;
     if (pointer !== undefined) {
       pointer.x = event.clientX;
       pointer.y = event.clientY;
@@ -354,6 +356,7 @@ export class NodeGraphCanvasRenderer {
       moved: true,
       pan: this.dimension === "2d",
       pointerId: remaining[0],
+      travel: 0,
       x: remaining[1].x,
       y: remaining[1].y,
     };
@@ -382,6 +385,7 @@ export class NodeGraphCanvasRenderer {
     this.canvas.addEventListener("pointermove", this.handlePointerMove);
     this.canvas.addEventListener("pointerup", this.handlePointerFinish);
     this.canvas.addEventListener("pointercancel", this.handlePointerCancel);
+    this.canvas.addEventListener("lostpointercapture", this.handlePointerCancel);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.focusOverlay.addEventListener("dblclick", this.handleOverlayDoubleClick);
@@ -395,6 +399,7 @@ export class NodeGraphCanvasRenderer {
     this.canvas.removeEventListener("pointermove", this.handlePointerMove);
     this.canvas.removeEventListener("pointerup", this.handlePointerFinish);
     this.canvas.removeEventListener("pointercancel", this.handlePointerCancel);
+    this.canvas.removeEventListener("lostpointercapture", this.handlePointerCancel);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.removeEventListener("wheel", this.handleWheel);
     this.focusOverlay.removeEventListener("dblclick", this.handleOverlayDoubleClick);
