@@ -9,6 +9,7 @@ describe("Node Graph integration contract", () => {
   const plugin = source("src/app/plugin.ts");
   const graphPlugin = source("src/app/node-graph-plugin.ts");
   const graphView = source("src/ui/node-graph-view.ts");
+  const graphStyles = source("src/ui/node-graph.css");
   const canvasRenderer = source("src/ui/node-graph-canvas-renderer.ts");
   const polishedView = source("src/ui/node-graph-polish-view.ts");
 
@@ -45,7 +46,8 @@ describe("Node Graph integration contract", () => {
   });
 
   it("switches large graphs to constant-DOM Canvas rendering with explicit teardown", () => {
-    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length, data.model.edges.length)");
+    expect(graphView).toContain("const visibleEdgeCount = edgesForMode(data.model, this.relationMode).length");
+    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount)");
     expect(graphView).toContain("new NodeGraphCanvasRenderer");
     expect(canvasRenderer).toContain('surface.createEl("canvas"');
     expect(canvasRenderer).toContain("this.cancelFrame()");
@@ -56,5 +58,7 @@ describe("Node Graph integration contract", () => {
     expect(polishedView).not.toContain("MutationObserver");
     expect(graphPlugin).not.toContain("MutationObserver");
     expect(graphPlugin).toContain('view.setRenderExtension("node-graph"');
+    expect(graphStyles).toContain(".folder-nodes-node-graph-focus-overlay[hidden]");
+    expect(graphStyles).toContain("display: none");
   });
 });

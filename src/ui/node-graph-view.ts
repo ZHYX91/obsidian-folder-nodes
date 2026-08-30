@@ -65,6 +65,7 @@ type GraphPointer = {
 };
 
 export const NODE_GRAPH_VIEW_TYPE = "folder-nodes-node-graph";
+const NODE_GRAPH_DOM_MIN_SCALE = 0.65;
 
 export class FolderNodeGraphView extends ItemView {
   private focusPath: string | null = null;
@@ -162,7 +163,8 @@ export class FolderNodeGraphView extends ItemView {
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
-    if (shouldUseNodeGraphCanvas(data.model.nodes.length, data.model.edges.length)) this.renderCanvas(surface, data, fit);
+    const visibleEdgeCount = edgesForMode(data.model, this.relationMode).length;
+    if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount)) this.renderCanvas(surface, data, fit);
     else if (this.dimension === "2d") this.render2D(surface, data, fit);
     else this.render3D(surface, data, fit);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
@@ -339,6 +341,8 @@ export class FolderNodeGraphView extends ItemView {
         this.camera,
         this.threeDViewport.width,
         this.threeDViewport.height,
+        48,
+        NODE_GRAPH_DOM_MIN_SCALE,
       );
       this.update3DProjection();
     });
@@ -558,7 +562,7 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private position3DNode(node: HTMLElement, point: NodeGraphProjectedPoint): void {
-    const scale = Math.max(0.65, Math.min(1.2, point.scale));
+    const scale = Math.max(NODE_GRAPH_DOM_MIN_SCALE, Math.min(1.2, point.scale));
     node.style.left = `${point.x}px`;
     node.style.top = `${point.y}px`;
     node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));

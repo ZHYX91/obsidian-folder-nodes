@@ -61,4 +61,22 @@ describe("Node Graph 3D layout", () => {
     expect(points[1]?.z).toBeGreaterThan(points[0]?.z ?? -1);
     expect(points.at(-1)?.z).toBeLessThan(4_000);
   });
+
+  it("fits the minimum-scale DOM cards inside the padded viewport", () => {
+    const points = layoutNodeGraph3D({
+      nodes: Array.from({ length: 400 }, (_, index) => ({ id: String(index), depth: 1 })),
+      edges: [],
+    });
+    const width = 800;
+    const height = 600;
+    const padding = 48;
+    const fitted = fitNodeGraphCamera(points, defaultNodeGraphCamera(), width, height, padding, 0.65);
+    const projected = projectNodeGraph3D(points, fitted, width, height);
+    const halfWidth = 180 * 0.65 / 2;
+    const halfHeight = 46 * 0.65 / 2;
+    expect(Math.min(...projected.map(({ x }) => x - halfWidth))).toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map(({ x }) => x + halfWidth))).toBeLessThanOrEqual(width - padding + 0.001);
+    expect(Math.min(...projected.map(({ y }) => y - halfHeight))).toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map(({ y }) => y + halfHeight))).toBeLessThanOrEqual(height - padding + 0.001);
+  });
 });

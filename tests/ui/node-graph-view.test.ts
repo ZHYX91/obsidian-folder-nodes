@@ -183,7 +183,7 @@ describe("Node Graph view interactions", () => {
     getContext.mockRestore();
   });
 
-  it("uses Canvas for a link-dense graph below the node threshold", async () => {
+  it("chooses Canvas from the visible relation mode rather than hidden model edges", async () => {
     const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
     const folders = new Map<string, TFolder>();
     const notes = new Map<string, TFile>();
@@ -235,6 +235,12 @@ describe("Node Graph view interactions", () => {
     await view.onOpen();
     await new Promise((resolve) => window.setTimeout(resolve, 20));
 
+    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
+    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(41);
+    const links = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+      .find((button) => button.textContent === "Links");
+    links?.click();
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
     expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
     expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
     expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges line")).toHaveLength(0);

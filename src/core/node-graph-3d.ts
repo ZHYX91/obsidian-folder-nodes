@@ -112,20 +112,46 @@ export function fitNodeGraphCamera(
   viewportWidth: number,
   viewportHeight: number,
   padding = 48,
+  minimumNodeScale = 0,
 ): NodeGraphCamera {
   const width = Math.max(1, viewportWidth);
   const height = Math.max(1, viewportHeight);
   if (points.length === 0) return { ...camera, panX: 0, panY: 0 };
-  const neutral = { ...camera, zoom: 1, panX: 0, panY: 0 };
-  const neutralBounds = projectedBounds(projectNodeGraph3D(points, neutral, width, height));
   const availableWidth = Math.max(1, width - Math.max(0, padding) * 2);
   const availableHeight = Math.max(1, height - Math.max(0, padding) * 2);
-  const zoom = clamp(Math.min(
-    availableWidth / Math.max(1, neutralBounds.width),
-    availableHeight / Math.max(1, neutralBounds.height),
-  ), MIN_CAMERA_ZOOM, 4);
+  const boundedMinimumNodeScale = clamp(minimumNodeScale, 0, 1.2);
+  let zoom: number;
+  if (boundedMinimumNodeScale === 0) {
+    const neutral = { ...camera, zoom: 1, panX: 0, panY: 0 };
+    const neutralBounds = projectedBounds(projectNodeGraph3D(points, neutral, width, height));
+    zoom = clamp(Math.min(
+      availableWidth / Math.max(1, neutralBounds.width),
+      availableHeight / Math.max(1, neutralBounds.height),
+    ), MIN_CAMERA_ZOOM, 4);
+  } else {
+    const boundsAt = (candidateZoom: number) => projectedBounds(
+      projectNodeGraph3D(points, { ...camera, zoom: candidateZoom, panX: 0, panY: 0 }, width, height),
+      boundedMinimumNodeScale,
+    );
+    let low = MIN_CAMERA_ZOOM;
+    let high = 4;
+    const highBounds = boundsAt(high);
+    if (highBounds.width <= availableWidth && highBounds.height <= availableHeight) low = high;
+    else {
+      for (let iteration = 0; iteration < 48; iteration += 1) {
+        const candidate = (low + high) / 2;
+        const bounds = boundsAt(candidate);
+        if (bounds.width <= availableWidth && bounds.height <= availableHeight) low = candidate;
+        else high = candidate;
+      }
+    }
+    zoom = low;
+  }
   const fitted = { ...camera, zoom, panX: 0, panY: 0 };
-  const fittedBounds = projectedBounds(projectNodeGraph3D(points, fitted, width, height));
+  const fittedBounds = projectedBounds(
+    projectNodeGraph3D(points, fitted, width, height),
+    boundedMinimumNodeScale,
+  );
   return {
     ...fitted,
     panX: width / 2 - fittedBounds.centerX,
@@ -150,7 +176,7 @@ export function zoomNodeGraphCamera(camera: NodeGraphCamera, deltaY: number): No
   return { ...camera, zoom: clamp(camera.zoom * factor, MIN_CAMERA_ZOOM, 4) };
 }
 
-function projectedBounds(points: readonly NodeGraphProjectedPoint[]): {
+function projectedBounds(points: readonly NodeGraphProjectedPoint[], minimumNodeScale = 0): {
   readonly centerX: number;
   readonly centerY: number;
   readonly height: number;
@@ -161,7 +187,7 @@ function projectedBounds(points: readonly NodeGraphProjectedPoint[]): {
   let top = Number.POSITIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
   for (const point of points) {
-    const geometry = nodeGraphCanvasGeometry(point.scale);
+    const geometry = nodeGraphCanvasGeometry(Math.max(minimumNodeScale, point.scale));
     left = Math.min(left, point.x - geometry.halfWidth);
     right = Math.max(right, point.x + geometry.halfWidth);
     top = Math.min(top, point.y - geometry.halfHeight);
