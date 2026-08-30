@@ -9,6 +9,7 @@ import {
   rotateNodeGraphCamera,
   zoomNodeGraphCamera,
 } from "../../src/core/node-graph-3d";
+import { nodeGraphCanvasGeometry } from "../../src/core/node-graph-canvas";
 import { buildNodeGraphModel } from "../../src/core/node-graph-model";
 
 const model = buildNodeGraphModel({
@@ -78,5 +79,25 @@ describe("Node Graph 3D layout", () => {
     expect(Math.max(...projected.map(({ x }) => x + halfWidth))).toBeLessThanOrEqual(width - padding + 0.001);
     expect(Math.min(...projected.map(({ y }) => y - halfHeight))).toBeGreaterThanOrEqual(padding - 0.001);
     expect(Math.max(...projected.map(({ y }) => y + halfHeight))).toBeLessThanOrEqual(height - padding + 0.001);
+  });
+
+  it("fits adaptive Canvas geometry inside the padded viewport at the large-graph boundary", () => {
+    const points = layoutNodeGraph3D({
+      nodes: Array.from({ length: 501 }, (_, index) => ({ id: String(index), depth: index === 0 ? 0 : 1 })),
+      edges: [],
+    });
+    const width = 800;
+    const height = 600;
+    const padding = 48;
+    const fitted = fitNodeGraphCamera(points, defaultNodeGraphCamera(), width, height, padding);
+    const projected = projectNodeGraph3D(points, fitted, width, height);
+    expect(Math.min(...projected.map((point) => point.x - nodeGraphCanvasGeometry(point.scale).halfWidth)))
+      .toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map((point) => point.x + nodeGraphCanvasGeometry(point.scale).halfWidth)))
+      .toBeLessThanOrEqual(width - padding + 0.001);
+    expect(Math.min(...projected.map((point) => point.y - nodeGraphCanvasGeometry(point.scale).halfHeight)))
+      .toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map((point) => point.y + nodeGraphCanvasGeometry(point.scale).halfHeight)))
+      .toBeLessThanOrEqual(height - padding + 0.001);
   });
 });
