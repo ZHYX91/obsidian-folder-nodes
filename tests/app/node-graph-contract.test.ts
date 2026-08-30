@@ -5,73 +5,59 @@ import { describe, expect, it } from "vitest";
 
 function source(path: string): string { return readFileSync(resolve(process.cwd(), path), "utf8"); }
 
-describe("Node Graph integration contract", () => {
+describe("Node Graph negative architecture contracts", () => {
   const plugin = source("src/app/plugin.ts");
   const graphPlugin = source("src/app/node-graph-plugin.ts");
+  const graphIndex = source("src/app/node-graph-index.ts");
   const graphView = source("src/ui/node-graph-view.ts");
   const graphStyles = source("src/ui/node-graph.css");
+  const settings = source("src/app/settings-tab.ts");
   const canvasRenderer = source("src/ui/node-graph-canvas-renderer.ts");
-  const polishedView = source("src/ui/node-graph-polish-view.ts");
 
-  it("refreshes through the existing coalescing Metadata Cache and refresh path", () => {
-    expect(plugin).toContain("this.refreshExtensionViews(batch)");
-    expect(plugin).toContain('this.app.metadataCache.on("changed"');
-    expect(plugin).toContain('this.app.metadataCache.on("resolved"');
-    expect(graphPlugin).toContain("protected override refreshExtensionViews");
-    expect(graphPlugin).not.toContain("override refreshVisuals");
-    expect(graphView).toContain("this.app.metadataCache.resolvedLinks");
+  it("does not restore the obsolete relation selector or graph-obstructing density overlay", () => {
+    expect(graphView).not.toContain('data-node-graph-switch="relation"');
+    expect(graphView).not.toContain("nodeGraphDensityOverview");
+    expect(graphView).not.toContain("folder-nodes-node-graph-density-notice");
+    expect(graphStyles).not.toContain(".folder-nodes-node-graph-density-notice");
+    expect(settings).not.toContain("defaultRelationMode");
+    expect(settings).not.toContain("localDepth");
+    expect(settings).not.toContain("showBoundaryNodes");
   });
 
-  it("extends the owned Node Contents menu without exposing it as a generic file menu", () => {
+  it("keeps Vault traversal and Metadata Cache link normalization outside the view", () => {
+    expect(graphPlugin).toContain("NodeGraphIndex");
+    expect(graphPlugin).toContain("getIndexSnapshot");
+    expect(graphView).not.toContain("metadataCache.resolvedLinks");
+    expect(graphView).not.toContain("nodeGraphTraversalRoots(");
+    expect(graphIndex).toContain("references.targetsForSource");
+    expect(graphIndex).not.toContain("metadataCache.resolvedLinks");
+  });
+
+  it("keeps one runtime stylesheet authority across base and Node Graph surfaces", () => {
+    expect(plugin).toContain("`${BASE_STYLES}\\n${NODE_GRAPH_STYLES}`");
+    expect(plugin).toContain("new RuntimeStyles(PLUGIN_STYLES)");
+    expect(graphPlugin).not.toContain("RuntimeStyles");
+    expect(graphPlugin).not.toContain("NODE_GRAPH_STYLES");
+  });
+
+  it("does not introduce global DOM observers or per-edge SVG nodes in the Canvas renderer", () => {
+    expect(graphPlugin).not.toContain("MutationObserver");
+    expect(graphView).not.toContain("MutationObserver");
+    expect(graphView).not.toContain("document.body");
+    expect(canvasRenderer).not.toContain('createSvg("line"');
+    expect(canvasRenderer).not.toContain('createSvg("path"');
+  });
+
+  it("keeps narrow and coarse-pointer controls reachable without desktop-only CSS", () => {
+    expect(graphStyles).toContain("@media (max-width: 480px)");
+    expect(graphStyles).toContain("@media (pointer: coarse)");
+    expect(graphStyles).toContain("min-width: 44px");
+    expect(graphStyles).toContain("min-height: 44px");
+  });
+
+  it("continues to extend only owned Node Contents menus", () => {
     expect(plugin).toContain("protected addOwnedNodeMenuItems");
     expect(graphPlugin).toContain("protected override addOwnedNodeMenuItems");
     expect(graphPlugin).toContain("this.addNodeGraphItem(menu, folder)");
-  });
-
-  it("keeps one Workspace View for relation and dimension modes", () => {
-    expect(graphView).toContain('["structure", "links", "hybrid"]');
-    expect(graphView).toContain('["2d", "3d"]');
-    expect(graphView).toContain("buildNodeGraphModelFromNodes(");
-    expect(graphView).toContain("layoutNodeGraphForest(forest, { direction: this.settings().layoutDirection })");
-    expect(graphView).toContain("points3D: layoutNodeGraph3D(model)");
-  });
-
-  it("preserves Enter opening, 2D fit, and interactive 3D projection", () => {
-    expect(graphView).toContain('node.addEventListener("keydown"');
-    expect(graphView).toContain('event.key !== "Enter"');
-    expect(graphView).toContain("fitNodeGraphViewport");
-    expect(graphView).toContain("canvas.style.transform = `scale(${fit.scale})`");
-    expect(graphView).toContain('surface.addEventListener("pointermove"');
-    expect(graphView).toContain('surface.addEventListener("wheel"');
-    expect(graphView).toContain("this.update3DProjection()");
-  });
-
-  it("switches large graphs to constant-DOM Canvas rendering with explicit teardown", () => {
-    expect(graphView).toContain("const visibleEdgeCount = edgesForMode(data.model, this.relationMode).length");
-    expect(graphView).toContain("shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)");
-    expect(graphView).toContain("new NodeGraphCanvasRenderer");
-    expect(canvasRenderer).toContain('surface.createEl("canvas"');
-    expect(canvasRenderer).toContain("this.cancelFrame()");
-    expect(canvasRenderer).toContain("this.unbindEvents()");
-    expect(canvasRenderer).toContain("selectNodeGraphCanvasOverviewEdges");
-    expect(canvasRenderer).toContain("strokeEdgeBatch");
-    expect(canvasRenderer).not.toContain('createSvg("line"');
-    expect(polishedView).not.toContain("MutationObserver");
-    expect(graphPlugin).not.toContain("MutationObserver");
-    expect(graphPlugin).toContain('view.setRenderExtension("node-graph"');
-    expect(graphStyles).toContain(".folder-nodes-node-graph-focus-overlay[hidden]");
-    expect(graphStyles).toContain("display: none");
-  });
-
-  it("filters scope before model/layout and tears down disabled views", () => {
-    expect(graphView).toContain("nodeGraphTraversalRoots(this.graphScope, settings)");
-    expect(graphView).toContain("nodeGraphSubtreeIsExcluded(path, settings)");
-    expect(graphView).toContain("if (!this.settings().enabled)");
-    expect(graphView).toContain("this.canvasRenderer?.destroy()");
-    expect(graphPlugin).toContain("if (!this.settings.nodeGraph.enabled)");
-    expect(graphPlugin).toContain("leaf.detach()");
-    expect(graphPlugin).toContain('id: "open-node-graph-subtree"');
-    expect(graphPlugin).toContain('id: "open-node-graph-local"');
-    expect(graphPlugin).toContain("checkCallback:");
   });
 });

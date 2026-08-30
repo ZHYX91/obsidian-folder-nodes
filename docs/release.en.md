@@ -12,7 +12,9 @@ translation_status: synced
 
 ## Release gates
 
-Before candidacy, run `npm ci`, `npm run check`, `npm run release:check`, and the large-directory benchmark. Isolated-Vault host acceptance binds to the exact candidate. Desktop covers the four settings pages, homepage, Explorer/title icons, disclosure arrow, Explorer/Contents Node drag, all three Contents menus and keyboard access, ordinary-file into moves and conflict rejection, selection context menus, Visuals, static Album, both exemptions, detailed maintenance preview, read-only Health, and deletion. A mobile candidate separately requires current emulator product evidence for no draggable/drag handles, native folder move, Move/Move up/Move down, target-rank reconciliation, touch menus, narrow layout, and restart. Emulator, physical-device, and iOS claims do not substitute for one another. Acceptance separately confirms Folder Nodes creates no GIF, video, or audio playback controls.
+Before candidacy, run `npm ci`, `npm run check`, `npm run release:check`, and the large-directory benchmark. Isolated-Vault host acceptance binds to the exact candidate. Desktop covers the five settings pages, homepage, Explorer/title icons, disclosure arrow, Explorer/Contents Node drag, all three Contents menus and keyboard access, ordinary-file into moves and conflict rejection, selection context menus, Visuals, static Album, both exemptions, detailed maintenance preview, read-only Health, and deletion. It also covers Node Graph progressive Global/Subtree/Local defaults, Local parent context without sibling escape, multiple branches, direct/Alt/range expansion, session-only expansion with a safe restart default, old relation-state migration, SearchComponent reveal/restore, external focus, links off by default and independently enabled, node menus, tooltips and keyboard controls, narrow-window wrapping, 2D/3D shared selection, and large-scene safety without graph-covering notices. Acceptance separately confirms Folder Nodes creates no GIF, video, or audio playback controls.
+
+The Node Graph repository/desktop candidate handoff requires automated narrow-screen, coarse-pointer, and touch coverage but does not make a real Android run a blocking gate. If Android is not run, record it as **not covered**, never passed. A separately authorized mobile acceptance may use the current emulator to cover Node Graph scopes, handles, search, 2D/3D, touch targets, and restart together with the existing no-draggable, native-move, menu, rank, and narrow-layout scenarios. Emulator, physical-device, and iOS claims do not substitute for one another; no iOS result is implied.
 
 ## Git and GitHub
 
@@ -30,7 +32,7 @@ versioned ZIP.
 
 ## Production Vault
 
-Before deployment, confirm the exact Vault, plugin ID, and Obsidian process state. Preserve existing `data.json`. Copy only the exact candidate's three runtime files, recompute hashes after deployment, and confirm enabled state. A production Vault never receives migration fixtures or automated destructive acceptance.
+Source, PR, and isolated-candidate completion stop before production deployment unless the user separately authorizes the exact Vault. Before deployment, confirm the exact Vault, plugin ID, and Obsidian process state. Preserve existing `data.json`. Copy only the exact candidate's three runtime files, recompute hashes after deployment, and confirm enabled state. A production Vault never receives migration fixtures or automated destructive acceptance.
 
 ## Release content
 

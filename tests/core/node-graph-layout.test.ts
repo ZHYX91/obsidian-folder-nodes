@@ -63,6 +63,16 @@ describe("node graph layout", () => {
     });
   });
 
+  it("keeps oversized DOM graphs readable and grows the scrollable stage", () => {
+    expect(fitNodeGraphViewport(20_000, 8_000, 1_000, 600, 24, 0.65)).toEqual({
+      scale: 0.65,
+      stageWidth: 13_048,
+      stageHeight: 5_248,
+      offsetX: 24,
+      offsetY: 24,
+    });
+  });
+
   it("keeps the original layout when the viewport is not measurable", () => {
     expect(fitNodeGraphViewport(200, 100, 0, 0)).toEqual({
       scale: 1,
@@ -88,10 +98,13 @@ describe("node graph layout", () => {
     expect(Math.max(...layout.nodes.map(({ depth }) => depth))).toBe(19_999);
   });
 
-  it("sorts siblings before placement so enumeration order cannot move nodes", () => {
+  it("preserves caller sibling order so NodeService manual rank reaches the final layout", () => {
     const forward = layoutNodeGraph({ id: "", children: [{ id: "A", children: [] }, { id: "B", children: [] }] });
     const reversed = layoutNodeGraph({ id: "", children: [{ id: "B", children: [] }, { id: "A", children: [] }] });
-    expect(reversed).toEqual(forward);
+    const forwardPositions = new Map(forward.nodes.map((node) => [node.id, node]));
+    const reversedPositions = new Map(reversed.nodes.map((node) => [node.id, node]));
+    expect((forwardPositions.get("A")?.y ?? 0) < (forwardPositions.get("B")?.y ?? 0)).toBe(true);
+    expect((reversedPositions.get("B")?.y ?? 0) < (reversedPositions.get("A")?.y ?? 0)).toBe(true);
   });
 
   it("lays out disconnected scoped roots without a visible synthetic node or edge", () => {

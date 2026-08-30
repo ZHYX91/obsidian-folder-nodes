@@ -4,13 +4,10 @@ import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core
 export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = {
   enabled: true,
   defaultDimension: "2d",
-  defaultRelationMode: "structure",
   layoutDirection: "left-to-right",
   includedSubtrees: [],
   excludedNodes: [],
   excludedSubtrees: [],
-  localDepth: 2,
-  showBoundaryNodes: false,
   largeGraphThreshold: 500,
   overviewEdgeLimit: 6_000,
 };
@@ -75,15 +72,10 @@ function normalizeNodeGraphSettings(value: unknown): NodeGraphSettings {
   return {
     enabled: input.enabled !== false,
     defaultDimension: input.defaultDimension === "3d" ? "3d" : "2d",
-    defaultRelationMode: input.defaultRelationMode === "links" || input.defaultRelationMode === "hybrid"
-      ? input.defaultRelationMode
-      : "structure",
     layoutDirection: input.layoutDirection === "top-to-bottom" ? "top-to-bottom" : "left-to-right",
     includedSubtrees: normalizePaths(input.includedSubtrees, DEFAULT_NODE_GRAPH_SETTINGS.includedSubtrees),
     excludedNodes: normalizePaths(input.excludedNodes, DEFAULT_NODE_GRAPH_SETTINGS.excludedNodes),
     excludedSubtrees: normalizePaths(input.excludedSubtrees, DEFAULT_NODE_GRAPH_SETTINGS.excludedSubtrees),
-    localDepth: normalizeInteger(input.localDepth, 1, 8, DEFAULT_NODE_GRAPH_SETTINGS.localDepth),
-    showBoundaryNodes: input.showBoundaryNodes === true,
     largeGraphThreshold: normalizeInteger(input.largeGraphThreshold, 50, 10_000, DEFAULT_NODE_GRAPH_SETTINGS.largeGraphThreshold),
     overviewEdgeLimit: normalizeInteger(input.overviewEdgeLimit, 100, 100_000, DEFAULT_NODE_GRAPH_SETTINGS.overviewEdgeLimit),
   };

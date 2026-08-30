@@ -48,7 +48,6 @@ export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOpt
   }
   const points: NodeGraphPoint3D[] = [];
   for (const [depth, ids] of [...byDepth.entries()].sort(([a], [b]) => a - b)) {
-    ids.sort((a, b) => a.localeCompare(b, "en"));
     const columns = Math.max(1, Math.ceil(Math.sqrt(ids.length)));
     const rows = Math.max(1, Math.ceil(ids.length / columns));
     for (const [index, id] of ids.entries()) {

@@ -1,7 +1,4 @@
 import type { NodeGraphTree } from "./node-graph-layout";
-import type { NodeGraphRelationMode } from "./types";
-
-export type { NodeGraphRelationMode } from "./types";
 
 export interface NodeGraphModelNode {
   readonly id: string;
@@ -35,7 +32,7 @@ export function buildNodeGraphModel(
     if (nodeIds.has(node.id)) throw new Error(`Duplicate Node Graph id: ${node.id}`);
     nodeIds.add(node.id);
     nodes.push({ id: node.id, depth });
-    const children = [...node.children].sort((left, right) => left.id.localeCompare(right.id, "en"));
+    const children = node.children;
     for (const child of children) {
       mergeEdge(edges, node.id, child.id, "structure");
     }
@@ -84,17 +81,23 @@ export function buildNodeGraphModelFromNodes(
     }
   }
   return {
-    nodes: [...nodes].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id, "en")),
+    nodes: [...nodes],
     edges: [...edges.values()]
       .map(({ source, target, structure, link }) => ({ source, target, structure, link }))
       .sort(compareEdges),
   };
 }
 
-export function edgesForMode(model: NodeGraphModel, mode: NodeGraphRelationMode): readonly NodeGraphModelEdge[] {
-  if (mode === "structure") return model.edges.filter((edge) => edge.structure);
-  if (mode === "links") return model.edges.filter((edge) => edge.link);
-  return model.edges.filter((edge) => edge.structure || edge.link);
+export function nodeGraphStructureEdges(model: NodeGraphModel): readonly NodeGraphModelEdge[] {
+  return model.edges.filter((edge) => edge.structure);
+}
+
+export function nodeGraphLinkEdges(model: NodeGraphModel): readonly NodeGraphModelEdge[] {
+  return model.edges.filter((edge) => edge.link);
+}
+
+export function edgesForShowLinks(model: NodeGraphModel, showLinks: boolean): readonly NodeGraphModelEdge[] {
+  return model.edges.filter((edge) => edge.structure || (showLinks && edge.link));
 }
 
 interface MutableEdge {
@@ -105,10 +108,19 @@ interface MutableEdge {
 }
 
 function mergeEdge(edges: Map<string, MutableEdge>, left: string, right: string, kind: "structure" | "link"): void {
-  const [source, target] = left.localeCompare(right, "en") <= 0 ? [left, right] : [right, left];
-  const key = `${source}\u0000${target}`;
-  const edge = edges.get(key) ?? { source, target, structure: false, link: false };
-  edge[kind] = true;
+  const [first, second] = left.localeCompare(right, "en") <= 0 ? [left, right] : [right, left];
+  const key = `${first}\u0000${second}`;
+  const edge = edges.get(key) ?? { source: first, target: second, structure: false, link: false };
+  if (kind === "structure") {
+    if (edge.structure && (edge.source !== left || edge.target !== right)) {
+      throw new Error(`Conflicting Node Graph structure edge: ${left} -> ${right}`);
+    }
+    edge.source = left;
+    edge.target = right;
+    edge.structure = true;
+  } else {
+    edge.link = true;
+  }
   edges.set(key, edge);
 }
 

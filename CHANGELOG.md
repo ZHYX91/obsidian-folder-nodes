@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Rebuilt Node Graph around progressive per-scope expansion, independent multi-branch and range controls, node-card handles, native search with state restoration, and session-only expansion that returns to a safe one-level default after restart.
+- Kept structure as the permanent graph skeleton and replaced Structure/Links/Hybrid with a default-off resolved-link overlay, including compatible migration of existing workspace relation state.
+- Unified 2D and 3D around one incrementally refreshed graph scene, preserving all visible structure edges, constant-DOM Canvas rendering, readable large-graph presentation, narrow/coarse-pointer controls, and unobstructed status feedback.
 - Added Android support while keeping HTML5 node/file drag-and-drop desktop-only; mobile retains native folder moves plus plugin Move, Move up, and Move down actions.
 - Reconciled child-owned sparse rank metadata after a folder is moved natively across parents, preventing a stale source-parent rank from disturbing a manual target order.
 - Replaced the icon-versus-file-name guide's unexplained numeric examples with neutral `Project`, `A Project`, and `📓 Project` comparisons.

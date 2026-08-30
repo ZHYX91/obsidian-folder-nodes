@@ -1,3 +1,5 @@
+import { nodeGraphBoxContains, nodeGraphBoxFromCenter } from "./node-graph-geometry";
+
 export interface NodeGraphCanvasCamera {
   readonly panX: number;
   readonly panY: number;
@@ -23,6 +25,24 @@ export interface NodeGraphCanvasGeometry {
   readonly label: boolean;
   readonly radius: number;
   readonly scale: number;
+}
+
+export interface NodeGraphCanvasSpatialPoint {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface NodeGraphCanvasSpatialIndex {
+  readonly buckets: ReadonlyMap<string, readonly NodeGraphCanvasSpatialPoint[]>;
+  readonly cellSize: number;
+}
+
+export interface NodeGraphCanvasWorldBounds {
+  readonly maxX: number;
+  readonly maxY: number;
+  readonly minX: number;
+  readonly minY: number;
 }
 
 export const LARGE_NODE_GRAPH_THRESHOLD = 500;
@@ -71,6 +91,45 @@ export function shouldUseNodeGraphCanvas(
   return Math.max(0, nodeCount) > limit || Math.max(0, edgeCount) > limit;
 }
 
+export function buildNodeGraphCanvasSpatialIndex(
+  points: readonly NodeGraphCanvasSpatialPoint[],
+  cellSize = 512,
+): NodeGraphCanvasSpatialIndex {
+  const size = positive(cellSize, 512);
+  const buckets = new Map<string, NodeGraphCanvasSpatialPoint[]>();
+  for (const point of points) {
+    const key = spatialKey(Math.floor(point.x / size), Math.floor(point.y / size));
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(point);
+    buckets.set(key, bucket);
+  }
+  return { buckets, cellSize: size };
+}
+
+export function queryNodeGraphCanvasSpatialIndex(
+  index: NodeGraphCanvasSpatialIndex,
+  bounds: NodeGraphCanvasWorldBounds,
+): readonly NodeGraphCanvasSpatialPoint[] {
+  const minX = Math.min(bounds.minX, bounds.maxX);
+  const maxX = Math.max(bounds.minX, bounds.maxX);
+  const minY = Math.min(bounds.minY, bounds.maxY);
+  const maxY = Math.max(bounds.minY, bounds.maxY);
+  const minCellX = Math.floor(minX / index.cellSize);
+  const maxCellX = Math.floor(maxX / index.cellSize);
+  const minCellY = Math.floor(minY / index.cellSize);
+  const maxCellY = Math.floor(maxY / index.cellSize);
+  const result: NodeGraphCanvasSpatialPoint[] = [];
+  for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      for (const point of index.buckets.get(spatialKey(cellX, cellY)) ?? []) {
+        if (point.x < minX || point.x > maxX || point.y < minY || point.y > maxY) continue;
+        result.push(point);
+      }
+    }
+  }
+  return result;
+}
+
 export function fitNodeGraphCanvasCamera(
   content: NodeGraphCanvasSize,
   viewport: NodeGraphCanvasSize,
@@ -115,8 +174,9 @@ export function zoomNodeGraphCanvasCamera(
   deltaY: number,
   anchorX: number,
   anchorY: number,
+  minimumZoom = 0.000_01,
 ): NodeGraphCanvasCamera {
-  const zoom = clamp(camera.zoom * Math.exp(-deltaY * 0.0015), 0.000_01, 8);
+  const zoom = clamp(camera.zoom * Math.exp(-deltaY * 0.0015), Math.max(0.000_01, minimumZoom), 8);
   const ratio = zoom / camera.zoom;
   return {
     zoom,
@@ -148,9 +208,8 @@ export function hitTestNodeGraphCanvas(
     const point = points[index];
     if (point === undefined) continue;
     const geometry = nodeGraphCanvasGeometry(point.scale);
-    const dx = Math.abs(x - point.x);
-    const dy = Math.abs(y - point.y);
-    if (dx > geometry.halfWidth || dy > geometry.halfHeight) continue;
+    const box = nodeGraphBoxFromCenter(point.x, point.y, geometry.halfWidth, geometry.halfHeight);
+    if (!nodeGraphBoxContains(box, { x, y })) continue;
     return point.id;
   }
   return null;
@@ -158,6 +217,10 @@ export function hitTestNodeGraphCanvas(
 
 function positive(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function spatialKey(cellX: number, cellY: number): string {
+  return `${cellX}:${cellY}`;
 }
 
 function clamp(value: number, min: number, max: number): number {

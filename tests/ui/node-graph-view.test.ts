@@ -1,358 +1,533 @@
-import { TFile, TFolder } from "obsidian";
-import { describe, expect, it, vi } from "vitest";
+import { Menu } from "obsidian";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
+import type { NodeGraphIndexRecord, NodeGraphIndexSnapshot } from "../../src/core/node-graph-index-snapshot";
+import type { NodeGraphSettings, NodeVisual } from "../../src/core/types";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../../src/shared/settings";
+import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
 
-function graphFixture() {
-  const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
-  const a = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "A", path: "A", parent: root });
-  const b = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "B", path: "B", parent: root });
-  const aNote = Object.assign(new TFile(), { name: "A.md", basename: "A", extension: "md", path: "A/A.md", parent: a });
-  const bNote = Object.assign(new TFile(), { name: "B.md", basename: "B", extension: "md", path: "B/B.md", parent: b });
-  root.children = [a, b];
-  a.children = [aNote];
-  b.children = [bNote];
-  const openFolderNode = vi.fn(async () => undefined);
-  const app = {
-    vault: {
-      getName: () => "Test Vault",
-      getRoot: () => root,
-      getAbstractFileByPath: (path: string) => path === aNote.path ? aNote : path === bNote.path ? bNote : null,
-    },
-    metadataCache: {
-      resolvedLinks: {
-        "A/A.md": { "B/B.md": 2, "Loose.md": 1 },
-        "B/B.md": {},
-      },
-    },
-  };
-  const service = {
-    children: (path: string) => path === "" ? [{ childPath: "A" }, { childPath: "B" }] : [],
-    getCanonicalFile: (path: string) => path === "A" ? aNote : path === "B" ? bNote : null,
-    getFolder: (path: string) => path === "A" ? a : path === "B" ? b : null,
-    folderForFile: (file: TFile | null) => file?.parent ?? null,
-    isCanonicalFile: (file: TFile) => file === aNote || file === bNote,
-    openFolderNode,
-  };
-  const visuals = {
-    resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const,
-  };
-  return { app, openFolderNode, service, visuals };
-}
+const FALLBACK: NodeVisual = { accent: null, inheritedFrom: null, kind: "fallback", value: "folder" };
+const openViews: FolderNodeGraphView[] = [];
 
-describe("Node Graph view interactions", () => {
-  it("opens Node Notes with Enter, fits 2D, and switches relation modes", async () => {
-    const { app, openFolderNode, service, visuals } = graphFixture();
-    const view = new FolderNodeGraphView({ app } as never, service, visuals);
+afterEach(async () => {
+  for (const view of openViews.splice(0)) await view.onClose();
+});
+
+describe("Node Graph progressive view", () => {
+  it("starts at one level with structure only and renders accessible sibling interaction zones", async () => {
+    const fixture = await graphViewFixture();
+    expectVisible(fixture.view, ["", "Work", "Personal"]);
+    expect(fixture.view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(2);
+    expect(fixture.view.contentEl.querySelectorAll("path.is-link")).toHaveLength(0);
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-link-summary")).toBeNull();
+
+    const root = graphNode(fixture.view, "");
+    const work = graphNode(fixture.view, "Work");
+    expect(root.querySelector(".folder-nodes-node-graph-node-icon-handle svg")?.getAttribute("data-icon")).toBe("home");
+    expect(work.querySelector(".folder-nodes-node-graph-node-icon-handle svg")?.getAttribute("data-icon")).toBe("folder");
+    expect(work.tagName).toBe("DIV");
+    expect(work.children[0]?.classList.contains("folder-nodes-node-graph-node-icon-handle")).toBe(true);
+    expect(work.children[1]?.classList.contains("folder-nodes-node-graph-node-body")).toBe(true);
+    expect(work.children[2]?.classList.contains("folder-nodes-node-graph-node-expand-handle")).toBe(true);
+    const expand = expandHandle(fixture.view, "Work");
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(expand.getAttribute("aria-label")).toContain("2");
+    expect(expand.getAttribute("data-tooltip")).toContain("Alt");
+
+    expect(scopeButton(fixture.view, "subtree").disabled).toBe(true);
+    expect(scopeButton(fixture.view, "local").disabled).toBe(true);
+    nodeBody(fixture.view, "Work").click();
+    expect(scopeButton(fixture.view, "subtree").disabled).toBe(false);
+    expect(scopeButton(fixture.view, "local").disabled).toBe(false);
+
+    nodeBody(fixture.view, "Work").dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true, ctrlKey: true, key: "Enter",
+    }));
+    expect(fixture.openFolderNode).toHaveBeenCalledWith("Work", true);
+    nodeBody(fixture.view, "Work").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(fixture.openFolderNode).toHaveBeenCalledWith("Work", false);
+    work.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(fixture.onNodeMenu).toHaveBeenCalledWith(expect.any(MouseEvent), "Work");
+  });
+
+  it("keeps multiple branches open and applies Alt to the whole selected branch", async () => {
+    const fixture = await graphViewFixture();
+    expandHandle(fixture.view, "Work").click();
+    expectVisible(fixture.view, ["", "Work", "Personal", "Work/A", "Work/B"]);
+    expandHandle(fixture.view, "Personal").click();
+    expectVisible(fixture.view, ["", "Work", "Personal", "Work/A", "Work/B", "Personal/Home"]);
+
+    expandHandle(fixture.view, "Work/A").dispatchEvent(new MouseEvent("click", {
+      altKey: true, bubbles: true,
+    }));
+    expectVisible(fixture.view, [
+      "", "Work", "Personal", "Work/A", "Work/B", "Personal/Home",
+      "Work/A/One", "Work/A/Two", "Work/A/One/Deep",
+    ]);
+
+    expandHandle(fixture.view, "Work/A").dispatchEvent(new MouseEvent("click", {
+      altKey: true, bubbles: true,
+    }));
+    expectVisible(fixture.view, ["", "Work", "Personal", "Work/A", "Work/B", "Personal/Home"]);
+    expect(expandHandle(fixture.view, "Work").getAttribute("aria-expanded")).toBe("true");
+    expect(expandHandle(fixture.view, "Personal").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("requests workspace persistence only for serialized graph state", async () => {
+    const fixture = await graphViewFixture();
+    fixture.requestSaveLayout.mockClear();
+    expandHandle(fixture.view, "Work").click();
+    expect(fixture.requestSaveLayout).not.toHaveBeenCalled();
+
+    nodeBody(fixture.view, "Work").click();
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(1);
+    fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")?.click();
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(2);
+    scopeButton(fixture.view, "subtree").click();
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(3);
+    const threeD = [...fixture.view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+      .find((button) => button.textContent === "3D");
+    threeD?.click();
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps expansion per scope for the leaf but never serializes or restores it across leaves", async () => {
+    const fixture = await graphViewFixture();
+    expandHandle(fixture.view, "Work").click();
+    nodeBody(fixture.view, "Work").click();
+    scopeButton(fixture.view, "subtree").click();
+    expectVisible(fixture.view, ["Work", "Work/A", "Work/B"]);
+    expandHandle(fixture.view, "Work/A").click();
+    expectVisible(fixture.view, ["Work", "Work/A", "Work/B", "Work/A/One", "Work/A/Two"]);
+
+    fixture.view.setGraphScope({ mode: "global" });
+    expectVisible(fixture.view, ["", "Work", "Personal", "Work/A", "Work/B"]);
+    fixture.view.setGraphScope({ mode: "subtree", rootPath: "Work" });
+    expectVisible(fixture.view, ["Work", "Work/A", "Work/B", "Work/A/One", "Work/A/Two"]);
+    expect(fixture.view.getState()).not.toHaveProperty("expansion");
+
+    const restarted = await graphViewFixture();
+    await restarted.view.setState(fixture.view.getState(), {} as never);
+    await restarted.view.onOpen();
+    expectVisible(restarted.view, ["Work", "Work/A", "Work/B"]);
+  });
+
+  it("overlays direct links only when enabled and migrates legacy workspace relation state", async () => {
+    const fixture = await graphViewFixture();
+    expandHandle(fixture.view, "Work").click();
+    nodeBody(fixture.view, "Work/A").click();
+    scopeButton(fixture.view, "local").click();
+    const toggle = fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle");
+    expect(toggle?.getAttribute("aria-checked")).toBe("false");
+    expect(fixture.view.getState().showLinks).toBe(false);
+    toggle?.click();
+
+    expect(fixture.view.getState().showLinks).toBe(true);
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Personal/Home']")?.classList.contains("is-boundary")).toBe(true);
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/B']")?.classList.contains("is-boundary")).toBe(true);
+    expect(fixture.view.contentEl.querySelectorAll("path.is-link")).toHaveLength(3);
+    expect(fixture.view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(3);
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-link-summary")?.textContent).toBe("3 visible links");
+
+    fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")?.click();
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Personal/Home']")).toBeNull();
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/B']")).toBeNull();
+    expect(fixture.view.contentEl.querySelectorAll("path.is-link")).toHaveLength(0);
+
+    const migrated = await graphViewFixture(false);
+    await migrated.view.setState({ relationMode: "hybrid" }, {} as never);
+    await migrated.view.onOpen();
+    expect(migrated.view.getState().showLinks).toBe(true);
+    expect(migrated.view.contentEl.querySelector(".folder-nodes-node-graph-links-toggle")?.getAttribute("aria-checked")).toBe("true");
+
+    const noLinks = await graphViewFixture(false);
+    noLinks.snapshot.links.clear();
+    await noLinks.view.onOpen();
+    noLinks.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")?.click();
+    const emptySummary = noLinks.view.contentEl.querySelector(".folder-nodes-node-graph-link-summary");
+    expect(emptySummary?.classList.contains("is-empty")).toBe(true);
+    expect(emptySummary?.textContent).toBe("No visible links in the current scope");
+  });
+
+  it("temporarily reveals a hidden search result and restores focus and expansion on Escape", async () => {
+    const fixture = await graphViewFixture();
+    expandHandle(fixture.view, "Personal").click();
+    nodeBody(fixture.view, "Personal").click();
+    fixture.requestSaveLayout.mockClear();
+    expect(graphNode(fixture.view, "Personal/Home")).not.toBeNull();
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']")).toBeNull();
+    const surfaceBeforeSearch = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    const stageBeforeSearch = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+    const canvasBeforeSearch = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+    if (surfaceBeforeSearch !== null) {
+      surfaceBeforeSearch.scrollLeft = 37;
+      surfaceBeforeSearch.scrollTop = 29;
+    }
+    if (stageBeforeSearch !== null && canvasBeforeSearch !== null) {
+      stageBeforeSearch.style.width = "777px";
+      stageBeforeSearch.style.height = "555px";
+      canvasBeforeSearch.style.left = "11px";
+      canvasBeforeSearch.style.top = "13px";
+      canvasBeforeSearch.style.transform = "scale(0.73)";
+    }
+
+    let search = searchInput(fixture.view);
+    expect(search.closest(".folder-nodes-node-graph-search")).not.toBeNull();
+    search.value = "Deep";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']")?.classList.contains("is-search-match")).toBe(true);
+    expect(fixture.requestSaveLayout).not.toHaveBeenCalled();
+    search = searchInput(fixture.view);
+    search.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    expect(graphNode(fixture.view, "Work/A/One/Deep").classList.contains("is-focused")).toBe(true);
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(1);
+
+    search = searchInput(fixture.view);
+    search.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']")).toBeNull();
+    expect(graphNode(fixture.view, "Personal/Home")).not.toBeNull();
+    expect(graphNode(fixture.view, "Personal").classList.contains("is-focused")).toBe(true);
+    expect(searchInput(fixture.view).value).toBe("");
+    const restoredSurface = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    const restoredStage = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+    const restoredCanvas = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+    expect(restoredSurface?.scrollLeft).toBe(37);
+    expect(restoredSurface?.scrollTop).toBe(29);
+    expect(restoredStage?.style.width).toBe("777px");
+    expect(restoredStage?.style.height).toBe("555px");
+    expect(restoredCanvas?.style.left).toBe("11px");
+    expect(restoredCanvas?.style.top).toBe("13px");
+    expect(restoredCanvas?.style.transform).toBe("scale(0.73)");
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(2);
+  });
+
+  it("restores the real Canvas camera after temporary search reveal", async () => {
+    const settings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: 1 };
+    const fixture = await graphViewFixture(true, settings);
+    fixture.view.setFocus("Work");
+    const camera = {
+      camera2D: { panX: 83, panY: -41, zoom: 1.35 },
+      camera3D: { panX: 17, panY: 29, pitch: 0.1, yaw: -0.2, zoom: 0.8 },
+      dimension: "2d" as const,
+    };
+    const renderer = (fixture.view as unknown as {
+      canvasRenderer: { restoreViewportState: (state: typeof camera) => void } | null;
+    }).canvasRenderer;
+    renderer?.restoreViewportState(camera);
+
+    let search = searchInput(fixture.view);
+    search.value = "Deep";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    expect((fixture.view as unknown as {
+      canvasRenderer: { readonly focusPath: string | null } | null;
+    }).canvasRenderer?.focusPath).toBe("Work");
+    search = searchInput(fixture.view);
+    search.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    expect((fixture.view as unknown as {
+      canvasRenderer: { readonly focusPath: string | null } | null;
+    }).canvasRenderer?.focusPath).toBe("Work/A/One/Deep");
+    search = searchInput(fixture.view);
+    search.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+
+    const restored = (fixture.view as unknown as {
+      canvasRenderer: { captureViewportState: () => typeof camera } | null;
+    }).canvasRenderer?.captureViewportState();
+    expect(restored).toEqual(camera);
+    expect((fixture.view as unknown as {
+      canvasRenderer: { readonly focusPath: string | null } | null;
+    }).canvasRenderer?.focusPath).toBe("Work");
+  });
+
+  it("reveals an externally focused hidden path without changing the active scope", async () => {
+    const fixture = await graphViewFixture();
+    fixture.view.setFocus("Work/A/One/Deep");
+    expect(graphNode(fixture.view, "Work/A/One/Deep").classList.contains("is-focused")).toBe(true);
+    expect(fixture.view.getState().scope).toEqual({ mode: "global" });
+  });
+
+  it("remaps persisted leaf paths on folder rename and prunes them on delete", async () => {
+    const fixture = await graphViewFixture();
+    fixture.view.setGraphScope({ mode: "local", rootPath: "Work/A" });
+    fixture.view.setFocus("Work/A/One");
+
+    fixture.view.remapPathState("Work", "Projects");
+    expect(fixture.view.getState()).toMatchObject({
+      focus: "Projects/A/One",
+      scope: { mode: "local", rootPath: "Projects/A" },
+    });
+
+    fixture.view.removePathState("Projects");
+    expect(fixture.view.getState()).toMatchObject({ focus: null, scope: { mode: "global" } });
+  });
+
+  it("falls back from stale persisted scope and focus during cold start", async () => {
+    const fixture = await graphViewFixture(false);
+    await fixture.view.setState({
+      focus: "Removed/Child",
+      scope: { mode: "subtree", rootPath: "Removed" },
+    }, {} as never);
+    await fixture.view.onOpen();
+    expect(fixture.view.getState()).toMatchObject({ focus: null, scope: { mode: "global" } });
+    expectVisible(fixture.view, ["", "Work", "Personal"]);
+  });
+
+  it("reveals a valid persisted deep focus without serializing transient expansion", async () => {
+    const fixture = await graphViewFixture(false);
+    await fixture.view.setState({ focus: "Work/A/One/Deep", scope: { mode: "global" } }, {} as never);
+    await fixture.view.onOpen();
+    expect(graphNode(fixture.view, "Work/A/One/Deep").classList.contains("is-focused")).toBe(true);
+    expect(fixture.view.getState()).not.toHaveProperty("expansion");
+  });
+
+  it("offers exact range counts and keeps local expansion inside the selected subtree", async () => {
+    const fixture = await graphViewFixture();
+    fixture.view.setFocus("Work/A");
+    fixture.view.setGraphScope({ mode: "local", rootPath: "Work/A" });
+    expectVisible(fixture.view, ["Work", "Work/A", "Work/A/One", "Work/A/Two"]);
+    expect(graphNode(fixture.view, "Work").querySelector(".folder-nodes-node-graph-node-expand-handle")).toBeNull();
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/B']")).toBeNull();
+
+    fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-range-button")?.click();
+    const menu = lastMenu();
+    expect(menu.items.map(({ title }) => title)).toEqual([
+      "Expand next level",
+      "Expand 2 levels",
+      "Expand 3 levels",
+      "Expand the entire local scope (5 nodes)",
+      "Collapse to level 1",
+    ]);
+    menu.items[3]?.click?.();
+    expectVisible(fixture.view, ["Work", "Work/A", "Work/A/One", "Work/A/Two", "Work/A/One/Deep"]);
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/B']")).toBeNull();
+
+    fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-range-button")?.click();
+    lastMenu().items[4]?.click?.();
+    expectVisible(fixture.view, ["Work", "Work/A", "Work/A/One", "Work/A/Two"]);
+  });
+
+  it("does not leak temporary search expansion into a scope session", async () => {
+    const fixture = await graphViewFixture();
+    let search = searchInput(fixture.view);
+    search.value = "Deep";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(graphNode(fixture.view, "Work/A/One/Deep")).not.toBeNull();
+
+    fixture.view.setGraphScope({ mode: "subtree", rootPath: "Personal" });
+    fixture.view.setGraphScope({ mode: "global" });
+    expect(fixture.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']")).toBeNull();
+    expectVisible(fixture.view, ["", "Work", "Personal"]);
+  });
+
+  it("keeps the default DOM threshold boundary readable instead of shrinking cards to dots", async () => {
+    const records = new Map<string, NodeGraphIndexRecord>();
+    records.set("", record("", "Threshold Vault", null, "Threshold Vault.md"));
+    for (let index = 0; index < 499; index += 1) {
+      const path = `N${String(index).padStart(3, "0")}`;
+      records.set(path, record(path, path, "", `${path}/${path}.md`));
+    }
+    const snapshot: MutableNodeGraphIndexSnapshot = { links: new Map(), records, revision: 1 };
+    const dependencies = graphViewDependencies(snapshot);
+    const view = new FolderNodeGraphView({ app: dependencies.app } as never, dependencies.service, dependencies.options);
+    openViews.push(view);
     await view.onOpen();
-
-    const node = view.contentEl.querySelector<HTMLButtonElement>("[data-node-path='A']");
-    const rootNode = view.contentEl.querySelector<HTMLElement>("[data-node-path='']");
-    expect(Number.parseFloat(rootNode?.style.left ?? "0")).toBeLessThan(Number.parseFloat(node?.style.left ?? "0"));
-    node?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
-    expect(openFolderNode).toHaveBeenCalledWith("A", true);
+    expect(view.contentEl.querySelector("canvas")).toBeNull();
 
     const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
-    expect(surface).not.toBeNull();
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 600 },
+      clientWidth: { configurable: true, value: 1_000 },
+      scrollTo: { configurable: true, value: vi.fn() },
+    });
+    view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']")?.click();
+
+    const canvas = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+    const stage = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+    expect(canvas?.style.transform).toBe("scale(0.65)");
+    expect(Number.parseFloat(stage?.style.height ?? "0")).toBeGreaterThan(600);
+  });
+
+  it("does not expose a no-op local parent toggle when the scene uses Canvas", async () => {
+    const settings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: 1 };
+    const fixture = await graphViewFixture(true, settings);
+    fixture.view.setFocus("Work/A");
+    fixture.view.setGraphScope({ mode: "local", rootPath: "Work/A" });
+    const renderer = (fixture.view as unknown as {
+      canvasRenderer: { data: { records: ReadonlyMap<string, { readonly childCount?: number }> } } | null;
+    }).canvasRenderer;
+    expect(renderer).not.toBeNull();
+    expect(renderer?.data.records.get("Work")?.childCount).toBe(0);
+  });
+
+  it("keeps 2D fit, top-to-bottom layout, 3D projection, and disabled short-circuit behavior", async () => {
+    const settings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
+    const fixture = await graphViewFixture(true, settings);
+    const surface = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
     Object.defineProperties(surface, {
       clientHeight: { configurable: true, value: 100 },
       clientWidth: { configurable: true, value: 100 },
       scrollTo: { configurable: true, value: vi.fn() },
     });
-    view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']")?.click();
-    expect(surface?.scrollTo).toHaveBeenCalledWith({ left: 0, top: 0, behavior: "smooth" });
-
-    const linksButton = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
-      .find((button) => button.textContent === "Links");
-    linksButton?.click();
-    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(0);
-
-    const hybridButton = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
-      .find((button) => button.textContent === "Hybrid");
-    hybridButton?.click();
-    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(2);
-    expect(view.contentEl.querySelector("path.is-link")?.getAttribute("d")).toContain(" Q ");
-    expect(view.contentEl.querySelector("path.is-structure")?.getAttribute("d")).toContain(" C ");
-  });
-
-  it("switches the shared 2D graph between left-to-right and top-to-bottom settings", async () => {
-    const { app, service, visuals } = graphFixture();
-    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
-    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
-    await view.onOpen();
-
-    const initialRoot = view.contentEl.querySelector<HTMLElement>("[data-node-path='']");
-    const initialA = view.contentEl.querySelector<HTMLElement>("[data-node-path='A']");
-    expect(Number.parseFloat(initialRoot?.style.left ?? "0")).toBeLessThan(Number.parseFloat(initialA?.style.left ?? "0"));
-
-    graphSettings.layoutDirection = "top-to-bottom";
-    view.refresh();
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
-    const updatedRoot = view.contentEl.querySelector<HTMLElement>("[data-node-path='']");
-    const updatedA = view.contentEl.querySelector<HTMLElement>("[data-node-path='A']");
-    expect(Number.parseFloat(updatedRoot?.style.top ?? "0")).toBeLessThan(Number.parseFloat(updatedA?.style.top ?? "0"));
-    await view.onClose();
-  });
-
-  it("switches the same graph model into 3D and keeps focus/open interactions", async () => {
-    const { app, openFolderNode, service, visuals } = graphFixture();
-    const view = new FolderNodeGraphView({ app } as never, service, visuals);
-    await view.onOpen();
-    const threeD = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
-      .find((button) => button.textContent === "3D");
-    threeD?.click();
-
-    expect(view.contentEl.classList.contains("is-3d")).toBe(true);
-    const node = view.contentEl.querySelector<HTMLButtonElement>("[data-node-path='A']");
-    expect(node?.classList.contains("is-3d")).toBe(true);
-    expect(node?.style.transform).toContain("translate(-50%, -50%) scale(");
-
-    const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
-    const canvas = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-3d");
-    const edges = view.contentEl.querySelector<SVGSVGElement>(".folder-nodes-node-graph-edges");
-    expect(surface).not.toBeNull();
-    Object.defineProperties(surface, {
-      clientHeight: { configurable: true, value: 360 },
-      clientWidth: { configurable: true, value: 640 },
+    fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']")?.click();
+    expect(surface?.scrollTo).toHaveBeenCalledWith({
+      behavior: "smooth",
+      left: expect.any(Number),
+      top: expect.any(Number),
     });
-    view.onResize();
-    expect(canvas?.style.width).toBe("640px");
-    expect(canvas?.style.height).toBe("360px");
-    expect(edges?.getAttribute("viewBox")).toBe("0 0 640 360");
 
-    const transformsBeforeTouch = [...view.contentEl.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-node")]
-      .map((element) => element.style.transform);
-    surface?.dispatchEvent(new PointerEvent("pointerdown", {
-      bubbles: true, clientX: 100, clientY: 100, pointerId: 1, pointerType: "touch",
-    }));
-    surface?.dispatchEvent(new PointerEvent("pointerdown", {
-      bubbles: true, clientX: 200, clientY: 100, pointerId: 2, pointerType: "touch",
-    }));
-    surface?.dispatchEvent(new PointerEvent("pointermove", {
-      bubbles: true, clientX: 150, clientY: 110, pointerId: 2, pointerType: "touch",
-    }));
-    const transformsAfterTouch = [...view.contentEl.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-node")]
-      .map((element) => element.style.transform);
-    expect(transformsAfterTouch).not.toEqual(transformsBeforeTouch);
-    surface?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 2, pointerType: "touch" }));
-    surface?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, pointerType: "touch" }));
+    settings.layoutDirection = "top-to-bottom";
+    fixture.view.refresh();
+    await new Promise((resolve) => window.setTimeout(resolve, 60));
+    const root = graphNode(fixture.view, "");
+    const work = graphNode(fixture.view, "Work");
+    expect(Number.parseFloat(root.style.top)).toBeLessThan(Number.parseFloat(work.style.top));
+    const twoDData = (fixture.view as unknown as {
+      displayGraphData: { layout: { nodes: readonly unknown[] }; points3D: readonly unknown[] } | null;
+    }).displayGraphData;
+    expect(twoDData?.layout.nodes.length).toBeGreaterThan(0);
+    expect(twoDData?.points3D).toHaveLength(0);
 
-    surface?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100_000 }));
-    expect(node?.classList.contains("is-depth-far")).toBe(true);
-    node?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    expect(openFolderNode).toHaveBeenCalledWith("A", false);
-
-    view.setFocus("B");
-    expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-focused")).toBe(true);
-  });
-
-  it("persists global, subtree, and local scopes while filtering before layout", async () => {
-    const { app, service, visuals } = graphFixture();
-    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
-    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
-    await view.onOpen();
-
-    view.setGraphScope({ mode: "subtree", rootPath: "A" });
-    expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
-    expect(view.contentEl.querySelector("[data-node-path='B']")).toBeNull();
-    expect(view.getState().scope).toEqual({ mode: "subtree", rootPath: "A" });
-
-    view.setGraphScope({ mode: "local", rootPath: "A" });
-    expect(view.contentEl.querySelector("[data-node-path='']")).not.toBeNull();
-    expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
-    expect(view.contentEl.querySelector("[data-node-path='B']")).toBeNull();
-
-    const links = [...view.contentEl.querySelectorAll<HTMLButtonElement>("[data-node-graph-switch='relation'] button")]
-      .find((button) => button.textContent === "Links");
-    links?.click();
-    expect(view.contentEl.querySelector("[data-node-path='B']")?.classList.contains("is-boundary")).toBe(true);
-
-    graphSettings.excludedNodes = ["A"];
-    view.refresh();
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
-    expect(view.contentEl.querySelector("[data-node-path='A']")).toBeNull();
-    await view.onClose();
-  });
-
-  it("restores the scoped root as focus and rebuilds links after a coalesced refresh", async () => {
-    const { app, service, visuals } = graphFixture();
-    const view = new FolderNodeGraphView({ app } as never, service, visuals);
-    await view.setState({ relationMode: "links", scope: { mode: "subtree", rootPath: "A" } }, {} as never);
-    await view.onOpen();
-
-    expect(view.contentEl.querySelector("[data-node-path='A']")?.classList.contains("is-focused")).toBe(true);
-    expect(view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-scope-action='local']")?.disabled).toBe(false);
-    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(0);
-
-    view.setGraphScope({ mode: "global" });
-    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(1);
-    (app.metadataCache.resolvedLinks as Record<string, Record<string, number>>)["A/A.md"] = {};
-    view.refresh();
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
-    expect(view.contentEl.querySelectorAll("path.is-link")).toHaveLength(0);
-  });
-
-  it("starts traversal at configured include roots instead of scanning unrelated branches", async () => {
-    const { app, service, visuals } = graphFixture();
-    const children = vi.spyOn(service, "children");
-    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
-    graphSettings.includedSubtrees = ["A"];
-    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
-    await view.onOpen();
-
-    expect(view.contentEl.querySelector("[data-node-path='A']")).not.toBeNull();
-    expect(view.contentEl.querySelector("[data-node-path='B']")).toBeNull();
-    expect(children).not.toHaveBeenCalledWith("");
-    expect(children).toHaveBeenCalledWith("A");
-  });
-
-  it("does not build or traverse graph data when the total switch is off", async () => {
-    const { app, service, visuals } = graphFixture();
-    const children = vi.spyOn(service, "children");
-    const graphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
-    graphSettings.enabled = false;
-    const view = new FolderNodeGraphView({ app } as never, service, visuals, { getSettings: () => graphSettings });
-    await view.onOpen();
-
-    expect(children).not.toHaveBeenCalled();
-    expect(view.contentEl.querySelector(".folder-nodes-node-graph-disabled")).not.toBeNull();
-    expect(view.contentEl.querySelector(".folder-nodes-node-graph-disabled")?.getAttribute("role")).toBe("status");
-    expect(view.contentEl.querySelector(".folder-nodes-node-graph-toolbar")).toBeNull();
-  });
-
-  it("compacts a dense branch first and keeps the constant-DOM Canvas fallback for show-all", async () => {
-    const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
-    const folders = new Map<string, TFolder>();
-    for (let index = 0; index < 501; index += 1) {
-      const path = `N${String(index).padStart(3, "0")}`;
-      folders.set(path, Object.assign(new TFolder(), {
-        children: [] as Array<TFile | TFolder>,
-        name: path,
-        parent: root,
-        path,
-      }));
-    }
-    const openFolderNode = vi.fn(async () => undefined);
-    const app = {
-      vault: { getName: () => "Large Vault", getRoot: () => root },
-      metadataCache: { resolvedLinks: {} },
-    };
-    const service = {
-      children: (path: string) => path === "" ? [...folders.keys()].map((childPath) => ({ childPath })) : [],
-      getCanonicalFile: () => null,
-      getFolder: (path: string) => folders.get(path) ?? null,
-      openFolderNode,
-    };
-    const visuals = {
-      resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const,
-    };
-    const context = {
-      arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-      lineTo: vi.fn(), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
-      stroke: vi.fn(), strokeRect: vi.fn(),
-    };
-    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
-    const view = new FolderNodeGraphView({ app } as never, service, visuals);
-    await view.onOpen();
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
-
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(17);
-    expect(view.contentEl.querySelector(".folder-nodes-node-graph-density-notice")?.textContent).toContain("485");
-    view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-density-action")?.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
-
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges path")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-focus-overlay")).toHaveLength(1);
-
-    view.setFocus("N500");
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
-    const focus = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay");
-    expect(focus?.dataset.nodePath).toBe("N500");
-    focus?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(openFolderNode).toHaveBeenCalledWith("N500", false);
-
-    const threeD = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+    const threeD = [...fixture.view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
       .find((button) => button.textContent === "3D");
+    fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")?.click();
+    expect(fixture.view.contentEl.classList.contains("is-3d")).toBe(false);
     threeD?.click();
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
-    view.refresh();
-    view.refresh();
-    await view.onClose();
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
-    getContext.mockRestore();
+    expect(fixture.view.contentEl.classList.contains("is-3d")).toBe(true);
+    expect(graphNode(fixture.view, "Work").style.transform).toContain("translate(-50%, -50%) scale(");
+    const threeDData = (fixture.view as unknown as {
+      displayGraphData: { layout: { nodes: readonly unknown[] }; points3D: readonly unknown[] } | null;
+    }).displayGraphData;
+    expect(threeDData?.layout.nodes).toHaveLength(0);
+    expect(threeDData?.points3D.length).toBeGreaterThan(0);
+
+    const disabledSettings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), enabled: false };
+    const disabled = await graphViewFixture(false, disabledSettings);
+    await disabled.view.onOpen();
+    expect(disabled.getIndexSnapshot).not.toHaveBeenCalled();
+    expect(disabled.view.contentEl.querySelector(".folder-nodes-node-graph-disabled")?.getAttribute("role")).toBe("status");
+    expect(disabled.view.contentEl.querySelector(".folder-nodes-node-graph-toolbar")).toBeNull();
   });
 
-  it("chooses Canvas from the visible relation mode rather than hidden model edges", async () => {
-    const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
-    const folders = new Map<string, TFolder>();
-    const notes = new Map<string, TFile>();
-    for (let index = 0; index < 40; index += 1) {
-      const path = `D${String(index).padStart(2, "0")}`;
-      const folder = Object.assign(new TFolder(), {
-        children: [] as Array<TFile | TFolder>,
-        name: path,
-        parent: root,
-        path,
-      });
-      const note = Object.assign(new TFile(), {
-        basename: path,
-        extension: "md",
-        name: `${path}.md`,
-        parent: folder,
-        path: `${path}/${path}.md`,
-      });
-      folder.children = [note];
-      folders.set(path, folder);
-      notes.set(path, note);
-    }
-    const resolvedLinks = Object.fromEntries([...notes.values()].map((source) => [
-      source.path,
-      Object.fromEntries([...notes.values()]
-        .filter((target) => target.path !== source.path)
-        .map((target) => [target.path, 1])),
-    ]));
-    const app = {
-      vault: { getName: () => "Dense Vault", getRoot: () => root },
-      metadataCache: { resolvedLinks },
-    };
-    const service = {
-      children: (path: string) => path === "" ? [...folders.keys()].map((childPath) => ({ childPath })) : [],
-      getCanonicalFile: (path: string) => notes.get(path) ?? null,
-      getFolder: (path: string) => folders.get(path) ?? null,
-      openFolderNode: vi.fn(async () => undefined),
-    };
-    const visuals = {
-      resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const,
-    };
-    const context = {
-      arc: vi.fn(), beginPath: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-      lineTo: vi.fn(), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
-      stroke: vi.fn(), strokeRect: vi.fn(),
-    };
-    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
-    const view = new FolderNodeGraphView({ app } as never, service, visuals);
-    await view.onOpen();
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
+  it("releases large transient graph and search state on close", async () => {
+    const fixture = await graphViewFixture();
+    fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-range-button")?.click();
+    lastMenu().items[3]?.click?.();
+    const search = searchInput(fixture.view);
+    search.value = "Deep";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    await fixture.view.onClose();
 
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(41);
-    const links = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
-      .find((button) => button.textContent === "Links");
-    links?.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
-    expect(view.contentEl.querySelectorAll("canvas.folder-nodes-node-graph-render-canvas")).toHaveLength(1);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-node")).toHaveLength(0);
-    expect(view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges path")).toHaveLength(0);
-
-    await view.onClose();
-    getContext.mockRestore();
+    const internals = fixture.view as unknown as {
+      currentExpansion: { readonly expandedIds: ReadonlySet<string> };
+      expansionSession: { readonly scopes: ReadonlyMap<string, unknown> };
+      searchQuery: string;
+      searchResultsCache: unknown;
+      searchSnapshot: unknown;
+    };
+    expect(internals.currentExpansion.expandedIds.size).toBe(0);
+    expect(internals.expansionSession.scopes.size).toBe(0);
+    expect(internals.searchQuery).toBe("");
+    expect(internals.searchResultsCache).toBeNull();
+    expect(internals.searchSnapshot).toBeNull();
+    expect(fixture.view.contentEl.childElementCount).toBe(0);
   });
 });
+
+interface MutableNodeGraphIndexSnapshot extends NodeGraphIndexSnapshot {
+  readonly links: Map<string, Set<string>>;
+  readonly records: Map<string, NodeGraphIndexRecord>;
+}
+
+function nodeGraphSnapshot(): MutableNodeGraphIndexSnapshot {
+  const records = [
+    record("", "Test Vault", null, "Test Vault.md"),
+    record("Work", "Work", "", "Work/Work.md"),
+    record("Work/A", "A", "Work", "Work/A/A.md"),
+    record("Work/A/One", "One", "Work/A", "Work/A/One/One.md"),
+    record("Work/A/One/Deep", "Deep", "Work/A/One", "Work/A/One/Deep/Deep.md"),
+    record("Work/A/Two", "Two", "Work/A", "Work/A/Two/Two.md"),
+    record("Work/B", "B", "Work", "Work/B/B.md"),
+    record("Personal", "Personal", "", "Personal/Personal.md"),
+    record("Personal/Home", "Home", "Personal", "Personal/Home/Home.md"),
+  ];
+  return {
+    links: new Map([
+      ["Work", new Set(["Personal/Home"])],
+      ["Work/A", new Set(["Personal/Home"])],
+      ["Work/A/One", new Set(["Work/B"])],
+    ]),
+    records: new Map(records.map((value) => [value.path, value])),
+    revision: 1,
+  };
+}
+
+function graphViewDependencies(snapshot = nodeGraphSnapshot(), settings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS)) {
+  const openFolderNode = vi.fn(async () => undefined);
+  const onNodeMenu = vi.fn();
+  const getIndexSnapshot = vi.fn(() => snapshot);
+  const requestSaveLayout = vi.fn();
+  const app = { vault: { getName: () => "Test Vault" }, workspace: { requestSaveLayout } };
+  const service = { openFolderNode };
+  const options = { getIndexSnapshot, getSettings: () => settings, onNodeMenu };
+  return { app, getIndexSnapshot, onNodeMenu, openFolderNode, options, requestSaveLayout, service, settings, snapshot };
+}
+
+async function graphViewFixture(open = true, settings: NodeGraphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS)) {
+  const dependencies = graphViewDependencies(nodeGraphSnapshot(), settings);
+  const view = new FolderNodeGraphView({ app: dependencies.app } as never, dependencies.service, dependencies.options);
+  openViews.push(view);
+  if (open) await view.onOpen();
+  return { ...dependencies, view };
+}
+
+function record(path: string, label: string, parentPath: string | null, notePath: string): NodeGraphIndexRecord {
+  return { label, notePath, parentPath, path, visual: FALLBACK };
+}
+
+function graphNode(view: FolderNodeGraphView, path: string): HTMLElement {
+  const node = view.contentEl.querySelector<HTMLElement>(`[data-node-path='${path}']`);
+  if (node === null) throw new Error(`Missing graph node: ${path}`);
+  return node;
+}
+
+function nodeBody(view: FolderNodeGraphView, path: string): HTMLButtonElement {
+  const body = graphNode(view, path).querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-body");
+  if (body === null) throw new Error(`Missing graph node body: ${path}`);
+  return body;
+}
+
+function expandHandle(view: FolderNodeGraphView, path: string): HTMLButtonElement {
+  const handle = graphNode(view, path).querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-expand-handle");
+  if (handle === null) throw new Error(`Missing graph expand handle: ${path}`);
+  return handle;
+}
+
+function scopeButton(view: FolderNodeGraphView, action: "local" | "subtree"): HTMLButtonElement {
+  const button = view.contentEl.querySelector<HTMLButtonElement>(`[data-node-graph-scope-action='${action}']`);
+  if (button === null) throw new Error(`Missing graph scope button: ${action}`);
+  return button;
+}
+
+function searchInput(view: FolderNodeGraphView): HTMLInputElement {
+  const input = view.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
+  if (input === null) throw new Error("Missing native Node Graph search input");
+  return input;
+}
+
+function visiblePaths(view: FolderNodeGraphView): string[] {
+  return [...view.contentEl.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-node")]
+    .map(({ dataset }) => dataset.nodePath ?? "missing");
+}
+
+function expectVisible(view: FolderNodeGraphView, paths: readonly string[]): void {
+  expect(new Set(visiblePaths(view))).toEqual(new Set(paths));
+}
+
+interface MockMenu {
+  readonly items: Array<{ readonly click: (() => void) | null; readonly title: string }>;
+}
+
+function lastMenu(): MockMenu {
+  const menu = (Menu as unknown as { lastCreated: MockMenu | null }).lastCreated;
+  if (menu === null) throw new Error("Expected a Node Graph range menu");
+  return menu;
+}

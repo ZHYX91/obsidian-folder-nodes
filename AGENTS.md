@@ -10,7 +10,7 @@ children list. Natural sorting writes no order metadata. Manual sorting uses chi
 are the first public field names; do not add compatibility reads for unpublished prototypes.
 
 Declarative settings are intentionally disabled because Obsidian 1.13 bypasses `display()` for
-non-empty definitions, which removes Folder Nodes' four-tab settings layout and degrades the user
+non-empty definitions, which removes Folder Nodes' five-tab settings layout and degrades the user
 experience. Preserve the imperative `PluginSettingTab.display()` surface and keep
 `getSettingDefinitions()` empty. Dormant declarative builders and tests may remain, but must not be
 activated accidentally. Do not flag the `display()` deprecation, empty definitions, the disabled

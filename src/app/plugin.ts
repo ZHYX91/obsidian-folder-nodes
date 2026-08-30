@@ -1,6 +1,7 @@
 import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
 
-import PLUGIN_STYLES from "../ui/styles.css";
+import BASE_STYLES from "../ui/styles.css";
+import NODE_GRAPH_STYLES from "../ui/node-graph.css";
 
 import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
@@ -27,9 +28,10 @@ import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { FolderNodesSettingTab } from "./settings-tab";
-import { RefreshScheduler, type RefreshBatch } from "./refresh-scheduler";
+import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
 
 type NodeMenuSurface = "owned" | "native-folder" | "native-note";
+const PLUGIN_STYLES = `${BASE_STYLES}\n${NODE_GRAPH_STYLES}`;
 
 export default class FolderNodesPlugin extends Plugin {
   public override settings: FolderNodesSettings = structuredClone(DEFAULT_SETTINGS);
@@ -45,6 +47,7 @@ export default class FolderNodesPlugin extends Plugin {
   private reconcileErrorMessages = new Set<string>();
   private readonly unresolvedLinkDocuments = new Set<Document>();
   private unloaded = false;
+  private initialized = false;
   private lifecycleGeneration = 0;
   private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
   private readonly settingsSaver = new SettingsSaveCoordinator<FolderNodesSettings>(
@@ -54,6 +57,7 @@ export default class FolderNodesPlugin extends Plugin {
   public override async onload(): Promise<void> {
     const generation = ++this.lifecycleGeneration;
     this.unloaded = false;
+    this.initialized = false;
     const stored: unknown = await this.loadData();
     if (this.unloaded || generation !== this.lifecycleGeneration) return;
     this.settings = normalizeSettings(stored);
@@ -110,11 +114,13 @@ export default class FolderNodesPlugin extends Plugin {
       this.app.workspace.iterateAllLeaves((leaf) => this.registerUnresolvedLinkDocument(leaf.view.containerEl.ownerDocument));
       if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) this.runAction(this.openHomepage());
     });
+    this.initialized = true;
   }
 
   public override onunload(): void {
     this.lifecycleGeneration += 1;
     this.unloaded = true;
+    this.initialized = false;
     this.reconciliationReady = false;
     this.service?.dispose();
     this.refreshScheduler?.cancel();
@@ -152,8 +158,12 @@ export default class FolderNodesPlugin extends Plugin {
     }, this.settings.prefix, this.settings.suffix, this.settings.timestampFormat));
   }
 
-  public refreshVisuals(path?: string): void {
-    if (!this.unloaded) this.refreshScheduler?.request(path);
+  public refreshVisuals(path?: string, reason?: RefreshReason): void {
+    if (!this.unloaded) this.refreshScheduler?.request(path, reason);
+  }
+
+  protected get pluginLifecycleActive(): boolean {
+    return this.initialized && !this.unloaded;
   }
 
   public async reconcileSettingsChange(): Promise<void> {
@@ -293,14 +303,14 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("delete", (entry) => {
       if (entry instanceof TFolder) this.removeDeletedNodeGraphPaths(entry.path);
       const affected = this.references.removeSource(entry.path);
-      for (const path of affected) this.refreshVisuals(path);
+      for (const path of affected) this.refreshVisuals(path, "reference");
       if (this.service.consumeExpectedEvent("delete", entry.path)) { this.refreshVisuals(entry.path); return; }
       this.scheduleReconcile(entry.path, "delete");
     }));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
       this.remapUnmanagedPaths(entry, oldPath);
       const affected = this.references.removeSource(oldPath);
-      for (const path of affected) this.refreshVisuals(path);
+      for (const path of affected) this.refreshVisuals(path, "reference");
       if (this.service.consumeExpectedEvent("rename", entry.path, oldPath)) {
         this.refreshVisuals(oldPath);
         this.refreshVisuals(entry.path);
@@ -324,12 +334,12 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("css-change", () => this.ensureWorkspaceStyles()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       this.updateContentsView();
-      this.refreshVisuals();
+      this.refreshVisuals(undefined, "active-leaf");
     }));
     this.registerEvent(this.app.metadataCache.on("changed", (file) => {
       const affected = this.references.updateSource(file.path, this.app.metadataCache.resolvedLinks[file.path] ?? {});
-      this.refreshVisuals(file.path);
-      for (const path of affected) this.refreshVisuals(path);
+      this.refreshVisuals(file.path, "metadata");
+      for (const path of affected) this.refreshVisuals(path, "reference");
     }));
     this.registerEvent(this.app.metadataCache.on("resolved", () => {
       this.references.rebuild(this.app.metadataCache.resolvedLinks);

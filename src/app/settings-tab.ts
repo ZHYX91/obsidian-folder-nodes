@@ -56,10 +56,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       addSelectionAlias: settings.addSelectionAlias,
       nodeGraphEnabled: settings.nodeGraph.enabled,
       nodeGraphDefaultDimension: settings.nodeGraph.defaultDimension,
-      nodeGraphDefaultRelationMode: settings.nodeGraph.defaultRelationMode,
       nodeGraphLayoutDirection: settings.nodeGraph.layoutDirection,
-      nodeGraphLocalDepth: settings.nodeGraph.localDepth,
-      nodeGraphShowBoundaryNodes: settings.nodeGraph.showBoundaryNodes,
       prefixEnabled: settings.prefix.enabled,
       prefixSource: settings.prefix.source,
       prefixSeparator: settings.prefix.separator,
@@ -103,17 +100,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         if (value !== "2d" && value !== "3d") throw new Error("Unsupported Node Graph dimension");
         settings.nodeGraph.defaultDimension = value;
         break;
-      case "nodeGraphDefaultRelationMode":
-        if (value !== "structure" && value !== "links" && value !== "hybrid") throw new Error("Unsupported Node Graph relation mode");
-        settings.nodeGraph.defaultRelationMode = value;
-        break;
       case "nodeGraphLayoutDirection":
         if (value !== "left-to-right" && value !== "top-to-bottom") throw new Error("Unsupported Node Graph layout direction");
         settings.nodeGraph.layoutDirection = value;
         reconcileNodeGraph = true;
         break;
-      case "nodeGraphLocalDepth": settings.nodeGraph.localDepth = this.graphInteger(value, 1, 8, 2); reconcileNodeGraph = true; break;
-      case "nodeGraphShowBoundaryNodes": settings.nodeGraph.showBoundaryNodes = Boolean(value); reconcileNodeGraph = true; break;
       case "prefixEnabled": settings.prefix.enabled = Boolean(value); break;
       case "prefixSource": settings.prefix.source = this.namingSource(value); break;
       case "prefixSeparator": settings.prefix.separator = String(value); break;
@@ -246,11 +237,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private nodeGraphDefinitions(): SettingDefinitionItem[] {
     return [
       { name: t("enableNodeGraph"), desc: t("enableNodeGraphDesc"), control: { type: "toggle", key: "nodeGraphEnabled", defaultValue: true } },
-      { name: t("nodeGraphDefaultRelation"), control: { type: "dropdown", key: "nodeGraphDefaultRelationMode", defaultValue: "structure", options: { structure: t("nodeGraphStructure"), links: t("nodeGraphLinks"), hybrid: t("nodeGraphHybrid") } } },
       { name: t("nodeGraphDefaultDimension"), control: { type: "dropdown", key: "nodeGraphDefaultDimension", defaultValue: "2d", options: { "2d": "2D", "3d": "3D" } } },
       { name: t("nodeGraphLayoutDirection"), desc: t("nodeGraphLayoutDirectionDesc"), control: { type: "dropdown", key: "nodeGraphLayoutDirection", defaultValue: "left-to-right", options: { "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") } } },
-      { name: t("nodeGraphLocalDepth"), desc: t("nodeGraphLocalDepthDesc"), control: { type: "slider", key: "nodeGraphLocalDepth", min: 1, max: 8, step: 1 } },
-      { name: t("nodeGraphBoundaryNodes"), desc: t("nodeGraphBoundaryNodesDesc"), control: { type: "toggle", key: "nodeGraphShowBoundaryNodes", defaultValue: false } },
     ];
   }
 
@@ -459,14 +447,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     }
 
     new Setting(panel).setName(t("nodeGraphDefaults")).setDesc(t("nodeGraphDefaultsDesc")).setHeading();
-    new Setting(panel).setName(t("nodeGraphDefaultRelation")).addDropdown((dropdown) => dropdown
-      .addOptions({ structure: t("nodeGraphStructure"), links: t("nodeGraphLinks"), hybrid: t("nodeGraphHybrid") })
-      .setValue(settings.defaultRelationMode)
-      .onChange(async (value) => {
-        if (value !== "structure" && value !== "links" && value !== "hybrid") return;
-        settings.defaultRelationMode = value;
-        await this.saveNodeGraphSettings(false);
-      }));
     new Setting(panel).setName(t("nodeGraphDefaultDimension")).addDropdown((dropdown) => dropdown
       .addOptions({ "2d": "2D", "3d": "3D" })
       .setValue(settings.defaultDimension)
@@ -483,21 +463,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         settings.layoutDirection = value;
         await this.saveNodeGraphSettings(true);
       }));
-    new Setting(panel).setName(t("nodeGraphLocalDepth")).setDesc(t("nodeGraphLocalDepthDesc")).addSlider((slider) => slider
-      .setLimits(1, 8, 1)
-      .setDynamicTooltip()
-      .setValue(settings.localDepth)
-      .onChange(async (value) => {
-        settings.localDepth = this.graphInteger(value, 1, 8, 2);
-        await this.saveNodeGraphSettings(true);
-      }));
-    new Setting(panel).setName(t("nodeGraphBoundaryNodes")).setDesc(t("nodeGraphBoundaryNodesDesc")).addToggle((toggle) => toggle
-      .setValue(settings.showBoundaryNodes)
-      .onChange(async (value) => {
-        settings.showBoundaryNodes = value;
-        await this.saveNodeGraphSettings(true);
-      }));
-
     new Setting(panel).setName(t("nodeGraphPerformance")).setDesc(t("nodeGraphPerformanceDesc")).setHeading();
     this.renderGraphNumberSetting(panel, "largeGraphThreshold", t("nodeGraphCanvasThreshold"), t("nodeGraphCanvasThresholdDesc"), 50, 10_000);
     this.renderGraphNumberSetting(panel, "overviewEdgeLimit", t("nodeGraphEdgeLimit"), t("nodeGraphEdgeLimitDesc"), 100, 100_000);

@@ -10,11 +10,22 @@ export function normalizeNodeGraphLinks(
   resolvedLinks: ResolvedLinkMap,
   notePathToNodeId: ReadonlyMap<string, string>,
 ): ReadonlyMap<string, ReadonlySet<string>> {
+  return normalizeNodeGraphLinksFromTargets(
+    sources,
+    ({ notePath }) => Object.keys(resolvedLinks[notePath] ?? {}),
+    notePathToNodeId,
+  );
+}
+
+export function normalizeNodeGraphLinksFromTargets(
+  sources: readonly NodeGraphLinkSource[],
+  targetsForSource: (source: NodeGraphLinkSource) => Iterable<string>,
+  notePathToNodeId: ReadonlyMap<string, string>,
+): ReadonlyMap<string, ReadonlySet<string>> {
   const result = new Map<string, ReadonlySet<string>>();
   for (const source of sources) {
     const targets = new Set<string>();
-    const resolved = resolvedLinks[source.notePath] ?? {};
-    for (const targetPath of Object.keys(resolved)) {
+    for (const targetPath of targetsForSource(source)) {
       const targetNode = notePathToNodeId.get(targetPath);
       if (targetNode === undefined || targetNode === source.nodeId) continue;
       targets.add(targetNode);

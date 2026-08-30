@@ -7,29 +7,36 @@ export interface NodeGraphSearchResult extends NodeGraphSearchCandidate {
   readonly rank: number;
 }
 
-export function nodeGraphSearchResults(
-  candidates: readonly NodeGraphSearchCandidate[],
-  rawQuery: string,
-): readonly NodeGraphSearchResult[] {
-  const query = rawQuery.trim().toLocaleLowerCase();
-  if (query === "") return [];
-  return candidates.flatMap((candidate) => {
-    const label = candidate.label.toLocaleLowerCase();
-    const path = candidate.path.toLocaleLowerCase();
-    const rank = searchRank(label, path, query);
-    return rank === null ? [] : [{ ...candidate, rank }];
-  }).sort((left, right) => left.rank - right.rank
-    || left.label.localeCompare(right.label, "en")
-    || left.path.localeCompare(right.path, "en"));
+export interface NodeGraphSearchSummary {
+  readonly bestPaths: ReadonlySet<string>;
+  readonly first: NodeGraphSearchResult | null;
 }
 
-export function bestNodeGraphSearchPaths(
+export function summarizeNodeGraphSearch(
   candidates: readonly NodeGraphSearchCandidate[],
   rawQuery: string,
-): ReadonlySet<string> {
-  const results = nodeGraphSearchResults(candidates, rawQuery);
-  const bestRank = results[0]?.rank;
-  return new Set(bestRank === undefined ? [] : results.filter(({ rank }) => rank === bestRank).map(({ path }) => path));
+): NodeGraphSearchSummary {
+  const query = rawQuery.trim().toLocaleLowerCase();
+  if (query === "") return { bestPaths: new Set(), first: null };
+  let bestRank = Number.POSITIVE_INFINITY;
+  let first: NodeGraphSearchResult | null = null;
+  const bestPaths = new Set<string>();
+  for (const candidate of candidates) {
+    const rank = searchRank(candidate.label.toLocaleLowerCase(), candidate.path.toLocaleLowerCase(), query);
+    if (rank === null || rank > bestRank) continue;
+    const result = { ...candidate, rank };
+    if (rank < bestRank) {
+      bestRank = rank;
+      bestPaths.clear();
+      first = result;
+    } else if (first === null || compareSearchResult(result, first) < 0) first = result;
+    bestPaths.add(candidate.path);
+  }
+  return { bestPaths, first };
+}
+
+function compareSearchResult(left: NodeGraphSearchResult, right: NodeGraphSearchResult): number {
+  return left.label.localeCompare(right.label, "en") || left.path.localeCompare(right.path, "en");
 }
 
 function searchRank(label: string, path: string, query: string): number | null {

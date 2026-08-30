@@ -1,13 +1,15 @@
 import {
+  buildNodeGraphCanvasSpatialIndex,
   fitNodeGraphCanvasCamera,
-  hitTestNodeGraphCanvas,
   nodeGraphCanvasGeometry,
   panNodeGraphCanvasCamera,
   pointIsVisible,
+  queryNodeGraphCanvasSpatialIndex,
   selectNodeGraphCanvasOverviewEdges,
   zoomNodeGraphCanvasCamera,
   type NodeGraphCanvasCamera,
   type NodeGraphCanvasPoint,
+  type NodeGraphCanvasSpatialIndex,
 } from "../core/node-graph-canvas";
 import {
   defaultNodeGraphCamera,
@@ -19,21 +21,35 @@ import {
   type NodeGraphCamera,
   type NodeGraphPoint3D,
 } from "../core/node-graph-3d";
+import {
+  nodeGraphBoxContains,
+  nodeGraphBoxFromCenter,
+  nodeGraphLinkGeometry,
+  nodeGraphStructureGeometry,
+  type NodeGraphBox,
+} from "../core/node-graph-geometry";
 import type { NodeGraphLayout } from "../core/node-graph-layout";
 import {
-  edgesForMode,
+  nodeGraphLinkEdges,
+  nodeGraphStructureEdges,
   type NodeGraphModel,
   type NodeGraphModelEdge,
-  type NodeGraphRelationMode,
 } from "../core/node-graph-model";
 import type { NodeVisual } from "../core/types";
-import { bestNodeGraphSearchPaths } from "../core/node-graph-search";
 import { renderVisual } from "../presentation/render-visual";
 
 export type NodeGraphCanvasDimension = "2d" | "3d";
 
+export interface NodeGraphCanvasViewportState {
+  readonly camera2D: NodeGraphCanvasCamera;
+  readonly camera3D: NodeGraphCamera;
+  readonly dimension: NodeGraphCanvasDimension;
+}
+
 export interface NodeGraphCanvasRecord {
   readonly boundary?: boolean;
+  readonly childCount?: number;
+  readonly expanded?: boolean;
   readonly label: string;
   readonly path: string;
   readonly visual: NodeVisual;
@@ -47,11 +63,14 @@ export interface NodeGraphCanvasData {
 }
 
 interface NodeGraphCanvasCallbacks {
-  readonly label: (key: "boundaryNode" | "denseEdges" | "largeGraph" | "nodeGraph" | "readableFit") => string;
+  readonly label: (key: "altBranchHint" | "boundaryNode" | "largeGraph" | "nodeGraph") => string;
+  readonly onContextMenu?: (path: string, event: MouseEvent) => void;
   readonly onOpen: (path: string, newLeaf: boolean) => void;
   readonly onSelect: (path: string) => void;
+  readonly onToggle?: (path: string, branch: boolean) => void;
   readonly overviewEdgeLimit?: number;
   readonly relationSummary: (structure: number, links: number) => string;
+  readonly toggleLabel?: (label: string, childCount: number, expanded: boolean) => string;
 }
 
 interface CanvasDrag {
@@ -73,6 +92,8 @@ interface CanvasPalette {
   readonly accent: string;
   readonly background: string;
   readonly border: string;
+  readonly emojiFont: string;
+  readonly glyphFont: string;
   readonly link: string;
   readonly mutedText: string;
   readonly node: string;
@@ -88,12 +109,23 @@ type EdgeBatchKey =
   | "structure-active"
   | "structure-muted";
 
-const MIN_READABLE_2D_ZOOM = 0.22;
+const MIN_READABLE_2D_ZOOM = 0.38;
 const MIN_READABLE_3D_ZOOM = 0.32;
 const DENSE_3D_DOT_THRESHOLD = 48;
+const MOUSE_DRAG_SLOP = 3;
+const TOUCH_DRAG_SLOP = 8;
+
+interface CanvasNodePresentation {
+  readonly box: NodeGraphBox;
+  readonly kind: "card" | "dot";
+  readonly label: boolean;
+  readonly radius: number;
+  readonly scale: number;
+}
 
 export class NodeGraphCanvasRenderer {
   private readonly canvas: HTMLCanvasElement;
+  private readonly activeAnnouncement: HTMLElement;
   private readonly context: CanvasRenderingContext2D | null;
   private readonly edgeBatches: Record<EdgeBatchKey, number[]> = {
     "link-active": [],
@@ -103,15 +135,20 @@ export class NodeGraphCanvasRenderer {
     "structure-active": [],
     "structure-muted": [],
   };
-  private readonly edgeLodNotice: HTMLElement;
-  private readonly focusOverlay: HTMLButtonElement;
-  private readonly edges: readonly NodeGraphModelEdge[];
-  private readonly incidentEdges = new Map<string, NodeGraphModelEdge[]>();
-  private readonly overviewEdges: readonly NodeGraphModelEdge[];
-  private readonly overviewEdgeSet: ReadonlySet<NodeGraphModelEdge>;
-  private readonly denseEdgeOverview: boolean;
+  private readonly focusOverlay: HTMLElement;
+  private readonly focusOverlayBody: HTMLButtonElement;
+  private readonly focusOverlayToggle: HTMLButtonElement;
+  private readonly structureEdges: readonly NodeGraphModelEdge[];
+  private readonly structureParentEdges = new Map<string, NodeGraphModelEdge>();
+  private readonly linkEdges: readonly NodeGraphModelEdge[];
+  private readonly incidentStructureEdges = new Map<string, NodeGraphModelEdge[]>();
+  private readonly incidentLinkEdges = new Map<string, NodeGraphModelEdge[]>();
+  private readonly overviewLinkEdges: readonly NodeGraphModelEdge[];
+  private readonly overviewLinkEdgeSet: ReadonlySet<NodeGraphModelEdge>;
   private readonly tooltip: HTMLElement;
+  private readonly visualImages = new Map<string, HTMLImageElement>();
   private readonly layoutPositions: ReadonlyMap<string, { readonly x: number; readonly y: number }>;
+  private readonly layoutSpatialIndex: NodeGraphCanvasSpatialIndex;
   private readonly pointers = new Map<number, CanvasPointer>();
   private readonly projectedById = new Map<string, NodeGraphCanvasPoint>();
   private themeObserver: MutationObserver | null = null;
@@ -128,7 +165,6 @@ export class NodeGraphCanvasRenderer {
   private overlayPath: string | null = null;
   private palette: CanvasPalette;
   private readonly relationCounts = new Map<string, { readonly links: number; readonly structure: number }>();
-  private readableFit = false;
   private searchMatches = new Set<string>();
   private visiblePoints: readonly NodeGraphCanvasPoint[] = [];
   private width = 1;
@@ -137,42 +173,56 @@ export class NodeGraphCanvasRenderer {
     private readonly surface: HTMLElement,
     private readonly data: NodeGraphCanvasData,
     private readonly dimension: NodeGraphCanvasDimension,
-    private readonly relationMode: NodeGraphRelationMode,
+    showLinks: boolean,
     focusPath: string | null,
     private readonly callbacks: NodeGraphCanvasCallbacks,
   ) {
     this.focusPath = focusPath;
-    this.edges = edgesForMode(data.model, relationMode);
+    this.structureEdges = nodeGraphStructureEdges(data.model);
+    for (const edge of this.structureEdges) this.structureParentEdges.set(edge.target, edge);
+    this.linkEdges = showLinks ? nodeGraphLinkEdges(data.model) : [];
     this.buildEdgeIndex();
-    this.overviewEdges = selectNodeGraphCanvasOverviewEdges(this.edges, callbacks.overviewEdgeLimit);
-    this.overviewEdgeSet = new Set(this.overviewEdges);
-    this.denseEdgeOverview = this.overviewEdges.length < this.edges.length;
+    this.overviewLinkEdges = selectNodeGraphCanvasOverviewEdges(this.linkEdges, callbacks.overviewEdgeLimit);
+    this.overviewLinkEdgeSet = new Set(this.overviewLinkEdges);
     this.layoutPositions = new Map(data.layout.nodes.map((node) => [
       node.id,
       { x: node.x + data.layout.nodeWidth / 2, y: node.y + data.layout.nodeHeight / 2 },
     ]));
+    this.layoutSpatialIndex = buildNodeGraphCanvasSpatialIndex(
+      data.layout.nodes.map((node) => ({
+        id: node.id,
+        x: node.x + data.layout.nodeWidth / 2,
+        y: node.y + data.layout.nodeHeight / 2,
+      })),
+    );
     this.surface.addClass("folder-nodes-node-graph-canvas-surface");
     this.canvas = surface.createEl("canvas", {
       cls: "folder-nodes-node-graph-render-canvas",
       attr: { role: "application", tabindex: "0", "aria-label": callbacks.label("largeGraph") },
     });
+    this.activeAnnouncement = surface.createDiv({
+      cls: "folder-nodes-node-graph-canvas-announcement",
+      attr: { "aria-live": "polite", role: "status" },
+    });
     this.context = this.canvas.getContext("2d");
-    this.focusOverlay = surface.createEl("button", {
+    this.focusOverlay = surface.createDiv({
       cls: "folder-nodes-node-graph-focus-overlay",
+      attr: { role: "group" },
+    });
+    this.focusOverlayBody = this.focusOverlay.createEl("button", {
+      cls: "folder-nodes-node-graph-focus-overlay-body",
+      attr: { type: "button" },
+    });
+    this.focusOverlayToggle = this.focusOverlay.createEl("button", {
+      cls: "folder-nodes-node-graph-focus-overlay-toggle",
       attr: { type: "button" },
     });
     this.tooltip = surface.createDiv({ cls: "folder-nodes-node-graph-canvas-tooltip" });
-    this.edgeLodNotice = surface.createDiv({
-      cls: "folder-nodes-node-graph-edge-lod",
-      text: callbacks.label("denseEdges"),
-      attr: { "aria-live": "polite" },
-    });
-    this.edgeLodNotice.hidden = !this.denseEdgeOverview;
-    this.surface.dataset.nodeGraphEdgeLod = this.denseEdgeOverview ? "overview" : "complete";
     this.tooltip.hidden = true;
     this.focusOverlay.hidden = true;
     this.palette = this.readPalette();
     this.updateDerivedState();
+    this.announceFocus();
     this.bindEvents();
     this.bindThemeChanges();
     this.resize(true);
@@ -192,24 +242,19 @@ export class NodeGraphCanvasRenderer {
     this.searchMatches.clear();
     this.neighbors.clear();
     this.relationCounts.clear();
+    this.visualImages.clear();
     this.canvas.remove();
-    this.edgeLodNotice.remove();
+    this.activeAnnouncement.remove();
     this.focusOverlay.remove();
     this.tooltip.remove();
     this.surface.removeClass("folder-nodes-node-graph-canvas-surface", "is-dragging");
-    delete this.surface.dataset.nodeGraphEdgeLod;
   }
 
   public fit(): void {
     const targetPath = this.focusPath ?? [...this.data.model.nodes]
-      .sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id, "en"))[0]?.id ?? null;
+      .sort((left, right) => left.depth - right.depth)[0]?.id ?? null;
     if (this.dimension === "2d") {
       const target = targetPath === null ? undefined : this.layoutPositions.get(targetPath);
-      const fitted = fitNodeGraphCanvasCamera(
-        { width: this.data.layout.width, height: this.data.layout.height },
-        { width: this.width, height: this.height },
-      );
-      this.readableFit = fitted.zoom < MIN_READABLE_2D_ZOOM;
       this.camera2D = fitNodeGraphCanvasCamera(
         { width: this.data.layout.width, height: this.data.layout.height },
         { width: this.width, height: this.height },
@@ -219,11 +264,10 @@ export class NodeGraphCanvasRenderer {
       );
     } else {
       const fitted = fitNodeGraphCamera(this.data.points3D, this.camera3D, this.width, this.height);
-      this.readableFit = fitted.zoom < MIN_READABLE_3D_ZOOM;
-      this.camera3D = this.readableFit ? { ...fitted, zoom: MIN_READABLE_3D_ZOOM } : fitted;
-      if (this.readableFit && targetPath !== null) this.centerOn(targetPath);
+      const constrained = fitted.zoom < MIN_READABLE_3D_ZOOM;
+      this.camera3D = constrained ? { ...fitted, zoom: MIN_READABLE_3D_ZOOM } : fitted;
+      if (constrained && targetPath !== null) this.centerOn(targetPath);
     }
-    this.updateNotice();
     this.scheduleDraw();
   }
 
@@ -249,18 +293,41 @@ export class NodeGraphCanvasRenderer {
   public refreshPalette(): void {
     if (this.destroyed) return;
     this.palette = this.readPalette();
+    this.visualImages.clear();
     this.scheduleDraw();
   }
 
   public setFocus(path: string | null, center: boolean): void {
     this.focusPath = path;
     this.updateDerivedState();
+    this.announceFocus();
     if (center && path !== null) this.centerOn(path);
     this.scheduleDraw();
   }
 
-  public setSearchQuery(rawQuery: string): void {
-    this.searchMatches = new Set(bestNodeGraphSearchPaths([...this.data.records.values()], rawQuery));
+  public centerPath(path: string): void {
+    if (this.destroyed) return;
+    this.centerOn(path);
+    this.scheduleDraw();
+  }
+
+  public setSearchMatches(paths: Iterable<string>): void {
+    this.searchMatches = new Set(paths);
+    this.scheduleDraw();
+  }
+
+  public captureViewportState(): NodeGraphCanvasViewportState {
+    return {
+      camera2D: { ...this.camera2D },
+      camera3D: { ...this.camera3D },
+      dimension: this.dimension,
+    };
+  }
+
+  public restoreViewportState(state: NodeGraphCanvasViewportState): void {
+    if (state.dimension !== this.dimension) return;
+    this.camera2D = { ...state.camera2D, zoom: Math.max(MIN_READABLE_2D_ZOOM, state.camera2D.zoom) };
+    this.camera3D = { ...state.camera3D };
     this.scheduleDraw();
   }
 
@@ -270,20 +337,86 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleOverlayDoubleClick = (event: MouseEvent): void => {
-    if (this.focusPath !== null) this.callbacks.onOpen(this.focusPath, event.ctrlKey || event.metaKey);
+    if (this.overlayPath !== null) this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+  };
+
+  private readonly handleOverlayClick = (): void => {
+    if (this.overlayPath !== null && this.overlayPath !== this.focusPath) this.selectFromCanvas(this.overlayPath, false);
+  };
+
+  private readonly handleOverlayKeyDown = (event: KeyboardEvent): void => {
+    if (event.repeat || this.overlayPath === null) return;
+    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
+    event.preventDefault();
+    this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+  };
+
+  private readonly handleOverlayToggle = (event: MouseEvent): void => {
+    if (this.overlayPath === null || this.callbacks.onToggle === undefined) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.callbacks.onToggle(this.overlayPath, event.altKey);
+  };
+
+  private readonly handleContextMenu = (event: MouseEvent): void => {
+    const path = this.hitTest(event.offsetX, event.offsetY);
+    if (path === null || this.callbacks.onContextMenu === undefined) return;
+    event.preventDefault();
+    if (path !== this.focusPath) this.selectFromCanvas(path, false);
+    this.callbacks.onContextMenu(path, event);
+  };
+
+  private readonly handleOverlayContextMenu = (event: MouseEvent): void => {
+    if (this.overlayPath === null || this.callbacks.onContextMenu === undefined) return;
+    event.preventDefault();
+    this.callbacks.onContextMenu(this.overlayPath, event);
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== "Enter" || this.focusPath === null || event.repeat) return;
+    if (event.repeat) return;
+    if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+      if (this.focusPath === null || this.callbacks.onContextMenu === undefined) return;
+      event.preventDefault();
+      const point = this.projectedById.get(this.focusPath);
+      const bounds = this.canvas.getBoundingClientRect();
+      const EventConstructor = this.surface.ownerDocument.defaultView?.MouseEvent ?? MouseEvent;
+      const menuEvent = new EventConstructor("contextmenu", {
+        bubbles: false,
+        clientX: bounds.left + (point?.x ?? this.width / 2),
+        clientY: bounds.top + (point?.y ?? this.height / 2),
+      });
+      this.callbacks.onContextMenu(this.focusPath, menuEvent);
+      return;
+    }
+    if (["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home"].includes(event.key)) {
+      const ordered = this.keyboardPaths();
+      if (ordered.length === 0) return;
+      const current = this.focusPath === null ? -1 : ordered.indexOf(this.focusPath);
+      const backwards = event.key === "ArrowLeft" || event.key === "ArrowUp";
+      const nextIndex = event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? ordered.length - 1
+          : current < 0
+            ? 0
+            : (current + (backwards ? -1 : 1) + ordered.length) % ordered.length;
+      const next = ordered[nextIndex];
+      if (next === undefined) return;
+      event.preventDefault();
+      this.selectFromCanvas(next, true);
+      return;
+    }
+    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
     event.preventDefault();
+    if (this.focusPath === null) {
+      const first = this.keyboardPaths()[0];
+      if (first !== undefined) this.selectFromCanvas(first, true);
+      return;
+    }
     this.callbacks.onOpen(this.focusPath, event.ctrlKey || event.metaKey);
   };
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
-    if (this.readableFit) {
-      this.readableFit = false;
-      this.updateNotice();
-    }
     this.pointers.set(event.pointerId, { pointerType: event.pointerType, x: event.clientX, y: event.clientY });
     const pan = this.dimension === "2d" || event.shiftKey || event.button === 1;
     this.drag = { moved: false, pan, pointerId: event.pointerId, travel: 0, x: event.clientX, y: event.clientY };
@@ -314,6 +447,7 @@ export class NodeGraphCanvasRenderer {
               -Math.log(after.distance / before.distance) / 0.0015,
               anchorX,
               anchorY,
+              MIN_READABLE_2D_ZOOM,
             );
           }
         } else {
@@ -338,7 +472,8 @@ export class NodeGraphCanvasRenderer {
     this.drag.x = event.clientX;
     this.drag.y = event.clientY;
     this.drag.travel += Math.hypot(deltaX, deltaY);
-    if (this.drag.travel > 1) this.drag.moved = true;
+    const dragSlop = pointer?.pointerType === "touch" ? TOUCH_DRAG_SLOP : MOUSE_DRAG_SLOP;
+    if (this.drag.travel > dragSlop) this.drag.moved = true;
     if (pointer !== undefined) {
       pointer.x = event.clientX;
       pointer.y = event.clientY;
@@ -366,11 +501,9 @@ export class NodeGraphCanvasRenderer {
     this.pointers.delete(event.pointerId);
     if (wasClick) {
       const path = this.hitTest(event.offsetX, event.offsetY);
-      if (path !== null) {
-        this.focusPath = path;
-        this.updateDerivedState();
-        this.callbacks.onSelect(path);
-      }
+      if (path !== null && this.isToggleHit(path, event.offsetX, event.offsetY)) {
+        this.callbacks.onToggle?.(path, event.altKey);
+      } else if (path !== null) this.selectFromCanvas(path, false);
     }
     const remaining = this.pointers.entries().next().value;
     this.drag = remaining === undefined ? null : {
@@ -385,18 +518,30 @@ export class NodeGraphCanvasRenderer {
     this.scheduleDraw();
   }
 
-  private readonly handlePointerLeave = (): void => {
+  private readonly handlePointerLeave = (event: PointerEvent): void => {
+    const related = event.relatedTarget;
+    if (related instanceof Node && this.focusOverlay.contains(related)) return;
     if (this.drag === null) this.hideTooltip();
+    this.scheduleDraw();
+  };
+
+  private readonly handleOverlayPointerLeave = (event: PointerEvent): void => {
+    const related = event.relatedTarget;
+    if (related === this.canvas) return;
+    this.hideTooltip();
+    this.scheduleDraw();
   };
 
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    if (this.readableFit) {
-      this.readableFit = false;
-      this.updateNotice();
-    }
     if (this.dimension === "2d") {
-      this.camera2D = zoomNodeGraphCanvasCamera(this.camera2D, event.deltaY, event.offsetX, event.offsetY);
+      this.camera2D = zoomNodeGraphCanvasCamera(
+        this.camera2D,
+        event.deltaY,
+        event.offsetX,
+        event.offsetY,
+        MIN_READABLE_2D_ZOOM,
+      );
     } else {
       this.camera3D = zoomNodeGraphCamera(this.camera3D, event.deltaY);
     }
@@ -404,6 +549,7 @@ export class NodeGraphCanvasRenderer {
   };
 
   private bindEvents(): void {
+    this.canvas.addEventListener("contextmenu", this.handleContextMenu);
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
     this.canvas.addEventListener("keydown", this.handleKeyDown);
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
@@ -413,11 +559,16 @@ export class NodeGraphCanvasRenderer {
     this.canvas.addEventListener("lostpointercapture", this.handlePointerCancel);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
-    this.focusOverlay.addEventListener("dblclick", this.handleOverlayDoubleClick);
-    this.focusOverlay.addEventListener("keydown", this.handleKeyDown);
+    this.focusOverlayBody.addEventListener("click", this.handleOverlayClick);
+    this.focusOverlayBody.addEventListener("dblclick", this.handleOverlayDoubleClick);
+    this.focusOverlayBody.addEventListener("keydown", this.handleOverlayKeyDown);
+    this.focusOverlay.addEventListener("contextmenu", this.handleOverlayContextMenu);
+    this.focusOverlay.addEventListener("pointerleave", this.handleOverlayPointerLeave);
+    this.focusOverlayToggle.addEventListener("click", this.handleOverlayToggle);
   }
 
   private unbindEvents(): void {
+    this.canvas.removeEventListener("contextmenu", this.handleContextMenu);
     this.canvas.removeEventListener("dblclick", this.handleDoubleClick);
     this.canvas.removeEventListener("keydown", this.handleKeyDown);
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
@@ -427,8 +578,12 @@ export class NodeGraphCanvasRenderer {
     this.canvas.removeEventListener("lostpointercapture", this.handlePointerCancel);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.removeEventListener("wheel", this.handleWheel);
-    this.focusOverlay.removeEventListener("dblclick", this.handleOverlayDoubleClick);
-    this.focusOverlay.removeEventListener("keydown", this.handleKeyDown);
+    this.focusOverlayBody.removeEventListener("click", this.handleOverlayClick);
+    this.focusOverlayBody.removeEventListener("dblclick", this.handleOverlayDoubleClick);
+    this.focusOverlayBody.removeEventListener("keydown", this.handleOverlayKeyDown);
+    this.focusOverlay.removeEventListener("contextmenu", this.handleOverlayContextMenu);
+    this.focusOverlay.removeEventListener("pointerleave", this.handleOverlayPointerLeave);
+    this.focusOverlayToggle.removeEventListener("click", this.handleOverlayToggle);
   }
 
   private scheduleDraw(): void {
@@ -460,42 +615,101 @@ export class NodeGraphCanvasRenderer {
     const projected = this.dimension === "2d" ? this.project2D() : projectNodeGraph3D(this.data.points3D, this.camera3D, this.width, this.height);
     this.projectedById.clear();
     for (const point of projected) this.projectedById.set(point.id, point);
-    this.drawEdges(this.projectedById);
-    this.visiblePoints = projected
-      .filter((point) => pointIsVisible(point, { width: this.width, height: this.height }))
-      .sort((left, right) => left.scale - right.scale || left.id.localeCompare(right.id, "en"));
+    this.drawEdges(this.dimension === "2d" ? this.project2DEdgeEndpoints(projected) : this.projectedById);
+    this.visiblePoints = this.orderVisiblePoints(
+      projected.filter((point) => pointIsVisible(point, { width: this.width, height: this.height })),
+    );
     for (const point of this.visiblePoints) this.drawNode(point);
     this.updateFocusOverlay(this.projectedById);
   }
 
   private project2D(): readonly NodeGraphCanvasPoint[] {
-    return this.data.layout.nodes.map((node) => ({
+    const zoom = this.camera2D.zoom;
+    const padding = Math.max(this.data.layout.nodeWidth, this.data.layout.nodeHeight) / 2 + 32 / zoom;
+    const candidates = queryNodeGraphCanvasSpatialIndex(this.layoutSpatialIndex, {
+      minX: -this.camera2D.panX / zoom - padding,
+      maxX: (this.width - this.camera2D.panX) / zoom + padding,
+      minY: -this.camera2D.panY / zoom - padding,
+      maxY: (this.height - this.camera2D.panY) / zoom + padding,
+    });
+    return candidates.map((node) => ({
       id: node.id,
       scale: this.camera2D.zoom,
-      x: (node.x + this.data.layout.nodeWidth / 2) * this.camera2D.zoom + this.camera2D.panX,
-      y: (node.y + this.data.layout.nodeHeight / 2) * this.camera2D.zoom + this.camera2D.panY,
+      x: node.x * this.camera2D.zoom + this.camera2D.panX,
+      y: node.y * this.camera2D.zoom + this.camera2D.panY,
     }));
+  }
+
+  private project2DEdgeEndpoints(
+    projected: readonly NodeGraphCanvasPoint[],
+  ): ReadonlyMap<string, NodeGraphCanvasPoint> {
+    const endpoints = new Map(projected.map((point) => [point.id, point]));
+    for (const point of projected) {
+      for (const edge of this.incidentStructureEdges.get(point.id) ?? []) {
+        const otherId = edge.source === point.id ? edge.target : edge.source;
+        if (endpoints.has(otherId)) continue;
+        const other = this.layoutPositions.get(otherId);
+        if (other === undefined) continue;
+        endpoints.set(otherId, {
+          id: otherId,
+          scale: this.camera2D.zoom,
+          x: other.x * this.camera2D.zoom + this.camera2D.panX,
+          y: other.y * this.camera2D.zoom + this.camera2D.panY,
+        });
+      }
+    }
+    return endpoints;
+  }
+
+  private orderVisiblePoints(points: readonly NodeGraphCanvasPoint[]): readonly NodeGraphCanvasPoint[] {
+    if (this.dimension !== "3d" || points.length < 2_000) {
+      return [...points].sort((left, right) => left.scale - right.scale || left.id.localeCompare(right.id, "en"));
+    }
+    const buckets = Array.from({ length: 64 }, (): NodeGraphCanvasPoint[] => []);
+    for (const point of points) {
+      const index = Math.max(0, Math.min(buckets.length - 1, Math.floor(point.scale / 1.2 * buckets.length)));
+      buckets[index]?.push(point);
+    }
+    return buckets.flat();
   }
 
   private drawEdges(projected: ReadonlyMap<string, NodeGraphCanvasPoint>): void {
     if (this.context === null) return;
     for (const segments of Object.values(this.edgeBatches)) segments.length = 0;
-    for (const edge of this.drawnEdges()) {
+    const structureEdges = this.dimension === "2d"
+      ? [...projected.keys()].flatMap((id) => {
+        const edge = this.structureParentEdges.get(id);
+        return edge !== undefined && projected.has(edge.source) ? [edge] : [];
+      })
+      : this.structureEdges;
+    for (const edge of structureEdges) {
       const source = projected.get(edge.source);
       const target = projected.get(edge.target);
       if (source === undefined || target === undefined || !lineMightBeVisible(source, target, this.width, this.height)) continue;
       const connected = this.focusPath !== null && (edge.source === this.focusPath || edge.target === this.focusPath);
       const muted = this.focusPath !== null && !connected;
-      if (this.relationMode !== "links" && edge.structure) {
-        this.appendEdgeBatch(muted ? "structure-muted" : "structure-active", source, target, 0);
-      }
-      if (this.relationMode !== "structure" && edge.link) {
-        const offset = this.relationMode === "hybrid" && edge.structure ? 4 : 0;
-        const key = offset === 0
-          ? muted ? "link-muted" : "link-active"
-          : muted ? "link-offset-muted" : "link-offset-active";
-        this.appendEdgeBatch(key, source, target, offset);
-      }
+      this.appendStructureEdgeBatch(
+        muted ? "structure-muted" : "structure-active",
+        this.presentationForPoint(source).box,
+        this.presentationForPoint(target).box,
+      );
+    }
+    for (const edge of this.drawnLinkEdges()) {
+      const source = projected.get(edge.source);
+      const target = projected.get(edge.target);
+      if (source === undefined || target === undefined || !lineMightBeVisible(source, target, this.width, this.height)) continue;
+      const connected = this.focusPath !== null && (edge.source === this.focusPath || edge.target === this.focusPath);
+      const muted = this.focusPath !== null && !connected;
+      const offset = edge.structure ? 7 : 0;
+      const key = offset === 0
+        ? muted ? "link-muted" : "link-active"
+        : muted ? "link-offset-muted" : "link-offset-active";
+      this.appendLinkEdgeBatch(
+        key,
+        this.presentationForPoint(source).box,
+        this.presentationForPoint(target).box,
+        offset,
+      );
     }
     this.strokeEdgeBatch("structure-active", this.palette.border, false, 1);
     this.strokeEdgeBatch("structure-muted", this.palette.border, false, 0.08);
@@ -505,26 +719,39 @@ export class NodeGraphCanvasRenderer {
     this.strokeEdgeBatch("link-offset-muted", this.palette.link, true, 0.08);
   }
 
-  private appendEdgeBatch(
-    key: EdgeBatchKey,
-    source: NodeGraphCanvasPoint,
-    target: NodeGraphCanvasPoint,
+  private appendStructureEdgeBatch(
+    key: "structure-active" | "structure-muted",
+    source: NodeGraphBox,
+    target: NodeGraphBox,
+  ): void {
+    const geometry = nodeGraphStructureGeometry(source, target, this.data.layout.direction);
+    this.edgeBatches[key].push(
+      geometry.source.x,
+      geometry.source.y,
+      geometry.control1.x,
+      geometry.control1.y,
+      geometry.control2.x,
+      geometry.control2.y,
+      geometry.target.x,
+      geometry.target.y,
+    );
+  }
+
+  private appendLinkEdgeBatch(
+    key: "link-active" | "link-muted" | "link-offset-active" | "link-offset-muted",
+    source: NodeGraphBox,
+    target: NodeGraphBox,
     offset: number,
   ): void {
-    const shifted = offsetLine(source.x, source.y, target.x, target.y, offset);
-    if (key.startsWith("link")) {
-      const control = linkControlPoint(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY);
-      this.edgeBatches[key].push(
-        shifted.sourceX,
-        shifted.sourceY,
-        control.x,
-        control.y,
-        shifted.targetX,
-        shifted.targetY,
-      );
-      return;
-    }
-    this.edgeBatches[key].push(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY);
+    const geometry = nodeGraphLinkGeometry(source, target, offset);
+    this.edgeBatches[key].push(
+      geometry.source.x,
+      geometry.source.y,
+      geometry.control.x,
+      geometry.control.y,
+      geometry.target.x,
+      geometry.target.y,
+    );
   }
 
   private strokeEdgeBatch(key: EdgeBatchKey, color: string, dashed: boolean, alpha: number): void {
@@ -537,29 +764,37 @@ export class NodeGraphCanvasRenderer {
     this.context.lineWidth = alpha === 1 ? 1.7 : 1;
     this.context.setLineDash(dashed ? [6, 5] : []);
     this.context.beginPath();
-    const curved = key.startsWith("link");
-    const stride = curved ? 6 : 4;
+    const link = key.startsWith("link");
+    const stride = link ? 6 : 8;
     for (let index = 0; index < segments.length; index += stride) {
       this.context.moveTo(segments[index] ?? 0, segments[index + 1] ?? 0);
-      if (curved) {
+      if (link) {
         this.context.quadraticCurveTo(
           segments[index + 2] ?? 0,
           segments[index + 3] ?? 0,
           segments[index + 4] ?? 0,
           segments[index + 5] ?? 0,
         );
+      } else {
+        this.context.bezierCurveTo(
+          segments[index + 2] ?? 0,
+          segments[index + 3] ?? 0,
+          segments[index + 4] ?? 0,
+          segments[index + 5] ?? 0,
+          segments[index + 6] ?? 0,
+          segments[index + 7] ?? 0,
+        );
       }
-      else this.context.lineTo(segments[index + 2] ?? 0, segments[index + 3] ?? 0);
     }
     this.context.stroke();
     this.context.restore();
   }
 
-  private drawnEdges(): readonly NodeGraphModelEdge[] {
-    if (!this.denseEdgeOverview || this.focusPath === null) return this.overviewEdges;
-    const incident = this.incidentEdges.get(this.focusPath) ?? [];
-    if (incident.length === 0) return this.overviewEdges;
-    return [...this.overviewEdges, ...incident.filter((edge) => !this.overviewEdgeSet.has(edge))];
+  private drawnLinkEdges(): readonly NodeGraphModelEdge[] {
+    if (this.overviewLinkEdges.length === this.linkEdges.length || this.focusPath === null) return this.overviewLinkEdges;
+    const incident = this.incidentLinkEdges.get(this.focusPath) ?? [];
+    if (incident.length === 0) return this.overviewLinkEdges;
+    return [...this.overviewLinkEdges, ...incident.filter((edge) => !this.overviewLinkEdgeSet.has(edge))];
   }
 
   private drawNode(point: NodeGraphCanvasPoint): void {
@@ -570,26 +805,21 @@ export class NodeGraphCanvasRenderer {
     const neighbor = this.neighbors.has(point.id);
     const match = this.searchMatches.has(point.id);
     const unrelated = this.focusPath !== null && !focused && !neighbor;
-    const geometry = nodeGraphCanvasGeometry(point.scale);
-    const densityDot = this.dimension === "3d"
-      && this.data.model.nodes.length > DENSE_3D_DOT_THRESHOLD
-      && !focused
-      && !match
-      && point.id !== this.hoveredPath;
-    const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, geometry.scale)) : 1;
+    const presentation = this.presentationForPoint(point);
+    const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, presentation.scale)) : 1;
     const alpha = unrelated ? 0.22 : (record.boundary === true ? 0.62 : 1) * depthAlpha;
     this.context.save();
     this.context.globalAlpha = alpha;
-    if (geometry.kind === "dot" || densityDot) {
+    if (presentation.kind === "dot") {
       this.context.fillStyle = focused || match ? this.palette.accent : record.visual.accent ?? this.palette.border;
       this.context.beginPath();
-      this.context.arc(point.x, point.y, densityDot ? 4 : geometry.radius, 0, Math.PI * 2);
+      this.context.arc(point.x, point.y, presentation.radius, 0, Math.PI * 2);
       this.context.fill();
       this.context.restore();
       return;
     }
-    const width = geometry.halfWidth * 2;
-    const height = geometry.halfHeight * 2;
+    const width = presentation.box.width;
+    const height = presentation.box.height;
     const left = point.x - width / 2;
     const top = point.y - height / 2;
     this.context.fillStyle = point.id === this.hoveredPath ? this.palette.nodeHover : this.palette.node;
@@ -597,19 +827,96 @@ export class NodeGraphCanvasRenderer {
     this.context.lineWidth = focused ? 2.5 : match ? 2 : 1;
     this.context.fillRect(left, top, width, height);
     this.context.strokeRect(left, top, width, height);
-    if (geometry.label) {
-      const fontSize = Math.max(10, Math.min(14, 13 * geometry.scale));
+    if (this.dimension === "2d") this.drawVisualHandle(record, presentation);
+    if (presentation.label) {
+      const fontSize = Math.max(10, Math.min(14, 13 * presentation.scale));
+      const childCount = Math.max(0, record.childCount ?? 0);
+      const leftInset = this.dimension === "2d" && this.data.layout.direction === "left-to-right" ? 22 : 7;
+      const rightInset = childCount > 0 && this.data.layout.direction === "left-to-right" ? 44 : 7;
+      const labelX = left + leftInset + Math.max(0, width - leftInset - rightInset) / 2;
       this.context.fillStyle = this.palette.text;
       this.context.font = `${fontSize}px sans-serif`;
       this.context.textAlign = "center";
       this.context.textBaseline = "middle";
-      this.context.fillText(record.label, point.x, point.y, Math.max(10, width - 14));
+      this.context.fillText(record.label, labelX, point.y, Math.max(10, width - leftInset - rightInset - 4));
+      if (childCount > 0) {
+        this.context.fillStyle = this.palette.mutedText;
+        if (this.data.layout.direction === "top-to-bottom") {
+          this.context.textAlign = "center";
+          this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, point.x, top + height - 5, 38);
+        } else {
+          this.context.textAlign = "right";
+          this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, point.x + width / 2 - 5, point.y, 38);
+        }
+      }
     }
     this.context.restore();
   }
 
+  private drawVisualHandle(record: NodeGraphCanvasRecord, presentation: CanvasNodePresentation): void {
+    if (this.context === null) return;
+    const topToBottom = this.data.layout.direction === "top-to-bottom";
+    const radius = 7;
+    const x = topToBottom ? presentation.box.x : presentation.box.x - presentation.box.width / 2;
+    const y = topToBottom ? presentation.box.y - presentation.box.height / 2 : presentation.box.y;
+    const visual = record.visual;
+    this.context.fillStyle = visual.kind === "color"
+      ? visual.value
+      : visual.accent ?? this.palette.border;
+    this.context.beginPath();
+    this.context.arc(x, y, radius, 0, Math.PI * 2);
+    this.context.fill();
+    if (record.visual.kind === "image" || record.visual.kind === "lucide") {
+      const image = this.visualImageFor(record);
+      if (image.complete && image.naturalWidth > 0) {
+        this.context.drawImage(image, x - radius, y - radius, radius * 2, radius * 2);
+      }
+      return;
+    }
+    const glyph = visual.kind === "emoji" || visual.kind === "glyph"
+      ? visual.value
+      : visual.kind === "fallback" ? visual.value === "home" ? "⌂" : "▰" : null;
+    if (glyph === null) return;
+    this.context.fillStyle = visual.accent === null ? this.palette.text : this.palette.background;
+    this.context.font = visual.kind === "emoji"
+      ? `12px ${this.palette.emojiFont}`
+      : visual.kind === "glyph" ? `600 11px ${this.palette.glyphFont}` : "11px sans-serif";
+    this.context.textAlign = "center";
+    this.context.textBaseline = "middle";
+    this.context.fillText(glyph, x, y, radius * 2);
+  }
+
+  private visualImageFor(record: NodeGraphCanvasRecord): HTMLImageElement {
+    const visual = record.visual;
+    const key = `${visual.kind}\u0000${visual.value}\u0000${visual.accent ?? ""}`;
+    const cached = this.visualImages.get(key);
+    if (cached !== undefined) return cached;
+    if (this.visualImages.size >= 256) {
+      const oldest = this.visualImages.keys().next().value;
+      if (oldest !== undefined) this.visualImages.delete(oldest);
+    }
+    const image = this.surface.ownerDocument.createElement("img");
+    image.addEventListener("load", () => this.scheduleDraw(), { once: true });
+    image.addEventListener("error", () => this.scheduleDraw(), { once: true });
+    if (visual.kind === "image") image.src = visual.value;
+    else {
+      const host = this.surface.ownerDocument.createElement("span");
+      renderVisual(host, visual, record.label);
+      const svg = host.querySelector("svg");
+      if (svg !== null) {
+        svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        svg.setAttribute("width", "18");
+        svg.setAttribute("height", "18");
+        svg.style.color = visual.accent ?? this.palette.text;
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
+      }
+    }
+    this.visualImages.set(key, image);
+    return image;
+  }
+
   private updateFocusOverlay(projected: ReadonlyMap<string, NodeGraphCanvasPoint>): void {
-    const path = this.focusPath;
+    const path = this.hoveredPath ?? this.focusPath;
     const point = path === null ? undefined : projected.get(path);
     const record = path === null ? undefined : this.data.records.get(path);
     if (path === null || point === undefined || record === undefined) {
@@ -618,19 +925,37 @@ export class NodeGraphCanvasRenderer {
     }
     if (this.overlayPath !== path) {
       this.overlayPath = path;
-      this.focusOverlay.empty();
-      if (record.visual.kind !== "fallback") {
-        const icon = this.focusOverlay.createSpan({ cls: "folder-nodes-node-graph-icon" });
-        renderVisual(icon, record.visual, record.label);
-      }
-      this.focusOverlay.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
+      this.focusOverlayBody.empty();
+      const icon = this.focusOverlayBody.createSpan({ cls: "folder-nodes-node-graph-icon" });
+      renderVisual(icon, record.visual, record.label);
+      this.focusOverlayBody.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
       this.focusOverlay.dataset.nodePath = path;
+      this.focusOverlayBody.dataset.nodePath = path;
     }
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
     const boundary = record.boundary ? `\n${this.callbacks.label("boundaryNode")}` : "";
-    const title = `${path}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`;
-    this.focusOverlay.setAttribute("aria-label", title);
+    const pathDetail = path === "" ? "" : `\n${path}`;
+    const title = `${record.label}${pathDetail}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`;
+    this.focusOverlayBody.setAttribute("aria-label", title);
     this.focusOverlay.setAttribute("title", title);
+    const childCount = Math.max(0, record.childCount ?? 0);
+    this.focusOverlayToggle.hidden = childCount === 0 || this.callbacks.onToggle === undefined;
+    this.focusOverlayToggle.setText(`${record.expanded === true ? "−" : "+"} ${childCount}`);
+    this.focusOverlayToggle.setAttribute("aria-label", this.callbacks.toggleLabel?.(
+      record.label,
+      childCount,
+      record.expanded === true,
+    ) ?? `${record.expanded === true ? "Collapse" : "Expand"} ${record.label}; ${childCount}`);
+    if (this.focusOverlayToggle.hidden) {
+      this.focusOverlayToggle.removeAttribute("aria-expanded");
+      this.focusOverlayToggle.removeAttribute("title");
+    } else {
+      this.focusOverlayToggle.setAttribute("aria-expanded", String(record.expanded === true));
+      this.focusOverlayToggle.setAttribute(
+        "title",
+        `${this.focusOverlayToggle.getAttribute("aria-label") ?? ""}\n${this.callbacks.label("altBranchHint")}`,
+      );
+    }
     this.focusOverlay.style.left = `${point.x}px`;
     this.focusOverlay.style.top = `${point.y}px`;
     this.focusOverlay.hidden = false;
@@ -639,14 +964,12 @@ export class NodeGraphCanvasRenderer {
   private updateDerivedState(): void {
     this.neighbors.clear();
     if (this.focusPath === null) return;
-    for (const edge of this.incidentEdges.get(this.focusPath) ?? []) {
+    for (const edge of this.incidentStructureEdges.get(this.focusPath) ?? []) {
       this.neighbors.add(edge.source === this.focusPath ? edge.target : edge.source);
     }
-  }
-
-  private updateNotice(): void {
-    this.edgeLodNotice.setText(this.readableFit ? this.callbacks.label("readableFit") : this.callbacks.label("denseEdges"));
-    this.edgeLodNotice.hidden = !this.readableFit && !this.denseEdgeOverview;
+    for (const edge of this.incidentLinkEdges.get(this.focusPath) ?? []) {
+      this.neighbors.add(edge.source === this.focusPath ? edge.target : edge.source);
+    }
   }
 
   private centerOn(path: string): void {
@@ -668,7 +991,61 @@ export class NodeGraphCanvasRenderer {
   }
 
   private hitTest(x: number, y: number): string | null {
-    return hitTestNodeGraphCanvas(this.visiblePoints, x, y);
+    for (let index = this.visiblePoints.length - 1; index >= 0; index -= 1) {
+      const point = this.visiblePoints[index];
+      if (point === undefined) continue;
+      if (nodeGraphBoxContains(this.presentationForPoint(point).box, { x, y })) return point.id;
+    }
+    return null;
+  }
+
+  private isToggleHit(path: string, x: number, y: number): boolean {
+    if (this.callbacks.onToggle === undefined) return false;
+    const record = this.data.records.get(path);
+    const point = this.projectedById.get(path);
+    if (record === undefined || point === undefined || (record.childCount ?? 0) <= 0) return false;
+    const presentation = this.presentationForPoint(point);
+    if (presentation.kind !== "card") return false;
+    if (this.data.layout.direction === "top-to-bottom") {
+      const zoneHeight = Math.max(20, Math.min(32, presentation.box.height * 0.38));
+      return y >= presentation.box.y + presentation.box.height / 2 - zoneHeight;
+    }
+    const zoneWidth = Math.max(24, Math.min(44, presentation.box.width * 0.3));
+    return x >= presentation.box.x + presentation.box.width / 2 - zoneWidth;
+  }
+
+  private presentationForPoint(point: NodeGraphCanvasPoint): CanvasNodePresentation {
+    const geometry = nodeGraphCanvasGeometry(point.scale);
+    const denseDot = this.dimension === "3d"
+      && this.data.model.nodes.length > DENSE_3D_DOT_THRESHOLD
+      && point.id !== this.focusPath
+      && point.id !== this.hoveredPath;
+    const kind = geometry.kind === "dot" || denseDot ? "dot" : "card";
+    const radius = kind === "dot" ? denseDot ? 4 : geometry.radius : 0;
+    const halfWidth = kind === "dot" ? radius : geometry.halfWidth;
+    const halfHeight = kind === "dot" ? radius : geometry.halfHeight;
+    return {
+      box: nodeGraphBoxFromCenter(point.x, point.y, halfWidth, halfHeight),
+      kind,
+      label: kind === "card" && geometry.label,
+      radius,
+      scale: geometry.scale,
+    };
+  }
+
+  private keyboardPaths(): readonly string[] {
+    return [...this.data.model.nodes]
+      .sort((left, right) => left.depth - right.depth)
+      .map(({ id }) => id);
+  }
+
+  private selectFromCanvas(path: string, center: boolean): void {
+    this.focusPath = path;
+    this.updateDerivedState();
+    if (center) this.centerOn(path);
+    this.callbacks.onSelect(path);
+    this.announceFocus();
+    this.scheduleDraw();
   }
 
   private showTooltip(x: number, y: number): void {
@@ -684,7 +1061,12 @@ export class NodeGraphCanvasRenderer {
     if (record === undefined) return;
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
     const boundary = record.boundary ? `\n${this.callbacks.label("boundaryNode")}` : "";
-    this.tooltip.setText(`${record.label}\n${path}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`);
+    const childCount = Math.max(0, record.childCount ?? 0);
+    const toggleHint = childCount > 0 && this.isToggleHit(path, x, y)
+      ? `\n${this.callbacks.toggleLabel?.(record.label, childCount, record.expanded === true)
+        ?? `${record.expanded === true ? "Collapse" : "Expand"} ${record.label}; ${childCount}`}\n${this.callbacks.label("altBranchHint")}`
+      : "";
+    this.tooltip.setText(`${record.label}\n${path}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
     this.tooltip.style.left = `${Math.min(this.width - 16, x + 12)}px`;
     this.tooltip.style.top = `${Math.min(this.height - 16, y + 12)}px`;
     this.tooltip.hidden = false;
@@ -696,6 +1078,20 @@ export class NodeGraphCanvasRenderer {
     this.tooltip.hidden = true;
   }
 
+  private announceFocus(): void {
+    const record = this.focusPath === null ? undefined : this.data.records.get(this.focusPath);
+    const baseLabel = this.callbacks.label("largeGraph");
+    if (record === undefined) {
+      this.canvas.setAttribute("aria-label", baseLabel);
+      this.activeAnnouncement.setText("");
+      return;
+    }
+    const counts = this.relationCounts.get(record.path) ?? { links: 0, structure: 0 };
+    const announcement = `${record.label}. ${record.path}. ${this.callbacks.relationSummary(counts.structure, counts.links)}`;
+    this.canvas.setAttribute("aria-label", `${baseLabel}. ${announcement}`);
+    this.activeAnnouncement.setText(announcement);
+  }
+
   private readPalette(): CanvasPalette {
     const ownerWindow = this.surface.ownerDocument.defaultView;
     const style = ownerWindow?.getComputedStyle(this.surface);
@@ -704,6 +1100,8 @@ export class NodeGraphCanvasRenderer {
       accent: color("--interactive-accent", "#7c5cff"),
       background: color("--background-primary", "#1e1e1e"),
       border: color("--background-modifier-border-hover", "#666"),
+      emojiFont: color("--folder-nodes-emoji-font", '"Segoe UI Emoji", emoji'),
+      glyphFont: color("--folder-nodes-glyph-font", "sans-serif"),
       link: color("--interactive-accent", "#7c5cff"),
       mutedText: color("--text-muted", "#999"),
       node: color("--background-secondary", "#2b2b2b"),
@@ -713,15 +1111,27 @@ export class NodeGraphCanvasRenderer {
   }
 
   private buildEdgeIndex(): void {
-    for (const edge of this.edges) {
+    for (const edge of this.structureEdges) {
       for (const path of [edge.source, edge.target]) {
-        const incident = this.incidentEdges.get(path) ?? [];
+        const incident = this.incidentStructureEdges.get(path) ?? [];
         incident.push(edge);
-        this.incidentEdges.set(path, incident);
+        this.incidentStructureEdges.set(path, incident);
         const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
         this.relationCounts.set(path, {
-          links: counts.links + (this.relationMode !== "structure" && edge.link ? 1 : 0),
-          structure: counts.structure + (this.relationMode !== "links" && edge.structure ? 1 : 0),
+          links: counts.links,
+          structure: counts.structure + 1,
+        });
+      }
+    }
+    for (const edge of this.linkEdges) {
+      for (const path of [edge.source, edge.target]) {
+        const incident = this.incidentLinkEdges.get(path) ?? [];
+        incident.push(edge);
+        this.incidentLinkEdges.set(path, incident);
+        const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
+        this.relationCounts.set(path, {
+          links: counts.links + 1,
+          structure: counts.structure,
         });
       }
     }
@@ -756,40 +1166,6 @@ function lineMightBeVisible(
     && Math.min(source.x, target.x) <= width + padding
     && Math.max(source.y, target.y) >= -padding
     && Math.min(source.y, target.y) <= height + padding;
-}
-
-function linkControlPoint(sourceX: number, sourceY: number, targetX: number, targetY: number): {
-  readonly x: number;
-  readonly y: number;
-} {
-  const dx = targetX - sourceX;
-  const dy = targetY - sourceY;
-  const length = Math.hypot(dx, dy) || 1;
-  const bend = Math.min(96, Math.max(24, length * 0.14));
-  return {
-    x: (sourceX + targetX) / 2 - dy / length * bend,
-    y: (sourceY + targetY) / 2 + dx / length * bend,
-  };
-}
-
-function offsetLine(sourceX: number, sourceY: number, targetX: number, targetY: number, offset: number): {
-  readonly sourceX: number;
-  readonly sourceY: number;
-  readonly targetX: number;
-  readonly targetY: number;
-} {
-  if (offset === 0) return { sourceX, sourceY, targetX, targetY };
-  const dx = targetX - sourceX;
-  const dy = targetY - sourceY;
-  const length = Math.hypot(dx, dy) || 1;
-  const offsetX = -dy / length * offset;
-  const offsetY = dx / length * offset;
-  return {
-    sourceX: sourceX + offsetX,
-    sourceY: sourceY + offsetY,
-    targetX: targetX + offsetX,
-    targetY: targetY + offsetY,
-  };
 }
 
 function touchGesture(pointers: Iterable<CanvasPointer>): {

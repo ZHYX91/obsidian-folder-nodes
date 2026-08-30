@@ -1,4 +1,14 @@
-import { ItemView, setIcon, TFile, TFolder, WorkspaceLeaf, type ViewStateResult } from "obsidian";
+import {
+  ItemView,
+  Menu,
+  SearchComponent,
+  setIcon,
+  setTooltip,
+  WorkspaceLeaf,
+  type ViewStateResult,
+} from "obsidian";
+
+import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
 
 import {
   defaultNodeGraphCamera,
@@ -14,43 +24,55 @@ import {
 } from "../core/node-graph-3d";
 import { shouldUseNodeGraphCanvas } from "../core/node-graph-canvas";
 import {
-  NODE_GRAPH_DENSITY_THRESHOLD,
-  nodeGraphDensityOverview,
-} from "../core/node-graph-density";
-import { normalizeNodeGraphLinks } from "../core/node-graph-links";
+  nodeGraphBoxFromCenter,
+  nodeGraphBoxFromTopLeft,
+  nodeGraphCubicPath,
+  nodeGraphLinkGeometry,
+  nodeGraphQuadraticPath,
+  nodeGraphStructureGeometry,
+} from "../core/node-graph-geometry";
 import { fitNodeGraphViewport, layoutNodeGraphForest, type NodeGraphLayout, type NodeGraphTree } from "../core/node-graph-layout";
-import { buildNodeGraphModelFromNodes, edgesForMode, type NodeGraphModel, type NodeGraphModelEdge } from "../core/node-graph-model";
+import { buildNodeGraphModelFromNodes, edgesForShowLinks, type NodeGraphModel, type NodeGraphModelEdge } from "../core/node-graph-model";
 import {
   GLOBAL_NODE_GRAPH_SCOPE,
-  nodeGraphParentPath,
-  nodeGraphPathDepth,
-  nodeGraphPathIsConfigured,
-  nodeGraphSubtreeIsExcluded,
-  nodeGraphTraversalRoots,
+  isWithin,
   normalizeNodeGraphScope,
   type NodeGraphScope,
 } from "../core/node-graph-scope";
 import { normalizeVaultPath } from "../core/paths";
-import type { NodeGraphDimension, NodeGraphRelationMode, NodeGraphSettings, NodeVisual } from "../core/types";
+import { summarizeNodeGraphSearch, type NodeGraphSearchSummary } from "../core/node-graph-search";
+import {
+  captureNodeGraphSearchSnapshot,
+  createNodeGraphExpansionSession,
+  expandNodeGraphAncestors,
+  nodeGraphExpansionForScope,
+  nodeGraphScopeKey,
+  nodeGraphStructuralScopeIds,
+  nodeGraphShowLinksFromPersistedState,
+  restoreNodeGraphSearchSnapshot,
+  setNodeGraphRangeDepth,
+  toggleNodeGraphBranch,
+  toggleNodeGraphNode,
+  withNodeGraphExpansion,
+  type NodeGraphExpansionSession,
+  type NodeGraphExpansionState,
+  type NodeGraphRangeDepth,
+  type NodeGraphSearchSnapshot,
+} from "../core/node-graph-state";
+import { createNodeGraphTopology, type NodeGraphTopology } from "../core/node-graph-topology";
+import { buildNodeGraphVisibleScene, estimateNodeGraphRangeNodeCount } from "../core/node-graph-visible";
+import type { NodeGraphDimension, NodeGraphSettings } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
-import { resolvedLanguage } from "./i18n";
+import { t } from "./i18n";
 import {
   NodeGraphCanvasRenderer,
   type NodeGraphCanvasRecord,
+  type NodeGraphCanvasViewportState,
 } from "./node-graph-canvas-renderer";
 
 interface NodeGraphService {
-  getFolder(path: string): TFolder | null;
-  getCanonicalFile(folderPath: string): TFile | null;
-  isCanonicalFile?(file: TFile): boolean;
-  folderForFile?(file: TFile | null): TFolder | null;
-  children(path: string): readonly { readonly childPath: string }[];
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
-}
-
-interface NodeGraphVisuals {
-  resolve(folder: TFolder): NodeVisual;
 }
 
 interface GraphRecord extends NodeGraphCanvasRecord {
@@ -66,9 +88,27 @@ interface GraphData {
   readonly points3D: readonly NodeGraphPoint3D[];
 }
 
-interface NodeGraphViewOptions {
-  readonly getInboundSources?: (targetPath: string) => readonly string[];
+interface NodeGraphDom2DViewportState {
+  readonly canvasLeft: string;
+  readonly canvasTop: string;
+  readonly canvasTransform: string;
+  readonly scrollLeft: number;
+  readonly scrollTop: number;
+  readonly stageHeight: string;
+  readonly stageWidth: string;
+}
+
+interface NodeGraphViewportState {
+  readonly canvas: NodeGraphCanvasViewportState | null;
+  readonly dimension: NodeGraphDimension;
+  readonly dom2D: NodeGraphDom2DViewportState | null;
+  readonly view3D: NodeGraphCamera;
+}
+
+export interface NodeGraphViewOptions {
+  readonly getIndexSnapshot: () => NodeGraphIndexSnapshot;
   readonly getSettings?: () => NodeGraphSettings;
+  readonly onNodeMenu?: (event: MouseEvent, path: string) => void;
 }
 
 type GraphDrag = {
@@ -87,12 +127,13 @@ type GraphPointer = {
 
 export const NODE_GRAPH_VIEW_TYPE = "folder-nodes-node-graph";
 const NODE_GRAPH_DOM_MIN_SCALE = 0.65;
+const NODE_GRAPH_DOM_MIN_2D_SCALE = 0.65;
 const NODE_GRAPH_DENSE_3D_THRESHOLD = 24;
 const NODE_GRAPH_DENSE_3D_FIT_SCALE = 0.16;
 
 export class FolderNodeGraphView extends ItemView {
   private focusPath: string | null = null;
-  private relationMode: NodeGraphRelationMode;
+  private showLinks = false;
   private dimension: NodeGraphDimension;
   private graphScope: NodeGraphScope = GLOBAL_NODE_GRAPH_SCOPE;
   private camera: NodeGraphCamera = defaultNodeGraphCamera();
@@ -106,23 +147,35 @@ export class FolderNodeGraphView extends ItemView {
   private threeDSvg: SVGSVGElement | null = null;
   private threeDViewport: { width: number; height: number } | null = null;
   private canvasRenderer: NodeGraphCanvasRenderer | null = null;
-  private graphData: GraphData | null = null;
   private displayGraphData: GraphData | null = null;
-  private showAllDensityNodes = false;
-  private hiddenBranchCount = 0;
+  private indexSnapshot: NodeGraphIndexSnapshot | null = null;
+  private topology: NodeGraphTopology | null = null;
+  private topologyRevision: number | null = null;
+  private structuralScopeIds: ReadonlySet<string> = new Set();
+  private structuralScopeIdentity = "";
+  private expansionSession: NodeGraphExpansionSession = createNodeGraphExpansionSession();
+  private currentExpansion: NodeGraphExpansionState = { expandedIds: new Set() };
+  private searchSnapshot: NodeGraphSearchSnapshot<NodeGraphViewportState> | null = null;
   private denseThreeD = false;
+  private graphDataGeneration = 0;
   private refreshGeneration = 0;
   private refreshTimer: number | null = null;
+  private searchQuery = "";
+  private searchPreviewPath: string | null = null;
+  private pendingPersistedFocusReveal = false;
+  private searchResultsCache: {
+    readonly generation: number;
+    readonly query: string;
+    readonly summary: NodeGraphSearchSummary;
+  } | null = null;
 
   public constructor(
     leaf: WorkspaceLeaf,
     private readonly service: NodeGraphService,
-    private readonly visuals: NodeGraphVisuals,
-    private readonly options: NodeGraphViewOptions = {},
+    private readonly options: NodeGraphViewOptions,
   ) {
     super(leaf);
     const settings = this.settings();
-    this.relationMode = settings.defaultRelationMode;
     this.dimension = settings.defaultDimension;
   }
 
@@ -131,17 +184,24 @@ export class FolderNodeGraphView extends ItemView {
   public override getIcon(): string { return "git-fork"; }
   public override async onOpen(): Promise<void> { this.render(); }
   public override getState(): Record<string, unknown> {
-    return { dimension: this.dimension, relationMode: this.relationMode, scope: this.graphScope };
+    return { dimension: this.dimension, focus: this.focusPath, scope: this.graphScope, showLinks: this.showLinks };
   }
   public override async setState(state: unknown, _result: ViewStateResult): Promise<void> {
     if (typeof state === "object" && state !== null) {
-      const input = state as { readonly dimension?: unknown; readonly relationMode?: unknown; readonly scope?: unknown };
+      const input = state as {
+        readonly dimension?: unknown;
+        readonly focus?: unknown;
+        readonly relationMode?: unknown;
+        readonly scope?: unknown;
+        readonly showLinks?: unknown;
+      };
       if (input.dimension === "2d" || input.dimension === "3d") this.dimension = input.dimension;
-      if (input.relationMode === "structure" || input.relationMode === "links" || input.relationMode === "hybrid") {
-        this.relationMode = input.relationMode;
-      }
+      this.showLinks = nodeGraphShowLinksFromPersistedState(input);
       this.graphScope = normalizeNodeGraphScope(input.scope);
-      this.focusPath = this.graphScope.mode === "global" ? null : this.graphScope.rootPath;
+      this.focusPath = typeof input.focus === "string"
+        ? normalizeVaultPath(input.focus)
+        : this.graphScope.mode === "global" ? null : this.graphScope.rootPath;
+      this.pendingPersistedFocusReveal = this.focusPath !== null;
     }
     if (this.contentEl.isConnected) this.render();
   }
@@ -157,8 +217,12 @@ export class FolderNodeGraphView extends ItemView {
     }
     this.canvasRenderer?.destroy();
     this.canvasRenderer = null;
-    this.graphData = null;
     this.displayGraphData = null;
+    this.indexSnapshot = null;
+    this.topology = null;
+    this.topologyRevision = null;
+    this.structuralScopeIds = new Set();
+    this.structuralScopeIdentity = "";
     this.nodeElements.clear();
     this.projected3D.clear();
     this.threeDPoints = [];
@@ -168,13 +232,26 @@ export class FolderNodeGraphView extends ItemView {
     this.threeDViewport = null;
     this.drag = null;
     this.pointers.clear();
+    this.expansionSession = createNodeGraphExpansionSession();
+    this.currentExpansion = { expandedIds: new Set() };
+    this.searchSnapshot = null;
+    this.searchResultsCache = null;
+    this.searchQuery = "";
+    this.searchPreviewPath = null;
+    this.pendingPersistedFocusReveal = false;
+    this.contentEl.empty();
   }
 
   public setFocus(path: string | null): void {
-    this.focusPath = path === null ? null : normalizeVaultPath(path);
-    if (this.focusPath !== null
-      && this.graphData?.records.has(this.focusPath) === true
+    const nextFocus = path === null ? null : normalizeVaultPath(path);
+    const focusChanged = nextFocus !== this.focusPath;
+    this.focusPath = nextFocus;
+    if (focusChanged) this.markWorkspaceStateDirty();
+    if (this.focusPath !== null && this.topology?.nodes.has(this.focusPath) === true
       && this.displayGraphData?.records.has(this.focusPath) === false) {
+      const expansion = expandNodeGraphAncestors(this.topology, this.graphScope, this.currentExpansion, [this.focusPath]);
+      this.currentExpansion = expansion;
+      this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expansion);
       this.render();
       if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
       else if (this.dimension === "3d") this.center3DOnFocus();
@@ -184,18 +261,88 @@ export class FolderNodeGraphView extends ItemView {
     if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
     else if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
     else this.applyFocus(true);
+    this.applyNeighborhood();
     this.updateScopeControls();
   }
 
   public setGraphScope(scope: NodeGraphScope): void {
     const normalized = normalizeNodeGraphScope(scope);
     if (JSON.stringify(normalized) === JSON.stringify(this.graphScope)) return;
+    const restoredSearch = this.searchSnapshot === null
+      ? null
+      : restoreNodeGraphSearchSnapshot(this.searchSnapshot, this.graphScope);
+    if (restoredSearch !== null) {
+      this.currentExpansion = restoredSearch.expansion;
+      this.expansionSession = withNodeGraphExpansion(
+        this.expansionSession,
+        this.graphScope,
+        restoredSearch.expansion,
+      );
+      this.focusPath = restoredSearch.focusId;
+      this.camera = { ...restoredSearch.camera.view3D };
+    }
     this.graphScope = normalized;
-    this.graphData = null;
+    this.searchQuery = "";
+    this.searchSnapshot = null;
+    this.searchPreviewPath = null;
     this.displayGraphData = null;
-    this.showAllDensityNodes = false;
     if (normalized.mode !== "global") this.focusPath = normalized.rootPath;
+    this.markWorkspaceStateDirty();
     this.render();
+  }
+
+  public remapPathState(oldPath: string, newPath: string): void {
+    const previous = normalizeVaultPath(oldPath);
+    const next = normalizeVaultPath(newPath);
+    if (previous === next) return;
+    const serializedBefore = JSON.stringify(this.getState());
+    const remap = (path: string): string => remapNodeGraphPath(path, previous, next);
+    if (this.focusPath !== null) this.focusPath = remap(this.focusPath);
+    if (this.searchPreviewPath !== null) this.searchPreviewPath = remap(this.searchPreviewPath);
+    if (this.graphScope.mode !== "global") {
+      this.graphScope = { ...this.graphScope, rootPath: remap(this.graphScope.rootPath) };
+    }
+    this.currentExpansion = remapNodeGraphExpansion(this.currentExpansion, remap);
+    this.expansionSession = remapNodeGraphExpansionSession(this.expansionSession, remap);
+    if (this.searchSnapshot !== null) {
+      this.searchSnapshot = {
+        ...this.searchSnapshot,
+        expansion: remapNodeGraphExpansion(this.searchSnapshot.expansion, remap),
+        focusId: this.searchSnapshot.focusId === null ? null : remap(this.searchSnapshot.focusId),
+        scopeKey: remapNodeGraphScopeKey(this.searchSnapshot.scopeKey, remap),
+      };
+    }
+    if (JSON.stringify(this.getState()) !== serializedBefore) this.markWorkspaceStateDirty();
+  }
+
+  public removePathState(path: string): void {
+    const serializedBefore = JSON.stringify(this.getState());
+    const removed = normalizeVaultPath(path);
+    const retained = (candidate: string): boolean => !isWithin(candidate, removed);
+    if (this.focusPath !== null && !retained(this.focusPath)) this.focusPath = null;
+    if (this.searchPreviewPath !== null && !retained(this.searchPreviewPath)) this.searchPreviewPath = null;
+    const scopeRemoved = this.graphScope.mode !== "global" && !retained(this.graphScope.rootPath);
+    if (scopeRemoved) this.graphScope = GLOBAL_NODE_GRAPH_SCOPE;
+    this.currentExpansion = filterNodeGraphExpansion(this.currentExpansion, retained);
+    this.expansionSession = filterNodeGraphExpansionSession(this.expansionSession, retained);
+    if (this.searchSnapshot !== null) {
+      const snapshotRoot = nodeGraphScopeKeyRoot(this.searchSnapshot.scopeKey);
+      const snapshotScopeRemoved = snapshotRoot !== null && !retained(snapshotRoot);
+      if (scopeRemoved || snapshotScopeRemoved) {
+        this.searchQuery = "";
+        this.searchSnapshot = null;
+        this.searchPreviewPath = null;
+      } else {
+        this.searchSnapshot = {
+          ...this.searchSnapshot,
+          expansion: filterNodeGraphExpansion(this.searchSnapshot.expansion, retained),
+          focusId: this.searchSnapshot.focusId === null || retained(this.searchSnapshot.focusId)
+            ? this.searchSnapshot.focusId
+            : null,
+        };
+      }
+    }
+    if (JSON.stringify(this.getState()) !== serializedBefore) this.markWorkspaceStateDirty();
   }
 
   public refresh(): void {
@@ -205,7 +352,7 @@ export class FolderNodeGraphView extends ItemView {
     this.refreshTimer = ownerWindow.setTimeout(() => {
       this.refreshTimer = null;
       if (generation !== this.refreshGeneration) return;
-      this.graphData = null;
+      this.indexSnapshot = null;
       this.displayGraphData = null;
       this.render();
     }, 50);
@@ -215,7 +362,6 @@ export class FolderNodeGraphView extends ItemView {
     this.canvasRenderer?.destroy();
     this.canvasRenderer = null;
     this.displayGraphData = null;
-    this.hiddenBranchCount = 0;
     this.denseThreeD = false;
     this.nodeElements.clear();
     this.projected3D.clear();
@@ -230,76 +376,124 @@ export class FolderNodeGraphView extends ItemView {
     this.contentEl.addClass("folder-nodes-node-graph-view");
     this.contentEl.removeClass("is-canvas-graph");
     this.contentEl.toggleClass("is-3d", this.dimension === "3d");
+    this.contentEl.toggleClass("is-top-to-bottom", this.settings().layoutDirection === "top-to-bottom");
 
     if (!this.settings().enabled) {
       this.contentEl.createDiv({ cls: "folder-nodes-node-graph-disabled", text: label("disabledGraph"), attr: { role: "status" } });
-      this.didRender();
       return;
     }
 
-    const sourceData = this.graphData ?? this.buildGraphData();
-    this.graphData = sourceData;
-    const data = this.buildDisplayGraphData(sourceData);
+    const sourceData = this.buildGraphData();
+    const data = sourceData;
     this.displayGraphData = data;
     this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
     this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
     const toolbar = this.renderToolbar();
     const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
-    const visibleEdgeCount = edgesForMode(data.model, this.relationMode).length;
+    const visibleEdgeCount = edgesForShowLinks(data.model, this.showLinks).length;
     if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
       this.renderCanvas(surface, data, fit);
     }
     else if (this.dimension === "2d") this.render2D(surface, data, fit);
     else this.render3D(surface, data, fit);
-    this.renderDensityNotice(sourceData.records.size);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
-    this.didRender();
+    this.highlightSearch(this.searchQuery);
+    this.applyNeighborhood();
+    if (this.searchQuery.trim() !== "") this.centerSearchPreview();
   }
 
-  protected didRender(): void {}
-
-  protected currentGraphModel(): NodeGraphModel | null { return this.displayGraphData?.model ?? null; }
-  protected currentRelationMode(): NodeGraphRelationMode { return this.relationMode; }
-  protected currentDimension(): NodeGraphDimension { return this.dimension; }
-  protected currentGraphScope(): NodeGraphScope { return this.graphScope; }
-  protected isCanvasGraph(): boolean { return this.canvasRenderer !== null; }
-  protected setCanvasSearchQuery(query: string): void { this.canvasRenderer?.setSearchQuery(query); }
-  protected setCanvasSelectionFocus(path: string | null): void { this.canvasRenderer?.setFocus(path, false); }
-  protected graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
-    if (this.graphData === null) return [];
-    return [...this.graphData.records.values()]
-      .filter((record) => this.relationMode !== "structure" || !record.boundary);
+  private graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
+    const snapshot = this.indexSnapshot ?? this.graphIndexSnapshot();
+    const allowed = new Set(this.structuralScopeIds);
+    if (this.graphScope.mode === "local") {
+      const parentId = this.topology?.nodes.get(this.graphScope.rootPath)?.parentId;
+      if (parentId !== null && parentId !== undefined) allowed.add(parentId);
+    }
+    for (const record of this.displayGraphData?.records.values() ?? []) allowed.add(record.path);
+    return [...snapshot.records.values()]
+      .filter(({ path }) => allowed.has(path))
+      .map(({ label: recordLabel, path }) => ({ label: recordLabel, path }));
   }
-  protected onNodeSelected(_path: string): void {}
 
   private renderToolbar(): HTMLElement {
     const toolbar = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-toolbar" });
-    toolbar.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
-    const relation = toolbar.createDiv({
-      cls: "folder-nodes-node-graph-switch",
-      attr: { "aria-label": label("relationship"), "data-node-graph-switch": "relation" },
+    const primary = toolbar.createDiv({ cls: "folder-nodes-node-graph-toolbar-primary" });
+    const secondary = toolbar.createDiv({ cls: "folder-nodes-node-graph-toolbar-secondary" });
+    primary.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
+    const searchHost = primary.createDiv({ cls: "folder-nodes-node-graph-search" });
+    const search = new SearchComponent(searchHost)
+      .setPlaceholder(label("findNode"))
+      .setValue(this.searchQuery)
+      .onChange((value) => this.setSearchQuery(value));
+    search.inputEl.setAttribute("aria-label", label("findNode"));
+    search.inputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        search.setValue("");
+        this.setSearchQuery("");
+        return;
+      }
+      if (event.key !== "Enter") return;
+      const match = this.firstSearchMatch(this.searchQuery);
+      if (match === null) return;
+      event.preventDefault();
+      this.setFocus(match);
     });
-    for (const mode of ["structure", "links", "hybrid"] as const) {
-      this.switchButton(relation, relationLabel(mode), this.relationMode === mode, () => {
-        if (this.relationMode === mode) return;
-        this.relationMode = mode;
-        this.render();
+    setTooltip(search.inputEl, label("findNode"));
+    search.clearButtonEl.setAttribute("aria-label", label("clearSearch"));
+    setTooltip(search.clearButtonEl, label("clearSearch"));
+
+    const linksToggle = primary.createEl("button", {
+      cls: `folder-nodes-node-graph-links-toggle${this.showLinks ? " is-active" : ""}`,
+      attr: {
+        "aria-checked": String(this.showLinks),
+        "aria-label": label("showLinksTooltip"),
+        role: "switch",
+        type: "button",
+      },
+    });
+    linksToggle.createSpan({ text: label("showLinks") });
+    linksToggle.createSpan({ cls: "folder-nodes-node-graph-toggle-track", attr: { "aria-hidden": "true" } });
+    setTooltip(linksToggle, label("showLinksTooltip"));
+    linksToggle.addEventListener("click", () => {
+      this.showLinks = !this.showLinks;
+      this.markWorkspaceStateDirty();
+      this.render();
+    });
+    if (this.showLinks) {
+      const visibleLinks = this.displayGraphData?.model.edges.filter((edge) => edge.link).length ?? 0;
+      const summary = primary.createSpan({
+        cls: `folder-nodes-node-graph-link-summary${visibleLinks === 0 ? " is-empty" : ""}`,
+        attr: { role: "status" },
       });
+      summary.createSpan({ cls: "folder-nodes-node-graph-link-swatch", attr: { "aria-hidden": "true" } });
+      summary.createSpan({ text: visibleLinks === 0 ? label("noLinks") : linkCountLabel(visibleLinks) });
     }
+
     const scope = toolbar.createDiv({
       cls: "folder-nodes-node-graph-scope",
       attr: { "aria-label": label("scope"), "data-node-graph-scope": this.graphScope.mode },
     });
+    secondary.append(scope);
     scope.createSpan({ cls: "folder-nodes-node-graph-scope-path", text: this.scopeLabel() });
-    this.scopeButton(scope, label("globalScope"), this.graphScope.mode === "global", () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE));
-    this.scopeButton(scope, label("subtreeScope"), this.graphScope.mode === "subtree", () => {
+    this.scopeButton(scope, label("globalScope"), label("globalScopeTooltip"), this.graphScope.mode === "global", () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE));
+    this.scopeButton(scope, label("subtreeScope"), label("subtreeScopeTooltip"), this.graphScope.mode === "subtree", () => {
       if (this.focusPath !== null) this.setGraphScope({ mode: "subtree", rootPath: this.focusPath });
     }, this.focusPath === null, "subtree");
-    this.scopeButton(scope, label("localScope"), this.graphScope.mode === "local", () => {
+    this.scopeButton(scope, label("localScope"), label("localScopeTooltip"), this.graphScope.mode === "local", () => {
       if (this.focusPath !== null) this.setGraphScope({ mode: "local", rootPath: this.focusPath });
     }, this.focusPath === null, "local");
-    const dimension = toolbar.createDiv({
+    const range = secondary.createEl("button", {
+      cls: "folder-nodes-node-graph-range-button",
+      attr: { "aria-haspopup": "menu", "aria-label": label("expandRangeTooltip"), type: "button" },
+    });
+    range.createSpan({ text: label("expandRange") });
+    setIcon(range.createSpan({ cls: "folder-nodes-node-graph-range-chevron" }), "chevron-down");
+    setTooltip(range, label("expandRangeTooltip"));
+    range.addEventListener("click", () => this.openExpansionMenu(range));
+
+    const dimension = primary.createDiv({
       cls: "folder-nodes-node-graph-switch",
       attr: { "aria-label": label("dimension"), "data-node-graph-switch": "dimension" },
     });
@@ -308,14 +502,16 @@ export class FolderNodeGraphView extends ItemView {
         if (this.dimension === mode) return;
         this.dimension = mode;
         if (mode === "3d") this.camera = defaultNodeGraphCamera();
+        this.markWorkspaceStateDirty();
         this.render();
       });
     }
-    const fit = toolbar.createEl("button", {
+    const fit = primary.createEl("button", {
       cls: "clickable-icon",
       attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit" },
     });
     setIcon(fit, "maximize-2");
+    setTooltip(fit, label("fitGraph"));
     return toolbar;
   }
 
@@ -325,12 +521,14 @@ export class FolderNodeGraphView extends ItemView {
       text,
       attr: { "aria-pressed": String(active) },
     });
+    setTooltip(button, `${text} ${label("dimension")}`);
     button.addEventListener("click", onClick);
   }
 
   private scopeButton(
     container: HTMLElement,
     text: string,
+    tooltip: string,
     active: boolean,
     onClick: () => void,
     disabled = false,
@@ -342,6 +540,10 @@ export class FolderNodeGraphView extends ItemView {
       attr: { "aria-pressed": String(active), type: "button", ...(action === null ? {} : { "data-node-graph-scope-action": action }) },
     });
     button.disabled = disabled;
+    const description = disabled ? label("selectNodeFirst") : tooltip;
+    button.setAttribute("aria-label", description);
+    button.title = description;
+    setTooltip(button, description);
     button.addEventListener("click", onClick);
   }
 
@@ -351,155 +553,273 @@ export class FolderNodeGraphView extends ItemView {
     }
   }
 
-  private buildGraphData(): GraphData {
-    const settings = this.settings();
-    const records = new Map<string, GraphRecord>();
-    if (this.graphScope.mode === "local") this.collectLocalRecords(records, settings);
-    else {
-      for (const rootPath of nodeGraphTraversalRoots(this.graphScope, settings)) {
-        const root = rootPath === "" ? this.app.vault.getRoot() : this.service.getFolder(rootPath);
-        if (root !== null) this.collectDescendantRecords(records, root, settings, Number.POSITIVE_INFINITY);
-      }
-    }
-    if (this.graphScope.mode === "local" || settings.showBoundaryNodes) this.addLinkNeighborRecords(records, settings);
-
-    return this.graphDataFromRecords(records);
+  private toggleExpansion(path: string, branch: boolean): void {
+    if (this.topology === null) return;
+    const expansion = branch
+      ? toggleNodeGraphBranch(this.topology, this.currentExpansion, path)
+      : toggleNodeGraphNode(this.topology, this.currentExpansion, path);
+    this.setExpansion(expansion);
   }
 
-  private graphDataFromRecords(records: ReadonlyMap<string, GraphRecord>): GraphData {
-    const sources = [...records.values()].flatMap((record) => record.notePath === null
-      ? []
-      : [{ nodeId: record.path, notePath: record.notePath }]);
-    const notePathToNodeId = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
-    const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, notePathToNodeId);
-    const depths = [...records.keys()].map(nodeGraphPathDepth);
-    const minimumDepth = depths.length === 0 ? 0 : Math.min(...depths);
-    const structureEdges = [...records.values()].flatMap((record) =>
-      record.parentPath !== null && records.has(record.parentPath)
-        ? [{ source: record.parentPath, target: record.path }]
-        : []);
-    const model = buildNodeGraphModelFromNodes(
-      [...records.keys()].map((id) => ({ id, depth: nodeGraphPathDepth(id) - minimumDepth })),
-      structureEdges,
-      links,
-    );
-    const forest = this.buildForest(records);
+  private setExpansion(expansion: NodeGraphExpansionState): void {
+    this.currentExpansion = expansion;
+    this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expansion);
+    this.displayGraphData = null;
+    this.render();
+  }
+
+  private openExpansionMenu(anchor: HTMLElement): void {
+    if (this.topology === null) return;
+    const menu = new Menu();
+    for (const range of [1, 2, 3] as const) menu.addItem((item) => item
+      .setTitle(rangeExpansionLabel(range))
+      .setIcon("list-plus")
+      .onClick(() => this.setRangeExpansion(range)));
+    const total = estimateNodeGraphRangeNodeCount(this.topology, this.graphScope, "all", false);
+    menu.addItem((item) => item
+      .setTitle(expandAllLabel(this.graphScope, total))
+      .setIcon("unfold-vertical")
+      .onClick(() => this.setRangeExpansion("all")));
+    menu.addSeparator();
+    menu.addItem((item) => item
+      .setTitle(label("collapseToFirst"))
+      .setIcon("fold-vertical")
+      .onClick(() => this.setRangeExpansion("collapse")));
+    const rect = anchor.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom }, anchor.ownerDocument);
+  }
+
+  private setRangeExpansion(range: NodeGraphRangeDepth): void {
+    if (this.topology === null) return;
+    this.setExpansion(setNodeGraphRangeDepth(this.topology, this.graphScope, range));
+  }
+
+  private setSearchQuery(value: string): void {
+    const previous = this.searchQuery.trim();
+    const next = value.trim();
+    this.searchQuery = value;
+    if (previous === "" && next !== "" && this.topology !== null) {
+      this.searchSnapshot = captureNodeGraphSearchSnapshot(
+        this.graphScope,
+        this.currentExpansion,
+        this.focusPath,
+        this.captureViewportState(),
+      );
+    }
+    if (next === "") {
+      const restored = this.searchSnapshot === null ? null : restoreNodeGraphSearchSnapshot(this.searchSnapshot, this.graphScope);
+      this.searchSnapshot = null;
+      this.searchPreviewPath = null;
+      if (restored === null) {
+        this.highlightSearch("");
+        return;
+      }
+      const focusChanged = this.focusPath !== restored.focusId;
+      this.camera = { ...restored.camera.view3D };
+      this.focusPath = restored.focusId;
+      this.currentExpansion = restored.expansion;
+      this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, restored.expansion);
+      this.render();
+      this.restoreViewportState(restored.camera);
+      if (focusChanged) this.markWorkspaceStateDirty();
+      return;
+    }
+    const match = this.firstSearchMatch(value);
+    this.searchPreviewPath = match;
+    if (match === null || this.topology === null) {
+      this.highlightSearch(value);
+      return;
+    }
+    const expanded = expandNodeGraphAncestors(this.topology, this.graphScope, this.currentExpansion, [match]);
+    const changed = !sameIds(expanded.expandedIds, this.currentExpansion.expandedIds);
+    if (changed) {
+      this.currentExpansion = expanded;
+      this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expanded);
+      this.render();
+      this.focusSearchInput();
+    } else {
+      this.highlightSearch(value);
+      this.centerSearchPreview();
+    }
+  }
+
+  private firstSearchMatch(rawQuery: string): string | null {
+    return this.searchSummary(rawQuery).first?.path ?? null;
+  }
+
+  private highlightSearch(rawQuery: string): void {
+    if (this.canvasRenderer !== null) {
+      this.canvasRenderer.setSearchMatches(this.searchSummary(rawQuery).bestPaths);
+      return;
+    }
+    const matches = this.searchSummary(rawQuery).bestPaths;
+    for (const [path, node] of this.nodeElements) node.toggleClass("is-search-match", matches.has(path));
+  }
+
+  private searchSummary(rawQuery: string): NodeGraphSearchSummary {
+    const query = rawQuery.trim();
+    if (this.searchResultsCache?.generation === this.graphDataGeneration
+      && this.searchResultsCache.query === query) return this.searchResultsCache.summary;
+    const summary = summarizeNodeGraphSearch(this.graphSearchRecords(), query);
+    this.searchResultsCache = { generation: this.graphDataGeneration, query, summary };
+    return summary;
+  }
+
+  private centerSearchPreview(): void {
+    const path = this.searchPreviewPath;
+    if (path === null) return;
+    if (this.canvasRenderer !== null) {
+      this.canvasRenderer.centerPath(path);
+      return;
+    }
+    if (this.dimension === "3d") {
+      const previous = this.focusPath;
+      this.focusPath = path;
+      this.center3DOnFocus();
+      this.focusPath = previous;
+      this.applyFocus(false);
+      return;
+    }
+    this.nodeElements.get(path)?.scrollIntoView({ block: "center", inline: "center" });
+  }
+
+  private captureViewportState(): NodeGraphViewportState {
+    const surface = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    const stage = surface?.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+    const canvas = stage?.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+    const dom2D = this.dimension === "2d" && this.canvasRenderer === null
+      && surface !== null && stage != null && canvas != null
+      ? {
+        canvasLeft: canvas.style.left,
+        canvasTop: canvas.style.top,
+        canvasTransform: canvas.style.transform,
+        scrollLeft: surface.scrollLeft,
+        scrollTop: surface.scrollTop,
+        stageHeight: stage.style.height,
+        stageWidth: stage.style.width,
+      }
+      : null;
     return {
-      records,
-      model,
-      layout: layoutNodeGraphForest(forest, { direction: this.settings().layoutDirection }),
-      points3D: layoutNodeGraph3D(model),
+      canvas: this.canvasRenderer?.captureViewportState() ?? null,
+      dimension: this.dimension,
+      dom2D,
+      view3D: { ...this.camera },
     };
   }
 
-  private buildDisplayGraphData(source: GraphData): GraphData {
-    this.hiddenBranchCount = 0;
-    const relationSource = this.relationMode === "structure" && [...source.records.values()].some((record) => record.boundary)
-      ? this.graphDataFromRecords(new Map([...source.records].filter(([, record]) => !record.boundary)))
-      : source;
-    if (this.showAllDensityNodes || relationSource.records.size <= NODE_GRAPH_DENSITY_THRESHOLD) return relationSource;
-    const overview = nodeGraphDensityOverview(
-      [...relationSource.records.values()].map(({ path, parentPath }) => ({ id: path, parentId: parentPath })),
-      this.focusPath,
-      new Set<string>(),
-      this.graphScope.mode === "global" ? 16 : 12,
-      this.graphScope.mode === "global" ? 1 : 2,
-      16,
-    );
-    this.hiddenBranchCount = overview.hiddenBranchCount;
-    if (overview.hiddenBranchCount === 0) return relationSource;
-    const visibleRecords = new Map([...relationSource.records].filter(([path]) => overview.visibleIds.has(path)));
-    return this.graphDataFromRecords(visibleRecords);
+  private restoreViewportState(state: NodeGraphViewportState): void {
+    if (state.dimension !== this.dimension) return;
+    this.camera = { ...state.view3D };
+    if (state.canvas !== null && this.canvasRenderer !== null) {
+      this.canvasRenderer.restoreViewportState(state.canvas);
+      return;
+    }
+    if (state.dom2D === null || this.dimension !== "2d") return;
+    const surface = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    const stage = surface?.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+    const canvas = stage?.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+    if (surface === null || stage == null || canvas == null) return;
+    stage.style.width = state.dom2D.stageWidth;
+    stage.style.height = state.dom2D.stageHeight;
+    canvas.style.left = state.dom2D.canvasLeft;
+    canvas.style.top = state.dom2D.canvasTop;
+    canvas.style.transform = state.dom2D.canvasTransform;
+    surface.scrollLeft = state.dom2D.scrollLeft;
+    surface.scrollTop = state.dom2D.scrollTop;
   }
 
-  private renderDensityNotice(sourceNodeCount: number): void {
-    if (sourceNodeCount <= NODE_GRAPH_DENSITY_THRESHOLD) return;
-    const compact = !this.showAllDensityNodes && this.hiddenBranchCount > 0;
-    if (!compact && !this.showAllDensityNodes) return;
-    const notice = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-density-notice", attr: { role: "status" } });
-    notice.createSpan({ text: densityMessage(compact, this.hiddenBranchCount) });
-    const button = notice.createEl("button", {
-      cls: "folder-nodes-node-graph-density-action",
-      text: densityAction(compact),
-      attr: { type: "button" },
-    });
-    button.addEventListener("click", () => {
-      this.showAllDensityNodes = compact;
-      this.render();
+  private focusSearchInput(): void {
+    queueMicrotask(() => {
+      const input = this.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
+      input?.focus({ preventScroll: true });
+      input?.setSelectionRange(input.value.length, input.value.length);
     });
   }
 
-  private collectLocalRecords(records: Map<string, GraphRecord>, settings: NodeGraphSettings): void {
-    if (this.graphScope.mode !== "local") return;
-    const root = this.service.getFolder(this.graphScope.rootPath);
-    if (root === null) return;
-    const parent = root.parent;
-    if (parent !== null && nodeGraphPathIsConfigured(parent.path, settings)) this.addRecord(records, parent, false);
-    this.collectDescendantRecords(records, root, settings, settings.localDepth);
-  }
-
-  private collectDescendantRecords(
-    records: Map<string, GraphRecord>,
-    root: TFolder,
-    settings: NodeGraphSettings,
-    maximumDepth: number,
-  ): void {
-    const pending: Array<{ readonly depth: number; readonly folder: TFolder }> = [{ depth: 0, folder: root }];
-    while (pending.length > 0) {
-      const current = pending.pop();
-      if (current === undefined) break;
-      const { depth, folder } = current;
-      const path = normalizeVaultPath(folder.path);
-      if (nodeGraphSubtreeIsExcluded(path, settings)) continue;
-      if (nodeGraphPathIsConfigured(path, settings)) this.addRecord(records, folder, false);
-      if (depth >= maximumDepth) continue;
-      const children = this.service.children(path)
-        .flatMap(({ childPath }) => {
-          const child = this.service.getFolder(childPath);
-          return child === null ? [] : [child];
-        })
-        .sort((left, right) => left.path.localeCompare(right.path, "en"));
-      for (let index = children.length - 1; index >= 0; index -= 1) {
-        const child = children[index];
-        if (child !== undefined) pending.push({ depth: depth + 1, folder: child });
+  private buildGraphData(): GraphData {
+    this.graphDataGeneration += 1;
+    this.searchResultsCache = null;
+    const snapshot = this.graphIndexSnapshot();
+    let topology = this.topology;
+    if (topology === null || this.topologyRevision !== snapshot.revision) {
+      topology = createNodeGraphTopology(
+        [...snapshot.records.values()].map(({ path, parentPath }) => ({ id: path, parentId: parentPath })),
+        snapshot.links,
+      );
+      this.topology = topology;
+      this.topologyRevision = snapshot.revision;
+    }
+    let reconciledPersistedState = false;
+    if (this.graphScope.mode !== "global" && !topology.nodes.has(this.graphScope.rootPath)) {
+      this.graphScope = GLOBAL_NODE_GRAPH_SCOPE;
+      reconciledPersistedState = true;
+    }
+    if (this.focusPath !== null && !topology.nodes.has(this.focusPath)) {
+      this.focusPath = null;
+      reconciledPersistedState = true;
+    }
+    if (reconciledPersistedState) this.markWorkspaceStateDirty();
+    const structuralScopeIdentity = `${snapshot.revision}\u0000${nodeGraphScopeKey(this.graphScope)}`;
+    if (structuralScopeIdentity !== this.structuralScopeIdentity) {
+      this.structuralScopeIds = nodeGraphStructuralScopeIds(topology, this.graphScope);
+      this.structuralScopeIdentity = structuralScopeIdentity;
+    }
+    this.currentExpansion = nodeGraphExpansionForScope(this.expansionSession, topology, this.graphScope);
+    if (this.pendingPersistedFocusReveal) {
+      this.pendingPersistedFocusReveal = false;
+      if (this.focusPath !== null) {
+        this.currentExpansion = expandNodeGraphAncestors(
+          topology,
+          this.graphScope,
+          this.currentExpansion,
+          [this.focusPath],
+        );
       }
     }
+    this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, this.currentExpansion);
+    const scene = buildNodeGraphVisibleScene(topology, this.graphScope, this.currentExpansion, { showLinks: this.showLinks });
+    const records = new Map<string, GraphRecord>();
+    for (const node of scene.nodes) {
+      const record = snapshot.records.get(node.id);
+      if (record === undefined) continue;
+      const childCount = node.linkedOnly || !this.structuralScopeIds.has(node.id)
+        ? 0
+        : (topology.nodes.get(node.id)?.children ?? []).filter((id) => this.structuralScopeIds.has(id)).length;
+      records.set(node.id, {
+        ...record,
+        boundary: node.linkedOnly,
+        childCount,
+        expanded: childCount > 0 && this.currentExpansion.expandedIds.has(node.id),
+        parentPath: node.parentId,
+      });
+    }
+    const visibleLinks = new Map<string, Set<string>>();
+    for (const { source, target } of scene.linkEdges) {
+      const targets = visibleLinks.get(source) ?? new Set<string>();
+      targets.add(target);
+      visibleLinks.set(source, targets);
+    }
+    const model = buildNodeGraphModelFromNodes(
+      scene.nodes.map(({ id, depth }) => ({ id, depth })),
+      scene.structureEdges,
+      visibleLinks,
+    );
+    const direction = this.settings().layoutDirection;
+    return {
+      records,
+      model,
+      layout: layoutNodeGraphForest(
+        this.dimension === "2d" ? this.buildForest(records) : [],
+        { direction },
+      ),
+      points3D: this.dimension === "3d" ? layoutNodeGraph3D(model) : [],
+    };
   }
 
-  private addLinkNeighborRecords(records: Map<string, GraphRecord>, settings: NodeGraphSettings): void {
-    const seedNotePaths = new Set([...records.values()].flatMap(({ notePath }) => notePath === null ? [] : [notePath]));
-    if (seedNotePaths.size === 0) return;
-    const neighborNotePaths = new Set<string>();
-    for (const seed of seedNotePaths) {
-      for (const target of Object.keys(this.app.metadataCache.resolvedLinks[seed] ?? {})) neighborNotePaths.add(target);
-    }
-    for (const seed of seedNotePaths) {
-      for (const source of this.options.getInboundSources?.(seed) ?? []) neighborNotePaths.add(source);
-    }
-    for (const notePath of neighborNotePaths) {
-      const entry = this.app.vault.getAbstractFileByPath(notePath);
-      if (!(entry instanceof TFile)) continue;
-      const folder = this.service.folderForFile?.(entry) ?? entry.parent;
-      if (folder === null || !nodeGraphPathIsConfigured(folder.path, settings)) continue;
-      const canonical = this.service.isCanonicalFile?.(entry)
-        ?? this.service.getCanonicalFile(folder.path)?.path === entry.path;
-      if (!canonical) continue;
-      this.addRecord(records, folder, true);
-    }
-  }
-
-  private addRecord(records: Map<string, GraphRecord>, folder: TFolder, boundary: boolean): void {
-    const path = normalizeVaultPath(folder.path);
-    const previous = records.get(path);
-    const note = this.service.getCanonicalFile(path);
-    records.set(path, {
-      path,
-      label: path === "" ? this.app.vault.getName() : folder.name,
-      boundary: previous?.boundary === false ? false : boundary,
-      notePath: note?.path ?? null,
-      parentPath: nodeGraphParentPath(path),
-      visual: this.visuals.resolve(folder),
-    });
+  private graphIndexSnapshot(): NodeGraphIndexSnapshot {
+    const snapshot = this.options.getIndexSnapshot();
+    this.indexSnapshot = snapshot;
+    return snapshot;
   }
 
   private buildForest(records: ReadonlyMap<string, GraphRecord>): NodeGraphTree[] {
@@ -514,17 +834,24 @@ export class FolderNodeGraphView extends ItemView {
       if (parent === undefined) roots.push(tree);
       else parent.children.push(tree);
     }
-    for (const tree of trees.values()) tree.children.sort((left, right) => left.id.localeCompare(right.id, "en"));
-    return roots.sort((left, right) => left.id.localeCompare(right.id, "en"));
+    return roots;
   }
 
   private settings(): NodeGraphSettings {
     return this.options.getSettings?.() ?? DEFAULT_NODE_GRAPH_SETTINGS;
   }
 
+  private markWorkspaceStateDirty(): void {
+    const app = this.app as unknown as { readonly workspace?: { readonly requestSaveLayout?: () => void } };
+    app.workspace?.requestSaveLayout?.();
+  }
+
   private scopeLabel(): string {
-    if (this.graphScope.mode === "global") return label("allNodes");
-    return `${this.graphScope.mode === "subtree" ? label("subtreeScope") : label("localScope")} · ${this.graphScope.rootPath}`;
+    if (this.graphScope.mode === "global") return `${label("scopePrefix")}${label("globalScope")}`;
+    const rootLabel = this.graphScope.rootPath === ""
+      ? this.app.vault.getName()
+      : this.indexSnapshot?.records.get(this.graphScope.rootPath)?.label ?? this.graphScope.rootPath;
+    return `${label("scopePrefix")}${rootLabel} · ${this.graphScope.mode === "subtree" ? label("subtreeScope") : label("localScope")}`;
   }
 
   private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
@@ -537,7 +864,7 @@ export class FolderNodeGraphView extends ItemView {
     canvas.style.height = `${layout.height}px`;
     const svg = this.edgeLayer(canvas, layout.width, layout.height);
     const positions = new Map(layout.nodes.map((node) => [node.id, node]));
-    for (const edge of edgesForMode(data.model, this.relationMode)) {
+    for (const edge of edgesForShowLinks(data.model, this.showLinks)) {
       const source = positions.get(edge.source);
       const target = positions.get(edge.target);
       if (source === undefined || target === undefined) continue;
@@ -568,11 +895,11 @@ export class FolderNodeGraphView extends ItemView {
     this.threeDSvg = this.edgeLayer(canvas, width, height);
     const projected = projectNodeGraph3D(this.threeDPoints, this.camera, width, height);
     this.projected3D = new Map(projected.map((point) => [point.id, point]));
-    for (const edge of edgesForMode(data.model, this.relationMode)) {
+    for (const edge of edgesForShowLinks(data.model, this.showLinks)) {
       const source = this.projected3D.get(edge.source);
       const target = this.projected3D.get(edge.target);
       if (source === undefined || target === undefined) continue;
-      this.renderRelationEdge(this.threeDSvg, edge, source.x, source.y, target.x, target.y);
+      this.renderRelationEdge(this.threeDSvg, edge, source, target);
     }
     for (const point of [...projected].sort((a, b) => a.scale - b.scale || a.id.localeCompare(b.id, "en"))) {
       const record = data.records.get(point.id);
@@ -607,18 +934,25 @@ export class FolderNodeGraphView extends ItemView {
         records: data.records,
       },
       this.dimension,
-      this.relationMode,
+      this.showLinks,
       this.focusPath,
       {
         label: (key) => label(key),
         onOpen: (path, newLeaf) => void this.service.openFolderNode(path, newLeaf),
         onSelect: (path) => {
+          const changed = this.focusPath !== path;
           this.focusPath = path;
+          if (changed) this.markWorkspaceStateDirty();
           this.updateScopeControls();
-          this.onNodeSelected(path);
         },
+        onToggle: (path, branch) => this.toggleExpansion(path, branch),
+        onContextMenu: (path, event) => this.options.onNodeMenu?.(event, path),
         overviewEdgeLimit: this.settings().overviewEdgeLimit,
         relationSummary,
+        toggleLabel: (nodeLabel, childCount, expanded) => childActionLabel(
+          `${expanded ? label("collapseChildren") : label("expandChildren")} ${nodeLabel}`,
+          childCount,
+        ),
       },
     );
     fit?.addEventListener("click", () => this.canvasRenderer?.fit());
@@ -634,22 +968,29 @@ export class FolderNodeGraphView extends ItemView {
   private renderRelationEdge(
     svg: SVGSVGElement,
     edge: NodeGraphModelEdge,
-    sourceX: number,
-    sourceY: number,
-    targetX: number,
-    targetY: number,
+    source: NodeGraphProjectedPoint,
+    target: NodeGraphProjectedPoint,
   ): void {
-    if (this.relationMode !== "links" && edge.structure) {
-      this.path(svg, edge.source, edge.target, straightEdgePath(sourceX, sourceY, targetX, targetY), "is-structure", 0);
-    }
-    if (this.relationMode !== "structure" && edge.link) {
-      const offset = this.relationMode === "hybrid" && edge.structure ? 4 : 0;
-      const shifted = offsetLine(sourceX, sourceY, targetX, targetY, offset);
+    const sourceBox = this.projectedNodeBox(source);
+    const targetBox = this.projectedNodeBox(target);
+    if (edge.structure) {
       this.path(
         svg,
         edge.source,
         edge.target,
-        linkedEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY),
+        nodeGraphCubicPath(nodeGraphStructureGeometry(sourceBox, targetBox, this.settings().layoutDirection)),
+        "is-structure",
+        0,
+      );
+    }
+    if (this.showLinks && edge.link) {
+      const offset = edge.structure ? 4 : 0;
+      const geometry = nodeGraphLinkGeometry(sourceBox, targetBox, offset);
+      this.path(
+        svg,
+        edge.source,
+        edge.target,
+        nodeGraphQuadraticPath(geometry),
         "is-link",
         offset,
       );
@@ -663,28 +1004,25 @@ export class FolderNodeGraphView extends ItemView {
     target: NodeGraphLayout["nodes"][number],
     layout: NodeGraphLayout,
   ): void {
-    const sourceX = source.x + layout.nodeWidth / 2;
-    const sourceY = source.y + layout.nodeHeight / 2;
-    const targetX = target.x + layout.nodeWidth / 2;
-    const targetY = target.y + layout.nodeHeight / 2;
-    if (this.relationMode !== "links" && edge.structure) {
+    const sourceBox = nodeGraphBoxFromTopLeft(source.x, source.y, layout.nodeWidth, layout.nodeHeight);
+    const targetBox = nodeGraphBoxFromTopLeft(target.x, target.y, layout.nodeWidth, layout.nodeHeight);
+    if (edge.structure) {
       this.path(
         svg,
         edge.source,
         edge.target,
-        hierarchyEdgePath(sourceX, sourceY, targetX, targetY, layout),
+        nodeGraphCubicPath(nodeGraphStructureGeometry(sourceBox, targetBox, layout.direction)),
         "is-structure",
         0,
       );
     }
-    if (this.relationMode !== "structure" && edge.link) {
-      const offset = this.relationMode === "hybrid" && edge.structure ? 7 : 0;
-      const shifted = offsetLine(sourceX, sourceY, targetX, targetY, offset);
+    if (this.showLinks && edge.link) {
+      const offset = edge.structure ? 7 : 0;
       this.path(
         svg,
         edge.source,
         edge.target,
-        linkedEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY),
+        nodeGraphQuadraticPath(nodeGraphLinkGeometry(sourceBox, targetBox, offset)),
         "is-link",
         offset,
       );
@@ -710,33 +1048,78 @@ export class FolderNodeGraphView extends ItemView {
     });
   }
 
-  private createNode(canvas: HTMLElement, record: GraphRecord): HTMLButtonElement {
+  private createNode(canvas: HTMLElement, record: GraphRecord): HTMLElement {
     const title = record.path === "" ? this.app.vault.getName() : record.path;
     const accessibleTitle = record.boundary ? `${title}\n${label("boundaryNode")}` : title;
-    const node = canvas.createEl("button", {
-      cls: `folder-nodes-node-graph-node${record.boundary ? " is-boundary" : ""}`,
-      attr: { "aria-label": accessibleTitle, "data-node-path": record.path, title: accessibleTitle },
+    const topologyNode = this.topology?.nodes.get(record.path);
+    const childIds = (topologyNode?.children ?? []).filter((id) => this.structuralScopeIds.has(id));
+    const expandable = !record.boundary && this.structuralScopeIds.has(record.path) && childIds.length > 0;
+    const expanded = expandable && this.currentExpansion.expandedIds.has(record.path);
+    const node = canvas.createDiv({
+      cls: [
+        "folder-nodes-node-graph-node",
+        record.boundary ? "is-boundary" : "",
+        expandable ? expanded ? "is-expanded" : "is-collapsed" : "is-leaf",
+      ].filter(Boolean).join(" "),
+      attr: { "data-node-path": record.path, title: accessibleTitle },
+    });
+    const icon = node.createSpan({
+      cls: "folder-nodes-node-graph-node-icon-handle",
+      attr: { "aria-hidden": "true" },
     });
     const visual = record.visual;
-    if (visual.kind !== "fallback") {
-      const icon = node.createSpan({ cls: "folder-nodes-node-graph-icon" });
-      renderVisual(icon, visual, record.label);
-    }
-    node.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
-    node.addEventListener("click", () => {
-      this.focusPath = record.path;
-      this.applyFocus(false);
-      this.updateScopeControls();
-      this.onNodeSelected(record.path);
+    if (visual.kind === "fallback") setIcon(icon, record.path === "" ? "home" : "folder");
+    else renderVisual(icon, visual, record.label);
+    const body = node.createEl("button", {
+      cls: "folder-nodes-node-graph-node-body",
+      attr: { "aria-label": accessibleTitle, type: "button" },
     });
-    node.addEventListener("dblclick", (event) => {
+    body.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
+    setTooltip(body, accessibleTitle);
+    body.addEventListener("click", () => {
+      const changed = this.focusPath !== record.path;
+      this.focusPath = record.path;
+      if (changed) this.markWorkspaceStateDirty();
+      this.applyFocus(false);
+      this.applyNeighborhood();
+      this.updateScopeControls();
+    });
+    body.addEventListener("dblclick", (event) => {
       void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
     });
-    node.addEventListener("keydown", (event) => {
+    body.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       event.preventDefault();
       if (event.repeat) return;
       void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
+    });
+    if (expandable) {
+      const action = expanded ? label("collapseChildren") : label("expandChildren");
+      const expand = node.createEl("button", {
+        cls: "folder-nodes-node-graph-node-expand-handle",
+        attr: {
+          "aria-expanded": String(expanded),
+          "aria-label": childActionLabel(action, childIds.length),
+          type: "button",
+        },
+      });
+      expand.createSpan({ cls: "folder-nodes-node-graph-node-child-count", text: String(childIds.length) });
+      setIcon(expand.createSpan({ cls: "folder-nodes-node-graph-node-expand-icon" }), expanded ? "minus" : "plus");
+      setTooltip(expand, `${childActionLabel(action, childIds.length)} · ${label("altBranchHint")}`);
+      expand.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.toggleExpansion(record.path, event.altKey);
+      });
+      expand.addEventListener("keydown", (event) => {
+        if (!event.altKey || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.toggleExpansion(record.path, true);
+      });
+    }
+    node.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      this.options.onNodeMenu?.(event, record.path);
     });
     this.nodeElements.set(record.path, node);
     return node;
@@ -830,10 +1213,14 @@ export class FolderNodeGraphView extends ItemView {
       const target = this.projected3D.get(targetId);
       if (source === undefined || target === undefined) continue;
       const offset = Number(edgeElement.dataset.edgeOffset ?? 0);
-      const shifted = offsetLine(source.x, source.y, target.x, target.y, Number.isFinite(offset) ? offset : 0);
+      const boundedOffset = Number.isFinite(offset) ? offset : 0;
       edgeElement.setAttribute("d", edgeElement.classList.contains("is-link")
-        ? linkedEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY)
-        : straightEdgePath(shifted.sourceX, shifted.sourceY, shifted.targetX, shifted.targetY));
+        ? nodeGraphQuadraticPath(nodeGraphLinkGeometry(this.projectedNodeBox(source), this.projectedNodeBox(target), boundedOffset))
+        : nodeGraphCubicPath(nodeGraphStructureGeometry(
+          this.projectedNodeBox(source),
+          this.projectedNodeBox(target),
+          this.settings().layoutDirection,
+        )));
     }
     this.applyFocus(false);
   }
@@ -853,7 +1240,7 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private position3DNode(node: HTMLElement, point: NodeGraphProjectedPoint): void {
-    const scale = Math.max(NODE_GRAPH_DOM_MIN_SCALE, Math.min(1.2, point.scale));
+    const scale = this.projectedNodeScale(point);
     node.style.left = `${point.x}px`;
     node.style.top = `${point.y}px`;
     node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));
@@ -862,10 +1249,43 @@ export class FolderNodeGraphView extends ItemView {
     node.addClass(scale >= 1.02 ? "is-depth-near" : scale >= 0.82 ? "is-depth-mid" : "is-depth-far");
   }
 
+  private projectedNodeBox(point: NodeGraphProjectedPoint): ReturnType<typeof nodeGraphBoxFromCenter> {
+    const scale = this.projectedNodeScale(point);
+    if (this.denseThreeD && point.id !== this.focusPath) return nodeGraphBoxFromCenter(point.x, point.y, 5 * scale, 5 * scale);
+    return nodeGraphBoxFromCenter(point.x, point.y, 90 * scale, 23 * scale);
+  }
+
+  private projectedNodeScale(point: NodeGraphProjectedPoint): number {
+    return Math.max(NODE_GRAPH_DOM_MIN_SCALE, Math.min(1.2, point.scale));
+  }
+
   private applyFocus(scrollIntoView: boolean): void {
     for (const [path, element] of this.nodeElements) element.toggleClass("is-focused", path === this.focusPath);
     if (!scrollIntoView || this.focusPath === null) return;
     this.nodeElements.get(this.focusPath)?.scrollIntoView({ block: "center", inline: "center" });
+  }
+
+  private applyNeighborhood(): void {
+    if (this.canvasRenderer !== null) {
+      this.canvasRenderer.setFocus(this.focusPath, false);
+      return;
+    }
+    const selected = this.focusPath;
+    const neighbors = new Set<string>();
+    for (const edge of edgesForShowLinks(this.displayGraphData?.model ?? { nodes: [], edges: [] }, this.showLinks)) {
+      if (edge.source === selected) neighbors.add(edge.target);
+      else if (edge.target === selected) neighbors.add(edge.source);
+    }
+    for (const [path, node] of this.nodeElements) {
+      node.toggleClass("is-neighbor", neighbors.has(path));
+      node.toggleClass("is-muted", selected !== null && path !== selected && !neighbors.has(path));
+    }
+    for (const edge of this.contentEl.querySelectorAll<SVGElement>(".folder-nodes-node-graph-edges [data-edge-source][data-edge-target]")) {
+      const connected = selected !== null
+        && (edge.dataset.edgeSource === selected || edge.dataset.edgeTarget === selected);
+      edge.classList.toggle("is-connected", connected);
+      edge.classList.toggle("is-muted", selected !== null && !connected);
+    }
   }
 
   private center3DOnFocus(): void {
@@ -887,13 +1307,32 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private fit2D(surface: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
-    const fit = fitNodeGraphViewport(width, height, surface.clientWidth, surface.clientHeight);
+    const fit = fitNodeGraphViewport(
+      width,
+      height,
+      surface.clientWidth,
+      surface.clientHeight,
+      24,
+      NODE_GRAPH_DOM_MIN_2D_SCALE,
+    );
     stage.style.width = `${fit.stageWidth}px`;
     stage.style.height = `${fit.stageHeight}px`;
     canvas.style.left = `${fit.offsetX}px`;
     canvas.style.top = `${fit.offsetY}px`;
     canvas.style.transform = `scale(${fit.scale})`;
-    surface.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+    let left = 0;
+    let top = 0;
+    if (fit.stageWidth > surface.clientWidth || fit.stageHeight > surface.clientHeight) {
+      const fallbackPath = this.displayGraphData?.model.nodes[0]?.id;
+      const target = this.focusPath === null ? fallbackPath === undefined ? null : this.nodeElements.get(fallbackPath) : this.nodeElements.get(this.focusPath);
+      if (target !== null && target !== undefined) {
+        const centerX = (Number.parseFloat(target.style.left) + Number.parseFloat(target.style.width) / 2) * fit.scale + fit.offsetX;
+        const centerY = (Number.parseFloat(target.style.top) + Number.parseFloat(target.style.height) / 2) * fit.scale + fit.offsetY;
+        left = Math.max(0, centerX - surface.clientWidth / 2);
+        top = Math.max(0, centerY - surface.clientHeight / 2);
+      }
+    }
+    surface.scrollTo({ left, top, behavior: "smooth" });
   }
 }
 
@@ -911,102 +1350,139 @@ function touchGesture(pointers: Iterable<GraphPointer>): {
   };
 }
 
-function relationLabel(mode: NodeGraphRelationMode): string {
-  const zh = resolvedLanguage() === "zh-CN";
-  if (mode === "structure") return zh ? "结构" : "Structure";
-  if (mode === "links") return zh ? "链接" : "Links";
-  return zh ? "混合" : "Hybrid";
-}
-
 function relationSummary(structure: number, links: number): string {
-  return resolvedLanguage() === "zh-CN"
-    ? `结构 ${structure} · 链接 ${links}`
-    : `Structure ${structure} · Links ${links}`;
-}
-
-function densityMessage(compact: boolean, hiddenBranchCount: number): string {
-  const zh = resolvedLanguage() === "zh-CN";
-  if (!compact) return zh ? "当前显示全部节点" : "Showing all nodes";
-  return zh
-    ? `大型图谱已保持可读比例，收起 ${hiddenBranchCount} 个分支`
-    : `Large graph kept readable with ${hiddenBranchCount} branches collapsed`;
-}
-
-function densityAction(compact: boolean): string {
-  const zh = resolvedLanguage() === "zh-CN";
-  if (compact) return zh ? "显示全部" : "Show all";
-  return zh ? "恢复精简" : "Restore overview";
+  return t("nodeGraphRelationSummary", { structure, links });
 }
 
 function label(
-  key: "allNodes" | "boundaryNode" | "denseEdges" | "dimension" | "disabledGraph" | "fitGraph" | "globalScope" | "largeGraph" | "localScope" | "nodeGraph" | "readableFit" | "relationship" | "scope" | "subtreeScope",
+  key: "altBranchHint" | "boundaryNode" | "clearSearch" | "collapseChildren" | "collapseToFirst" | "dimension" | "disabledGraph" | "expandChildren" | "expandRange" | "expandRangeTooltip" | "findNode" | "fitGraph" | "globalScope" | "globalScopeTooltip" | "largeGraph" | "localScope" | "localScopeTooltip" | "nodeGraph" | "noLinks" | "scope" | "scopePrefix" | "selectNodeFirst" | "showLinks" | "showLinksTooltip" | "subtreeScope" | "subtreeScopeTooltip",
 ): string {
-  const zh = resolvedLanguage() === "zh-CN";
-  if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
-  if (key === "disabledGraph") return zh ? "节点图谱已在 Folder Nodes 设置中关闭。" : "Node Graph is disabled in Folder Nodes settings.";
-  if (key === "boundaryNode") return zh ? "范围外的链接边界节点" : "Linked boundary node outside the selected scope";
-  if (key === "allNodes") return zh ? "全部节点" : "All nodes";
-  if (key === "globalScope") return zh ? "全局" : "Global";
-  if (key === "subtreeScope") return zh ? "子树" : "Subtree";
-  if (key === "localScope") return zh ? "局部" : "Local";
-  if (key === "scope") return zh ? "图谱范围" : "Graph scope";
-  if (key === "largeGraph") return zh ? "大型节点图谱；拖动平移或旋转，滚轮缩放，回车打开所选节点" : "Large Node Graph; drag to pan or rotate, wheel to zoom, Enter to open the selected node";
-  if (key === "denseEdges") return zh ? "稠密关系概览 · 聚焦节点以显示其全部关系" : "Dense relation overview · focus a node to show all of its relations";
-  if (key === "readableFit") return zh ? "图谱过大，已保持可读比例并聚焦当前节点" : "Graph is too large to fit legibly; keeping a readable scale around the focused node";
-  if (key === "fitGraph") return zh ? "适应视图" : "Fit graph";
-  if (key === "relationship") return zh ? "关系模式" : "Relationship mode";
-  return zh ? "维度" : "Dimension";
+  const translationKey = ({
+    altBranchHint: "nodeGraphToggleBranch",
+    boundaryNode: "nodeGraphBoundaryNode",
+    clearSearch: "nodeGraphClearSearch",
+    collapseChildren: "nodeGraphCollapseChildren",
+    collapseToFirst: "nodeGraphCollapseToLevelOne",
+    dimension: "nodeGraphDimension",
+    disabledGraph: "nodeGraphDisabledDesc",
+    expandChildren: "nodeGraphExpandChildren",
+    expandRange: "nodeGraphExpandRange",
+    expandRangeTooltip: "nodeGraphExpandRangeTooltip",
+    findNode: "nodeGraphFindNode",
+    fitGraph: "nodeGraphFitGraph",
+    globalScope: "nodeGraphGlobalScope",
+    globalScopeTooltip: "nodeGraphGlobalScopeTooltip",
+    largeGraph: "nodeGraphLargeGraphAria",
+    localScope: "nodeGraphLocalScope",
+    localScopeTooltip: "nodeGraphLocalScopeTooltip",
+    nodeGraph: "nodeGraph",
+    noLinks: "nodeGraphNoLinks",
+    scope: "nodeGraphScope",
+    scopePrefix: "nodeGraphScopePrefix",
+    selectNodeFirst: "nodeGraphSelectNodeFirst",
+    showLinks: "nodeGraphShowLinks",
+    showLinksTooltip: "nodeGraphShowLinksTooltip",
+    subtreeScope: "nodeGraphSubtreeScope",
+    subtreeScopeTooltip: "nodeGraphSubtreeScopeTooltip",
+  } as const)[key];
+  return t(translationKey);
 }
 
-function straightEdgePath(sourceX: number, sourceY: number, targetX: number, targetY: number): string {
-  return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+function rangeExpansionLabel(range: 1 | 2 | 3): string {
+  if (range === 1) return t("nodeGraphExpandOneLevel");
+  return t(range === 2 ? "nodeGraphExpandTwoLevels" : "nodeGraphExpandThreeLevels");
 }
 
-function hierarchyEdgePath(
-  sourceX: number,
-  sourceY: number,
-  targetX: number,
-  targetY: number,
-  layout: NodeGraphLayout,
-): string {
-  if (layout.direction === "left-to-right") {
-    const startX = sourceX + layout.nodeWidth / 2;
-    const endX = targetX - layout.nodeWidth / 2;
-    const middleX = (startX + endX) / 2;
-    return `M ${startX} ${sourceY} C ${middleX} ${sourceY}, ${middleX} ${targetY}, ${endX} ${targetY}`;
+function expandAllLabel(scope: NodeGraphScope, count: number): string {
+  const key = scope.mode === "global"
+    ? "nodeGraphExpandAllGlobal"
+    : scope.mode === "subtree" ? "nodeGraphExpandAllSubtree" : "nodeGraphExpandAllLocal";
+  return t(key, { count: count.toLocaleString() });
+}
+
+function childActionLabel(action: string, count: number): string {
+  return t("nodeGraphActionCount", { action, count });
+}
+
+function linkCountLabel(count: number): string {
+  return t("nodeGraphVisibleLinks", { count });
+}
+
+function sameIds(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left.size === right.size && [...left].every((id) => right.has(id));
+}
+
+function remapNodeGraphPath(path: string, previous: string, next: string): string {
+  const normalized = normalizeVaultPath(path);
+  if (!isWithin(normalized, previous)) return normalized;
+  return normalized === previous ? next : normalizeVaultPath(`${next}${normalized.slice(previous.length)}`);
+}
+
+function remapNodeGraphExpansion(
+  expansion: NodeGraphExpansionState,
+  remap: (path: string) => string,
+): NodeGraphExpansionState {
+  return graphExpansionState(
+    [...expansion.expandedIds].map(remap),
+    [...expansion.collapsedIds ?? []].map(remap),
+  );
+}
+
+function filterNodeGraphExpansion(
+  expansion: NodeGraphExpansionState,
+  retained: (path: string) => boolean,
+): NodeGraphExpansionState {
+  return graphExpansionState(
+    [...expansion.expandedIds].filter(retained),
+    [...expansion.collapsedIds ?? []].filter(retained),
+  );
+}
+
+function remapNodeGraphExpansionSession(
+  session: NodeGraphExpansionSession,
+  remap: (path: string) => string,
+): NodeGraphExpansionSession {
+  const scopes = new Map<string, NodeGraphExpansionState>();
+  for (const [scopeKey, expansion] of session.scopes) {
+    const key = remapNodeGraphScopeKey(scopeKey, remap);
+    const remapped = remapNodeGraphExpansion(expansion, remap);
+    const existing = scopes.get(key);
+    scopes.set(key, existing === undefined
+      ? remapped
+      : graphExpansionState(
+        [...existing.expandedIds, ...remapped.expandedIds],
+        [...existing.collapsedIds ?? [], ...remapped.collapsedIds ?? []],
+      ));
   }
-  const startY = sourceY + layout.nodeHeight / 2;
-  const endY = targetY - layout.nodeHeight / 2;
-  const middleY = (startY + endY) / 2;
-  return `M ${sourceX} ${startY} C ${sourceX} ${middleY}, ${targetX} ${middleY}, ${targetX} ${endY}`;
+  return { scopes };
 }
 
-function linkedEdgePath(sourceX: number, sourceY: number, targetX: number, targetY: number): string {
-  const dx = targetX - sourceX;
-  const dy = targetY - sourceY;
-  const length = Math.hypot(dx, dy) || 1;
-  const bend = Math.min(96, Math.max(24, length * 0.14));
-  const controlX = (sourceX + targetX) / 2 - dy / length * bend;
-  const controlY = (sourceY + targetY) / 2 + dx / length * bend;
-  return `M ${sourceX} ${sourceY} Q ${controlX} ${controlY}, ${targetX} ${targetY}`;
+function filterNodeGraphExpansionSession(
+  session: NodeGraphExpansionSession,
+  retained: (path: string) => boolean,
+): NodeGraphExpansionSession {
+  const scopes = new Map<string, NodeGraphExpansionState>();
+  for (const [scopeKey, expansion] of session.scopes) {
+    const root = nodeGraphScopeKeyRoot(scopeKey);
+    if (root !== null && !retained(root)) continue;
+    scopes.set(scopeKey, filterNodeGraphExpansion(expansion, retained));
+  }
+  return { scopes };
 }
 
-function offsetLine(sourceX: number, sourceY: number, targetX: number, targetY: number, offset: number): {
-  readonly sourceX: number;
-  readonly sourceY: number;
-  readonly targetX: number;
-  readonly targetY: number;
-} {
-  if (offset === 0) return { sourceX, sourceY, targetX, targetY };
-  const dx = targetX - sourceX;
-  const dy = targetY - sourceY;
-  const length = Math.hypot(dx, dy) || 1;
-  const offsetX = -dy / length * offset;
-  const offsetY = dx / length * offset;
-  return {
-    sourceX: sourceX + offsetX,
-    sourceY: sourceY + offsetY,
-    targetX: targetX + offsetX,
-    targetY: targetY + offsetY,
-  };
+function graphExpansionState(expanded: Iterable<string>, collapsed: Iterable<string>): NodeGraphExpansionState {
+  const collapsedIds = new Set(collapsed);
+  const expandedIds = new Set([...expanded].filter((id) => !collapsedIds.has(id)));
+  return collapsedIds.size === 0 ? { expandedIds } : { collapsedIds, expandedIds };
+}
+
+function remapNodeGraphScopeKey(scopeKey: string, remap: (path: string) => string): string {
+  const separator = scopeKey.indexOf(":");
+  if (separator < 0) return scopeKey;
+  return `${scopeKey.slice(0, separator)}:${remap(scopeKey.slice(separator + 1))}`;
+}
+
+function nodeGraphScopeKeyRoot(scopeKey: string): string | null {
+  const separator = scopeKey.indexOf(":");
+  return separator < 0 ? null : normalizeVaultPath(scopeKey.slice(separator + 1));
 }

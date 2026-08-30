@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildNodeGraphCanvasSpatialIndex,
   fitNodeGraphCanvasCamera,
   hitTestNodeGraphCanvas,
   nodeGraphCanvasGeometry,
   panNodeGraphCanvasCamera,
   pointIsVisible,
+  queryNodeGraphCanvasSpatialIndex,
   selectNodeGraphCanvasOverviewEdges,
   shouldUseNodeGraphCanvas,
   zoomNodeGraphCanvasCamera,
@@ -35,6 +37,21 @@ describe("Node Graph canvas math", () => {
     const zoomed = zoomNodeGraphCanvasCamera(panned, -400, anchor.x, anchor.y);
     expect((anchor.x - zoomed.panX) / zoomed.zoom).toBeCloseTo(worldBefore.x, 6);
     expect((anchor.y - zoomed.panY) / zoomed.zoom).toBeCloseTo(worldBefore.y, 6);
+    expect(zoomNodeGraphCanvasCamera({ panX: 0, panY: 0, zoom: 1 }, 100_000, 0, 0, 0.38).zoom).toBe(0.38);
+  });
+
+  it("queries a bounded 2D viewport without projecting the full 100k scene", () => {
+    const points = Array.from({ length: 100_000 }, (_, index) => ({ id: String(index), x: 100, y: index * 64 }));
+    const index = buildNodeGraphCanvasSpatialIndex(points);
+    const visible = queryNodeGraphCanvasSpatialIndex(index, {
+      minX: 0,
+      maxX: 1_000,
+      minY: 3_199_000,
+      maxY: 3_201_000,
+    });
+    expect(visible.length).toBeGreaterThan(0);
+    expect(visible.length).toBeLessThan(40);
+    expect(visible.every(({ y }) => y >= 3_199_000 && y <= 3_201_000)).toBe(true);
   });
 
   it("culls and hit-tests projected nodes deterministically", () => {

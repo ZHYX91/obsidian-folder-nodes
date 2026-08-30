@@ -14,7 +14,7 @@ export function normalizeNodeGraphScope(value: unknown): NodeGraphScope {
     return GLOBAL_NODE_GRAPH_SCOPE;
   }
   const rootPath = normalizeVaultPath(input.rootPath);
-  return rootPath === "" ? GLOBAL_NODE_GRAPH_SCOPE : { mode: input.mode, rootPath };
+  return { mode: input.mode, rootPath };
 }
 
 export function nodeGraphPathIsConfigured(path: string, settings: NodeGraphSettings): boolean {

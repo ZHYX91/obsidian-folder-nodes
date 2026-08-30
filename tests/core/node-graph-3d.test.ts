@@ -33,6 +33,15 @@ describe("Node Graph 3D layout", () => {
     expect(points.get("A")?.x).not.toBe(points.get("B")?.x);
   });
 
+  it("preserves model order within a depth so manual sibling rank reaches 3D", () => {
+    const points = layoutNodeGraph3D({
+      nodes: [{ id: "", depth: 0 }, { id: "B", depth: 1 }, { id: "A", depth: 1 }],
+      edges: [],
+    });
+    const positions = new Map(points.map((point) => [point.id, point]));
+    expect((positions.get("B")?.x ?? 0) < (positions.get("A")?.x ?? 0)).toBe(true);
+  });
+
   it("projects stably and supports bounded rotate, pan, zoom, and fit camera changes", () => {
     const points = layoutNodeGraph3D(model);
     const camera = defaultNodeGraphCamera();

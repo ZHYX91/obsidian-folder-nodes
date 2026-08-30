@@ -34,6 +34,7 @@ describe("Node Graph scope rules", () => {
 
   it("normalizes persisted view state and remaps paths after folder moves", () => {
     expect(normalizeNodeGraphScope({ mode: "subtree", rootPath: "/Work/Project/" })).toEqual({ mode: "subtree", rootPath: "Work/Project" });
+    expect(normalizeNodeGraphScope({ mode: "local", rootPath: "/" })).toEqual({ mode: "local", rootPath: "" });
     expect(normalizeNodeGraphScope({ mode: "broken", rootPath: "Work" })).toEqual({ mode: "global" });
     const value = settings();
     value.includedSubtrees = ["Work/Project"];

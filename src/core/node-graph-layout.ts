@@ -110,7 +110,7 @@ function layoutSingleNodeGraph(root: NodeGraphTree, options: NodeGraphLayoutOpti
     const current = pending.pop();
     if (current === undefined) break;
     const { depth, node, visited } = current;
-    const children = [...node.children].sort((left, right) => left.id.localeCompare(right.id, "en"));
+    const children = node.children;
     if (!visited) {
       pending.push({ depth, node, visited: true });
       for (let index = children.length - 1; index >= 0; index -= 1) {
@@ -183,6 +183,7 @@ export function fitNodeGraphViewport(
   viewportWidth: number,
   viewportHeight: number,
   padding = 24,
+  minimumScale = 0,
 ): NodeGraphViewportFit {
   const width = positive(contentWidth, 1);
   const height = positive(contentHeight, 1);
@@ -192,17 +193,22 @@ export function fitNodeGraphViewport(
   if (availableWidth === 0 || availableHeight === 0) {
     return { scale: 1, stageWidth: width, stageHeight: height, offsetX: 0, offsetY: 0 };
   }
-  const scale = Math.min(
+  const fittedScale = Math.min(
     1,
     Math.max(1, availableWidth - inset * 2) / width,
     Math.max(1, availableHeight - inset * 2) / height,
   );
+  const scale = Math.max(Math.min(1, nonNegative(minimumScale, 0)), fittedScale);
+  const scaledWidth = width * scale;
+  const scaledHeight = height * scale;
+  const stageWidth = Math.max(availableWidth, scaledWidth + inset * 2);
+  const stageHeight = Math.max(availableHeight, scaledHeight + inset * 2);
   return {
     scale,
-    stageWidth: availableWidth,
-    stageHeight: availableHeight,
-    offsetX: (availableWidth - width * scale) / 2,
-    offsetY: (availableHeight - height * scale) / 2,
+    stageWidth,
+    stageHeight,
+    offsetX: (stageWidth - scaledWidth) / 2,
+    offsetY: (stageHeight - scaledHeight) / 2,
   };
 }
 

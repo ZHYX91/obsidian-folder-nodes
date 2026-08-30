@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bestNodeGraphSearchPaths, nodeGraphSearchResults } from "../../src/core/node-graph-search";
+import { summarizeNodeGraphSearch } from "../../src/core/node-graph-search";
 
 const candidates = [
   { label: "财务", path: "财务" },
@@ -10,15 +10,18 @@ const candidates = [
 
 describe("Node Graph search ranking", () => {
   it("prefers an exact label over descendant path matches", () => {
-    expect([...bestNodeGraphSearchPaths(candidates, "财务")]).toEqual(["财务"]);
-    expect(nodeGraphSearchResults(candidates, "财务").map(({ path, rank }) => [path, rank])).toEqual([
-      ["财务", 0],
-      ["工作/财务制度", 1],
-      ["财务/垃圾费", 4],
-    ]);
+    const summary = summarizeNodeGraphSearch(candidates, "财务");
+    expect([...summary.bestPaths]).toEqual(["财务"]);
+    expect(summary.first).toMatchObject({ path: "财务", rank: 0 });
   });
 
   it("keeps all equally ranked label matches", () => {
-    expect([...bestNodeGraphSearchPaths(candidates, "制度")]).toEqual(["工作/财务制度"]);
+    expect([...summarizeNodeGraphSearch(candidates, "制度").bestPaths]).toEqual(["工作/财务制度"]);
+  });
+
+  it("summarizes the first and best matches in one linear pass", () => {
+    const summary = summarizeNodeGraphSearch(candidates, "制度");
+    expect(summary.first?.path).toBe("工作/财务制度");
+    expect([...summary.bestPaths]).toEqual(["工作/财务制度"]);
   });
 });

@@ -1,28 +1,31 @@
 import { Menu, Notice, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
 
-import NODE_GRAPH_STYLES from "../ui/node-graph.css";
 import FolderNodesPlugin from "./plugin";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
-import { PolishedFolderNodeGraphView } from "../ui/node-graph-polish-view";
 import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view";
-import { normalizeVaultPath } from "../core/paths";
+import { isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import { isWithin, nodeGraphPathIsConfigured, type NodeGraphScope } from "../core/node-graph-scope";
 import { resolvedLanguage } from "../ui/i18n";
-import { RuntimeStyles } from "../ui/runtime-styles";
 import type { RefreshBatch } from "./refresh-scheduler";
 import { onLayoutReadyOnce } from "./layout-ready";
+import { NodeGraphIndex } from "./node-graph-index";
 
 export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
-  private readonly nodeGraphStyles = new RuntimeStyles(NODE_GRAPH_STYLES);
+  private nodeGraphIndex!: NodeGraphIndex;
 
   public override async onload(): Promise<void> {
     await super.onload();
+    if (!this.pluginLifecycleActive) return;
+    this.nodeGraphIndex = new NodeGraphIndex(this.app, this.service, this.visuals, this.references);
     this.registerView(NODE_GRAPH_VIEW_TYPE, (leaf) => {
-      const view = new PolishedFolderNodeGraphView(leaf, this.service, this.visuals, {
+      const view = new FolderNodeGraphView(leaf, this.service, {
         getSettings: () => this.settings.nodeGraph,
-        getInboundSources: (targetPath) => this.references.sourcesForTarget(targetPath),
+        getIndexSnapshot: () => this.nodeGraphIndex.snapshot(this.settings.nodeGraph),
+        onNodeMenu: (event, path) => {
+          const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
+          if (folder !== null) this.openNodeMenu(event, folder);
+        },
       });
-      this.nodeGraphStyles.install(view.containerEl.ownerDocument);
       return view;
     });
     this.addCommand({
@@ -47,8 +50,42 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     this.registerEvent(this.app.workspace.on("file-menu", (menu, entry) => this.addNodeGraphMenu(menu, entry)));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.decorateContentsViews()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.decorateContentsViews()));
-    this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, window) => this.nodeGraphStyles.install(window.document)));
-    this.nodeGraphStyles.install(this.app.workspace.rootSplit.win.document);
+    this.registerEvent(this.app.vault.on("create", (entry) => {
+      if (entry instanceof TFolder) {
+        this.invalidateNodeGraphStructure();
+        return;
+      }
+      if (entry instanceof TFile && this.service.isCanonicalFile(entry)) {
+        this.invalidateNodeGraphPaths([entry.path]);
+      }
+    }));
+    this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
+      if (entry instanceof TFolder) {
+        for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
+          if (leaf.view instanceof FolderNodeGraphView) leaf.view.remapPathState(oldPath, entry.path);
+        }
+        this.invalidateNodeGraphStructure();
+        return;
+      }
+      if (!(entry instanceof TFile)) return;
+      const wasCanonical = this.nodeGraphCanonicalNotePath(oldPath);
+      const isCanonical = this.service.isCanonicalFile(entry);
+      if (!wasCanonical && !isCanonical) return;
+      this.invalidateNodeGraphPaths([oldPath, entry.path]);
+    }));
+    this.registerEvent(this.app.vault.on("delete", (entry) => {
+      if (entry instanceof TFolder) {
+        for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
+          if (leaf.view instanceof FolderNodeGraphView) leaf.view.removePathState(entry.path);
+        }
+        this.invalidateNodeGraphStructure();
+        return;
+      }
+      if (!(entry instanceof TFile) || !this.nodeGraphCanonicalNotePath(entry.path)) return;
+      this.removeNodeGraphPathState(this.nodeGraphFolderPathForNote(entry.path));
+      this.invalidateNodeGraphPaths([entry.path]);
+    }));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => this.nodeGraphIndex.invalidateLinks()));
     this.decorateContentsViews();
     let graphPluginActive = true;
     this.register(() => { graphPluginActive = false; });
@@ -56,6 +93,11 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       if (!graphPluginActive) return;
       if (!this.settings.nodeGraph.enabled) {
         for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
+      } else {
+        this.nodeGraphIndex.invalidateLinks();
+        for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
+          if (leaf.view instanceof FolderNodeGraphView) leaf.view.refresh();
+        }
       }
       this.decorateContentsViews();
     });
@@ -63,17 +105,29 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   public override onunload(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
-    this.nodeGraphStyles.removeAll();
     super.onunload();
   }
 
   protected override refreshExtensionViews(batch: RefreshBatch): void {
-    void batch;
+    const structuralPaths = new Set([...batch.pathReasons]
+      .filter(([, reasons]) => reasons.has("path"))
+      .map(([path]) => path)
+      .filter((path) => this.nodeGraphPathAffectsIndex(path)));
+    const metadataFolderPaths = new Set([...batch.pathReasons]
+      .filter(([, reasons]) => reasons.has("metadata"))
+      .map(([path]) => this.nodeGraphMetadataFolderPath(path))
+      .filter((path): path is string => path !== null));
+    if (structuralPaths.size === 0 && metadataFolderPaths.size === 0 && !batch.reasons.has("full")) return;
     if (!this.settings.nodeGraph.enabled) {
       for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
       this.decorateContentsViews();
       return;
     }
+    if (structuralPaths.size > 0) this.nodeGraphIndex.invalidatePaths(structuralPaths);
+    if (metadataFolderPaths.size > 0 && this.nodeGraphIndex.invalidateRecordMetadata(metadataFolderPaths)) {
+      this.nodeGraphIndex.invalidateLinks();
+    }
+    if (batch.reasons.has("full")) this.nodeGraphIndex.invalidateVisuals();
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeGraphView) leaf.view.refresh();
     }
@@ -82,6 +136,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   public override async reconcileSettingsChange(): Promise<void> {
     await super.reconcileSettingsChange();
+    this.nodeGraphIndex.invalidateAll();
     if (!this.settings.nodeGraph.enabled) {
       for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
     }
@@ -90,6 +145,55 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   protected override addOwnedNodeMenuItems(menu: Menu, folder: TFolder): void {
     this.addNodeGraphItem(menu, folder);
+  }
+
+  private invalidateNodeGraphStructure(): void {
+    this.nodeGraphIndex.invalidateAll();
+    this.refreshNodeGraphViews();
+  }
+
+  private nodeGraphCanonicalNotePath(path: string): boolean {
+    return normalizeVaultPath(path) === normalizeVaultPath(this.service.rootNotePath()) || isCanonicalNodeNote(path);
+  }
+
+  private nodeGraphPathAffectsIndex(path: string): boolean {
+    const entry = this.app.vault.getAbstractFileByPath(path);
+    if (entry instanceof TFile) return this.service.isCanonicalFile(entry);
+    if (entry instanceof TFolder) return true;
+    return this.nodeGraphCanonicalNotePath(path) || !path.toLocaleLowerCase().endsWith(".md");
+  }
+
+  private nodeGraphMetadataFolderPath(path: string): string | null {
+    const entry = this.app.vault.getAbstractFileByPath(path);
+    if (!(entry instanceof TFile) || !this.service.isCanonicalFile(entry)) return null;
+    const folder = this.service.folderForFile(entry);
+    return folder === null ? null : normalizeVaultPath(folder.path);
+  }
+
+  private nodeGraphFolderPathForNote(path: string): string {
+    const normalized = normalizeVaultPath(path);
+    if (normalized === normalizeVaultPath(this.service.rootNotePath())) return "";
+    const slash = normalized.lastIndexOf("/");
+    return slash < 0 ? "" : normalized.slice(0, slash);
+  }
+
+  private removeNodeGraphPathState(path: string): void {
+    if (path === "") return;
+    for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
+      if (leaf.view instanceof FolderNodeGraphView) leaf.view.removePathState(path);
+    }
+  }
+
+  private invalidateNodeGraphPaths(paths: readonly string[]): void {
+    this.nodeGraphIndex.invalidatePaths(new Set(paths));
+    this.refreshNodeGraphViews();
+  }
+
+  private refreshNodeGraphViews(): void {
+    if (!this.settings.nodeGraph.enabled) return;
+    for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
+      if (leaf.view instanceof FolderNodeGraphView) leaf.view.refresh();
+    }
   }
 
   private async openNodeGraph(path: string | null = null, scope: NodeGraphScope = { mode: "global" }): Promise<void> {
@@ -110,8 +214,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   }
 
   private async openCurrentNodeGraph(mode: "local" | "subtree"): Promise<void> {
-    const active = this.app.workspace.getActiveFile();
-    const folder = active === null ? null : this.service.folderForFile(active);
+    const folder = this.currentGraphFolder();
     if (folder === null || !nodeGraphPathIsConfigured(folder.path, this.settings.nodeGraph)) {
       new Notice(label("noGraphNode"));
       return;
@@ -121,8 +224,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   private checkOpenCurrentNodeGraph(mode: "local" | "subtree", checking: boolean): boolean {
     if (!this.settings.nodeGraph.enabled) return false;
-    const active = this.app.workspace.getActiveFile();
-    const folder = active === null ? null : this.service.folderForFile(active);
+    const folder = this.currentGraphFolder();
     if (folder === null || !nodeGraphPathIsConfigured(folder.path, this.settings.nodeGraph)) return false;
     if (!checking) void this.openCurrentNodeGraph(mode);
     return true;
@@ -215,20 +317,27 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   private graphFolder(entry: TAbstractFile): TFolder | null {
     if (entry instanceof TFolder) {
-      if (this.service.isIgnoredPath(entry.path) || this.service.getCanonicalFile(entry.path) === null) return null;
-      return entry;
+      return this.graphFolderIsEligible(entry) ? entry : null;
     }
     if (!(entry instanceof TFile) || !this.service.isCanonicalFile(entry)) return null;
     const folder = this.service.folderForFile(entry);
-    if (folder === null || this.service.isIgnoredPath(folder.path)) return null;
-    return folder;
+    return folder !== null && this.graphFolderIsEligible(folder) ? folder : null;
+  }
+
+  private currentGraphFolder(): TFolder | null {
+    const active = this.app.workspace.getActiveFile();
+    return active === null ? null : this.graphFolder(active);
+  }
+
+  private graphFolderIsEligible(folder: TFolder): boolean {
+    const path = normalizeVaultPath(folder.path);
+    return path === "" || (!this.service.isIgnoredPath(path) && this.service.getCanonicalFile(path) !== null);
   }
 
   private decorateContentsViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
       if (!(leaf.view instanceof FolderNodeContentsView)) continue;
       const view = leaf.view;
-      this.nodeGraphStyles.install(view.contentEl.ownerDocument);
       view.setRenderExtension("node-graph", () => this.ensureContentsEntry(view));
     }
   }
@@ -251,7 +360,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     button.addEventListener("click", () => {
       const active = this.app.workspace.getActiveFile();
       const folder = active === null ? null : this.service.folderForFile(active);
-      const focus = folder !== null && !this.service.isIgnoredPath(folder.path) && this.service.getCanonicalFile(folder.path) !== null
+      const focus = folder !== null && this.graphFolderIsEligible(folder)
         ? normalizeVaultPath(folder.path)
         : null;
       void this.openNodeGraph(focus);

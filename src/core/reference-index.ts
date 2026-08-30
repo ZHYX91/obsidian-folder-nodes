@@ -45,6 +45,9 @@ export class ReferenceIndex {
 
   public removeSource(sourcePath: string): Set<string> { return this.updateSource(sourcePath, {}); }
   public isReferenced(path: string): boolean { return (this.counts.get(normalizeVaultPath(path)) ?? 0) > 0; }
+  public targetsForSource(path: string): readonly string[] {
+    return [...(this.sources.get(normalizeVaultPath(path))?.keys() ?? [])];
+  }
   public sourcesForTarget(path: string): readonly string[] {
     return [...(this.incomingSources.get(normalizeVaultPath(path)) ?? [])];
   }

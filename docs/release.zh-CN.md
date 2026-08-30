@@ -11,7 +11,9 @@ translation_status: source
 
 ## 发布门禁
 
-候选前运行 `npm ci`、`npm run check`、`npm run release:check` 和大目录 benchmark。隔离 Vault 主机验收必须绑定 exact candidate。桌面端覆盖四页设置、主页、Explorer/标题图标、disclosure arrow、Explorer/Contents Node 拖拽、Contents 三类菜单与键盘入口、普通文件 into 移动及冲突拒绝、选区右键、Visual、静态相册、两类豁免、详细维护预览、只读 Health 和删除。Android 候选另需当前模拟器的产品证据，覆盖无 draggable/drag handle、原生文件夹移动、Move/Move up/Move down、目标 rank 调和、触摸菜单、窄屏与重启。模拟器、真机和 iOS 结论不得互相替代；必须单独确认 Folder Nodes 未创建 GIF、视频或音频播放控件。
+候选前运行 `npm ci`、`npm run check`、`npm run release:check` 和大目录 benchmark。隔离 Vault 主机验收必须绑定 exact candidate。桌面端覆盖五页设置、主页、Explorer/标题图标、disclosure arrow、Explorer/Contents Node 拖拽、Contents 三类菜单与键盘入口、普通文件 into 移动及冲突拒绝、选区右键、Visual、静态相册、两类豁免、详细维护预览、只读 Health 和删除。还要覆盖节点图谱的全局/子树/局部渐进默认、局部父级上下文且不扩出兄弟、多分支、普通/Alt/范围展开、仅会话展开及重启安全默认、旧关系状态迁移、SearchComponent 展开/恢复、外部聚焦、链接默认关闭且可独立开启、节点菜单、Tooltip 与键盘、窄窗口换行、2D/3D 共用选择，以及无覆盖提示的大图安全。必须单独确认 Folder Nodes 未创建 GIF、视频或音频播放控件。
+
+节点图谱的仓库/桌面候选交接要求窄屏、粗指针和触控自动化覆盖，但不把真实 Android 运行设为阻塞门；未运行时必须记录为“未覆盖”，绝不能写成已通过。另行授权的移动端验收可使用当前模拟器，覆盖节点图谱范围、把手、搜索、2D/3D、触控目标和重启，并同时覆盖既有的无 draggable、原生移动、菜单、rank 与窄屏场景。模拟器、真机和 iOS 结论不得互相替代，本流程不暗示任何 iOS 结果。
 
 ## Git 与 GitHub
 
@@ -26,7 +28,7 @@ handoff，公共 Release 固定为三个 loose assets 与版本化 ZIP。
 
 ## 正式 Vault
 
-正式部署前确认 exact Vault、插件 ID 和 Obsidian 进程。保留现有 `data.json`；只复制 exact candidate 的三个运行文件，部署后重新计算哈希并确认 enabled 状态。正式 Vault 不能运行迁移 fixture 或自动 destructive acceptance。
+源码、PR 与隔离候选完成后默认停止，不部署正式 Vault；只有用户另行授权 exact Vault 才进入部署。部署前确认 exact Vault、插件 ID 和 Obsidian 进程。保留现有 `data.json`；只复制 exact candidate 的三个运行文件，部署后重新计算哈希并确认 enabled 状态。正式 Vault 不能运行迁移 fixture 或自动 destructive acceptance。
 
 ## 发布内容
 

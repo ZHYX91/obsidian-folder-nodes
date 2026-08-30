@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNodeGraphModel, buildNodeGraphModelFromNodes, edgesForMode } from "../../src/core/node-graph-model";
+import {
+  buildNodeGraphModel,
+  buildNodeGraphModelFromNodes,
+  edgesForShowLinks,
+  nodeGraphLinkEdges,
+  nodeGraphStructureEdges,
+} from "../../src/core/node-graph-model";
 
 const tree = {
   id: "",
@@ -27,16 +33,15 @@ describe("Node Graph relation model", () => {
     ]);
   });
 
-  it("filters one shared model into Structure, Links, and Hybrid", () => {
+  it("keeps structure permanent and overlays links only when requested", () => {
     const model = buildNodeGraphModel(tree, new Map([["A", new Set(["B"])]]));
-    expect(edgesForMode(model, "structure")).toHaveLength(3);
-    expect(edgesForMode(model, "links")).toEqual([
-      { source: "A", target: "B", structure: false, link: true },
-    ]);
-    expect(edgesForMode(model, "hybrid")).toHaveLength(4);
+    expect(nodeGraphStructureEdges(model)).toHaveLength(3);
+    expect(nodeGraphLinkEdges(model)).toHaveLength(1);
+    expect(edgesForShowLinks(model, false)).toHaveLength(3);
+    expect(edgesForShowLinks(model, true)).toHaveLength(4);
   });
 
-  it("builds a deep graph iteratively and sorts sibling identity", () => {
+  it("builds a deep graph iteratively and preserves the supplied sibling order", () => {
     type MutableTree = { id: string; children: MutableTree[] };
     const deep: MutableTree = { id: "0", children: [] };
     let cursor = deep;
@@ -51,7 +56,7 @@ describe("Node Graph relation model", () => {
       id: "",
       children: [{ id: "B", children: [] }, { id: "A", children: [] }],
     });
-    expect(reversed.nodes.map(({ id }) => id)).toEqual(["", "A", "B"]);
+    expect(reversed.nodes.map(({ id }) => id)).toEqual(["", "B", "A"]);
   });
 
   it("builds a shared model from a scoped forest without inventing structure edges", () => {
@@ -63,6 +68,13 @@ describe("Node Graph relation model", () => {
     expect(model.edges).toEqual([
       { source: "External", target: "Work/A", structure: false, link: true },
       { source: "Work", target: "Work/A", structure: true, link: false },
+    ]);
+  });
+
+  it("retains parent-to-child direction even when the child sorts first", () => {
+    const model = buildNodeGraphModel({ id: "Z", children: [{ id: "A", children: [] }] });
+    expect(model.edges).toEqual([
+      { source: "Z", target: "A", structure: true, link: false },
     ]);
   });
 });
