@@ -79,6 +79,17 @@ describe("Node Graph canvas math", () => {
     expect(hitTestNodeGraphCanvas([far], 3, 50)).toBeNull();
   });
 
+  it("uses each card width consistently for geometry, culling, and hit testing", () => {
+    expect(nodeGraphCanvasGeometry(1, 144).halfWidth).toBe(72);
+    expect(nodeGraphCanvasGeometry(1, 220).halfWidth).toBe(110);
+    const compact = { id: "compact", scale: 1, width: 144, x: 100, y: 50 };
+    const wide = { id: "wide", scale: 1, width: 220, x: 100, y: 50 };
+    expect(hitTestNodeGraphCanvas([compact], 190, 50)).toBeNull();
+    expect(hitTestNodeGraphCanvas([wide], 190, 50)).toBe("wide");
+    expect(pointIsVisible({ ...compact, x: 210 }, { width: 100, height: 100 }, 0)).toBe(false);
+    expect(pointIsVisible({ ...wide, x: 210 }, { width: 100, height: 100 }, 0)).toBe(true);
+  });
+
   it("selects a deterministic bounded overview from an edge-dense model", () => {
     const edges = Array.from({ length: 124_750 }, (_, index) => index);
     const overview = selectNodeGraphCanvasOverviewEdges(edges);

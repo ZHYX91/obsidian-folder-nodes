@@ -8,7 +8,7 @@ import { NodeGraphCanvasRenderer } from "../../src/ui/node-graph-canvas-renderer
 function fakeContext() {
   return {
     arc: vi.fn(), beginPath: vi.fn(), bezierCurveTo: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
-    drawImage: vi.fn(), lineTo: vi.fn(), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
+    drawImage: vi.fn(), lineTo: vi.fn(), measureText: vi.fn((text: string) => ({ width: [...text].length * 7 })), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
     stroke: vi.fn(), strokeRect: vi.fn(),
   };
 }
@@ -74,10 +74,10 @@ describe("large Node Graph canvas renderer", () => {
       height: 646,
       nodeHeight: 46,
       nodes: [
-        { depth: 0, id: "", x: 0, y: 277 },
-        { depth: 1, id: "A", x: 1_000, y: 277 },
+        { depth: 0, id: "", width: 180, x: 0, y: 277 },
+        { depth: 1, id: "A", width: 180, x: 1_000, y: 277 },
       ],
-      nodeWidth: 180,
+      maxNodeWidth: 180,
       width: 1_180,
     };
     const records = new Map(model.nodes.map(({ id }) => [id, {
@@ -510,6 +510,49 @@ describe("large Node Graph canvas renderer", () => {
     expect(context.drawImage).toHaveBeenCalledWith(cachedIcon, 103, 93, 14, 14);
     renderer.refreshPalette();
     expect(internals.visualImages.size).toBe(0);
+
+    renderer.destroy();
+    surface.remove();
+    getContext.mockRestore();
+  });
+
+  it("uses compact Canvas bounds, ellipsizes the drawn label, and keeps the full accessible title", async () => {
+    const tree: NodeGraphTree = { id: "", children: [] };
+    const model = buildNodeGraphModel(tree);
+    const layout = layoutNodeGraph(tree, { nodeWidths: new Map([["", 144]]) });
+    const fullLabel = "A deliberately long Canvas node title that must not be squeezed";
+    const records = new Map([["", {
+      label: fullLabel,
+      path: "",
+      visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
+    }]]);
+    const context = fakeContext();
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const surface = document.body.createDiv();
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 600 },
+      clientWidth: { configurable: true, value: 1_000 },
+    });
+    const renderer = new NodeGraphCanvasRenderer(
+      surface,
+      { layout, model, points3D: layoutNodeGraph3D(model, { nodeWidths: new Map([["", 144]]) }), records },
+      "2d",
+      false,
+      "",
+      {
+        label: () => "Large Node Graph",
+        onOpen: vi.fn(),
+        onSelect: vi.fn(),
+        relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
+      },
+    );
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+
+    expect(context.fillText.mock.calls.some(([text]) => typeof text === "string" && text.endsWith("…"))).toBe(true);
+    expect(context.fillText.mock.calls.some(([text]) => text === fullLabel)).toBe(false);
+    const overlay = surface.querySelector<HTMLElement>(".folder-nodes-node-graph-focus-overlay");
+    expect(overlay?.style.width).toBe("144px");
+    expect(overlay?.getAttribute("title")).toContain(fullLabel);
 
     renderer.destroy();
     surface.remove();

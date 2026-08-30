@@ -264,6 +264,7 @@
   justify-content: center;
   gap: 0;
   width: 180px;
+  max-width: calc(100% - 24px);
   min-height: 46px;
   padding: 0;
   overflow: hidden;
@@ -499,7 +500,7 @@
 }
 
 .folder-nodes-node-graph-node.is-3d {
-  width: 180px;
+  width: var(--folder-nodes-node-graph-card-width, 180px);
   min-height: 46px;
   transform-origin: center;
 }
@@ -535,7 +536,7 @@
 
 .folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:hover {
   z-index: 10000 !important;
-  width: 180px;
+  width: var(--folder-nodes-node-graph-card-width, 180px);
   min-height: 46px;
   background: var(--background-secondary);
   border-radius: 10px;

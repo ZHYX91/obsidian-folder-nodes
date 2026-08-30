@@ -11,6 +11,10 @@ import {
 import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
 
 import {
+  nodeGraphSiblingCardWidths,
+  NODE_GRAPH_CARD_WIDTH_REGULAR,
+} from "../core/node-graph-card-width";
+import {
   defaultNodeGraphCamera,
   fitNodeGraphCamera,
   layoutNodeGraph3D,
@@ -804,15 +808,20 @@ export class FolderNodeGraphView extends ItemView {
       scene.structureEdges,
       visibleLinks,
     );
+    const nodeWidths = nodeGraphSiblingCardWidths([...records.values()].map((record) => ({
+      id: record.path,
+      label: record.label,
+      parentId: record.parentPath,
+    })));
     const direction = this.settings().layoutDirection;
     return {
       records,
       model,
       layout: layoutNodeGraphForest(
         this.dimension === "2d" ? this.buildForest(records) : [],
-        { direction },
+        { direction, nodeWidths },
       ),
-      points3D: this.dimension === "3d" ? layoutNodeGraph3D(model) : [],
+      points3D: this.dimension === "3d" ? layoutNodeGraph3D(model, { nodeWidths }) : [],
     };
   }
 
@@ -876,7 +885,7 @@ export class FolderNodeGraphView extends ItemView {
       const node = this.createNode(canvas, record);
       node.style.left = `${position.x}px`;
       node.style.top = `${position.y}px`;
-      node.style.width = `${layout.nodeWidth}px`;
+      node.style.width = `${position.width}px`;
       node.style.height = `${layout.nodeHeight}px`;
     }
     fit?.addEventListener("click", () => this.fit2D(surface, stage, canvas, layout.width, layout.height));
@@ -1004,8 +1013,8 @@ export class FolderNodeGraphView extends ItemView {
     target: NodeGraphLayout["nodes"][number],
     layout: NodeGraphLayout,
   ): void {
-    const sourceBox = nodeGraphBoxFromTopLeft(source.x, source.y, layout.nodeWidth, layout.nodeHeight);
-    const targetBox = nodeGraphBoxFromTopLeft(target.x, target.y, layout.nodeWidth, layout.nodeHeight);
+    const sourceBox = nodeGraphBoxFromTopLeft(source.x, source.y, source.width, layout.nodeHeight);
+    const targetBox = nodeGraphBoxFromTopLeft(target.x, target.y, target.width, layout.nodeHeight);
     if (edge.structure) {
       this.path(
         svg,
@@ -1241,6 +1250,7 @@ export class FolderNodeGraphView extends ItemView {
 
   private position3DNode(node: HTMLElement, point: NodeGraphProjectedPoint): void {
     const scale = this.projectedNodeScale(point);
+    node.style.setProperty("--folder-nodes-node-graph-card-width", `${point.width ?? NODE_GRAPH_CARD_WIDTH_REGULAR}px`);
     node.style.left = `${point.x}px`;
     node.style.top = `${point.y}px`;
     node.style.zIndex = String(Math.max(1, Math.round(point.scale * 1000)));
@@ -1251,8 +1261,13 @@ export class FolderNodeGraphView extends ItemView {
 
   private projectedNodeBox(point: NodeGraphProjectedPoint): ReturnType<typeof nodeGraphBoxFromCenter> {
     const scale = this.projectedNodeScale(point);
-    if (this.denseThreeD && point.id !== this.focusPath) return nodeGraphBoxFromCenter(point.x, point.y, 5 * scale, 5 * scale);
-    return nodeGraphBoxFromCenter(point.x, point.y, 90 * scale, 23 * scale);
+    if (this.denseThreeD && point.id !== this.focusPath) return nodeGraphBoxFromCenter(point.x, point.y, 8 * scale, 8 * scale);
+    return nodeGraphBoxFromCenter(
+      point.x,
+      point.y,
+      (point.width ?? NODE_GRAPH_CARD_WIDTH_REGULAR) / 2 * scale,
+      23 * scale,
+    );
   }
 
   private projectedNodeScale(point: NodeGraphProjectedPoint): number {

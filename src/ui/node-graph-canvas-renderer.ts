@@ -1,6 +1,7 @@
 import {
   buildNodeGraphCanvasSpatialIndex,
   fitNodeGraphCanvasCamera,
+  NODE_GRAPH_CANVAS_NODE_WIDTH,
   nodeGraphCanvasGeometry,
   panNodeGraphCanvasCamera,
   pointIsVisible,
@@ -36,6 +37,7 @@ import {
   type NodeGraphModelEdge,
 } from "../core/node-graph-model";
 import type { NodeVisual } from "../core/types";
+import { fitNodeGraphCardLabel } from "../core/node-graph-card-width";
 import { renderVisual } from "../presentation/render-visual";
 
 export type NodeGraphCanvasDimension = "2d" | "3d";
@@ -147,7 +149,7 @@ export class NodeGraphCanvasRenderer {
   private readonly overviewLinkEdgeSet: ReadonlySet<NodeGraphModelEdge>;
   private readonly tooltip: HTMLElement;
   private readonly visualImages = new Map<string, HTMLImageElement>();
-  private readonly layoutPositions: ReadonlyMap<string, { readonly x: number; readonly y: number }>;
+  private readonly layoutPositions: ReadonlyMap<string, { readonly width: number; readonly x: number; readonly y: number }>;
   private readonly layoutSpatialIndex: NodeGraphCanvasSpatialIndex;
   private readonly pointers = new Map<number, CanvasPointer>();
   private readonly projectedById = new Map<string, NodeGraphCanvasPoint>();
@@ -186,12 +188,12 @@ export class NodeGraphCanvasRenderer {
     this.overviewLinkEdgeSet = new Set(this.overviewLinkEdges);
     this.layoutPositions = new Map(data.layout.nodes.map((node) => [
       node.id,
-      { x: node.x + data.layout.nodeWidth / 2, y: node.y + data.layout.nodeHeight / 2 },
+      { width: node.width, x: node.x + node.width / 2, y: node.y + data.layout.nodeHeight / 2 },
     ]));
     this.layoutSpatialIndex = buildNodeGraphCanvasSpatialIndex(
       data.layout.nodes.map((node) => ({
         id: node.id,
-        x: node.x + data.layout.nodeWidth / 2,
+        x: node.x + node.width / 2,
         y: node.y + data.layout.nodeHeight / 2,
       })),
     );
@@ -625,7 +627,7 @@ export class NodeGraphCanvasRenderer {
 
   private project2D(): readonly NodeGraphCanvasPoint[] {
     const zoom = this.camera2D.zoom;
-    const padding = Math.max(this.data.layout.nodeWidth, this.data.layout.nodeHeight) / 2 + 32 / zoom;
+    const padding = Math.max(this.data.layout.maxNodeWidth, this.data.layout.nodeHeight) / 2 + 32 / zoom;
     const candidates = queryNodeGraphCanvasSpatialIndex(this.layoutSpatialIndex, {
       minX: -this.camera2D.panX / zoom - padding,
       maxX: (this.width - this.camera2D.panX) / zoom + padding,
@@ -635,6 +637,7 @@ export class NodeGraphCanvasRenderer {
     return candidates.map((node) => ({
       id: node.id,
       scale: this.camera2D.zoom,
+      width: this.layoutPositions.get(node.id)?.width ?? this.data.layout.maxNodeWidth,
       x: node.x * this.camera2D.zoom + this.camera2D.panX,
       y: node.y * this.camera2D.zoom + this.camera2D.panY,
     }));
@@ -653,6 +656,7 @@ export class NodeGraphCanvasRenderer {
         endpoints.set(otherId, {
           id: otherId,
           scale: this.camera2D.zoom,
+          width: other.width,
           x: other.x * this.camera2D.zoom + this.camera2D.panX,
           y: other.y * this.camera2D.zoom + this.camera2D.panY,
         });
@@ -685,19 +689,25 @@ export class NodeGraphCanvasRenderer {
     for (const edge of structureEdges) {
       const source = projected.get(edge.source);
       const target = projected.get(edge.target);
-      if (source === undefined || target === undefined || !lineMightBeVisible(source, target, this.width, this.height)) continue;
+      if (source === undefined || target === undefined) continue;
+      const sourceBox = this.presentationForPoint(source).box;
+      const targetBox = this.presentationForPoint(target).box;
+      if (!lineMightBeVisible(sourceBox, targetBox, this.width, this.height)) continue;
       const connected = this.focusPath !== null && (edge.source === this.focusPath || edge.target === this.focusPath);
       const muted = this.focusPath !== null && !connected;
       this.appendStructureEdgeBatch(
         muted ? "structure-muted" : "structure-active",
-        this.presentationForPoint(source).box,
-        this.presentationForPoint(target).box,
+        sourceBox,
+        targetBox,
       );
     }
     for (const edge of this.drawnLinkEdges()) {
       const source = projected.get(edge.source);
       const target = projected.get(edge.target);
-      if (source === undefined || target === undefined || !lineMightBeVisible(source, target, this.width, this.height)) continue;
+      if (source === undefined || target === undefined) continue;
+      const sourceBox = this.presentationForPoint(source).box;
+      const targetBox = this.presentationForPoint(target).box;
+      if (!lineMightBeVisible(sourceBox, targetBox, this.width, this.height)) continue;
       const connected = this.focusPath !== null && (edge.source === this.focusPath || edge.target === this.focusPath);
       const muted = this.focusPath !== null && !connected;
       const offset = edge.structure ? 7 : 0;
@@ -706,8 +716,8 @@ export class NodeGraphCanvasRenderer {
         : muted ? "link-offset-muted" : "link-offset-active";
       this.appendLinkEdgeBatch(
         key,
-        this.presentationForPoint(source).box,
-        this.presentationForPoint(target).box,
+        sourceBox,
+        targetBox,
         offset,
       );
     }
@@ -838,7 +848,13 @@ export class NodeGraphCanvasRenderer {
       this.context.font = `${fontSize}px sans-serif`;
       this.context.textAlign = "center";
       this.context.textBaseline = "middle";
-      this.context.fillText(record.label, labelX, point.y, Math.max(10, width - leftInset - rightInset - 4));
+      const maxLabelWidth = Math.max(10, width - leftInset - rightInset - 4);
+      const visibleLabel = fitNodeGraphCardLabel(
+        record.label,
+        maxLabelWidth,
+        (text) => this.context?.measureText(text).width ?? Number.POSITIVE_INFINITY,
+      );
+      this.context.fillText(visibleLabel, labelX, point.y);
       if (childCount > 0) {
         this.context.fillStyle = this.palette.mutedText;
         if (this.data.layout.direction === "top-to-bottom") {
@@ -958,6 +974,7 @@ export class NodeGraphCanvasRenderer {
     }
     this.focusOverlay.style.left = `${point.x}px`;
     this.focusOverlay.style.top = `${point.y}px`;
+    this.focusOverlay.style.width = `${point.width ?? NODE_GRAPH_CANVAS_NODE_WIDTH}px`;
     this.focusOverlay.hidden = false;
   }
 
@@ -1015,7 +1032,7 @@ export class NodeGraphCanvasRenderer {
   }
 
   private presentationForPoint(point: NodeGraphCanvasPoint): CanvasNodePresentation {
-    const geometry = nodeGraphCanvasGeometry(point.scale);
+    const geometry = nodeGraphCanvasGeometry(point.scale, point.width);
     const denseDot = this.dimension === "3d"
       && this.data.model.nodes.length > DENSE_3D_DOT_THRESHOLD
       && point.id !== this.focusPath
@@ -1156,16 +1173,16 @@ export class NodeGraphCanvasRenderer {
 }
 
 function lineMightBeVisible(
-  source: NodeGraphCanvasPoint,
-  target: NodeGraphCanvasPoint,
+  source: NodeGraphBox,
+  target: NodeGraphBox,
   width: number,
   height: number,
 ): boolean {
   const padding = 32;
-  return Math.max(source.x, target.x) >= -padding
-    && Math.min(source.x, target.x) <= width + padding
-    && Math.max(source.y, target.y) >= -padding
-    && Math.min(source.y, target.y) <= height + padding;
+  return Math.max(source.x + source.width / 2, target.x + target.width / 2) >= -padding
+    && Math.min(source.x - source.width / 2, target.x - target.width / 2) <= width + padding
+    && Math.max(source.y + source.height / 2, target.y + target.height / 2) >= -padding
+    && Math.min(source.y - source.height / 2, target.y - target.height / 2) <= height + padding;
 }
 
 function touchGesture(pointers: Iterable<CanvasPointer>): {

@@ -1,5 +1,6 @@
 import type { NodeGraphModel } from "./node-graph-model";
 import { nodeGraphCanvasGeometry } from "./node-graph-canvas";
+import { NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
 
 export interface NodeGraphPoint3D {
   readonly id: string;
@@ -7,6 +8,7 @@ export interface NodeGraphPoint3D {
   readonly y: number;
   readonly z: number;
   readonly depth: number;
+  readonly width?: number;
 }
 
 export interface NodeGraphCamera {
@@ -23,9 +25,11 @@ export interface NodeGraphProjectedPoint {
   readonly y: number;
   readonly scale: number;
   readonly depth: number;
+  readonly width?: number;
 }
 
 export interface NodeGraph3DOptions {
+  readonly nodeWidths?: ReadonlyMap<string, number>;
   readonly spacingX?: number;
   readonly spacingY?: number;
   readonly spacingZ?: number;
@@ -50,15 +54,31 @@ export function layoutNodeGraph3D(model: NodeGraphModel, options: NodeGraph3DOpt
   for (const [depth, ids] of [...byDepth.entries()].sort(([a], [b]) => a - b)) {
     const columns = Math.max(1, Math.ceil(Math.sqrt(ids.length)));
     const rows = Math.max(1, Math.ceil(ids.length / columns));
+    const horizontalGap = Math.max(0, spacingX - NODE_GRAPH_CARD_WIDTH_REGULAR);
+    const columnWidths = Array.from({ length: columns }, () => 0);
+    for (const [index, id] of ids.entries()) {
+      const column = index % columns;
+      const width = positive(options.nodeWidths?.get(id), NODE_GRAPH_CARD_WIDTH_REGULAR);
+      columnWidths[column] = Math.max(columnWidths[column] ?? 0, width);
+    }
+    const columnCenters: number[] = [];
+    let nextColumn = 0;
+    for (const width of columnWidths) {
+      columnCenters.push(nextColumn + width / 2);
+      nextColumn += width + horizontalGap;
+    }
+    const layerWidth = Math.max(0, nextColumn - horizontalGap);
     for (const [index, id] of ids.entries()) {
       const column = index % columns;
       const row = Math.floor(index / columns);
+      const requestedWidth = options.nodeWidths?.get(id);
       points.push({
         id,
-        x: (column - (columns - 1) / 2) * spacingX,
+        x: (columnCenters[column] ?? 0) - layerWidth / 2,
         y: (row - (rows - 1) / 2) * spacingY,
         z: compressedDepth(depth) * spacingZ,
         depth,
+        ...(requestedWidth === undefined ? {} : { width: positive(requestedWidth, NODE_GRAPH_CARD_WIDTH_REGULAR) }),
       });
     }
   }
@@ -97,6 +117,7 @@ export function projectNodeGraph3D(
       y: height / 2 + camera.panY + pitchY * scale,
       scale,
       depth: point.depth,
+      ...(point.width === undefined ? {} : { width: point.width }),
     };
   });
 }
@@ -176,7 +197,7 @@ function projectedBounds(points: readonly NodeGraphProjectedPoint[], minimumNode
   let top = Number.POSITIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
   for (const point of points) {
-    const geometry = nodeGraphCanvasGeometry(Math.max(minimumNodeScale, point.scale));
+    const geometry = nodeGraphCanvasGeometry(Math.max(minimumNodeScale, point.scale), point.width);
     left = Math.min(left, point.x - geometry.halfWidth);
     right = Math.max(right, point.x + geometry.halfWidth);
     top = Math.min(top, point.y - geometry.halfHeight);

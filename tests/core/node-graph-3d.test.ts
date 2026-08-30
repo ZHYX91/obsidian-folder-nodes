@@ -42,6 +42,35 @@ describe("Node Graph 3D layout", () => {
     expect((positions.get("B")?.x ?? 0) < (positions.get("A")?.x ?? 0)).toBe(true);
   });
 
+  it("keeps mixed-width columns separated and carries widths through projection and fit", () => {
+    const widths = new Map([["", 144], ["A", 144], ["B", 220], ["A/C", 180]]);
+    const points = layoutNodeGraph3D(model, { nodeWidths: widths });
+    const byId = new Map(points.map((point) => [point.id, point]));
+    expect(byId.get("A")?.width).toBe(144);
+    expect(byId.get("B")?.width).toBe(220);
+    expect((byId.get("B")?.x ?? 0) - (byId.get("A")?.x ?? 0)).toBe(222);
+
+    const viewportWidth = 800;
+    const viewportHeight = 600;
+    const padding = 48;
+    const fitted = fitNodeGraphCamera(
+      points,
+      defaultNodeGraphCamera(),
+      viewportWidth,
+      viewportHeight,
+      padding,
+      0.65,
+    );
+    const projected = projectNodeGraph3D(points, fitted, viewportWidth, viewportHeight);
+    expect(projected.find(({ id }) => id === "B")?.width).toBe(220);
+    expect(Math.min(...projected.map((point) => (
+      point.x - nodeGraphCanvasGeometry(point.scale, point.width).halfWidth
+    )))).toBeGreaterThanOrEqual(padding - 0.001);
+    expect(Math.max(...projected.map((point) => (
+      point.x + nodeGraphCanvasGeometry(point.scale, point.width).halfWidth
+    )))).toBeLessThanOrEqual(viewportWidth - padding + 0.001);
+  });
+
   it("projects stably and supports bounded rotate, pan, zoom, and fit camera changes", () => {
     const points = layoutNodeGraph3D(model);
     const camera = defaultNodeGraphCamera();

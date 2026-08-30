@@ -50,6 +50,39 @@ describe("Node Graph progressive view", () => {
     expect(fixture.onNodeMenu).toHaveBeenCalledWith(expect.any(MouseEvent), "Work");
   });
 
+  it("keeps siblings equal while sizing separate branches independently in 2D and 3D", async () => {
+    const snapshot = nodeGraphSnapshot();
+    snapshot.records.set("Work/B", record(
+      "Work/B",
+      "A deliberately long sibling card title",
+      "Work",
+      "Work/B/B.md",
+    ));
+    const dependencies = graphViewDependencies(snapshot);
+    const view = new FolderNodeGraphView(
+      { app: dependencies.app } as never,
+      dependencies.service,
+      dependencies.options,
+    );
+    openViews.push(view);
+    await view.onOpen();
+    expandHandle(view, "Work").click();
+    expandHandle(view, "Personal").click();
+
+    expect(graphNode(view, "").style.width).toBe("180px");
+    expect(graphNode(view, "Work").style.width).toBe("144px");
+    expect(graphNode(view, "Personal").style.width).toBe("144px");
+    expect(graphNode(view, "Work/A").style.width).toBe("220px");
+    expect(graphNode(view, "Work/B").style.width).toBe("220px");
+    expect(graphNode(view, "Personal/Home").style.width).toBe("144px");
+
+    const threeD = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+      .find((button) => button.textContent === "3D");
+    threeD?.click();
+    expect(graphNode(view, "Work/A").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("220px");
+    expect(graphNode(view, "Personal/Home").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("144px");
+  });
+
   it("keeps multiple branches open and applies Alt to the whole selected branch", async () => {
     const fixture = await graphViewFixture();
     expandHandle(fixture.view, "Work").click();
