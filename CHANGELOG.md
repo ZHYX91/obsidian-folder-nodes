@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.7.2
+
+- Migrated release handoff to the single Candidate Bundle v3 contract backed by release-core 2.0,
+  with source-candidate and transport-candidate verification kept as separate claims.
+- Added repository-owned fixtures and scenario declarations for independently reproducible desktop
+  and Android-emulator acceptance of hidden nodes, graph behavior, and node creation.
+
 ## 0.7.1
 
 - Restored the exact production assets from the fixed candidate handoff before detached GitHub publication and post-verification jobs validate it, keeping those jobs independent from untracked build output.
