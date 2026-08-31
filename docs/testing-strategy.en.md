@@ -30,7 +30,7 @@ Check at least default light, default dark, and one third-party theme. Keyboard 
 
 ## Android mobile acceptance
 
-Every `isDesktopOnly: false` candidate must retain Android-compatible code and CSS, with automated narrow-screen, coarse-pointer, and touch coverage. For the Node Graph repository/desktop candidate handoff, a real Android host run is not a blocking gate; when it is not performed, the evidence must say **not covered**, never passed. A separately authorized mobile run may use the current Android 15/API 35 emulator and a disposable Vault to cover plugin load, File Explorer/Contents, native moves, menus, settings persistence, Node Graph scopes/handles/search/2D/3D, narrow layout, touch targets, system trash, and disable cleanup. Emulator evidence is not physical-device or iOS evidence, and no iOS result is claimed by this workflow.
+Every `isDesktopOnly: false` candidate must retain Android-compatible code and CSS, with automated narrow-screen, coarse-pointer, and touch coverage. Release closure also requires the current Android 15/API 35 emulator and a disposable Vault to cover plugin load, File Explorer/Contents, native moves, menus, settings persistence, Node Graph scopes/handles/search/2D/3D, narrow layout, touch targets, system trash, and disable cleanup. Android physical devices and iOS are out of scope.
 
 ## Production deployment
 

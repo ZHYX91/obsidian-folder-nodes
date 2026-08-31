@@ -27,6 +27,12 @@ not be treated as a defect or a reason to remove the archive. The deterministic 
 `folder-nodes/` directory with `main.js`, `manifest.json`, and `styles.css`, byte-identical to the
 three loose release assets. Release checks must preserve and verify all four public assets.
 
+## Release acceptance scope
+
+This plugin is mobile-capable. An exact release candidate requires current desktop and Android
+emulator acceptance. Android physical devices and iOS are out of scope. Keep source,
+packaged-candidate, real-host, emulator, publication, and production-Vault claims separate.
+
 Migration is preview-first. Destructive or ambiguous changes fail closed. Tests and fixtures must
 use an isolated disposable Vault. A production deployment is separate from build, commit, push,
 tag, and GitHub Release actions; preserve existing plugin `data.json` unless explicitly authorized.

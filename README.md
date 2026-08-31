@@ -53,7 +53,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 ## Requirements and compatibility
 
 - Obsidian 1.12.7 or later.
-- Desktop Obsidian and Android Obsidian. Node Graph keeps narrow-screen, coarse-pointer, and touch-compatible controls; emulator, physical-device, and iOS behavior require their own evidence and are never inferred from desktop or automated checks.
+- Desktop Obsidian and Android Obsidian. Node Graph keeps narrow-screen, coarse-pointer, and touch-compatible controls; Android release acceptance uses the current emulator. Android physical devices and iOS are out of scope.
 - A complete structural node still uses exactly one same-named Node Note. A managed folder or Markdown without its counterpart is an incomplete node; unmanaged Markdown and folder rules define explicit boundaries for plugin-owned structural actions.
 
 ## Installation

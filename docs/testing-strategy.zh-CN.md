@@ -29,7 +29,7 @@ Quick 门槛验证 10,000 个、large 门槛验证 100,000 个直接 Child Nodes
 
 ## Android 移动端验收
 
-每个 `isDesktopOnly: false` 候选都必须保持 Android 兼容代码与 CSS，并有窄屏、粗指针和触控自动化覆盖。节点图谱的仓库/桌面候选交接不把真实 Android 主机运行设为阻塞门；没有执行时必须把证据写成“未覆盖”，绝不能写成已通过。另行授权的移动端运行可使用当前 Android 15/API 35 模拟器和一次性 Vault，覆盖插件加载、File Explorer/Contents、原生移动、菜单、设置持久化、节点图谱范围/把手/搜索/2D/3D、窄屏、触控目标、系统回收站和停用清理。模拟器证据不等于真机或 iOS，本流程不声称任何 iOS 结果。
+每个 `isDesktopOnly: false` 候选都必须保持 Android 兼容代码与 CSS，并有窄屏、粗指针和触控自动化覆盖。发布闭环还必须使用当前 Android 15/API 35 模拟器和一次性 Vault，覆盖插件加载、File Explorer/Contents、原生移动、菜单、设置持久化、节点图谱范围/把手/搜索/2D/3D、窄屏、触控目标、系统回收站和停用清理。Android 真机和 iOS 不在验收范围内。
 
 ## 正式部署
 
