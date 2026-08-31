@@ -1,7 +1,43 @@
 import { isEmojiFontPreference } from "../core/emoji-font";
 import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core/types";
 
-export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = {
+export const CURRENT_SETTINGS_SCHEMA_VERSION = 1 as const;
+
+export interface PersistedFolderNodesSettings extends FolderNodesSettings {
+  schemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
+}
+
+export type SettingsCompatibility =
+  | {
+      readonly status: "compatible";
+      readonly currentSchemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
+      readonly storedSchemaVersion: 0 | typeof CURRENT_SETTINGS_SCHEMA_VERSION;
+    }
+  | {
+      readonly status: "incompatible";
+      readonly currentSchemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
+      readonly storedSchemaVersion: number | null;
+      readonly reason: "future-schema" | "invalid-schema";
+    };
+
+export interface SettingsLoadResult {
+  readonly settings: FolderNodesSettings;
+  readonly compatibility: SettingsCompatibility;
+  readonly migration: PersistedFolderNodesSettings | null;
+}
+
+export class SettingsSchemaIncompatibleError extends Error {
+  public readonly code = "settings_schema_incompatible";
+
+  public constructor(
+    public readonly compatibility: Extract<SettingsCompatibility, { status: "incompatible" }>,
+  ) {
+    super("The stored settings schema is incompatible and read-only.");
+    this.name = "SettingsSchemaIncompatibleError";
+  }
+}
+
+export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = deepFreeze({
   enabled: true,
   defaultDimension: "2d",
   layoutDirection: "left-to-right",
@@ -10,9 +46,9 @@ export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = {
   excludedSubtrees: [],
   largeGraphThreshold: 500,
   overviewEdgeLimit: 6_000,
-};
+});
 
-export const DEFAULT_SETTINGS: FolderNodesSettings = {
+export const DEFAULT_SETTINGS: FolderNodesSettings = deepFreeze({
   language: "auto",
   homepageEnabled: false,
   openHomepageOnStartup: false,
@@ -39,10 +75,10 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = {
     customText: "",
   },
   timestampFormat: "%Y%m%d-%H%M%S",
-};
+});
 
 export function normalizeSettings(value: unknown): FolderNodesSettings {
-  const input = typeof value === "object" && value !== null ? value as Partial<FolderNodesSettings> : {};
+  const input = isRecord(value) ? value as Partial<FolderNodesSettings> : {};
   const language = input.language === "zh-CN" || input.language === "en" ? input.language : "auto";
   const explorerIconPosition = input.explorerIconPosition === "after" || input.explorerIconPosition === "hidden"
     ? input.explorerIconPosition
@@ -64,6 +100,66 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     prefix: normalizeNamingPart(input.prefix, DEFAULT_SETTINGS.prefix),
     suffix: normalizeNamingPart(input.suffix, DEFAULT_SETTINGS.suffix),
     timestampFormat: typeof input.timestampFormat === "string" ? input.timestampFormat : DEFAULT_SETTINGS.timestampFormat,
+  };
+}
+
+export function loadSettingsData(value: unknown): SettingsLoadResult {
+  const input = isRecord(value) ? value : null;
+  const hasSchemaVersion = input !== null
+    && Object.prototype.hasOwnProperty.call(input, "schemaVersion");
+  const storedSchemaVersion = hasSchemaVersion ? input.schemaVersion : undefined;
+  const settings = normalizeSettings(input ?? {});
+
+  if (hasSchemaVersion && !isValidSchemaVersion(storedSchemaVersion)) {
+    return {
+      settings,
+      compatibility: {
+        status: "incompatible",
+        currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+        storedSchemaVersion: typeof storedSchemaVersion === "number" && Number.isFinite(storedSchemaVersion)
+          ? storedSchemaVersion
+          : null,
+        reason: "invalid-schema",
+      },
+      migration: null,
+    };
+  }
+
+  if (
+    typeof storedSchemaVersion === "number"
+    && storedSchemaVersion > CURRENT_SETTINGS_SCHEMA_VERSION
+  ) {
+    return {
+      settings,
+      compatibility: {
+        status: "incompatible",
+        currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+        storedSchemaVersion,
+        reason: "future-schema",
+      },
+      migration: null,
+    };
+  }
+
+  const snapshot = createSettingsSnapshot(settings);
+  const canonical = input !== null && JSON.stringify(input) === JSON.stringify(snapshot);
+  return {
+    settings,
+    compatibility: {
+      status: "compatible",
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: hasSchemaVersion ? CURRENT_SETTINGS_SCHEMA_VERSION : 0,
+    },
+    migration: canonical ? null : snapshot,
+  };
+}
+
+export function createSettingsSnapshot(
+  settings: FolderNodesSettings,
+): PersistedFolderNodesSettings {
+  return {
+    schemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+    ...structuredClone(settings),
   };
 }
 
@@ -117,4 +213,18 @@ function normalizePrefixes(value: unknown, fallback: readonly string[]): string[
     const normalized = prefix.trim();
     return normalized === "" || normalized.includes("/") || normalized.includes("\\") ? [] : [normalized];
   }))].sort(compareText);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidSchemaVersion(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
 }

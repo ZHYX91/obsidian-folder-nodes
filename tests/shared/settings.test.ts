@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, normalizeSettings } from "../../src/shared/settings";
+import {
+  CURRENT_SETTINGS_SCHEMA_VERSION,
+  createSettingsSnapshot,
+  DEFAULT_SETTINGS,
+  loadSettingsData,
+  normalizeSettings,
+} from "../../src/shared/settings";
 
 describe("settings", () => {
   it("merges nested naming defaults", () => {
@@ -79,5 +85,82 @@ describe("settings", () => {
     expect(settings.nodeGraph).not.toHaveProperty("showBoundaryNodes");
     expect(normalizeSettings({ nodeGraph: "broken" }).nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
     expect(normalizeSettings({ nodeGraph: { layoutDirection: "broken" } }).nodeGraph.layoutDirection).toBe("left-to-right");
+  });
+
+  it("migrates unversioned settings once into the current schema", () => {
+    const legacy = {
+      homepageEnabled: true,
+      ignoredFolders: ["/Generated/"],
+      prefix: { enabled: true },
+    };
+    const before = structuredClone(legacy);
+
+    const loaded = loadSettingsData(legacy);
+
+    expect(loaded.compatibility).toEqual({
+      status: "compatible",
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: 0,
+    });
+    expect(loaded.migration).toEqual(createSettingsSnapshot(loaded.settings));
+    expect(legacy).toEqual(before);
+    const reloaded = loadSettingsData(loaded.migration);
+    expect(reloaded.settings).toEqual(loaded.settings);
+    expect(reloaded.migration).toBeNull();
+  });
+
+  it("fails closed for future settings without losing their unknown fields", () => {
+    const future = {
+      schemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION + 1,
+      language: "zh-CN",
+      nodeGraph: { enabled: false },
+      futureFeature: { mode: "lossless", paths: ["A", "B"] },
+    };
+    const before = structuredClone(future);
+
+    const loaded = loadSettingsData(future);
+
+    expect(loaded.compatibility).toEqual({
+      status: "incompatible",
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION + 1,
+      reason: "future-schema",
+    });
+    expect(loaded.migration).toBeNull();
+    expect(future).toEqual(before);
+    expect(future.futureFeature).toEqual({ mode: "lossless", paths: ["A", "B"] });
+  });
+
+  it("treats malformed explicit schema values as incompatible", () => {
+    expect(loadSettingsData({ schemaVersion: "2", futureField: true }).compatibility).toMatchObject({
+      status: "incompatible",
+      storedSchemaVersion: null,
+      reason: "invalid-schema",
+    });
+  });
+
+  it("normalizes purely and returns independent deep copies", () => {
+    const source = Object.freeze({
+      ignoredFolders: Object.freeze(["/Generated/"]),
+      nodeGraph: Object.freeze({
+        includedSubtrees: Object.freeze(["/Work/"]),
+      }),
+      prefix: Object.freeze({ enabled: true }),
+    });
+    const before = structuredClone(source);
+    const first = normalizeSettings(source);
+    const second = normalizeSettings(source);
+
+    expect(first).toEqual(second);
+    expect(source).toEqual(before);
+    first.ignoredFolders.push("Other");
+    first.nodeGraph.includedSubtrees.push("Other");
+    first.prefix.customText = "changed";
+    expect(second.ignoredFolders).toEqual(["Generated"]);
+    expect(second.nodeGraph.includedSubtrees).toEqual(["Work"]);
+    expect(second.prefix.customText).toBe("");
+    expect(Object.isFrozen(DEFAULT_SETTINGS)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_SETTINGS.nodeGraph)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_SETTINGS.ignoredFolders)).toBe(true);
   });
 });

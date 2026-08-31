@@ -20,6 +20,38 @@ export class TFolder extends TAbstractFile {
 export class App {}
 export class Component { public onunload(): void {} }
 export class WorkspaceLeaf {}
+export class ButtonComponent {
+  public readonly buttonEl: HTMLButtonElement;
+  private click: () => void = () => undefined;
+  public constructor(container: HTMLElement) {
+    this.buttonEl = container.createEl("button", { attr: { type: "button" } });
+    this.buttonEl.addEventListener("click", () => this.click());
+  }
+  public onClick(callback: () => void): this { this.click = callback; return this; }
+  public setButtonText(value: string): this { this.buttonEl.textContent = value; return this; }
+  public setDisabled(value: boolean): this { this.buttonEl.disabled = value; return this; }
+}
+export class Setting {
+  public readonly settingEl: HTMLDivElement;
+  public readonly infoEl: HTMLDivElement;
+  public readonly nameEl: HTMLDivElement;
+  public readonly descEl: HTMLDivElement;
+  public readonly controlEl: HTMLDivElement;
+  public constructor(container: HTMLElement) {
+    this.settingEl = container.createDiv({ cls: "setting-item" });
+    this.infoEl = this.settingEl.createDiv({ cls: "setting-item-info" });
+    this.nameEl = this.infoEl.createDiv({ cls: "setting-item-name" });
+    this.descEl = this.infoEl.createDiv({ cls: "setting-item-description" });
+    this.controlEl = this.settingEl.createDiv({ cls: "setting-item-control" });
+  }
+  public addButton(configure: (button: ButtonComponent) => unknown): this {
+    configure(new ButtonComponent(this.controlEl));
+    return this;
+  }
+  public setClass(value: string): this { this.settingEl.classList.add(value); return this; }
+  public setDesc(value: string): this { this.descEl.textContent = value; return this; }
+  public setName(value: string): this { this.nameEl.textContent = value; return this; }
+}
 export class ItemView {
   public readonly app: unknown;
   public readonly containerEl = document.createElement("div");

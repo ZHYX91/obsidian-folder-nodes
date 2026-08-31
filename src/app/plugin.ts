@@ -15,8 +15,19 @@ import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../co
 import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
 import type { FolderNodesSettings } from "../core/types";
-import { DEFAULT_SETTINGS, normalizeSettings } from "../shared/settings";
-import { SettingsSaveCoordinator } from "../shared/settings-save-coordinator";
+import {
+  CURRENT_SETTINGS_SCHEMA_VERSION,
+  createSettingsSnapshot,
+  DEFAULT_SETTINGS,
+  loadSettingsData,
+  SettingsSchemaIncompatibleError,
+  type PersistedFolderNodesSettings,
+  type SettingsCompatibility,
+} from "../shared/settings";
+import {
+  SettingsSaveCoordinator,
+  type SettingsSaveState,
+} from "../shared/settings-save-coordinator";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE, type ContentsMenuAnchor } from "../ui/contents-view";
 import { CONTENTS_MENU_SOURCE } from "../ui/contents-interactions";
 import { MigrationModal } from "../ui/migration-modal";
@@ -48,19 +59,43 @@ export default class FolderNodesPlugin extends Plugin {
   private readonly unresolvedLinkDocuments = new Set<Document>();
   private unloaded = false;
   private initialized = false;
+  private settingsLoaded = false;
   private lifecycleGeneration = 0;
   private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
-  private readonly settingsSaver = new SettingsSaveCoordinator<FolderNodesSettings>(
+  private settingsTab: FolderNodesSettingTab | null = null;
+  private settingsSaveWasPending = false;
+  private readonly settingsSaver = new SettingsSaveCoordinator<PersistedFolderNodesSettings>(
     (snapshot) => this.saveData(snapshot),
+    (state) => {
+      if (state === "pending") {
+        this.settingsSaveWasPending = true;
+        this.settingsTab?.refreshPersistenceStatus();
+      } else if (state === "saved" && this.settingsSaveWasPending) {
+        this.settingsSaveWasPending = false;
+        this.settingsTab?.refreshPersistenceStatus();
+      }
+    },
   );
+  private settingsCompatibility: SettingsCompatibility = {
+    status: "compatible",
+    currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+    storedSchemaVersion: 0,
+  };
 
   public override async onload(): Promise<void> {
     const generation = ++this.lifecycleGeneration;
     this.unloaded = false;
     this.initialized = false;
+    this.settingsLoaded = false;
     const stored: unknown = await this.loadData();
     if (this.unloaded || generation !== this.lifecycleGeneration) return;
-    this.settings = normalizeSettings(stored);
+    const loaded = loadSettingsData(stored);
+    this.settings = loaded.settings;
+    this.settingsCompatibility = loaded.compatibility;
+    this.settingsLoaded = true;
+    if (loaded.migration !== null) {
+      void this.settingsSaver.save(loaded.migration).catch(() => undefined);
+    }
     this.updateEmojiFontStyle();
     setLanguage(this.settings.language);
     this.service = new NodeService(this.app, () => this.settings);
@@ -100,7 +135,8 @@ export default class FolderNodesPlugin extends Plugin {
       refresh: () => this.refreshVisuals(),
       reportError: (error) => new Notice(formatError(error), 8000),
     }, Platform.isDesktopApp));
-    this.addSettingTab(new FolderNodesSettingTab(this.app, this));
+    this.settingsTab = new FolderNodesSettingTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
     this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
     this.registerCommands();
     this.registerEvents();
@@ -118,9 +154,14 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   public override onunload(): void {
+    if (this.settingsLoaded && this.settingsCompatibility.status === "compatible") {
+      void this.settingsSaver.flush(createSettingsSnapshot(this.settings)).catch(() => undefined);
+    }
     this.lifecycleGeneration += 1;
     this.unloaded = true;
     this.initialized = false;
+    this.settingsLoaded = false;
+    this.settingsTab = null;
     this.reconciliationReady = false;
     this.service?.dispose();
     this.refreshScheduler?.cancel();
@@ -135,7 +176,26 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   public async saveSettings(): Promise<void> {
-    await this.settingsSaver.save(this.settings);
+    if (this.settingsCompatibility.status === "incompatible") {
+      throw new SettingsSchemaIncompatibleError(this.settingsCompatibility);
+    }
+    await this.settingsSaver.save(createSettingsSnapshot(this.settings));
+  }
+
+  public getSettingsCompatibility(): SettingsCompatibility {
+    return this.settingsCompatibility;
+  }
+
+  public getSettingsSaveState(): SettingsSaveState | "blocked" {
+    if (this.settingsCompatibility.status === "incompatible") return "blocked";
+    return this.settingsSaver.getState();
+  }
+
+  public retrySettingsSave(): Promise<void> {
+    if (this.settingsCompatibility.status === "incompatible") {
+      return Promise.reject(new SettingsSchemaIncompatibleError(this.settingsCompatibility));
+    }
+    return this.settingsSaver.retry();
   }
 
   public ensureStyles(document: Document): void {

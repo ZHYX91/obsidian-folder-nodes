@@ -86,6 +86,23 @@ body {
   min-width: 0;
 }
 
+.folder-nodes-settings-warning.setting-item {
+  background: var(--background-secondary);
+  border: 1px solid var(--text-error);
+  border-radius: var(--radius-m);
+  margin: 0 0 var(--size-4-4);
+  padding: var(--size-4-3);
+}
+
+.folder-nodes-settings-warning .setting-item-name {
+  color: var(--text-error);
+  font-weight: var(--font-semibold);
+}
+
+.folder-nodes-settings-warning .setting-item-description {
+  color: var(--text-normal);
+}
+
 .folder-nodes-settings-guide {
   margin: 0 0 18px;
   padding: 12px 14px;

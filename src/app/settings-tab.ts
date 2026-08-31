@@ -5,6 +5,11 @@ import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "
 import { normalizeNodeGraphLinks } from "../core/node-graph-links";
 import { nodeGraphParentPath, nodeGraphPathDepth, nodeGraphPathIsConfigured } from "../core/node-graph-scope";
 import type { NamingPart } from "../core/types";
+import {
+  assertSettingsWritable,
+  lockSettingsPanel,
+  renderSettingsPersistenceStatus,
+} from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { setLanguage, t } from "../ui/i18n";
@@ -71,6 +76,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public override async setControlValue(key: string, value: unknown): Promise<void> {
+    assertSettingsWritable(this.plugin.getSettingsCompatibility());
     const settings = this.plugin.settings;
     let reconcileNodeGraph = false;
     switch (key) {
@@ -134,12 +140,33 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       cls: "folder-nodes-tab-panel",
       attr: { id: this.panelId(this.activeTab), role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },
     });
+    const compatibility = this.plugin.getSettingsCompatibility();
+    renderSettingsPersistenceStatus(
+      panel,
+      compatibility,
+      this.plugin.getSettingsSaveState(),
+      () => this.retrySettingsSave(),
+    );
     if (this.activeTab === "general") this.renderGeneral(panel);
     else if (this.activeTab === "homepage") this.renderHomepage(panel);
     else if (this.activeTab === "icons") this.renderIcons(panel);
     else if (this.activeTab === "naming") this.renderNaming(panel);
     else this.renderNodeGraph(panel);
+    lockSettingsPanel(panel, compatibility.status === "incompatible");
     this.revealActiveTab(tabs);
+  }
+
+  public refreshPersistenceStatus(): void {
+    if (this.containerEl.isConnected) this.display();
+  }
+
+  private async retrySettingsSave(): Promise<void> {
+    try {
+      await this.plugin.retrySettingsSave();
+    } catch {
+      // The retained snapshot and visible pending state remain available.
+    }
+    this.refreshPersistenceStatus();
   }
 
   private addTabButton(container: HTMLElement, id: TabId, label: string): void {

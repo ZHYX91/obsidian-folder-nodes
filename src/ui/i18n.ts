@@ -3,6 +3,8 @@ import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
   settings: "Folder Nodes 设置", general: "常规", homepage: "主页", icons: "图标与外观", naming: "选区与命名", nodeGraph: "节点图谱",
+  settingsReadOnly: "设置为只读", settingsReadOnlyDesc: "这些设置使用不受支持的 schema {stored}；当前插件只支持 schema {current}。请先更新插件再编辑。现有 data.json 未被改写。",
+  settingsSavePending: "设置尚未保存", settingsSavePendingDesc: "最近的设置更改仍保留在本次会话中，但写入 data.json 失败。请重试保存。", retrySettingsSave: "重试保存",
   enableNodeGraph: "启用节点图谱", enableNodeGraphDesc: "启用独立的 Folder Node 图谱视图、命令和右键入口。关闭后会关闭现有图谱并释放渲染资源。",
   nodeGraphDisabledDesc: "节点图谱已关闭；Folder Nodes 的其他功能仍可正常使用。",
   nodeGraphDefaults: "默认视图", nodeGraphDefaultsDesc: "新打开的节点图谱使用这些默认值；已打开视图保留自己的范围、焦点、维度和链接开关。",
@@ -134,6 +136,8 @@ const zh = {
 
 const en: typeof zh = {
   settings: "Folder Nodes settings", general: "General", homepage: "Homepage", icons: "Icons & appearance", naming: "Selection & naming", nodeGraph: "Node Graph",
+  settingsReadOnly: "Settings are read-only", settingsReadOnlyDesc: "These settings use unsupported schema {stored}; this plugin supports schema {current}. Update the plugin before editing. Existing data.json was not rewritten.",
+  settingsSavePending: "Settings have not been saved", settingsSavePendingDesc: "The latest settings changes remain in this session, but writing data.json failed. Retry the save.", retrySettingsSave: "Retry save",
   enableNodeGraph: "Enable Node Graph", enableNodeGraphDesc: "Enable the dedicated Folder Node graph view, commands, and context-menu entries. Turning it off closes open graphs and releases rendering resources.",
   nodeGraphDisabledDesc: "Node Graph is disabled. Other Folder Nodes features remain available.",
   nodeGraphDefaults: "Default view", nodeGraphDefaultsDesc: "New Node Graph views use these defaults. Open views keep their current scope, focus, dimension, and links toggle.",

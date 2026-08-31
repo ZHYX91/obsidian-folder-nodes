@@ -50,6 +50,15 @@ describe("runtime architecture contract", () => {
     expect(layoutReady).not.toContain("setTimeout");
   });
 
+  it("fails closed around versioned settings and flushes only compatible loaded data", () => {
+    const plugin = source("src/app/plugin.ts");
+    expect(plugin).toContain("loadSettingsData(stored)");
+    expect(plugin).toContain("if (loaded.migration !== null)");
+    expect(plugin).toContain('this.settingsLoaded && this.settingsCompatibility.status === "compatible"');
+    expect(plugin).toContain("this.settingsSaver.flush(createSettingsSnapshot(this.settings))");
+    expect(plugin).toContain("throw new SettingsSchemaIncompatibleError");
+  });
+
   it("owns one authoritative versioned stylesheet per workspace document", () => {
     const plugin = source("src/app/plugin.ts");
     const settings = source("src/app/settings-tab.ts");
