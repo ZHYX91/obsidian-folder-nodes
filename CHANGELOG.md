@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.1
+
+- Restored the exact production assets from the fixed candidate handoff before detached GitHub publication and post-verification jobs validate it, keeping those jobs independent from untracked build output.
+
 ## 0.7.0
 
 - Added portable `folderNodeHidden: true` markers with inherited subtree hiding across File Explorer, Node Contents, and Folder Nodes Graph; included a persistent master switch, session-only reveal, explicit/inherited status feedback, unmanaged precedence, and merge-safe metadata handling.
