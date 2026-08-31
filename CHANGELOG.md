@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.0
+
 - Added portable `folderNodeHidden: true` markers with inherited subtree hiding across File Explorer, Node Contents, and Folder Nodes Graph; included a persistent master switch, session-only reveal, explicit/inherited status feedback, unmanaged precedence, and merge-safe metadata handling.
 - Rebuilt Node Graph around progressive per-scope expansion, independent multi-branch and range controls, node-card handles, native search with state restoration, and session-only expansion that returns to a safe one-level default after restart.
 - Kept structure as the permanent graph skeleton and replaced Structure/Links/Hybrid with a default-off resolved-link overlay, including compatible migration of existing workspace relation state.
