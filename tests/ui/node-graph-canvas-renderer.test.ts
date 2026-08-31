@@ -611,6 +611,12 @@ describe("large Node Graph canvas renderer", () => {
     canvas?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
     expect(onSelect).toHaveBeenCalledWith("");
     expect(surface.querySelector("[role='status']")?.textContent).toContain("Vault");
+    onSelect.mockClear();
+    const escape = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" });
+    canvas?.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(onSelect).toHaveBeenCalledWith(null);
+    canvas?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
     canvas?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: " " }));
     expect(onOpen).toHaveBeenCalledWith("", false);
     const keyboardMenu = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "F10", shiftKey: true });
@@ -667,6 +673,20 @@ describe("large Node Graph canvas renderer", () => {
     });
     canvas?.dispatchEvent(touchUp);
     expect(onSelect).toHaveBeenCalledWith("");
+
+    onSelect.mockClear();
+    canvas?.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, clientX: 500, clientY: 500, pointerId: 11, pointerType: "mouse",
+    }));
+    const backgroundUp = new PointerEvent("pointerup", {
+      bubbles: true, clientX: 500, clientY: 500, pointerId: 11, pointerType: "mouse",
+    });
+    Object.defineProperties(backgroundUp, {
+      offsetX: { configurable: true, value: 500 },
+      offsetY: { configurable: true, value: 500 },
+    });
+    canvas?.dispatchEvent(backgroundUp);
+    expect(onSelect).toHaveBeenCalledWith(null);
 
     onSelect.mockClear();
     canvas?.dispatchEvent(new PointerEvent("pointerdown", {

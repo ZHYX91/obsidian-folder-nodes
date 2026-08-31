@@ -36,7 +36,13 @@ import {
   nodeGraphStructureGeometry,
 } from "../core/node-graph-geometry";
 import { fitNodeGraphViewport, layoutNodeGraphForest, type NodeGraphLayout, type NodeGraphTree } from "../core/node-graph-layout";
-import { buildNodeGraphModelFromNodes, edgesForShowLinks, type NodeGraphModel, type NodeGraphModelEdge } from "../core/node-graph-model";
+import {
+  buildNodeGraphModelFromNodes,
+  edgesForShowLinks,
+  nodeGraphFocusContextIds,
+  type NodeGraphModel,
+  type NodeGraphModelEdge,
+} from "../core/node-graph-model";
 import {
   GLOBAL_NODE_GRAPH_SCOPE,
   isWithin,
@@ -134,6 +140,8 @@ const NODE_GRAPH_DOM_MIN_SCALE = 0.65;
 const NODE_GRAPH_DOM_MIN_2D_SCALE = 0.65;
 const NODE_GRAPH_DENSE_3D_THRESHOLD = 24;
 const NODE_GRAPH_DENSE_3D_FIT_SCALE = 0.16;
+const NODE_GRAPH_MOUSE_PRESS_SLOP = 4;
+const NODE_GRAPH_TOUCH_PRESS_SLOP = 8;
 
 export class FolderNodeGraphView extends ItemView {
   private focusPath: string | null = null;
@@ -888,6 +896,7 @@ export class FolderNodeGraphView extends ItemView {
       node.style.width = `${position.width}px`;
       node.style.height = `${layout.nodeHeight}px`;
     }
+    this.bindDomFocusClear(surface);
     fit?.addEventListener("click", () => this.fit2D(surface, stage, canvas, layout.width, layout.height));
   }
 
@@ -918,6 +927,7 @@ export class FolderNodeGraphView extends ItemView {
       this.position3DNode(node, point);
     }
     this.bind3DInteraction(surface);
+    this.bindDomFocusClear(surface);
     fit?.addEventListener("click", () => {
       if (this.threeDViewport === null) return;
       this.camera = fitNodeGraphCamera(
@@ -1214,6 +1224,45 @@ export class FolderNodeGraphView extends ItemView {
     }, { passive: false });
   }
 
+  private bindDomFocusClear(surface: HTMLElement): void {
+    let press: { moved: boolean; pointerId: number; pointerType: string; x: number; y: number } | null = null;
+    surface.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch" && event.button !== 0) return;
+      const target = event.target as Element | null;
+      if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
+      if (press !== null) {
+        press.moved = true;
+        return;
+      }
+      press = {
+        moved: false,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        x: event.clientX,
+        y: event.clientY,
+      };
+    });
+    surface.addEventListener("pointermove", (event) => {
+      if (press === null || press.pointerId !== event.pointerId) return;
+      const slop = press.pointerType === "touch" ? NODE_GRAPH_TOUCH_PRESS_SLOP : NODE_GRAPH_MOUSE_PRESS_SLOP;
+      if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > slop) press.moved = true;
+    });
+    const finish = (event: PointerEvent, clear: boolean): void => {
+      if (press === null || press.pointerId !== event.pointerId) return;
+      const shouldClear = clear && !press.moved;
+      press = null;
+      if (shouldClear) this.setFocus(null);
+    };
+    surface.addEventListener("pointerup", (event) => finish(event, true));
+    surface.addEventListener("pointercancel", (event) => finish(event, false));
+    surface.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || this.focusPath === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setFocus(null);
+    });
+  }
+
   private update3DProjection(): void {
     if (this.threeDViewport === null || this.threeDSvg === null) return;
     const projected = projectNodeGraph3D(this.threeDPoints, this.camera, this.threeDViewport.width, this.threeDViewport.height);
@@ -1294,20 +1343,25 @@ export class FolderNodeGraphView extends ItemView {
       return;
     }
     const selected = this.focusPath;
+    const model = this.displayGraphData?.model ?? { nodes: [], edges: [] };
+    const context = nodeGraphFocusContextIds(model, selected, this.showLinks);
     const neighbors = new Set<string>();
-    for (const edge of edgesForShowLinks(this.displayGraphData?.model ?? { nodes: [], edges: [] }, this.showLinks)) {
+    for (const edge of edgesForShowLinks(model, this.showLinks)) {
       if (edge.source === selected) neighbors.add(edge.target);
       else if (edge.target === selected) neighbors.add(edge.source);
     }
     for (const [path, node] of this.nodeElements) {
       node.toggleClass("is-neighbor", neighbors.has(path));
-      node.toggleClass("is-muted", selected !== null && path !== selected && !neighbors.has(path));
+      node.toggleClass("is-muted", selected !== null && !context.has(path));
     }
     for (const edge of this.contentEl.querySelectorAll<SVGElement>(".folder-nodes-node-graph-edges [data-edge-source][data-edge-target]")) {
       const connected = selected !== null
         && (edge.dataset.edgeSource === selected || edge.dataset.edgeTarget === selected);
+      const contextual = selected !== null
+        && context.has(edge.dataset.edgeSource ?? "")
+        && context.has(edge.dataset.edgeTarget ?? "");
       edge.classList.toggle("is-connected", connected);
-      edge.classList.toggle("is-muted", selected !== null && !connected);
+      edge.classList.toggle("is-muted", selected !== null && !contextual);
     }
   }
 

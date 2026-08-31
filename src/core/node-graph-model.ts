@@ -100,6 +100,39 @@ export function edgesForShowLinks(model: NodeGraphModel, showLinks: boolean): re
   return model.edges.filter((edge) => edge.structure || (showLinks && edge.link));
 }
 
+export function nodeGraphFocusContextIds(
+  model: NodeGraphModel,
+  focusId: string | null,
+  showLinks: boolean,
+): ReadonlySet<string> {
+  const context = new Set<string>();
+  if (focusId === null) return context;
+  context.add(focusId);
+
+  let parentId: string | null = null;
+  for (const edge of model.edges) {
+    if (!edge.structure) continue;
+    if (edge.source === focusId) context.add(edge.target);
+    else if (edge.target === focusId) {
+      parentId = edge.source;
+      context.add(edge.source);
+    }
+  }
+  if (parentId !== null) {
+    for (const edge of model.edges) {
+      if (edge.structure && edge.source === parentId) context.add(edge.target);
+    }
+  }
+  if (showLinks) {
+    for (const edge of model.edges) {
+      if (!edge.link) continue;
+      if (edge.source === focusId) context.add(edge.target);
+      else if (edge.target === focusId) context.add(edge.source);
+    }
+  }
+  return context;
+}
+
 interface MutableEdge {
   source: string;
   target: string;

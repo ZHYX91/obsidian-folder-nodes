@@ -4,6 +4,7 @@ import {
   buildNodeGraphModel,
   buildNodeGraphModelFromNodes,
   edgesForShowLinks,
+  nodeGraphFocusContextIds,
   nodeGraphLinkEdges,
   nodeGraphStructureEdges,
 } from "../../src/core/node-graph-model";
@@ -39,6 +40,21 @@ describe("Node Graph relation model", () => {
     expect(nodeGraphLinkEdges(model)).toHaveLength(1);
     expect(edgesForShowLinks(model, false)).toHaveLength(3);
     expect(edgesForShowLinks(model, true)).toHaveLength(4);
+  });
+
+  it("keeps the selected structural family visible without promoting sibling descendants", () => {
+    const model = buildNodeGraphModel({
+      id: "",
+      children: [
+        { id: "A", children: [{ id: "A/C", children: [] }] },
+        { id: "B", children: [{ id: "B/D", children: [] }] },
+      ],
+    }, new Map([["A", new Set(["B/D"])]]));
+
+    expect([...nodeGraphFocusContextIds(model, "A", false)].sort()).toEqual(["", "A", "A/C", "B"]);
+    expect(nodeGraphFocusContextIds(model, "A", false).has("B/D")).toBe(false);
+    expect(nodeGraphFocusContextIds(model, "A", true).has("B/D")).toBe(true);
+    expect(nodeGraphFocusContextIds(model, null, true).size).toBe(0);
   });
 
   it("builds a deep graph iteratively and preserves the supplied sibling order", () => {

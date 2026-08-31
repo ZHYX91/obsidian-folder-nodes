@@ -83,6 +83,37 @@ describe("Node Graph progressive view", () => {
     expect(graphNode(view, "Personal/Home").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("144px");
   });
 
+  it("keeps siblings as context and clears focus from the background or Escape", async () => {
+    const fixture = await graphViewFixture();
+    expandHandle(fixture.view, "Work").click();
+    expandHandle(fixture.view, "Personal").click();
+    nodeBody(fixture.view, "Work").click();
+
+    expect(graphNode(fixture.view, "Work").classList.contains("is-focused")).toBe(true);
+    for (const path of ["", "Work/A", "Work/B", "Personal"]) {
+      expect(graphNode(fixture.view, path).classList.contains("is-muted"), path).toBe(false);
+    }
+    expect(graphNode(fixture.view, "Personal/Home").classList.contains("is-muted")).toBe(true);
+    expect(scopeButton(fixture.view, "local").disabled).toBe(false);
+
+    const surface = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    surface?.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, button: 0, clientX: 10, clientY: 10, pointerId: 1, pointerType: "mouse",
+    }));
+    surface?.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true, button: 0, clientX: 10, clientY: 10, pointerId: 1, pointerType: "mouse",
+    }));
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-node.is-focused")).toBeNull();
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-node.is-muted")).toBeNull();
+    expect(scopeButton(fixture.view, "local").disabled).toBe(true);
+
+    nodeBody(fixture.view, "Work").click();
+    const escape = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" });
+    nodeBody(fixture.view, "Work").dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-node.is-focused")).toBeNull();
+  });
+
   it("keeps multiple branches open and applies Alt to the whole selected branch", async () => {
     const fixture = await graphViewFixture();
     expandHandle(fixture.view, "Work").click();

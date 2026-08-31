@@ -73,7 +73,7 @@ interface NodeGraphCanvasCallbacks {
   readonly label: (key: "altBranchHint" | "boundaryNode" | "largeGraph" | "nodeGraph") => string;
   readonly onContextMenu?: (path: string, event: MouseEvent) => void;
   readonly onOpen: (path: string, newLeaf: boolean) => void;
-  readonly onSelect: (path: string) => void;
+  readonly onSelect: (path: string | null) => void;
   readonly onToggle?: (path: string, branch: boolean) => void;
   readonly overviewEdgeLimit?: number;
   readonly relationSummary: (structure: number, links: number) => string;
@@ -166,6 +166,7 @@ export class NodeGraphCanvasRenderer {
   private frameId: number | null = null;
   private frameUsesTimeout = false;
   private focusPath: string | null;
+  private readonly focusContextPaths = new Set<string>();
   private height = 1;
   private hoveredPath: string | null = null;
   private neighbors = new Set<string>();
@@ -248,6 +249,7 @@ export class NodeGraphCanvasRenderer {
     this.projectedById.clear();
     this.searchMatches.clear();
     this.neighbors.clear();
+    this.focusContextPaths.clear();
     this.relationCounts.clear();
     this.visualImages.clear();
     this.canvas.remove();
@@ -381,6 +383,12 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
+    if (event.key === "Escape" && this.focusPath !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.selectFromCanvas(null, false);
+      return;
+    }
     if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
       if (this.focusPath === null || this.callbacks.onContextMenu === undefined) return;
       event.preventDefault();
@@ -511,6 +519,7 @@ export class NodeGraphCanvasRenderer {
       if (path !== null && this.isToggleHit(path, event.offsetX, event.offsetY)) {
         this.callbacks.onToggle?.(path, event.altKey);
       } else if (path !== null) this.selectFromCanvas(path, false);
+      else this.selectFromCanvas(null, false);
     }
     const remaining = this.pointers.entries().next().value;
     this.drag = remaining === undefined ? null : {
@@ -698,8 +707,10 @@ export class NodeGraphCanvasRenderer {
       const sourceBox = this.presentationForPoint(source).box;
       const targetBox = this.presentationForPoint(target).box;
       if (!lineMightBeVisible(sourceBox, targetBox, this.width, this.height)) continue;
-      const connected = this.focusPath !== null && (edge.source === this.focusPath || edge.target === this.focusPath);
-      const muted = this.focusPath !== null && !connected;
+      const contextual = this.focusPath !== null
+        && this.focusContextPaths.has(edge.source)
+        && this.focusContextPaths.has(edge.target);
+      const muted = this.focusPath !== null && !contextual;
       this.appendStructureEdgeBatch(
         muted ? "structure-muted" : "structure-active",
         sourceBox,
@@ -713,8 +724,10 @@ export class NodeGraphCanvasRenderer {
       const sourceBox = this.presentationForPoint(source).box;
       const targetBox = this.presentationForPoint(target).box;
       if (!lineMightBeVisible(sourceBox, targetBox, this.width, this.height)) continue;
-      const connected = this.focusPath !== null && (edge.source === this.focusPath || edge.target === this.focusPath);
-      const muted = this.focusPath !== null && !connected;
+      const contextual = this.focusPath !== null
+        && this.focusContextPaths.has(edge.source)
+        && this.focusContextPaths.has(edge.target);
+      const muted = this.focusPath !== null && !contextual;
       const offset = edge.structure ? 7 : 0;
       const key = offset === 0
         ? muted ? "link-muted" : "link-active"
@@ -819,7 +832,7 @@ export class NodeGraphCanvasRenderer {
     const focused = point.id === this.focusPath;
     const neighbor = this.neighbors.has(point.id);
     const match = this.searchMatches.has(point.id);
-    const unrelated = this.focusPath !== null && !focused && !neighbor;
+    const unrelated = this.focusPath !== null && !this.focusContextPaths.has(point.id);
     const presentation = this.presentationForPoint(point);
     const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, presentation.scale)) : 1;
     const hiddenAlpha = record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined && record.hiddenExplicit !== true ? 0.62 : 1;
@@ -1008,12 +1021,25 @@ export class NodeGraphCanvasRenderer {
 
   private updateDerivedState(): void {
     this.neighbors.clear();
+    this.focusContextPaths.clear();
     if (this.focusPath === null) return;
+    this.focusContextPaths.add(this.focusPath);
+    let parentId: string | null = null;
     for (const edge of this.incidentStructureEdges.get(this.focusPath) ?? []) {
-      this.neighbors.add(edge.source === this.focusPath ? edge.target : edge.source);
+      const neighbor = edge.source === this.focusPath ? edge.target : edge.source;
+      this.neighbors.add(neighbor);
+      this.focusContextPaths.add(neighbor);
+      if (edge.target === this.focusPath) parentId = edge.source;
+    }
+    if (parentId !== null) {
+      for (const edge of this.incidentStructureEdges.get(parentId) ?? []) {
+        if (edge.source === parentId) this.focusContextPaths.add(edge.target);
+      }
     }
     for (const edge of this.incidentLinkEdges.get(this.focusPath) ?? []) {
-      this.neighbors.add(edge.source === this.focusPath ? edge.target : edge.source);
+      const neighbor = edge.source === this.focusPath ? edge.target : edge.source;
+      this.neighbors.add(neighbor);
+      this.focusContextPaths.add(neighbor);
     }
   }
 
@@ -1084,10 +1110,11 @@ export class NodeGraphCanvasRenderer {
       .map(({ id }) => id);
   }
 
-  private selectFromCanvas(path: string, center: boolean): void {
+  private selectFromCanvas(path: string | null, center: boolean): void {
+    if (path === null && this.focusPath === null) return;
     this.focusPath = path;
     this.updateDerivedState();
-    if (center) this.centerOn(path);
+    if (center && path !== null) this.centerOn(path);
     this.callbacks.onSelect(path);
     this.announceFocus();
     this.scheduleDraw();
