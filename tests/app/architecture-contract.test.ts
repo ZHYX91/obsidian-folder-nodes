@@ -12,6 +12,12 @@ describe("runtime architecture contract", () => {
     expect(explorer).toContain('getLeavesOfType("file-explorer")');
   });
 
+  it("rebinds Explorer decoration when mobile mounts the sidebar after layout-ready", () => {
+    const plugin = source("src/app/plugin.ts");
+    expect(plugin).toContain('this.app.workspace.on("layout-change"');
+    expect(plugin).toContain("this.explorer.refresh()");
+  });
+
   it("routes structural moves through the link-safe FileManager API", () => {
     const nodes = source("src/adapters/node-service.ts");
     expect(nodes).not.toContain(".vault.rename(");

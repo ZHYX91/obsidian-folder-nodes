@@ -430,6 +430,10 @@ export default class FolderNodesPlugin extends Plugin {
       this.registerUnresolvedLinkDocument(window.document);
     }));
     this.registerEvent(this.app.workspace.on("css-change", () => this.ensureWorkspaceStyles()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => {
+      this.ensureWorkspaceStyles();
+      this.explorer.refresh();
+    }));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
       this.updateContentsView();
       this.refreshVisuals(undefined, "active-leaf");

@@ -7,6 +7,47 @@ import type { VisualService } from "../../src/adapters/visual-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 
 describe("ExplorerAdapter lifecycle", () => {
+  it("binds and decorates a File Explorer surface mounted after startup", () => {
+    const root = document.createElement("div");
+    root.className = "workspace-leaf-content";
+    const header = root.createDiv({ cls: "nav-header" });
+    header.createDiv({ cls: "nav-buttons-container" });
+    root.createDiv({ cls: "nav-files-container" });
+    document.body.append(root);
+    let explorerLeaves: Array<{ view: { containerEl: HTMLElement } }> = [];
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: () => null },
+      workspace: {
+        getActiveFile: () => null,
+        getLeavesOfType: (type: string) => type === "file-explorer" ? explorerLeaves : [],
+      },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, isCanonicalFile: () => false,
+      isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md",
+      openFolderNode: async () => undefined, placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    expect(root.querySelector(".folder-nodes-explorer-root")).toBeNull();
+
+    explorerLeaves = [{ view: { containerEl: root } }];
+    adapter.refresh();
+    expect(root.querySelectorAll(".folder-nodes-explorer-root")).toHaveLength(1);
+    expect(root.querySelectorAll(".folder-nodes-create-node")).toHaveLength(1);
+
+    adapter.stop();
+    expect(root.querySelector(".folder-nodes-explorer-root")).toBeNull();
+    root.remove();
+  });
+
   it("hides managed rows, shows one status eye during session reveal, and gives unmanaged precedence", () => {
     const root = document.createElement("div");
     root.createDiv({ cls: "nav-files-container" });
