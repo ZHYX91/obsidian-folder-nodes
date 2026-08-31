@@ -295,6 +295,25 @@ body {
 .folder-nodes-visual-preview-item .folder-nodes-visual { width: 28px; height: 28px; }
 .folder-nodes-visual-preview > .setting-item-description { flex-basis: 100%; }
 .folder-nodes-canonical-note { display: none !important; }
+.folder-nodes-hidden-node { display: none !important; }
+.folder-nodes-hidden-inherited { opacity: 0.62; }
+.folder-nodes-hidden-status {
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.folder-nodes-hidden-status > svg { width: 16px; height: 16px; }
+.folder-nodes-node-shell > .folder-nodes-hidden-status {
+  position: absolute;
+  z-index: 1;
+  inset-inline-end: 6px;
+  inset-block-end: 6px;
+}
 .folder-nodes-create-node.is-hidden { display: none !important; }
 
 .folder-nodes-explorer-root {

@@ -15,7 +15,7 @@ import {
 } from "./contents-interactions";
 import { t } from "./i18n";
 import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
-import type { ChildOrderRecord, NodeVisual } from "../core/types";
+import type { ChildOrderRecord, FolderNodeHiddenState, NodeVisual } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import type { ReferenceIndex } from "../core/reference-index";
 
@@ -34,6 +34,9 @@ interface ContentsService {
   notePathForFolder(path: string): string;
   isIgnoredPath(path: string): boolean;
   isIgnoredRootPath(path: string): boolean;
+  hiddenState?(path: string): FolderNodeHiddenState;
+  isNodeVisible?(path: string): boolean;
+  revealingHiddenNodes?(): boolean;
   isLeafNoteExempt(path: string): boolean;
   children(path: string): ChildOrderRecord[];
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
@@ -144,7 +147,8 @@ export class FolderNodeContentsView extends ItemView {
     const currentIgnored = this.service.isIgnoredPath(folderPath);
     const childFolders = folder.children.filter((entry): entry is TFolder => entry instanceof TFolder);
     const childOrder = new Map(this.service.children(folderPath).map(({ childPath }, index) => [childPath, index]));
-    const managedFolders = (currentIgnored ? [] : childFolders.filter((entry) => !this.service.isIgnoredPath(entry.path)))
+    const managedFolders = (currentIgnored ? [] : childFolders.filter((entry) =>
+      !this.service.isIgnoredPath(entry.path) && (this.service.isNodeVisible?.(entry.path) ?? true)))
       .sort((a, b) => (childOrder.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (childOrder.get(b.path) ?? Number.MAX_SAFE_INTEGER));
     const nodeEntries: NodeEntry[] = managedFolders.map((entry) => ({
       kind: this.service.getCanonicalFile(entry.path) === null ? "incomplete" : "healthy",
@@ -274,6 +278,18 @@ export class FolderNodeContentsView extends ItemView {
       const problemLabel = item.kind === "incomplete" ? t("missingNodeNote") : item.kind === "conflict" ? t("nodeConflict") : t("missingNodeFolder");
       const shell = grid.createDiv({ cls: `folder-nodes-entry-shell folder-nodes-node-shell${item.kind === "conflict" || item.kind === "missing-folder" ? " is-problem" : ""}` });
       const card = shell.createEl("button", { cls: "folder-nodes-node-card" });
+      if (item.kind === "healthy" && entry instanceof TFolder && (this.service.revealingHiddenNodes?.() ?? false)) {
+        const hiddenState = this.service.hiddenState?.(entry.path) ?? { explicit: false, sourcePath: null, unmanaged: false };
+        if (hiddenState.sourcePath !== null) {
+          const hiddenLabel = hiddenState.explicit ? t("hiddenNode") : t("hiddenByNode", { path: hiddenState.sourcePath });
+          card.setAttr("title", hiddenLabel);
+          card.setAttr("aria-label", `${entry.name} · ${hiddenLabel}`);
+          if (hiddenState.explicit) {
+            const status = shell.createSpan({ cls: "folder-nodes-hidden-status", attr: { title: hiddenLabel, "aria-label": hiddenLabel } });
+            setIcon(status, "eye-off");
+          } else shell.addClass("folder-nodes-hidden-inherited");
+        }
+      }
       if (item.kind !== "healthy") {
         card.setAttr("aria-label", `${entry.name} · ${problemLabel}`);
         card.setAttr("title", problemLabel);

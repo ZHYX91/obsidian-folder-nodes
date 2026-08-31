@@ -1,4 +1,4 @@
-import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
+import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
 
 import BASE_STYLES from "../ui/styles.css";
 import NODE_GRAPH_STYLES from "../ui/node-graph.css";
@@ -64,6 +64,8 @@ export default class FolderNodesPlugin extends Plugin {
   private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
   private settingsTab: FolderNodesSettingTab | null = null;
   private settingsSaveWasPending = false;
+  private showHiddenNodesThisSession = false;
+  private hiddenNodesRibbon: HTMLElement | null = null;
   private readonly settingsSaver = new SettingsSaveCoordinator<PersistedFolderNodesSettings>(
     (snapshot) => this.saveData(snapshot),
     (state) => {
@@ -98,7 +100,8 @@ export default class FolderNodesPlugin extends Plugin {
     }
     this.updateEmojiFontStyle();
     setLanguage(this.settings.language);
-    this.service = new NodeService(this.app, () => this.settings);
+    this.showHiddenNodesThisSession = false;
+    this.service = new NodeService(this.app, () => this.settings, () => this.showHiddenNodesThisSession);
     this.visuals = new VisualService(this.app, this.service, () => this.settings.iconInheritance);
     this.explorer = new ExplorerAdapter(
       this.app,
@@ -108,6 +111,7 @@ export default class FolderNodesPlugin extends Plugin {
       () => ({
         createNode: t("createNode"), incompleteNode: t("incompleteNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
         node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"), unmanaged: t("unmanaged"),
+        hiddenNode: t("hiddenNode"), hiddenByNode: (path) => t("hiddenByNode", { path }),
       }),
       (parentPath) => {
         const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
@@ -138,6 +142,8 @@ export default class FolderNodesPlugin extends Plugin {
     this.settingsTab = new FolderNodesSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
     this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
+    this.hiddenNodesRibbon = this.addRibbonIcon("eye-off", t("showHiddenNodesThisSession"), () => void this.toggleHiddenNodesThisSession());
+    this.syncHiddenNodesRibbon();
     this.registerCommands();
     this.registerEvents();
     onLayoutReadyOnce(this.app.workspace, () => {
@@ -162,6 +168,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.initialized = false;
     this.settingsLoaded = false;
     this.settingsTab = null;
+    this.hiddenNodesRibbon = null;
     this.reconciliationReady = false;
     this.service?.dispose();
     this.refreshScheduler?.cancel();
@@ -227,7 +234,29 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   public async reconcileSettingsChange(): Promise<void> {
+    if (!this.settings.hiddenNodesEnabled) this.showHiddenNodesThisSession = false;
+    this.syncHiddenNodesRibbon();
     this.refreshVisuals();
+  }
+
+  public async toggleHiddenNodesThisSession(): Promise<void> {
+    if (!this.settings.hiddenNodesEnabled) return;
+    this.showHiddenNodesThisSession = !this.showHiddenNodesThisSession;
+    this.syncHiddenNodesRibbon();
+    await this.reconcileSettingsChange();
+  }
+
+  private syncHiddenNodesRibbon(): void {
+    const ribbon = this.hiddenNodesRibbon;
+    if (ribbon === null) return;
+    const label = this.showHiddenNodesThisSession ? t("hideHiddenNodesThisSession") : t("showHiddenNodesThisSession");
+    ribbon.setAttr("aria-label", label);
+    ribbon.setAttr("title", label);
+    ribbon.toggleClass("is-active", this.showHiddenNodesThisSession);
+    ribbon.toggleClass("is-disabled", !this.settings.hiddenNodesEnabled);
+    ribbon.setAttr("aria-disabled", String(!this.settings.hiddenNodesEnabled));
+    ribbon.empty();
+    setIcon(ribbon, this.showHiddenNodesThisSession ? "eye" : "eye-off");
   }
 
   public openBatchOrganize(): void { this.showScan(false); }
@@ -348,6 +377,15 @@ export default class FolderNodesPlugin extends Plugin {
       },
     });
     this.addCommand({ id: "open-contents", name: t("contents"), callback: () => this.runAction(this.openContents()) });
+    this.addCommand({
+      id: "toggle-hidden-nodes",
+      name: t("showHiddenNodesThisSession"),
+      checkCallback: (checking) => {
+        if (!this.settings.hiddenNodesEnabled) return false;
+        if (!checking) void this.toggleHiddenNodesThisSession();
+        return true;
+      },
+    });
     this.addCommand({ id: "rename-node", name: t("renameCurrentNode"), callback: () => this.promptRenameCurrent() });
     this.addCommand({ id: "move-node", name: t("moveContainingNode"), callback: () => this.promptMoveCurrent() });
     this.addCommand({ id: "merge-node", name: t("mergeContainingNode"), callback: () => this.promptMergeCurrent() });
@@ -569,6 +607,21 @@ export default class FolderNodesPlugin extends Plugin {
     if (includeContents) menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(folder))));
     menu.addItem((item) => item.setTitle(t("editVisual")).setIcon("palette").onClick(() => this.promptVisual(folder)));
     if (normalizeVaultPath(folder.path) === "") return;
+    const hiddenState = this.service.hiddenState(folder.path);
+    if (hiddenState.explicit) {
+      menu.addItem((item) => item.setTitle(t("unhideNode")).setIcon("eye").onClick(() => void this.runRepair(async () => {
+        await this.service.setNodeHidden(folder, false);
+        await this.reconcileSettingsChange();
+      })));
+    } else if (hiddenState.sourcePath !== null) {
+      const sourcePath = hiddenState.sourcePath;
+      menu.addItem((item) => item.setTitle(t("hiddenByNode", { path: sourcePath })).setIcon("eye-off").setDisabled(true));
+    } else {
+      menu.addItem((item) => item.setTitle(t("hideNode")).setIcon("eye-off").onClick(() => void this.runRepair(async () => {
+        await this.service.setNodeHidden(folder, true);
+        await this.reconcileSettingsChange();
+      })));
+    }
     menu.addSeparator();
     if (surface === "owned") {
       menu.addItem((item) => item.setTitle(t("rename")).setIcon("pencil").onClick(() => this.promptRename(folder)));
@@ -661,11 +714,21 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private async manageFolder(path: string): Promise<void> {
-    const index = this.settings.ignoredFolders.indexOf(normalizeVaultPath(path));
+    const normalized = normalizeVaultPath(path);
+    const index = this.settings.ignoredFolders.indexOf(normalized);
     if (index < 0) { new Notice(t("unmanagedByRule"), 8000); return; }
-    this.settings.ignoredFolders.splice(index, 1);
-    await this.saveSettings();
-    await this.reconcileSettingsChange();
+    const apply = async (): Promise<void> => {
+      const currentIndex = this.settings.ignoredFolders.indexOf(normalized);
+      if (currentIndex >= 0) this.settings.ignoredFolders.splice(currentIndex, 1);
+      await this.saveSettings();
+      await this.reconcileSettingsChange();
+    };
+    const hiddenState = this.service.hiddenState(normalized);
+    if (hiddenState.sourcePath !== null) {
+      new ConfirmModal(this.app, t("manageAgain"), t("hiddenAgainOnManage", { path: hiddenState.sourcePath }), t("manageAgain"), false, apply).open();
+      return;
+    }
+    await apply();
   }
 
   private remapUnmanagedPaths(entry: TAbstractFile, oldPath: string): void {

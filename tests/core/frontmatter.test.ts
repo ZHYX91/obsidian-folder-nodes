@@ -15,4 +15,9 @@ describe("source-preserving frontmatter patches", () => {
   it("fails closed on unterminated frontmatter", () => {
     expect(() => patchFrontmatterScalar("---\nicon: x\nbody", "folderNodeSiblingRank", 1)).toThrow("malformed frontmatter");
   });
+  it("writes exact boolean hidden markers and deletes them on unhide", () => {
+    const hidden = patchFrontmatterScalar("Body", "folderNodeHidden", true);
+    expect(hidden).toBe("---\nfolderNodeHidden: true\n---\nBody");
+    expect(patchFrontmatterScalar(hidden, "folderNodeHidden", null)).toBe("---\n---\nBody");
+  });
 });

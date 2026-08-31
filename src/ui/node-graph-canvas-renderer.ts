@@ -1,3 +1,5 @@
+import { setIcon } from "obsidian";
+
 import {
   buildNodeGraphCanvasSpatialIndex,
   fitNodeGraphCanvasCamera,
@@ -52,6 +54,8 @@ export interface NodeGraphCanvasRecord {
   readonly boundary?: boolean;
   readonly childCount?: number;
   readonly expanded?: boolean;
+  readonly hiddenExplicit?: boolean;
+  readonly hiddenSourcePath?: string | null;
   readonly label: string;
   readonly path: string;
   readonly visual: NodeVisual;
@@ -65,6 +69,7 @@ export interface NodeGraphCanvasData {
 }
 
 interface NodeGraphCanvasCallbacks {
+  readonly hiddenLabel?: (sourcePath: string, explicit: boolean) => string;
   readonly label: (key: "altBranchHint" | "boundaryNode" | "largeGraph" | "nodeGraph") => string;
   readonly onContextMenu?: (path: string, event: MouseEvent) => void;
   readonly onOpen: (path: string, newLeaf: boolean) => void;
@@ -817,7 +822,8 @@ export class NodeGraphCanvasRenderer {
     const unrelated = this.focusPath !== null && !focused && !neighbor;
     const presentation = this.presentationForPoint(point);
     const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, presentation.scale)) : 1;
-    const alpha = unrelated ? 0.22 : (record.boundary === true ? 0.62 : 1) * depthAlpha;
+    const hiddenAlpha = record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined && record.hiddenExplicit !== true ? 0.62 : 1;
+    const alpha = unrelated ? 0.22 : (record.boundary === true ? 0.62 : 1) * depthAlpha * hiddenAlpha;
     this.context.save();
     this.context.globalAlpha = alpha;
     if (presentation.kind === "dot") {
@@ -855,6 +861,7 @@ export class NodeGraphCanvasRenderer {
         (text) => this.context?.measureText(text).width ?? Number.POSITIVE_INFINITY,
       );
       this.context.fillText(visibleLabel, labelX, point.y);
+      if (record.hiddenExplicit === true) this.drawHiddenStatus(left + width - 13, top + 10, Math.max(0.75, presentation.scale));
       if (childCount > 0) {
         this.context.fillStyle = this.palette.mutedText;
         if (this.data.layout.direction === "top-to-bottom") {
@@ -866,6 +873,20 @@ export class NodeGraphCanvasRenderer {
         }
       }
     }
+    this.context.restore();
+  }
+
+  private drawHiddenStatus(x: number, y: number, scale: number): void {
+    if (this.context === null) return;
+    const radius = 5 * scale;
+    this.context.save();
+    this.context.strokeStyle = this.palette.mutedText;
+    this.context.lineWidth = Math.max(1, scale);
+    this.context.beginPath();
+    this.context.ellipse(x, y, radius, radius * 0.62, 0, 0, Math.PI * 2);
+    this.context.moveTo(x - radius - 2 * scale, y - radius);
+    this.context.lineTo(x + radius + 2 * scale, y + radius);
+    this.context.stroke();
     this.context.restore();
   }
 
@@ -945,13 +966,20 @@ export class NodeGraphCanvasRenderer {
       const icon = this.focusOverlayBody.createSpan({ cls: "folder-nodes-node-graph-icon" });
       renderVisual(icon, record.visual, record.label);
       this.focusOverlayBody.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
+      if (record.hiddenExplicit === true) {
+        const status = this.focusOverlayBody.createSpan({ cls: "folder-nodes-hidden-status", attr: { "aria-hidden": "true" } });
+        setIcon(status, "eye-off");
+      }
       this.focusOverlay.dataset.nodePath = path;
       this.focusOverlayBody.dataset.nodePath = path;
     }
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
     const boundary = record.boundary ? `\n${this.callbacks.label("boundaryNode")}` : "";
     const pathDetail = path === "" ? "" : `\n${path}`;
-    const title = `${record.label}${pathDetail}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`;
+    const hidden = record.hiddenSourcePath === null || record.hiddenSourcePath === undefined
+      ? ""
+      : `\n${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
+    const title = `${record.label}${pathDetail}${boundary}${hidden}\n${this.callbacks.relationSummary(counts.structure, counts.links)}`;
     this.focusOverlayBody.setAttribute("aria-label", title);
     this.focusOverlay.setAttribute("title", title);
     const childCount = Math.max(0, record.childCount ?? 0);
@@ -1083,7 +1111,10 @@ export class NodeGraphCanvasRenderer {
       ? `\n${this.callbacks.toggleLabel?.(record.label, childCount, record.expanded === true)
         ?? `${record.expanded === true ? "Collapse" : "Expand"} ${record.label}; ${childCount}`}\n${this.callbacks.label("altBranchHint")}`
       : "";
-    this.tooltip.setText(`${record.label}\n${path}${boundary}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
+    const hidden = record.hiddenSourcePath === null || record.hiddenSourcePath === undefined
+      ? ""
+      : `\n${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
+    this.tooltip.setText(`${record.label}\n${path}${boundary}${hidden}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
     this.tooltip.style.left = `${Math.min(this.width - 16, x + 12)}px`;
     this.tooltip.style.top = `${Math.min(this.height - 16, y + 12)}px`;
     this.tooltip.hidden = false;
@@ -1104,7 +1135,10 @@ export class NodeGraphCanvasRenderer {
       return;
     }
     const counts = this.relationCounts.get(record.path) ?? { links: 0, structure: 0 };
-    const announcement = `${record.label}. ${record.path}. ${this.callbacks.relationSummary(counts.structure, counts.links)}`;
+    const hidden = record.hiddenSourcePath === null || record.hiddenSourcePath === undefined
+      ? ""
+      : `. ${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
+    const announcement = `${record.label}. ${record.path}${hidden}. ${this.callbacks.relationSummary(counts.structure, counts.links)}`;
     this.canvas.setAttribute("aria-label", `${baseLabel}. ${announcement}`);
     this.activeAnnouncement.setText(announcement);
   }

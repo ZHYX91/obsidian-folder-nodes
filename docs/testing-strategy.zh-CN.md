@@ -15,6 +15,8 @@ translation_status: source
 
 ## 性能
 
+自动化测试必须锁定 `folderNodeHidden` 的严格布尔解析、写入与删除、后代继承、Root/不完整/不管理写入拒绝、不管理与总开关优先级、合并不复制、Explorer/Contents/Graph 投影、会话显示状态和图谱元数据增量失效。隔离 Vault 验收还要覆盖中英文设置、移动端无 hover、显式根单眼睛、继承后代弱化提示、关闭总开关不改 YAML、会话重载复位，以及 Obsidian 搜索、快速切换、反向链接、原生图谱和直接打开不受影响。
+
 Quick 门槛验证 10,000 个、large 门槛验证 100,000 个直接 Child Nodes 的常规 reorder 计划在两秒内完成并只产生一个属性 patch。拥挤 rank 的局部 rebalance 不超过 64 个节点。反向引用 benchmark 对 quick 20,000/large 100,000 个来源建索引，并验证 1,000 个增量移除；不完整节点扫描对 quick 20,000/large 100,000 个条目验证近线性计划与完整计数。刷新调度器测试把 10,000 次请求合并为一次 batch。节点图谱 benchmark 在单一确定性串行 worker 中，用 quick 20,000/large 100,000 节点 fixture 构建真实生产 GraphIndex，然后在一次增量刷新中处理 32/128 个互不嵌套的 dirty roots。Quick 的首次构建和增量刷新门槛均为 2 秒，对应 large 门槛均为 6 秒；搜索候选聚合与一次精确查询的 quick/large 门槛分别为 1 秒和 3 秒。同一刷新后快照再经完整展开、topology、VisibleScene 与 model 聚合进入 2D layout，其 quick/large 门槛分别为 4 秒和 6 秒；纯 3D layout 加一次 1920×1080 投影的门槛分别为 2 秒和 5 秒。这些确定性计算门可以暴露线性退化，但不能证明交互式 Canvas 帧率或宿主 UI 响应速度。独立的 GraphIndex 行为测试锁定一次初始盘点、path-targeted 子树刷新、同级顺序、仅链接失效和精确扫描计数。这些计数证明范围、搜索、展开、维度与“显示链接”不重复执行全 Vault 盘点。完整展开仍保持常量 DOM、保留全部可见结构边，只对链接边应用配置上限。Contents View 的 Nodes/Album/Files 各自每批最多创建 200 项；相册图片从 resource URI 绘制一次到 canvas，普通文件不读取 binary 正文。
 
 ## 隔离 Vault 主机验收

@@ -36,6 +36,7 @@ export class ExplorerAdapter extends Component {
     private readonly getRootLabels: () => {
       createNode: string; incompleteNode: string; missingNodeFolder: string; missingNodeNote: string;
       node: string; nodeConflict: string; root: string; unmanaged: string;
+      hiddenNode?: string; hiddenByNode?: (path: string) => string;
     },
     private readonly createNode: (parentPath: string) => void,
     private readonly completeNode: (entry: TFile | TFolder) => void,
@@ -215,6 +216,13 @@ export class ExplorerAdapter extends Component {
         this.service.isIgnoredRootPath(folder.path),
         this.service.getCanonicalFile(folder.path) !== null,
       );
+      const row = element.closest<HTMLElement>(".nav-folder") ?? element;
+      const hiddenState = this.service.hiddenState?.(folder.path) ?? { explicit: false, sourcePath: null, unmanaged: false };
+      const hidden = identity === "node" && !(this.service.isNodeVisible?.(folder.path) ?? true);
+      row.toggleClass("folder-nodes-hidden-node", hidden);
+      element.removeClass("folder-nodes-hidden-inherited");
+      element.querySelector(":scope > .folder-nodes-hidden-status")?.remove();
+      restoreHiddenTitle(element);
       if (identity === "ordinary") {
         element.querySelector(":scope > .folder-nodes-explorer-icon")?.remove();
         element.querySelector(":scope > .folder-nodes-explorer-problem-badge")?.remove();
@@ -230,6 +238,7 @@ export class ExplorerAdapter extends Component {
       let repair = element.querySelector<HTMLButtonElement>(":scope > .folder-nodes-explorer-repair");
       const title = element.querySelector<HTMLElement>(":scope > .nav-folder-title-content");
       if (identity === "unmanaged") {
+        row.removeClass("folder-nodes-hidden-node");
         icon?.remove();
         repair?.remove();
         restoreOwnedDraggable(element);
@@ -264,6 +273,20 @@ export class ExplorerAdapter extends Component {
       }
       problemBadge?.remove();
       repair?.remove();
+      if ((this.service.revealingHiddenNodes?.() ?? false) && hiddenState.sourcePath !== null) {
+        if (hiddenState.explicit) {
+          const status = ownedSpan(element.ownerDocument, "folder-nodes-hidden-status folder-nodes-explorer-status-icon");
+          const label = this.getRootLabels().hiddenNode ?? "Hidden node";
+          status.setAttr("title", label);
+          status.setAttr("aria-label", label);
+          setIcon(status, "eye-off");
+          element.append(status);
+        } else {
+          const label = this.getRootLabels().hiddenByNode?.(hiddenState.sourcePath) ?? `Hidden by ${hiddenState.sourcePath}`;
+          element.addClass("folder-nodes-hidden-inherited");
+          ownHiddenTitle(element, label);
+        }
+      }
       if (this.dragEnabled) setOwnedDraggable(element);
       else restoreOwnedDraggable(element);
       const resolved = this.visuals.resolve(folder);
@@ -512,8 +535,9 @@ export class ExplorerAdapter extends Component {
   }
 
   private cleanupSurface(root: HTMLElement): void {
-    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-canonical-note, .folder-nodes-missing-folder-note, .folder-nodes-node, .folder-nodes-missing-note")) {
-      element.removeClass("folder-nodes-canonical-note", "folder-nodes-missing-folder-note", "folder-nodes-node", "folder-nodes-missing-note");
+    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-canonical-note, .folder-nodes-missing-folder-note, .folder-nodes-node, .folder-nodes-missing-note, .folder-nodes-hidden-node, .folder-nodes-hidden-inherited")) {
+      element.removeClass("folder-nodes-canonical-note", "folder-nodes-missing-folder-note", "folder-nodes-node", "folder-nodes-missing-note", "folder-nodes-hidden-node", "folder-nodes-hidden-inherited");
+      restoreHiddenTitle(element);
       restoreOwnedDraggable(element);
     }
     for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge, .folder-nodes-explorer-repair")) element.remove();
@@ -524,6 +548,21 @@ export class ExplorerAdapter extends Component {
     for (const icon of root.querySelectorAll<HTMLElement>(".folder-nodes-note-title-icon")) icon.remove();
     for (const host of root.querySelectorAll<HTMLElement>(".folder-nodes-note-title-host")) host.removeClass("folder-nodes-note-title-host");
   }
+}
+
+function ownHiddenTitle(element: HTMLElement, title: string): void {
+  if (element.dataset.folderNodesHiddenTitle === undefined) {
+    element.dataset.folderNodesHiddenTitle = element.hasAttribute("title") ? `value:${element.getAttribute("title") ?? ""}` : "missing";
+  }
+  element.setAttr("title", title);
+}
+
+function restoreHiddenTitle(element: HTMLElement): void {
+  const original = element.dataset.folderNodesHiddenTitle;
+  if (original === undefined) return;
+  if (original === "missing") element.removeAttribute("title");
+  else element.setAttr("title", original.slice(6));
+  delete element.dataset.folderNodesHiddenTitle;
 }
 
 function ownedSpan(document: Document, className: string): HTMLSpanElement {

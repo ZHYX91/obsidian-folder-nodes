@@ -3,6 +3,9 @@ import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
   settings: "Folder Nodes 设置", general: "常规", homepage: "主页", icons: "图标与外观", naming: "选区与命名", nodeGraph: "节点图谱",
+  applyHiddenNodes: "应用隐藏标记", applyHiddenNodesDesc: "开启后，frontmatter 中 folderNodeHidden 为 true 的节点及其子树不会出现在文件列表、节点内容和节点图谱中。关闭只会显示这些节点，不会删除标记。",
+  hideNode: "隐藏节点", unhideNode: "取消隐藏节点", hiddenNode: "已隐藏节点", hiddenByNode: "由 {path} 隐藏",
+  showHiddenNodesThisSession: "临时显示隐藏节点", hideHiddenNodesThisSession: "恢复隐藏节点", hiddenAgainOnManage: "重新纳入管理后，此节点会按 {path} 的隐藏标记再次隐藏。",
   settingsReadOnly: "设置为只读", settingsReadOnlyDesc: "这些设置使用不受支持的 schema {stored}；当前插件只支持 schema {current}。请先更新插件再编辑。现有 data.json 未被改写。",
   settingsSavePending: "设置尚未保存", settingsSavePendingDesc: "最近的设置更改仍保留在本次会话中，但写入 data.json 失败。请重试保存。", retrySettingsSave: "重试保存",
   enableNodeGraph: "启用节点图谱", enableNodeGraphDesc: "启用独立的 Folder Node 图谱视图、命令和右键入口。关闭后会关闭现有图谱并释放渲染资源。",
@@ -136,6 +139,9 @@ const zh = {
 
 const en: typeof zh = {
   settings: "Folder Nodes settings", general: "General", homepage: "Homepage", icons: "Icons & appearance", naming: "Selection & naming", nodeGraph: "Node Graph",
+  applyHiddenNodes: "Apply hidden markers", applyHiddenNodesDesc: "When enabled, nodes whose frontmatter has folderNodeHidden set to true, together with their subtrees, are omitted from File Explorer, Node Contents, and Node Graph. Turning this off shows them without deleting markers.",
+  hideNode: "Hide node", unhideNode: "Unhide node", hiddenNode: "Hidden node", hiddenByNode: "Hidden by {path}",
+  showHiddenNodesThisSession: "Temporarily show hidden nodes", hideHiddenNodesThisSession: "Hide hidden nodes again", hiddenAgainOnManage: "After it is managed again, this node will be hidden by the marker on {path}.",
   settingsReadOnly: "Settings are read-only", settingsReadOnlyDesc: "These settings use unsupported schema {stored}; this plugin supports schema {current}. Update the plugin before editing. Existing data.json was not rewritten.",
   settingsSavePending: "Settings have not been saved", settingsSavePendingDesc: "The latest settings changes remain in this session, but writing data.json failed. Retry the save.", retrySettingsSave: "Retry save",
   enableNodeGraph: "Enable Node Graph", enableNodeGraphDesc: "Enable the dedicated Folder Node graph view, commands, and context-menu entries. Turning it off closes open graphs and releases rendering resources.",

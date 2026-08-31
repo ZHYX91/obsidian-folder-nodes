@@ -46,6 +46,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 - Recognize complete and incomplete nodes immediately without initialization. Optional bulk organization uses a responsive exact-path preview, blocks collisions, and leaves Health strictly read-only.
 - Show both folder-only and Markdown-only halves as neutral Incomplete node states with explicit completion and Set as unmanaged actions. True pair conflicts remain warning-marked and fail closed.
 - Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and plain-language name-start rules; `.` and `_` are the defaults. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
+- Hide a complete managed node and its descendants with the portable `folderNodeHidden: true` Node Note property. Hidden nodes leave File Explorer, Node Contents, and Folder Nodes Graph only; Obsidian Search, Quick Switcher, backlinks, native Graph, links, and direct access remain unchanged. General can ignore all hidden markers without deleting them, while the ribbon or command palette can reveal them for the current session.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
 - Follow Obsidian's language automatically or override the interface with English or Simplified Chinese.
 - Keep all processing local and write no permanent node ID, `_pkwf` metadata, manifest, path, parent, or complete child list.
@@ -84,7 +85,7 @@ Preserve `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replac
 
 ## Settings
 
-- **General** controls interface language, two unified unmanaged-content rule groups, optional preview-first bulk organization, and read-only Health.
+- **General** controls interface language, whether hidden markers apply, two unified unmanaged-content rule groups, optional preview-first bulk organization, and read-only Health.
 - **Homepage** controls whether the root Node Note is a homepage and whether it opens after startup.
 - **Icons & appearance** controls inheritance, File Explorer placement, and note-title display. Its comparison card shows the difference between a property icon and the same character in a file name. Icon size and alignment follow Obsidian rather than an arbitrary size setting.
 - **Selection & naming** explains both Node-creation paths and controls their shared aliases switch, prefix and suffix sources, independent separators, custom text, timestamp format, and live filename preview.

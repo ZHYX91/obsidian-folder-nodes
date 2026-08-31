@@ -10,6 +10,45 @@ function service(fake: FakeObsidian): NodeService {
 }
 
 describe("NodeService structural safety", () => {
+  it("uses only exact true hidden markers, inherits them, and lets unmanaged override visibility", () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFolder("Parent");
+    fake.addFile("Parent/Parent.md", "", { folderNodeHidden: true });
+    fake.addFolder("Parent/Child");
+    fake.addFile("Parent/Child/Child.md", "", { folderNodeHidden: "true" });
+    fake.addFolder("StringValue");
+    fake.addFile("StringValue/StringValue.md", "", { folderNodeHidden: "true" });
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    const nodes = new NodeService(fake.app, () => settings);
+
+    expect(nodes.hiddenState("Parent")).toMatchObject({ explicit: true, sourcePath: "Parent", unmanaged: false });
+    expect(nodes.hiddenState("Parent/Child")).toMatchObject({ explicit: false, sourcePath: "Parent" });
+    expect(nodes.hiddenState("StringValue").sourcePath).toBeNull();
+    expect(nodes.isNodeVisible("Parent/Child")).toBe(false);
+    settings.hiddenNodesEnabled = false;
+    expect(nodes.isNodeVisible("Parent/Child")).toBe(true);
+    settings.hiddenNodesEnabled = true;
+    settings.ignoredFolders.push("Parent/Child");
+    expect(nodes.hiddenState("Parent/Child").unmanaged).toBe(true);
+    expect(nodes.isNodeVisible("Parent/Child")).toBe(true);
+  });
+
+  it("writes and removes the hidden marker only on complete managed non-root nodes", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const folder = fake.addFolder("A");
+    fake.addFile("A/A.md", "Body");
+    const nodes = service(fake);
+
+    await nodes.setNodeHidden(folder, true);
+    expect(fake.frontmatters.get("A/A.md")?.folderNodeHidden).toBe(true);
+    await nodes.setNodeHidden(folder, false);
+    expect(fake.frontmatters.get("A/A.md")).not.toHaveProperty("folderNodeHidden");
+    await expect(nodes.setNodeHidden(fake.root, true)).rejects.toThrow("Root Node");
+    const incomplete = fake.addFolder("Incomplete");
+    await expect(nodes.setNodeHidden(incomplete, true)).rejects.toThrow("Missing canonical");
+  });
   it("uses natural order when stale sibling ranks exist under a natural parent", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -534,6 +573,19 @@ describe("NodeService structural safety", () => {
     expect(fake.requireFile("Target/asset.bin")).toBeDefined();
     expect(fake.contents.get("Target/Target.md")).toContain("Merged from Source");
     expect(fake.files.has("Source")).toBe(false);
+  });
+
+  it("does not copy hidden state while merging nodes", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "source body", { folderNodeHidden: true });
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target body", {});
+
+    await service(fake).mergeNode(source, target);
+
+    expect(fake.frontmatters.get("Target/Target.md")).not.toHaveProperty("folderNodeHidden");
   });
 
   it("blocks merge property and path conflicts before writing", async () => {

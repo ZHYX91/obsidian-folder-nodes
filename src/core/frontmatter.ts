@@ -1,10 +1,10 @@
 const FRONTMATTER_BOUNDARY = /^---\s*$/u;
 
-export function patchFrontmatterScalar(source: string, key: string, value: string | number | null): string {
+export function patchFrontmatterScalar(source: string, key: string, value: string | number | boolean | null): string {
   const lines = source.replaceAll("\r\n", "\n").split("\n");
   const hasFrontmatter = FRONTMATTER_BOUNDARY.test(lines[0] ?? "");
   const end = hasFrontmatter ? lines.slice(1).findIndex((line) => FRONTMATTER_BOUNDARY.test(line)) + 1 : -1;
-  const rendered = value === null ? null : `${key}: ${typeof value === "number" ? value : JSON.stringify(value)}`;
+  const rendered = value === null ? null : `${key}: ${typeof value === "string" ? JSON.stringify(value) : String(value)}`;
 
   if (hasFrontmatter && end <= 0) throw new Error("Cannot update malformed frontmatter without a closing boundary");
   if (!hasFrontmatter) {

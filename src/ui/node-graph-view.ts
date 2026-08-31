@@ -946,6 +946,7 @@ export class FolderNodeGraphView extends ItemView {
       this.showLinks,
       this.focusPath,
       {
+        hiddenLabel: (sourcePath, explicit) => explicit ? t("hiddenNode") : t("hiddenByNode", { path: sourcePath }),
         label: (key) => label(key),
         onOpen: (path, newLeaf) => void this.service.openFolderNode(path, newLeaf),
         onSelect: (path) => {
@@ -1060,6 +1061,9 @@ export class FolderNodeGraphView extends ItemView {
   private createNode(canvas: HTMLElement, record: GraphRecord): HTMLElement {
     const title = record.path === "" ? this.app.vault.getName() : record.path;
     const accessibleTitle = record.boundary ? `${title}\n${label("boundaryNode")}` : title;
+    const hiddenTitle = record.hiddenSourcePath === null || record.hiddenSourcePath === undefined
+      ? accessibleTitle
+      : `${accessibleTitle}\n${record.hiddenExplicit ? t("hiddenNode") : t("hiddenByNode", { path: record.hiddenSourcePath })}`;
     const topologyNode = this.topology?.nodes.get(record.path);
     const childIds = (topologyNode?.children ?? []).filter((id) => this.structuralScopeIds.has(id));
     const expandable = !record.boundary && this.structuralScopeIds.has(record.path) && childIds.length > 0;
@@ -1070,7 +1074,7 @@ export class FolderNodeGraphView extends ItemView {
         record.boundary ? "is-boundary" : "",
         expandable ? expanded ? "is-expanded" : "is-collapsed" : "is-leaf",
       ].filter(Boolean).join(" "),
-      attr: { "data-node-path": record.path, title: accessibleTitle },
+      attr: { "data-node-path": record.path, title: hiddenTitle },
     });
     const icon = node.createSpan({
       cls: "folder-nodes-node-graph-node-icon-handle",
@@ -1081,10 +1085,14 @@ export class FolderNodeGraphView extends ItemView {
     else renderVisual(icon, visual, record.label);
     const body = node.createEl("button", {
       cls: "folder-nodes-node-graph-node-body",
-      attr: { "aria-label": accessibleTitle, type: "button" },
+      attr: { "aria-label": hiddenTitle, type: "button" },
     });
     body.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
-    setTooltip(body, accessibleTitle);
+    if (record.hiddenExplicit) {
+      const status = body.createSpan({ cls: "folder-nodes-hidden-status", attr: { "aria-hidden": "true" } });
+      setIcon(status, "eye-off");
+    } else if (record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined) node.addClass("folder-nodes-hidden-inherited");
+    setTooltip(body, hiddenTitle);
     body.addEventListener("click", () => {
       const changed = this.focusPath !== record.path;
       this.focusPath = record.path;

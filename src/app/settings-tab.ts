@@ -54,6 +54,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       language: settings.language,
       homepageEnabled: settings.homepageEnabled,
       openHomepageOnStartup: settings.openHomepageOnStartup,
+      hiddenNodesEnabled: settings.hiddenNodesEnabled,
       iconInheritance: settings.iconInheritance,
       emojiFont: settings.emojiFont,
       explorerIconPosition: settings.explorerIconPosition,
@@ -88,6 +89,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         break;
       case "homepageEnabled": settings.homepageEnabled = Boolean(value); this.plugin.refreshVisuals(); break;
       case "openHomepageOnStartup": settings.openHomepageOnStartup = Boolean(value); break;
+      case "hiddenNodesEnabled": settings.hiddenNodesEnabled = Boolean(value); reconcileNodeGraph = true; break;
       case "iconInheritance": settings.iconInheritance = Boolean(value); this.plugin.refreshVisuals(); break;
       case "emojiFont":
         if (!isEmojiFontPreference(value)) throw new Error("Unsupported Emoji font");
@@ -214,6 +216,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private generalDefinitions(): SettingDefinitionItem[] {
     return [
       { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } } },
+      { name: t("applyHiddenNodes"), desc: t("applyHiddenNodesDesc"), control: { type: "toggle", key: "hiddenNodesEnabled", defaultValue: true } },
       ...this.unmanagedRuleDefinitions("leaf"),
       ...this.unmanagedRuleDefinitions("folder"),
       this.actionDefinition(t("batchOrganize"), t("batchOrganizeDesc"), (setting) => {
@@ -309,6 +312,12 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
         new Notice(t("reloadLanguage"));
         this.display();
+      }));
+    new Setting(panel).setName(t("applyHiddenNodes")).setDesc(t("applyHiddenNodesDesc")).addToggle((toggle) => toggle
+      .setValue(this.plugin.settings.hiddenNodesEnabled).onChange(async (value) => {
+        this.plugin.settings.hiddenNodesEnabled = value;
+        await this.plugin.saveSettings();
+        await this.plugin.reconcileSettingsChange();
       }));
     this.renderUnmanagedGroup(panel, "leaf");
     this.renderUnmanagedGroup(panel, "folder");

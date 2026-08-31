@@ -14,10 +14,10 @@ import { createNodeDocument, patchFrontmatterScalar } from "../core/frontmatter"
 import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planReorder } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
-import { CHILDREN_SORT_PROPERTY, SIBLING_RANK_PROPERTY } from "../core/properties";
-import type { ChildOrderRecord, FolderNodesSettings, MigrationScan, NodeDropZone, OrderPatch } from "../core/types";
+import { CHILDREN_SORT_PROPERTY, HIDDEN_PROPERTY, SIBLING_RANK_PROPERTY } from "../core/properties";
+import type { ChildOrderRecord, FolderNodeHiddenState, FolderNodesSettings, MigrationScan, NodeDropZone, OrderPatch } from "../core/types";
 
-const STRUCTURAL_PROPERTIES = new Set([CHILDREN_SORT_PROPERTY, SIBLING_RANK_PROPERTY]);
+const STRUCTURAL_PROPERTIES = new Set([CHILDREN_SORT_PROPERTY, SIBLING_RANK_PROPERTY, HIDDEN_PROPERTY]);
 type Undo = () => Promise<void>;
 
 interface OpenMarkdownTarget {
@@ -31,7 +31,11 @@ export class NodeService {
   private readonly operations = new VaultOperationCoordinator();
   private readonly lifecycle = new AbortController();
 
-  public constructor(private readonly app: App, private readonly getSettings: () => FolderNodesSettings) {}
+  public constructor(
+    private readonly app: App,
+    private readonly getSettings: () => FolderNodesSettings,
+    private readonly getShowHiddenNodesThisSession: () => boolean = () => false,
+  ) {}
 
   public dispose(): void {
     if (!this.lifecycle.signal.aborted) {
@@ -83,6 +87,47 @@ export class NodeService {
   public isIgnoredRootPath(path: string): boolean {
     const normalized = normalizeVaultPath(path);
     return normalized !== "" && this.isIgnoredPath(normalized) && !this.isIgnoredPath(dirname(normalized));
+  }
+
+  public hiddenState(path: string): FolderNodeHiddenState {
+    const normalized = normalizeVaultPath(path);
+    const unmanaged = this.isIgnoredPath(normalized);
+    let current = normalized;
+    while (current !== "") {
+      const note = this.getCanonicalFile(current);
+      const hidden = note !== null
+        && this.app.metadataCache.getFileCache(note)?.frontmatter?.[HIDDEN_PROPERTY] === true;
+      if (hidden) return { explicit: current === normalized, sourcePath: current, unmanaged };
+      current = dirname(current);
+    }
+    return { explicit: false, sourcePath: null, unmanaged };
+  }
+
+  public isNodeVisible(path: string): boolean {
+    const state = this.hiddenState(path);
+    return state.unmanaged
+      || !this.getSettings().hiddenNodesEnabled
+      || this.getShowHiddenNodesThisSession()
+      || state.sourcePath === null;
+  }
+
+  public revealingHiddenNodes(): boolean {
+    return this.getSettings().hiddenNodesEnabled && this.getShowHiddenNodesThisSession();
+  }
+
+  public setNodeHidden(folder: TFolder, hidden: boolean): Promise<void> {
+    return this.exclusive(async () => {
+      const path = normalizeVaultPath(folder.path);
+      if (path === "") throw new Error("The Root Node cannot be hidden");
+      if (this.isIgnoredPath(path)) throw new Error(`Folder is unmanaged: ${path}`);
+      const note = this.requireCanonicalNote(folder);
+      const undos: Undo[] = [];
+      try {
+        await this.patchScalarTransactional(note, HIDDEN_PROPERTY, hidden ? true : null, undos);
+      } catch (error) {
+        await this.rollback(undos, error);
+      }
+    });
   }
 
   public isLeafNoteExempt(path: string): boolean {
@@ -761,7 +806,7 @@ export class NodeService {
     this.operations.expect(kind, newPath, oldPath, recursive);
   }
 
-  private async patchScalarTransactional(file: TFile | null, key: string, value: string | number, undos: Undo[]): Promise<void> {
+  private async patchScalarTransactional(file: TFile | null, key: string, value: string | number | boolean | null, undos: Undo[]): Promise<void> {
     if (file === null) throw new Error(`Cannot update missing node note: ${key}`);
     const path = file.path;
     const result = await this.applyFileChange(

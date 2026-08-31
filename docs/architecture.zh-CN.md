@@ -11,6 +11,8 @@ translation_status: source
 
 ## 分层
 
+`folderNodeHidden` 是 Node Note 中受保护的 Folder Nodes 布尔属性，与 `folderNodeChildrenSort`、`folderNodeSiblingRank` 一样不会在合并时从来源节点复制。NodeService 的 `children()` 仍返回完整受管理结构；可见性投影采用 `unmanaged || !hiddenNodesEnabled || showHiddenNodesThisSession || !effectiveHidden(node)`，并向上查找最近的严格 `true` 来源。Explorer、Contents 与 Graph 共用该规则，图谱在模型与布局前剪枝隐藏子树。插件只把持久总开关写入 schema v1 `data.json`，会话显示开关只存在内存中；设置 schema 不因新增带默认值的字段而升级。
+
 Core 只处理路径、命名、不管理边界规则、批量整理计划、反向引用索引、稀疏排序、frontmatter 最小 patch、Visual declaration 解析，以及节点图谱的纯可见性/几何。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View、节点图谱状态/渲染与批量刷新调度。节点图谱只采用有界的 `GraphIndex → ViewState → VisibleScene → renderer` 流程，不扩展成全插件数据抽象。UI/App 还为每个 Workspace document 唯一管理一份带内容指纹且包含节点图谱规则的 constructable stylesheet；发布包中的 `styles.css` 刻意保持无效，因此 Obsidian 原生样式缓存或第二份图谱 stylesheet 都不会成为另一个运行时权威。一次性 layout gate 会先向宿主注册，再检查 `layoutReady`，不用轮询或延时重试即可封闭状态转换竞争窗口。公开仓库不依赖本地工作区或个人 Vault。
 
 ## 排序引擎

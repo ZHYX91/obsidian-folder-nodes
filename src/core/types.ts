@@ -29,6 +29,7 @@ export interface FolderNodesSettings {
   language: InterfaceLanguage;
   homepageEnabled: boolean;
   openHomepageOnStartup: boolean;
+  hiddenNodesEnabled: boolean;
   iconInheritance: boolean;
   emojiFont: EmojiFontPreference;
   explorerIconPosition: ExplorerIconPosition;
@@ -42,6 +43,12 @@ export interface FolderNodesSettings {
   prefix: NamingPart;
   suffix: NamingPart;
   timestampFormat: string;
+}
+
+export interface FolderNodeHiddenState {
+  explicit: boolean;
+  sourcePath: string | null;
+  unmanaged: boolean;
 }
 
 export interface FolderNodeRecord {

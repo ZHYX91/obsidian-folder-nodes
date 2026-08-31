@@ -1,6 +1,8 @@
 import type { NodeVisual } from "./types";
 
 export interface NodeGraphIndexRecord {
+  readonly hiddenExplicit?: boolean;
+  readonly hiddenSourcePath?: string | null;
   readonly label: string;
   readonly notePath: string | null;
   readonly parentPath: string | null;

@@ -57,6 +57,32 @@ describe("Node Graph index", () => {
     expect(fixture.visuals.resolve).toHaveBeenCalledTimes(4);
   });
 
+  it("prunes hidden subtrees and restores them after a metadata invalidation", () => {
+    const fixture = graphIndexFixture();
+    const first = fixture.index.snapshot(fixture.settings);
+    expect(first.records.has("Work/One")).toBe(true);
+    fixture.fake.frontmatters.set("Work/Work.md", { folderNodeHidden: true });
+
+    expect(fixture.index.invalidateRecordMetadata(new Set(["Work"]))).toBe(false);
+    const hidden = fixture.index.snapshot(fixture.settings);
+    expect([...hidden.records.keys()]).toEqual(["", "Personal"]);
+
+    fixture.fake.frontmatters.set("Work/Work.md", {});
+    expect(fixture.index.invalidateRecordMetadata(new Set(["Work"]))).toBe(false);
+    const restored = fixture.index.snapshot(fixture.settings);
+    expect(new Set(restored.records.keys())).toEqual(new Set(["", "Work", "Work/One", "Personal"]));
+  });
+
+  it("retains explicit and inherited hidden status only during session reveal", () => {
+    const fixture = graphIndexFixture();
+    fixture.fake.frontmatters.set("Work/Work.md", { folderNodeHidden: true });
+    fixture.setRevealHidden(true);
+    const revealed = fixture.index.snapshot(fixture.settings);
+
+    expect(revealed.records.get("Work")).toMatchObject({ hiddenExplicit: true, hiddenSourcePath: "Work" });
+    expect(revealed.records.get("Work/One")).toMatchObject({ hiddenExplicit: false, hiddenSourcePath: "Work" });
+  });
+
   it("rescans only the affected folder for a canonical path invalidation", () => {
     const fixture = graphIndexFixture();
     const first = fixture.index.snapshot(fixture.settings);
@@ -395,6 +421,17 @@ function graphIndexFixture() {
   const children = vi.fn((path: string) => fake.requireFolder(path).children.flatMap((entry) =>
     entry instanceof TFolder && notes.has(entry.path) && ![...ignoredPaths].some((ignored) =>
       entry.path === ignored || entry.path.startsWith(`${ignored}/`)) ? [{ childPath: entry.path }] : []));
+  const hiddenSource = (path: string): string | null => {
+    let current = path;
+    while (current !== "") {
+      const note = notes.get(current);
+      if (note !== undefined && fake.frontmatters.get(note.path)?.folderNodeHidden === true) return current;
+      const slash = current.lastIndexOf("/");
+      current = slash < 0 ? "" : current.slice(0, slash);
+    }
+    return null;
+  };
+  let revealHidden = false;
   const service = {
     children,
     folderForFile: (file: TFile | null) => file?.parent ?? null,
@@ -404,6 +441,10 @@ function graphIndexFixture() {
       return entry instanceof TFolder ? entry : null;
     },
     isCanonicalFile: (file: TFile) => notes.get(file.parent?.path ?? "") === file,
+    isIgnoredPath: (path: string) => [...ignoredPaths].some((ignored) => path === ignored || path.startsWith(`${ignored}/`)),
+    isNodeVisible: (path: string) => revealHidden || hiddenSource(path) === null,
+    hiddenState: (path: string) => ({ explicit: hiddenSource(path) === path, sourcePath: hiddenSource(path) }),
+    revealingHiddenNodes: () => revealHidden,
   };
   const visuals = { resolve: vi.fn<(folder: TFolder) => NodeVisual>(() => FALLBACK_VISUAL) };
   const references = {
@@ -411,5 +452,6 @@ function graphIndexFixture() {
   };
   const settings: NodeGraphSettings = structuredClone(DEFAULT_NODE_GRAPH_SETTINGS);
   const index = new NodeGraphIndex(fake.app, service, visuals, references);
-  return { addNode, addOrdinary, children, fake, ignorePath, index, references, removeCanonical, service, setChildOrder, settings, visuals };
+  const setRevealHidden = (value: boolean): void => { revealHidden = value; index.invalidateAll(); };
+  return { addNode, addOrdinary, children, fake, ignorePath, index, references, removeCanonical, service, setChildOrder, setRevealHidden, settings, visuals };
 }

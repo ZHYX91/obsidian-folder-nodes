@@ -8,6 +8,12 @@ import {
 } from "../../src/shared/settings";
 
 describe("settings", () => {
+  it("applies hidden markers by default and preserves an explicit off switch", () => {
+    expect(DEFAULT_SETTINGS.hiddenNodesEnabled).toBe(true);
+    expect(normalizeSettings({}).hiddenNodesEnabled).toBe(true);
+    expect(normalizeSettings({ hiddenNodesEnabled: false }).hiddenNodesEnabled).toBe(false);
+    expect(createSettingsSnapshot(normalizeSettings({ hiddenNodesEnabled: false })).hiddenNodesEnabled).toBe(false);
+  });
   it("merges nested naming defaults", () => {
     const settings = normalizeSettings({ prefix: { enabled: true } });
     expect(settings.prefix.enabled).toBe(true);

@@ -25,6 +25,8 @@ translation_status: source
 
 ## 主页与不管理规则
 
+完整、受管理且非 Root 的节点可以在自己的 Node Note 中写入严格布尔值 `folderNodeHidden: true`。该标记对后代有效但不复制到后代 YAML；删除属性即取消显式隐藏，`false`、字符串与其他值都按未隐藏处理。隐藏只投影到 Folder Nodes 管理的文件列表文件夹行、Node Contents 与 Folder Nodes 节点图谱，不改变 Obsidian 搜索、快速切换、反向链接、原生图谱、WikiLink 或直接打开。插件设置 `hiddenNodesEnabled` 默认为开启；关闭时所有隐藏节点正常显示但 YAML 保持不变。会话级“临时显示隐藏节点”同时作用于所有窗口与三个投影面，重载后关闭。不管理优先于隐藏：不管理内容始终显示且不展示隐藏眼睛，重新纳入管理前若仍受隐藏标记影响则必须警告。
+
 Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符后的 Vault 名。用户可选择将它作为主页，通过命令或 Contents View 按钮打开，并可在 Vault 布局恢复后自动打开。Contents 的当前节点取活动文件所属文件夹；没有活动文件时回退到 Root。File Explorer 始终显示置顶、不可折叠且区别于普通节点的 Root 行。常规页包含“不管理的 Markdown 文件”和“不管理的文件夹”两个规则组，两组都接受 Vault 相对指定路径与名称开头规则，`.`、`_` 是默认规则；同页靠后提供可选批量整理和只读 Health。不管理规则停止节点识别、批量整理和结构修复但不隐藏内容。当前 Vault 配置目录、`.git` 和 `.trash` 始终受保护；根目录 `AGENTS.md` 和 `CLAUDE.md` 默认是不管理的 Markdown 路径。
 
 ## Node Visual 与 Contents View

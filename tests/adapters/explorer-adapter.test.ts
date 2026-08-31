@@ -7,6 +7,49 @@ import type { VisualService } from "../../src/adapters/visual-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 
 describe("ExplorerAdapter lifecycle", () => {
+  it("hides managed rows, shows one status eye during session reveal, and gives unmanaged precedence", () => {
+    const root = document.createElement("div");
+    root.createDiv({ cls: "nav-files-container" });
+    const row = root.createDiv({ cls: "nav-folder" });
+    const title = row.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Hidden" } });
+    title.createSpan({ cls: "nav-folder-title-content", text: "Hidden" });
+    document.body.append(root);
+    const folder = Object.assign(new TFolder(), { name: "Hidden", path: "Hidden" });
+    const file = Object.assign(new TFile(), { basename: "Hidden", extension: "md", name: "Hidden.md", parent: folder, path: "Hidden/Hidden.md" });
+    let reveal = false;
+    let ignored = false;
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => path === folder.path ? folder : null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => file, isCanonicalFile: () => false,
+      isIgnoredPath: () => ignored, isIgnoredRootPath: () => ignored, isLeafNoteExempt: () => false, notePathForFolder: () => "Hidden/Hidden.md",
+      openFolderNode: async () => undefined, placeNodeRelative: async () => folder, rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: true, sourcePath: "Hidden", unmanaged: ignored }), isNodeVisible: () => ignored || reveal, revealingHiddenNodes: () => reveal,
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged", hiddenNode: "Hidden node", hiddenByNode: (path) => `Hidden by ${path}` }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    expect(row.classList.contains("folder-nodes-hidden-node")).toBe(true);
+    reveal = true;
+    adapter.refresh();
+    expect(row.classList.contains("folder-nodes-hidden-node")).toBe(false);
+    expect(title.querySelector(".folder-nodes-hidden-status svg")).not.toBeNull();
+    ignored = true;
+    adapter.refresh();
+    expect(title.querySelector(".folder-nodes-hidden-status")).toBeNull();
+    expect(title.textContent).toContain("Unmanaged");
+    adapter.stop();
+    root.remove();
+  });
+
   it("keeps Explorer decoration but does not claim draggable ownership on mobile", () => {
     const root = document.createElement("div");
     root.createDiv({ cls: "nav-files-container" });

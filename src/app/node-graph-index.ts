@@ -27,6 +27,10 @@ interface NodeGraphIndexService {
   getCanonicalFile(folderPath: string): TFile | null;
   getFolder(path: string): TFolder | null;
   isCanonicalFile(file: TFile): boolean;
+  isIgnoredPath?(path: string): boolean;
+  isNodeVisible?(path: string): boolean;
+  hiddenState?(path: string): { readonly explicit: boolean; readonly sourcePath: string | null };
+  revealingHiddenNodes?(): boolean;
 }
 
 interface NodeGraphIndexVisuals {
@@ -45,6 +49,7 @@ export class NodeGraphIndex {
   private dirtyLinks = true;
   private readonly dirtyPaths = new Set<string>();
   private settingsIdentity = "";
+  private currentSettings: NodeGraphSettings | null = null;
   private revision = 0;
   private fullScans = 0;
   private partialScans = 0;
@@ -58,6 +63,7 @@ export class NodeGraphIndex {
   ) {}
 
   public snapshot(settings: NodeGraphSettings): NodeGraphIndexSnapshot {
+    this.currentSettings = settings;
     const identity = indexSettingsIdentity(settings);
     if (identity !== this.settingsIdentity) {
       this.settingsIdentity = identity;
@@ -98,6 +104,19 @@ export class NodeGraphIndex {
   public invalidateRecordMetadata(paths: ReadonlySet<string>): boolean {
     if (this.dirtyAll) return false;
     const requestedPaths = new Set([...paths].map(normalizeVaultPath));
+    if (this.service.revealingHiddenNodes?.() ?? false) {
+      this.invalidatePaths(requestedPaths);
+      return false;
+    }
+    if (this.currentSettings !== null && [...requestedPaths].some((path) => {
+      const expected = !(this.service.isIgnoredPath?.(path) ?? false)
+        && (this.service.isNodeVisible?.(path) ?? true)
+        && nodeGraphPathIsConfigured(path, this.currentSettings!);
+      return expected !== this.records.has(path);
+    })) {
+      this.invalidatePaths(requestedPaths);
+      return false;
+    }
     const relevantPaths = new Set([...requestedPaths].filter((path) => this.records.has(path)));
     const missingPaths = new Set([...requestedPaths].filter((path) => !relevantPaths.has(path)));
     if (missingPaths.size > 0) {
@@ -373,10 +392,16 @@ export class NodeGraphIndex {
       this.visitedFolders += 1;
       const path = normalizeVaultPath(folder.path);
       if (nodeGraphSubtreeIsExcluded(path, settings)) continue;
+      if (!(this.service.isNodeVisible?.(path) ?? true)) continue;
       if (nodeGraphPathIsConfigured(path, settings)) {
         const note = this.service.getCanonicalFile(path);
         const resolvedVisual = this.visuals.resolve(folder);
+        const hiddenState = (this.service.revealingHiddenNodes?.() ?? false)
+          ? this.service.hiddenState?.(path) ?? { explicit: false, sourcePath: null }
+          : { explicit: false, sourcePath: null };
         this.records.set(path, {
+          hiddenExplicit: hiddenState.explicit,
+          hiddenSourcePath: hiddenState.sourcePath,
           label: path === "" ? this.app.vault.getName() : folder.name,
           notePath: note?.path ?? null,
           parentPath: nodeGraphParentPath(path),
