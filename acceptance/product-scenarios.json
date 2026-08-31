@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "obsidian-plugin/product-scenarios-v1",
+  "pluginId": "folder-nodes",
+  "materializer": {
+    "kind": "copy-v1",
+    "roots": [
+      {
+        "source": "acceptance/fixtures",
+        "target": ""
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "hidden-node-projection",
+      "title": "Hidden node and inherited descendant projection",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "steps": [
+        "Confirm the explicit hidden root and its descendant are absent from Folder Nodes projections",
+        "Enable the session reveal and inspect the explicit eye and inherited source treatment",
+        "Disable Apply hidden markers and reload without editing frontmatter"
+      ],
+      "expected": [
+        "Only Folder Nodes Explorer, Contents, and Graph projections hide the marked subtree",
+        "The explicit root has one status eye and the descendant shows inherited muted feedback",
+        "Session reveal resets on reload and the strict Boolean marker remains byte-preserved"
+      ]
+    },
+    {
+      "id": "migration-selection-and-ordering",
+      "title": "Preview-first migration, selection creation, and sparse ordering",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "steps": [
+        "Preview leaf-note and missing-node migration before committing it",
+        "Create a child node from the selected fixture text after confirming the exact wikilink",
+        "Exercise before, into, and after placement using the available platform interaction"
+      ],
+      "expected": [
+        "No Vault write occurs before an explicit preview confirmation",
+        "Selection replacement matches the previewed wikilink exactly",
+        "Manual order uses only the parent mode and child-owned sparse rank fields"
+      ]
+    }
+  ]
+}
