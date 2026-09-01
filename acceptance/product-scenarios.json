@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "kind": "obsidian-plugin/product-scenarios-v1",
+  "schemaVersion": 2,
+  "kind": "obsidian-plugin/product-scenarios-v2",
   "pluginId": "folder-nodes",
   "materializer": {
     "kind": "copy-v1",
@@ -19,6 +19,10 @@
         "desktop",
         "android-emulator"
       ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
       "steps": [
         "Confirm the explicit hidden root and its descendant are absent from Folder Nodes projections",
         "Enable the session reveal and inspect the explicit eye and inherited source treatment",
@@ -37,6 +41,12 @@
         "desktop",
         "android-emulator"
       ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": [
+          "touch.drag"
+        ]
+      },
       "steps": [
         "Preview leaf-note and missing-node migration before committing it",
         "Create a child node from the selected fixture text after confirming the exact wikilink",
