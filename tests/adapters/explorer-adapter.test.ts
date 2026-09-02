@@ -70,12 +70,13 @@ describe("ExplorerAdapter lifecycle", () => {
     let reveal = false;
     let ignored = false;
     let explicit = true;
+    let canonicalFile: TFile | null = file;
     const app = {
       vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => path === folder.path ? folder : null },
       workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => file, isCanonicalFile: () => false,
+      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonicalFile, isCanonicalFile: () => false,
       isIgnoredPath: () => ignored, isIgnoredRootPath: () => ignored, isLeafNoteExempt: () => false, notePathForFolder: () => "Hidden/Hidden.md",
       openFolderNode: async () => undefined, placeNodeRelative: async () => folder, rootNotePath: () => "Vault.md",
       hiddenState: () => ({ explicit, sourcePath: "Hidden", unmanaged: ignored }), isNodeVisible: () => ignored || reveal, revealingHiddenNodes: () => reveal,
@@ -108,6 +109,14 @@ describe("ExplorerAdapter lifecycle", () => {
     expect(title.querySelector(".folder-nodes-hidden-status")).toBeNull();
     expect(title.textContent).toContain("Unmanaged");
     expect(title.querySelector(".is-unmanaged")?.getAttribute("title")).toBe("Not managed");
+    ignored = false;
+    canonicalFile = null;
+    adapter.refresh();
+    const incompleteBadge = title.querySelector<HTMLElement>(".folder-nodes-explorer-problem-badge.is-incomplete");
+    const repair = title.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
+    expect(incompleteBadge?.textContent).toBe("Incomplete");
+    expect(repair?.nextElementSibling).toBe(incompleteBadge);
+    expect(title.lastElementChild).toBe(incompleteBadge);
     adapter.stop();
     root.remove();
   });

@@ -352,7 +352,9 @@ export class ExplorerAdapter extends Component {
       const entry = this.service.getFolder(targetPath) ?? this.service.getFile(targetPath);
       if (entry !== null) this.completeNode(entry);
     });
-    container.append(button);
+    const statusBadge = container.querySelector<HTMLElement>(":scope > .folder-nodes-explorer-problem-badge");
+    if (statusBadge === null) container.append(button);
+    else container.insertBefore(button, statusBadge);
     return button;
   }
 
