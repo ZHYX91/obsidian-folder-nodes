@@ -2,7 +2,7 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
 
-Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结构节点。受管理的文件夹或 Markdown 缺少对应侧时，会作为中性的“不完整节点”显示，直到用户补全或设为不管理。
+Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结构节点。受管理的文件夹或 Markdown 缺少对应侧时，会作为“不完整”节点显示，直到用户补全或设为不管理。
 
 ## 截图
 
@@ -44,7 +44,7 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 - 将一个 Obsidian 原生 `icon` Text/List 解析为有序 Vault 图片、Lucide 或单字素候选及可选 `color:` 值，支持本地回退、祖先继承、文件列表名称前/后/隐藏位置，以及位于可编辑标题文字之外的可选笔记标题图标。属性图标统一放入固定且无边框的图标位，通过文字的字重、大小和颜色与文件名自身的开头字符区分；Emoji 使用所选本机彩色字体或系统样式并保留原色。
 - 可将根节点笔记作为主页，通过命令或节点内容视图打开，并可选择在 Vault 启动后打开。
 - 无需初始化即可立即识别完整与不完整节点；“管理”提供预览优先的批量整理、显式旧属性迁移，以及同时检查结构、Folder Nodes 属性和 icon 声明的严格只读健康检查。
-- 文件夹侧和 Markdown 侧缺失时都显示中性的“不完整节点”，并提供补全与“设为不管理”；真正的配对冲突继续使用警告状态并失败关闭。
+- 文件夹侧和 Markdown 侧缺失时都显示橙色“不完整”，并提供补全与“设为不管理”；真正的配对冲突使用红色“冲突”并失败关闭。
 - 使用两个统一的不管理规则组且不隐藏内容：不管理的 Markdown 文件和不管理的文件夹。两组都支持指定路径与自然语言的名称开头规则；`.`、`_` 是默认规则。当前 Vault 配置目录、`.git`、`.trash` 始终受保护，根目录 `AGENTS.md` 和 `CLAUDE.md` 默认是不管理的 Markdown 路径。
 - 用一个简洁 Node Note 属性保存 Folder Nodes 行为：`folder-nodes` 是 Text List，只包含 `order=manual`、`rank=1024`、`hidden=true` 这类非默认 token。隐藏节点会从文件列表、节点内容和 Folder Nodes 节点图谱中连同完整子树一起移除；Obsidian 搜索、快速切换、反向链接、原生图谱、链接与直接打开均不受影响。“常规”可以在不删除标记的情况下忽略全部隐藏标记；Root 行眼睛或命令面板可在当前会话临时显示它们。
 - 自然名称排序不写元数据；手动排序使用父节点模式和子节点自己的稀疏 rank，适用于大目录。

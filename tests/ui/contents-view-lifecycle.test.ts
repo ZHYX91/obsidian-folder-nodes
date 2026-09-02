@@ -87,7 +87,9 @@ describe("Node Contents render extension lifecycle", () => {
     reveal = true;
     view.refresh();
     expect([...view.contentEl.querySelectorAll(".folder-nodes-card-title")].map((entry) => entry.textContent)).toEqual(["Visible", "Hidden"]);
-    expect(view.contentEl.querySelector(".folder-nodes-hidden-status svg")).not.toBeNull();
+    const hiddenBadge = view.contentEl.querySelector<HTMLElement>(".folder-nodes-hidden-status.is-hidden");
+    expect(hiddenBadge?.textContent).toBe("Hidden");
+    expect(hiddenBadge?.querySelector("svg")).toBeNull();
     await view.onClose();
   });
 

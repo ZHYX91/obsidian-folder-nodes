@@ -96,7 +96,13 @@ describe("settings tab compatibility contract", () => {
     expect(styles).toContain(".folder-nodes-explorer-icon .folder-nodes-visual-emoji { font-size: 16px; }");
     expect(styles).toContain(".nav-folder-title.folder-nodes-missing-note { align-items: center; }");
     expect(styles).toContain("margin-inline-start: auto");
-    expect(styles).toContain("background: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary))");
+    expect(styles).toContain(".folder-nodes-status-badge.is-hidden");
+    expect(styles).toContain("background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary))");
+    expect(styles).toContain(".folder-nodes-status-badge.is-unmanaged");
+    expect(styles).toContain(".folder-nodes-status-badge.is-incomplete");
+    expect(styles).toContain("background: color-mix(in srgb, var(--color-orange) 10%, var(--background-primary))");
+    expect(styles).toContain(".folder-nodes-status-badge.is-conflict");
+    expect(styles).toContain("color: var(--text-error)");
     expect(styles).not.toContain(".folder-nodes-visual.has-accent:is(.is-emoji, .is-image)");
     expect(styles).toContain(".folder-nodes-visual.has-accent .folder-nodes-visual-glyph");
     expect(styles).toContain(".folder-nodes-visual-color { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; }");

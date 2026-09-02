@@ -21,7 +21,7 @@ translation_status: source
 
 ## Explorer Node Tree
 
-File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。仅在应用隐藏标记时显示眼睛；隐藏子树被抑制时使用 eye-off，临时显示时使用 eye，并通过当前动作和 `aria-pressed` 表达状态；激活它不会写 YAML，也不会打开 Root。卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定且无边框的图标位，把名称留在原生 title 位，并把“不完整节点”“不管理”“冲突”等状态固定为尾部胶囊，不把这些内容拼进名称。完整节点和仅有文件夹的一侧可使用节点图标；仅有 Markdown 的不完整节点与不管理项不补充通用文件图标。所有图标位使用相同几何尺寸，默认 SVG、文字、Emoji 和图片都不得改变原生行高。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。桌面端拖拽必须显示 before line、into highlight 或 after line，drop 前不得修改 Vault；Android 不注册 HTML5 drag/drop listener，也不增加 draggable。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件在旁边增加一次性创建文件夹与同名 Node Note 的“新建节点”，并提供 Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
+File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。仅在应用隐藏标记时显示眼睛；隐藏子树被抑制时使用 eye-off，临时显示时使用 eye，并通过当前动作和 `aria-pressed` 表达状态；激活它不会写 YAML，也不会打开 Root。Root 眼睛是唯一的可见性眼睛控件。卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定且无边框的图标位，把名称留在原生 title 位，并把紫色“隐藏”、灰色“不管理”、橙色“不完整”和红色“冲突”固定为不可点击的行尾文字胶囊，不把这些内容拼进名称；显式隐藏节点显示“隐藏”，继承隐藏的后代只降低透明度并提示来源。完整节点和仅有文件夹的一侧可使用节点图标；仅有 Markdown 的不完整节点与不管理项不补充通用文件图标。所有图标位使用相同几何尺寸，默认 SVG、文字、Emoji 和图片都不得改变原生行高。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。桌面端拖拽必须显示 before line、into highlight 或 after line，drop 前不得修改 Vault；Android 不注册 HTML5 drag/drop listener，也不增加 draggable。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件在旁边增加一次性创建文件夹与同名 Node Note 的“新建节点”，并提供 Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
 
 ## Node Contents View
 
@@ -49,7 +49,7 @@ Picker 打开时载入当前 `icon` 的完整 Text/List，而不是显示空输�
 
 ## 批量整理与健康
 
-插件没有初始化或接管状态；启用后立即把受管理范围内的结构识别为完整节点、不完整节点或冲突，并只对明确配对的完整节点同步重命名。“管理”在不管理规则之后提供可选的“批量整理不完整节点”：分批扫描 Vault，持续显示进度并允许取消，跳过指定路径、匹配名称开头规则及不管理文件夹子树。扫描完成后，预览逐项展开叶子 Markdown 的源/目标、待创建 Node Note 和阻塞冲突；确认前不会修改任何文件。独立的“迁移 Folder Nodes 属性”扫描新旧声明、报告冲突与非规范位置，并只在第二次明确确认及预览时效核对后写入。Health 合并两项只读扫描与 icon 形状诊断，绝不提供写入动作。Contents 和 Explorer 使用中性的“不完整节点”，只有真正的配对冲突才使用警告和恢复动作。
+插件没有初始化或接管状态；启用后立即把受管理范围内的结构识别为完整节点、不完整节点或冲突，并只对明确配对的完整节点同步重命名。“管理”在不管理规则之后提供可选的“批量整理不完整节点”：分批扫描 Vault，持续显示进度并允许取消，跳过指定路径、匹配名称开头规则及不管理文件夹子树。扫描完成后，预览逐项展开叶子 Markdown 的源/目标、待创建 Node Note 和阻塞冲突；确认前不会修改任何文件。独立的“迁移 Folder Nodes 属性”扫描新旧声明、报告冲突与非规范位置，并只在第二次明确确认及预览时效核对后写入。Health 合并两项只读扫描与 icon 形状诊断，绝不提供写入动作。Contents 和 Explorer 用橙色“不完整”表示可修复缺口，用红色“冲突”表示阻断性配对歧义。
 
 ## 不管理的内容
 

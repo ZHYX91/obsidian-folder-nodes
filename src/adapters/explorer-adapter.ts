@@ -34,9 +34,9 @@ export class ExplorerAdapter extends Component {
     private readonly visuals: VisualService,
     private readonly getSettings: () => FolderNodesSettings,
     private readonly getRootLabels: () => {
-      createNode: string; incompleteNode: string; missingNodeFolder: string; missingNodeNote: string;
-      node: string; nodeConflict: string; root: string; unmanaged: string;
-      hiddenNode?: string; hiddenByNode?: (path: string) => string;
+      createNode: string; incompleteNode: string; incompleteStatus?: string; missingNodeFolder: string; missingNodeNote: string;
+      node: string; nodeConflict: string; conflictStatus?: string; root: string; unmanaged: string; unmanagedDetail?: string;
+      hiddenNode?: string; hiddenNodeDetail?: string; hiddenByNode?: (path: string) => string;
       hideHiddenNodesThisSession?: string; showHiddenNodesThisSession?: string;
     },
     private readonly createNode: (parentPath: string) => void,
@@ -197,9 +197,11 @@ export class ExplorerAdapter extends Component {
         badge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
         element.append(badge);
       }
-      badge.removeClass("is-conflict", "is-incomplete", "is-unmanaged");
-      const label = identity === "conflict" ? this.getRootLabels().nodeConflict : identity === "unmanaged" ? this.getRootLabels().unmanaged : this.getRootLabels().incompleteNode;
-      const detail = identity === "incomplete" ? `${this.getRootLabels().incompleteNode}: ${this.service.notePathForFolder(counterpartPath)}` : label;
+      badge.addClass("folder-nodes-status-badge");
+      badge.removeClass("is-conflict", "is-hidden", "is-incomplete", "is-unmanaged");
+      const labels = this.getRootLabels();
+      const label = identity === "conflict" ? labels.conflictStatus ?? "Conflict" : identity === "unmanaged" ? labels.unmanaged : labels.incompleteStatus ?? labels.incompleteNode;
+      const detail = identity === "conflict" ? labels.nodeConflict : identity === "unmanaged" ? labels.unmanagedDetail ?? labels.unmanaged : `${labels.incompleteNode}: ${this.service.notePathForFolder(counterpartPath)}`;
       badge.addClass(identity === "conflict" ? "is-conflict" : identity === "unmanaged" ? "is-unmanaged" : "is-incomplete");
       badge.setText(label);
       badge.setAttr("title", detail);
@@ -248,10 +250,11 @@ export class ExplorerAdapter extends Component {
           problemBadge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
           element.append(problemBadge);
         }
-        problemBadge.removeClass("is-conflict", "is-incomplete");
+        problemBadge.addClass("folder-nodes-status-badge");
+        problemBadge.removeClass("is-conflict", "is-hidden", "is-incomplete");
         problemBadge.addClass("is-unmanaged");
         problemBadge.setText(this.getRootLabels().unmanaged);
-        problemBadge.setAttr("title", this.getRootLabels().unmanaged);
+        problemBadge.setAttr("title", this.getRootLabels().unmanagedDetail ?? this.getRootLabels().unmanaged);
         continue;
       }
       if (icon === null) icon = ownedSpan(element.ownerDocument, "folder-nodes-explorer-icon");
@@ -265,9 +268,10 @@ export class ExplorerAdapter extends Component {
           problemBadge = ownedSpan(element.ownerDocument, "folder-nodes-explorer-problem-badge");
           element.append(problemBadge);
         }
-        problemBadge.removeClass("is-conflict", "is-unmanaged");
+        problemBadge.addClass("folder-nodes-status-badge");
+        problemBadge.removeClass("is-conflict", "is-hidden", "is-unmanaged");
         problemBadge.addClass("is-incomplete");
-        problemBadge.setText(this.getRootLabels().incompleteNode);
+        problemBadge.setText(this.getRootLabels().incompleteStatus ?? this.getRootLabels().incompleteNode);
         problemBadge.setAttr("title", this.getRootLabels().missingNodeNote);
         if (repair === null) repair = this.createRepairButton(element, folder.path, "file-plus", this.getRootLabels().missingNodeNote);
         repair.dataset.path = folder.path;
@@ -277,11 +281,12 @@ export class ExplorerAdapter extends Component {
       repair?.remove();
       if ((this.service.revealingHiddenNodes?.() ?? false) && hiddenState.sourcePath !== null) {
         if (hiddenState.explicit) {
-          const status = ownedSpan(element.ownerDocument, "folder-nodes-hidden-status folder-nodes-explorer-status-icon");
+          const status = ownedSpan(element.ownerDocument, "folder-nodes-hidden-status folder-nodes-explorer-problem-badge folder-nodes-status-badge is-hidden");
           const label = this.getRootLabels().hiddenNode ?? "Hidden node";
-          status.setAttr("title", label);
-          status.setAttr("aria-label", label);
-          setIcon(status, "eye-off");
+          const detail = this.getRootLabels().hiddenNodeDetail ?? label;
+          status.setText(label);
+          status.setAttr("title", detail);
+          status.setAttr("aria-label", detail);
           element.append(status);
         } else {
           const label = this.getRootLabels().hiddenByNode?.(hiddenState.sourcePath) ?? `Hidden by ${hiddenState.sourcePath}`;

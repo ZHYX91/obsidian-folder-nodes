@@ -1,5 +1,3 @@
-import { setIcon } from "obsidian";
-
 import {
   buildNodeGraphCanvasSpatialIndex,
   fitNodeGraphCanvasCamera,
@@ -980,8 +978,7 @@ export class NodeGraphCanvasRenderer {
       renderVisual(icon, record.visual, record.label);
       this.focusOverlayBody.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
       if (record.hiddenExplicit === true) {
-        const status = this.focusOverlayBody.createSpan({ cls: "folder-nodes-hidden-status", attr: { "aria-hidden": "true" } });
-        setIcon(status, "eye-off");
+        this.focusOverlayBody.createSpan({ cls: "folder-nodes-hidden-status folder-nodes-status-badge is-hidden", text: this.callbacks.hiddenLabel?.(path, true) ?? "Hidden", attr: { "aria-hidden": "true" } });
       }
       this.focusOverlay.dataset.nodePath = path;
       this.focusOverlayBody.dataset.nodePath = path;

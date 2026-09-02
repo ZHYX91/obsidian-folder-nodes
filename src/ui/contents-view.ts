@@ -229,7 +229,7 @@ export class FolderNodeContentsView extends ItemView {
     }
     const title = identity.createSpan({ cls: "folder-nodes-current-title", text: folderPath === "" ? this.app.vault.getName() : folder.name });
     title.setAttr("title", folderPath);
-    if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteNode") });
+    if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteStatus") });
     else if (!managedNode && this.service.isIgnoredRootPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
     if (managedNode) identity.addEventListener("click", (event) => {
       const mouseEvent = event as MouseEvent;
@@ -285,8 +285,7 @@ export class FolderNodeContentsView extends ItemView {
           card.setAttr("title", hiddenLabel);
           card.setAttr("aria-label", `${entry.name} · ${hiddenLabel}`);
           if (hiddenState.explicit) {
-            const status = shell.createSpan({ cls: "folder-nodes-hidden-status", attr: { title: hiddenLabel, "aria-label": hiddenLabel } });
-            setIcon(status, "eye-off");
+            shell.createSpan({ cls: "folder-nodes-hidden-status folder-nodes-status-badge is-hidden", text: t("hiddenNode"), attr: { title: t("hiddenNodeDetail"), "aria-label": t("hiddenNodeDetail") } });
           } else shell.addClass("folder-nodes-hidden-inherited");
         }
       }
@@ -387,7 +386,7 @@ export class FolderNodeContentsView extends ItemView {
       if (entry instanceof TFolder && this.service.isIgnoredRootPath(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
       if (entry instanceof TFile && !this.service.isIgnoredPath(entry.parent?.path ?? "") && this.service.isLeafNoteExempt(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
       else if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && !this.service.isIgnoredPath(entry.parent?.path ?? "")) {
-        row.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteNode") });
+        row.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteStatus") });
       }
       if (entry instanceof TFolder) row.createSpan({ cls: "folder-nodes-file-extension", text: t("folderType") });
       if (entry instanceof TFile && entry.extension !== "") row.createSpan({ cls: "folder-nodes-file-extension", text: entry.extension.toLocaleUpperCase() });

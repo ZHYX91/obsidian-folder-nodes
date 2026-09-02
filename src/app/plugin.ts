@@ -111,9 +111,9 @@ export default class FolderNodesPlugin extends Plugin {
       this.visuals,
       () => this.settings,
       () => ({
-        createNode: t("createNode"), incompleteNode: t("incompleteNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
-        node: t("node"), nodeConflict: t("nodeConflict"), root: t("root"), unmanaged: t("unmanaged"),
-        hiddenNode: t("hiddenNode"), hiddenByNode: (path) => t("hiddenByNode", { path }),
+        createNode: t("createNode"), incompleteNode: t("incompleteNode"), incompleteStatus: t("incompleteStatus"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
+        node: t("node"), nodeConflict: t("nodeConflict"), conflictStatus: t("conflictStatus"), root: t("root"), unmanaged: t("unmanaged"), unmanagedDetail: t("unmanagedDetail"),
+        hiddenNode: t("hiddenNode"), hiddenNodeDetail: t("hiddenNodeDetail"), hiddenByNode: (path) => t("hiddenByNode", { path }),
         hideHiddenNodesThisSession: t("hideHiddenNodesThisSession"),
         showHiddenNodesThisSession: t("showHiddenNodesThisSession"),
       }),

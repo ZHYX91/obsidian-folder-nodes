@@ -58,7 +58,7 @@ describe("ExplorerAdapter lifecycle", () => {
     root.remove();
   });
 
-  it("hides managed rows, shows one status eye during session reveal, and gives unmanaged precedence", () => {
+  it("hides managed rows, shows a text status during session reveal, and gives unmanaged precedence", () => {
     const root = document.createElement("div");
     root.createDiv({ cls: "nav-files-container" });
     const row = root.createDiv({ cls: "nav-folder" });
@@ -69,6 +69,7 @@ describe("ExplorerAdapter lifecycle", () => {
     const file = Object.assign(new TFile(), { basename: "Hidden", extension: "md", name: "Hidden.md", parent: folder, path: "Hidden/Hidden.md" });
     let reveal = false;
     let ignored = false;
+    let explicit = true;
     const app = {
       vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => path === folder.path ? folder : null },
       workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
@@ -77,13 +78,13 @@ describe("ExplorerAdapter lifecycle", () => {
       children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => file, isCanonicalFile: () => false,
       isIgnoredPath: () => ignored, isIgnoredRootPath: () => ignored, isLeafNoteExempt: () => false, notePathForFolder: () => "Hidden/Hidden.md",
       openFolderNode: async () => undefined, placeNodeRelative: async () => folder, rootNotePath: () => "Vault.md",
-      hiddenState: () => ({ explicit: true, sourcePath: "Hidden", unmanaged: ignored }), isNodeVisible: () => ignored || reveal, revealingHiddenNodes: () => reveal,
+      hiddenState: () => ({ explicit, sourcePath: "Hidden", unmanaged: ignored }), isNodeVisible: () => ignored || reveal, revealingHiddenNodes: () => reveal,
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
       { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
       () => structuredClone(DEFAULT_SETTINGS),
-      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged", hiddenNode: "Hidden node", hiddenByNode: (path) => `Hidden by ${path}` }),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", incompleteStatus: "Incomplete", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Same-named node already exists", conflictStatus: "Conflict", root: "Root", unmanaged: "Unmanaged", unmanagedDetail: "Not managed", hiddenNode: "Hidden", hiddenNodeDetail: "This node and its subtree are hidden", hiddenByNode: (path) => `Hidden by ${path}` }),
       () => undefined, () => undefined, () => undefined, () => undefined,
     );
 
@@ -92,11 +93,21 @@ describe("ExplorerAdapter lifecycle", () => {
     reveal = true;
     adapter.refresh();
     expect(row.classList.contains("folder-nodes-hidden-node")).toBe(false);
-    expect(title.querySelector(".folder-nodes-hidden-status svg")).not.toBeNull();
+    const hiddenBadge = title.querySelector<HTMLElement>(".folder-nodes-hidden-status.is-hidden");
+    expect(hiddenBadge?.textContent).toBe("Hidden");
+    expect(hiddenBadge?.querySelector("svg")).toBeNull();
+    expect(hiddenBadge?.getAttribute("title")).toBe("This node and its subtree are hidden");
+    explicit = false;
+    adapter.refresh();
+    expect(title.querySelector(".folder-nodes-hidden-status")).toBeNull();
+    expect(title.classList.contains("folder-nodes-hidden-inherited")).toBe(true);
+    expect(title.getAttribute("title")).toBe("Hidden by Hidden");
     ignored = true;
+    explicit = true;
     adapter.refresh();
     expect(title.querySelector(".folder-nodes-hidden-status")).toBeNull();
     expect(title.textContent).toContain("Unmanaged");
+    expect(title.querySelector(".is-unmanaged")?.getAttribute("title")).toBe("Not managed");
     adapter.stop();
     root.remove();
   });

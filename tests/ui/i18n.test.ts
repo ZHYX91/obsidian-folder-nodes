@@ -38,6 +38,9 @@ describe("interface language", () => {
     expect(t("aliasesDesc")).toContain("[[a|b]]");
     expect(t("creationGuideScope")).toContain("Obsidian");
     expect(t("unmanaged")).toBe("不管理");
+    expect(t("hiddenNode")).toBe("隐藏");
+    expect(t("incompleteStatus")).toBe("不完整");
+    expect(t("conflictStatus")).toBe("冲突");
     expect(t("folderType")).toBe("文件夹");
     expect(t("moveContainingNode")).toContain("所在节点");
     expect(t("selectionCrossesTableCells")).toContain("表格");
@@ -48,6 +51,9 @@ describe("interface language", () => {
     expect(t("setAsVisual")).toBe("Use as current node icon");
     expect(t("aliasesDesc")).toContain("[[a|b]]");
     expect(t("unmanaged")).toBe("Unmanaged");
+    expect(t("hiddenNode")).toBe("Hidden");
+    expect(t("incompleteStatus")).toBe("Incomplete");
+    expect(t("conflictStatus")).toBe("Conflict");
     expect(t("folderType")).toBe("Folder");
     expect(t("deleteContainingNode")).toBe("Delete containing node");
   });

@@ -1099,8 +1099,7 @@ export class FolderNodeGraphView extends ItemView {
     });
     body.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
     if (record.hiddenExplicit) {
-      const status = body.createSpan({ cls: "folder-nodes-hidden-status", attr: { "aria-hidden": "true" } });
-      setIcon(status, "eye-off");
+      body.createSpan({ cls: "folder-nodes-hidden-status folder-nodes-status-badge is-hidden", text: t("hiddenNode"), attr: { "aria-hidden": "true" } });
     } else if (record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined) node.addClass("folder-nodes-hidden-inherited");
     setTooltip(body, hiddenTitle);
     body.addEventListener("click", () => {

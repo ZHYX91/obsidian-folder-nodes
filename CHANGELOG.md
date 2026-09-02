@@ -11,13 +11,17 @@
 - Simplified Node Graph by removing persistent include and node/subtree exclusion rules; the same
   Node Note `hidden=true` token now controls subtree visibility across Explorer, Contents, and Graph.
 - Added a stateful eye beside the pinned Root row to reveal hidden subtrees for the current session
-  without changing YAML, including touch-sized and accessible controls.
+  without changing YAML, including touch-sized and accessible controls. Explicit hidden nodes now
+  use a purple Hidden text badge instead of a second eye; Unmanaged, Incomplete, and Conflict use
+  gray, orange, and red text badges, while inherited descendants remain muted with source details.
 - Shortened Folder Node context menus and moved the complete action set into one grouped,
   touch-friendly panel shared across Contents, Graph, native folders, and Node Note tabs.
 - Merged homepage controls into General and moved unmanaged rules and maintenance into a dedicated
   Management tab while preserving the imperative five-tab settings surface.
 - Kept incremental Node Graph record order identical to a complete hierarchy rebuild so newly
   discovered branches cannot shift otherwise stable 3D coordinates.
+- Updated the non-major development-tool group used by lint, tests, coverage, DOM fixtures, and
+  production bundling.
 
 ## 0.7.2
 

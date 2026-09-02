@@ -2,7 +2,7 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
 
-Folder Nodes represents a complete structural node as a folder plus its same-named Node Note, `A/A.md`. A managed folder or Markdown without its counterpart remains visible as a neutral incomplete node until you complete it or mark it unmanaged.
+Folder Nodes represents a complete structural node as a folder plus its same-named Node Note, `A/A.md`. A managed folder or Markdown without its counterpart remains visible as an Incomplete node until you complete it or mark it unmanaged.
 
 ## Screenshots
 
@@ -44,7 +44,7 @@ See exactly how selected text and uncreated links map to Node paths, note bodies
 - Resolve one Obsidian-native `icon` Text/List as ordered Vault-image, Lucide, or single-glyph candidates plus an optional `color:` value, with local fallback, ancestor inheritance, before/after/hidden File Explorer placement, and optional note-title display outside editable title text. Property icons use a fixed frameless slot; glyph weight, size, and color distinguish them from file-name characters, while emoji retain the selected installed color-font or platform appearance.
 - Use the root Node Note as an optional homepage, open it by command or from Node Contents, and optionally open it after Vault startup.
 - Recognize complete and incomplete nodes immediately without initialization. Management provides preview-first bulk organization, an explicit preview-first legacy-property migration, and strictly read-only Health for structure, Folder Nodes properties, and icon declarations.
-- Show both folder-only and Markdown-only halves as neutral Incomplete node states with explicit completion and Set as unmanaged actions. True pair conflicts remain warning-marked and fail closed.
+- Show both folder-only and Markdown-only halves as orange Incomplete states with explicit completion and Set as unmanaged actions. True pair conflicts use a red Conflict badge and fail closed.
 - Configure two unmanaged-content groups without hiding anything: unmanaged Markdown files and unmanaged folders. Both accept exact paths and plain-language name-start rules; `.` and `_` are the defaults. The active Vault configuration folder, `.git`, and `.trash` are always protected; root `AGENTS.md` and `CLAUDE.md` are unmanaged Markdown paths by default.
 - Store Folder Nodes behavior in one concise Node Note property: `folder-nodes` is a Text List containing only non-default tokens such as `order=manual`, `rank=1024`, and `hidden=true`. A hidden node removes its complete subtree from File Explorer, Node Contents, and Folder Nodes Graph only; Obsidian Search, Quick Switcher, backlinks, native Graph, links, and direct access remain unchanged. General can ignore all hidden markers without deleting them, while the Root-row eye or command palette reveals them for the current session.
 - Use natural name order without metadata or scalable manual order with a parent mode flag and sparse ranks on child notes.
