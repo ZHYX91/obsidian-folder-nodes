@@ -27,7 +27,7 @@ Folder Nodes 只拥有一个名为 `folder-nodes` 的扁平 Text List。它只�
 
 ## 主页与不管理规则
 
-完整、受管理且非 Root 的节点可以在自己的 `folder-nodes` 列表中写入 `hidden=true`。该标记对后代有效但不复制到后代 YAML；删除 token 即取消显式隐藏。隐藏只投影到 Folder Nodes 管理的文件列表文件夹行、Node Contents 与 Folder Nodes 节点图谱，不改变 Obsidian 搜索、快速切换、反向链接、原生图谱、WikiLink 或直接打开。插件设置 `hiddenNodesEnabled` 默认为开启；关闭时所有隐藏节点正常显示但 YAML 保持不变。置顶 Root 行尾部的眼睛按钮与命令面板开关会同时切换所有窗口和三个投影面的会话级显示，重载后复位。不管理优先于隐藏：不管理内容始终显示且不展示隐藏眼睛，重新纳入管理前若仍受隐藏标记影响则必须警告。
+完整、受管理且非 Root 的节点可以在自己的 `folder-nodes` 列表中写入 `hidden=true`。该标记对后代有效但不复制到后代 YAML；删除 token 即取消显式隐藏。隐藏只投影到 Folder Nodes 管理的文件列表文件夹行、Node Contents 与 Folder Nodes 节点图谱，不改变 Obsidian 搜索、快速切换、反向链接、原生图谱、WikiLink 或直接打开。插件设置 `hiddenNodesEnabled` 默认为开启；关闭时所有隐藏节点正常显示但 YAML 保持不变。置顶 Root 行尾部的眼睛按钮与命令面板开关会同时切换所有窗口和三个投影面的会话级显示，重载后复位。不管理优先于隐藏：不管理内容始终显示，只显示灰色“不管理”徽标而不显示“隐藏”徽标；重新纳入管理前若仍受隐藏标记影响则必须警告。
 
 Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符后的 Vault 名。用户可选择将它作为主页，通过命令或 Contents View 按钮打开，并可在 Vault 布局恢复后自动打开。Contents 的当前节点取活动文件所属文件夹；没有活动文件时回退到 Root。File Explorer 始终显示置顶、不可折叠且区别于普通节点的 Root 行。“常规”负责语言、隐藏标记行为和主页；“管理”包含“不管理的 Markdown 文件”和“不管理的文件夹”两个规则组、预览优先的批量整理与属性迁移，以及只读 Health。两组规则都接受 Vault 相对指定路径与名称开头规则，`.`、`_` 是默认规则。不管理规则停止节点识别、批量整理和结构修复但不隐藏内容。当前 Vault 配置目录、`.git` 和 `.trash` 始终受保护；根目录 `AGENTS.md` 和 `CLAUDE.md` 默认是不管理的 Markdown 路径。
 

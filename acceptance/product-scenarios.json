@@ -25,12 +25,12 @@
       },
       "steps": [
         "Confirm the explicit hidden root and its descendant are absent from Folder Nodes projections",
-        "Use the eye beside Root to enable session reveal and inspect the explicit eye and inherited source treatment",
+        "Use the eye beside Root to enable session reveal and inspect the explicit Hidden text badge and inherited source treatment",
         "Disable Apply hidden markers and reload without editing frontmatter"
       ],
       "expected": [
         "Only Folder Nodes Explorer, Contents, and Graph projections hide the marked subtree",
-        "The explicit root has one status eye and the descendant shows inherited muted feedback",
+        "The explicit root has one non-interactive Hidden text badge, no per-node eye, and the descendant shows inherited muted feedback",
         "Session reveal resets on reload and the hidden=true token remains byte-preserved"
       ]
     },
