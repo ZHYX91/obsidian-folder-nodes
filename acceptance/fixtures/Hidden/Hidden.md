@@ -1,5 +1,6 @@
 ---
-folderNodeHidden: true
+folder-nodes:
+  - hidden=true
 ---
 
 # Explicit hidden root

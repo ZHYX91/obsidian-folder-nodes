@@ -15,8 +15,8 @@ describe("settings persistence status", () => {
     const input = panel.createEl("input");
     const compatibility = {
       status: "incompatible" as const,
-      currentSchemaVersion: 1 as const,
-      storedSchemaVersion: 2,
+      currentSchemaVersion: 2 as const,
+      storedSchemaVersion: 3,
       reason: "future-schema" as const,
     };
 
@@ -25,8 +25,8 @@ describe("settings persistence status", () => {
 
     const warning = container.querySelector<HTMLElement>(".folder-nodes-settings-warning");
     expect(warning?.getAttribute("role")).toBe("alert");
-    expect(warning?.textContent).toContain("unsupported schema 2");
-    expect(warning?.textContent).toContain("supports schema 1");
+    expect(warning?.textContent).toContain("unsupported schema 3");
+    expect(warning?.textContent).toContain("supports schema 2");
     expect(warning?.textContent).toContain("was not rewritten");
     expect(panel.getAttribute("aria-disabled")).toBe("true");
     expect(button.disabled).toBe(true);
@@ -42,8 +42,8 @@ describe("settings persistence status", () => {
     const retry = vi.fn().mockResolvedValue(undefined);
     renderSettingsPersistenceStatus(container, {
       status: "compatible",
-      currentSchemaVersion: 1,
-      storedSchemaVersion: 1,
+      currentSchemaVersion: 2,
+      storedSchemaVersion: 2,
     }, "pending", retry);
 
     const warning = container.querySelector<HTMLElement>(".folder-nodes-settings-warning");
@@ -59,8 +59,8 @@ describe("settings persistence status", () => {
     const container = document.body.createDiv();
     renderSettingsPersistenceStatus(container, {
       status: "compatible",
-      currentSchemaVersion: 1,
-      storedSchemaVersion: 1,
+      currentSchemaVersion: 2,
+      storedSchemaVersion: 2,
     }, "saved", vi.fn());
     expect(container.children).toHaveLength(0);
   });

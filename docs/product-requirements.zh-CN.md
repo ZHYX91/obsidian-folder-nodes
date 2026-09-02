@@ -9,9 +9,11 @@ translation_status: source
 
 完整 Folder Node 由文件夹和恰好一个同名 Node Note `A/A.md` 构成，其结构身份仍是当前规范化配对。受管理的文件夹或 Markdown 缺少对应侧时是不完整节点；用户可补全或设为不管理。Root 可在 Vault 根目录拥有可选 Node Note。Folder Nodes 不生成永久 ID，不写 `_pkwf`、path、parent、name、node type 或完整子节点列表。
 
-## 排序属性
+## Folder Nodes 属性与排序
 
-自然名称排序不写任何排序属性。手动排序由父 Node Note 的 `folderNodeChildrenSort: manual` 和各直接 Child Node Note 自己的稀疏正整数 `folderNodeSiblingRank` 表示。通常一次排序只写移动节点；局部 rebalance 最多 64 个节点。缺失或重复 rank 使用规范化 basename 与 path 作确定性 tie-break；重命名保留已有 rank，手动模式中新建的 Child 默认追加到末尾。
+Folder Nodes 只拥有一个名为 `folder-nodes` 的扁平 Text List。它只包含非默认 `key=value` token：父 Node Note 上的 `order=manual`、每个直接 Child Node Note 上形如 `rank=1024` 的稀疏正整数，以及隐藏子树根上的 `hidden=true`。token 的规范顺序是 order、rank、hidden，并保留语法有效的未知未来 token。自然名称排序、缺少 rank 和可见状态都不写入；空列表会被删除。自然排序使用规范化名称。通常一次手动排序只写移动的 Child；局部 rebalance 最多 64 个节点。缺失或重复 rank 使用规范化 basename 与 path 作确定性 tie-break；重命名保留已有 rank，手动模式中新建的 Child 默认追加到末尾。
+
+已经公开的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 继续兼容读取。“管理”中的显式动作只读扫描所有 Markdown，报告新属性、旧字段、冗余双写、冲突、非规范 Node Note 及无效 icon 声明，再预览精确迁移目标；启动时绝不迁移。提交会重新扫描并核对每个目标指纹，保留无关 frontmatter、正文、BOM、换行符和未知未来 token，完成后验证，失败时按原文精确回滚。新旧值等价时可以规范化；冲突、无效、重复、畸形或预览后已改变的输入全部失败关闭。提交迁移前，用户必须先更新所有设备。
 
 ## 节点操作
 
@@ -25,9 +27,9 @@ translation_status: source
 
 ## 主页与不管理规则
 
-完整、受管理且非 Root 的节点可以在自己的 Node Note 中写入严格布尔值 `folderNodeHidden: true`。该标记对后代有效但不复制到后代 YAML；删除属性即取消显式隐藏，`false`、字符串与其他值都按未隐藏处理。隐藏只投影到 Folder Nodes 管理的文件列表文件夹行、Node Contents 与 Folder Nodes 节点图谱，不改变 Obsidian 搜索、快速切换、反向链接、原生图谱、WikiLink 或直接打开。插件设置 `hiddenNodesEnabled` 默认为开启；关闭时所有隐藏节点正常显示但 YAML 保持不变。会话级“临时显示隐藏节点”同时作用于所有窗口与三个投影面，重载后关闭。不管理优先于隐藏：不管理内容始终显示且不展示隐藏眼睛，重新纳入管理前若仍受隐藏标记影响则必须警告。
+完整、受管理且非 Root 的节点可以在自己的 `folder-nodes` 列表中写入 `hidden=true`。该标记对后代有效但不复制到后代 YAML；删除 token 即取消显式隐藏。隐藏只投影到 Folder Nodes 管理的文件列表文件夹行、Node Contents 与 Folder Nodes 节点图谱，不改变 Obsidian 搜索、快速切换、反向链接、原生图谱、WikiLink 或直接打开。插件设置 `hiddenNodesEnabled` 默认为开启；关闭时所有隐藏节点正常显示但 YAML 保持不变。置顶 Root 行尾部的眼睛按钮与命令面板开关会同时切换所有窗口和三个投影面的会话级显示，重载后复位。不管理优先于隐藏：不管理内容始终显示且不展示隐藏眼睛，重新纳入管理前若仍受隐藏标记影响则必须警告。
 
-Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符后的 Vault 名。用户可选择将它作为主页，通过命令或 Contents View 按钮打开，并可在 Vault 布局恢复后自动打开。Contents 的当前节点取活动文件所属文件夹；没有活动文件时回退到 Root。File Explorer 始终显示置顶、不可折叠且区别于普通节点的 Root 行。常规页包含“不管理的 Markdown 文件”和“不管理的文件夹”两个规则组，两组都接受 Vault 相对指定路径与名称开头规则，`.`、`_` 是默认规则；同页靠后提供可选批量整理和只读 Health。不管理规则停止节点识别、批量整理和结构修复但不隐藏内容。当前 Vault 配置目录、`.git` 和 `.trash` 始终受保护；根目录 `AGENTS.md` 和 `CLAUDE.md` 默认是不管理的 Markdown 路径。
+Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符后的 Vault 名。用户可选择将它作为主页，通过命令或 Contents View 按钮打开，并可在 Vault 布局恢复后自动打开。Contents 的当前节点取活动文件所属文件夹；没有活动文件时回退到 Root。File Explorer 始终显示置顶、不可折叠且区别于普通节点的 Root 行。“常规”负责语言、隐藏标记行为和主页；“管理”包含“不管理的 Markdown 文件”和“不管理的文件夹”两个规则组、预览优先的批量整理与属性迁移，以及只读 Health。两组规则都接受 Vault 相对指定路径与名称开头规则，`.`、`_` 是默认规则。不管理规则停止节点识别、批量整理和结构修复但不隐藏内容。当前 Vault 配置目录、`.git` 和 `.trash` 始终受保护；根目录 `AGENTS.md` 和 `CLAUDE.md` 默认是不管理的 Markdown 路径。
 
 ## Node Visual 与 Contents View
 
@@ -37,6 +39,8 @@ Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符�
 
 节点图谱是插件自有 workspace view，不修改 Obsidian 原生 Graph View。结构始终是有方向的父子骨架；“显示链接”是独立叠加，新建视图默认关闭。旧 workspace 的 Structure 状态迁移为关闭，Links/Hybrid 迁移为开启。已解析 canonical-note 链接使用独立视觉，不改变结构布局；只有链接叠加开启时，局部范围才加入直接链接邻居。稳定的从左到右或从上到下 2D 与按深度分层的 3D 共用同一份过滤场景。
 
+节点图谱不再有持久的纳入子树、排除单个节点或排除子树规则。运行时的全局/子树/局部范围只控制当前视图；同一个 Node Note `hidden=true` token 会在图谱模型与布局之前剪枝完整子树。设置只保留启用、默认维度、2D 方向和大图限制。schema 1 中旧规则数组随显式设置 schema 迁移被丢弃并显示通知，绝不因此改写笔记。
+
 可见性在布局前按渐进展开计算。全局默认 Root 与一级；子树默认选中节点与直接子级；局部额外加入一个父级作为上下文，默认选中节点与直接子级，并且只允许在当前选中节点的完整子树内继续向下展开。用户可以同时保留多个已展开分支，通过节点把手切换直接子级，使用 Alt 展开整支，也可从当前范围锚点展开 1/2/3 层或全部后代并收回一级。全部展开不再二次确认。范围、焦点、维度和“显示链接”写入 workspace state；每个范围的分支展开与活动搜索快照只在会话内存在，重启后重置。
 
 每个节点都有规范化 visual/父级把手、负责选择并打开 canonical Node Note 的主体，以及叶子隐藏、其他节点显示子级数量和状态的子级把手。自身 visual、继承 visual、Folder 回退与 Root Home 回退共用同一固定图标位。搜索使用 Obsidian 原生 SearchComponent；内部或外部聚焦时展开隐藏祖先并居中，清除后恢复搜索前的展开、焦点与镜头快照。所有控件都有 Tooltip、键盘入口、明确 accessible name 和至少 44px 的粗指针命中区。
@@ -45,7 +49,7 @@ Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符�
 
 ## 结构安全
 
-Folder Nodes 不使用初始化或接管状态；启用后立即识别完整、不完整、不管理和冲突结构，并只对明确配对的完整节点执行自动重命名同步。原生创建不自动补全或移动内容。文件夹侧与 Markdown 侧缺失时都显示中性的“不完整节点”，提供显式补全和“设为不管理”；真正的配对冲突才使用警告。可选批量整理使用可取消的分批只读扫描，逐路径显示将创建、移动、跳过和阻止的内容；提交前重新核对预览，提交后验证结构，任一步失败都 rollback。Health 严格只读，不显示写入按钮。完整节点删除使用系统回收站。插件不联网。
+Folder Nodes 不使用初始化或接管状态；启用后立即识别完整、不完整、不管理和冲突结构，并只对明确配对的完整节点执行自动重命名同步。原生创建不自动补全或移动内容。文件夹侧与 Markdown 侧缺失时都显示中性的“不完整节点”，提供显式补全和“设为不管理”；真正的配对冲突才使用警告。可选批量整理使用可取消的分批只读扫描，逐路径显示将创建、移动、跳过和阻止的内容；提交前重新核对预览，提交后验证结构，任一步失败都 rollback。属性迁移是另一项显式预览与确认操作。Health 合并结构、Folder Nodes 属性和 icon 声明问题，严格只读且不显示写入按钮。完整节点删除使用系统回收站。插件不联网。
 
 ## v1 边界
 

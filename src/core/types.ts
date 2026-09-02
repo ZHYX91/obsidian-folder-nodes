@@ -11,9 +11,6 @@ export interface NodeGraphSettings {
   enabled: boolean;
   defaultDimension: NodeGraphDimension;
   layoutDirection: NodeGraphLayoutDirection;
-  includedSubtrees: string[];
-  excludedNodes: string[];
-  excludedSubtrees: string[];
   largeGraphThreshold: number;
   overviewEdgeLimit: number;
 }
@@ -88,6 +85,28 @@ export interface MigrationScan {
   exemptLeafMarkdown: string[];
   ignoredFolders: string[];
   conflicts: MigrationConflict[];
+}
+
+export interface PropertyMigrationChange {
+  path: string;
+  sourceFingerprint: string;
+  summary: string;
+}
+
+export interface PropertyHealthFinding {
+  path: string;
+  messages: string[];
+}
+
+export interface PropertyMigrationScan {
+  scannedNotes: number;
+  canonicalPropertyNotes: number;
+  legacyPropertyNotes: number;
+  redundantLegacyNotes: number;
+  changes: PropertyMigrationChange[];
+  conflicts: PropertyHealthFinding[];
+  nonCanonical: PropertyHealthFinding[];
+  invalidIcons: PropertyHealthFinding[];
 }
 
 export type VisualKind = "emoji" | "glyph" | "lucide" | "image" | "color" | "fallback";

@@ -37,12 +37,14 @@ export class ExplorerAdapter extends Component {
       createNode: string; incompleteNode: string; missingNodeFolder: string; missingNodeNote: string;
       node: string; nodeConflict: string; root: string; unmanaged: string;
       hiddenNode?: string; hiddenByNode?: (path: string) => string;
+      hideHiddenNodesThisSession?: string; showHiddenNodesThisSession?: string;
     },
     private readonly createNode: (parentPath: string) => void,
     private readonly completeNode: (entry: TFile | TFolder) => void,
     private readonly notifyChanged: () => void,
     private readonly reportError: (error: unknown) => void,
     private readonly dragEnabled = true,
+    private readonly toggleHiddenNodes: () => void = () => undefined,
   ) { super(); }
 
   public start(): void {
@@ -378,7 +380,7 @@ export class ExplorerAdapter extends Component {
     const active = rootNote !== null && this.app.workspace.getActiveFile() === rootNote;
     const labels = this.getRootLabels();
     for (const container of root.querySelectorAll<HTMLElement>(".nav-files-container")) {
-      const { row, icon, title, badge } = ensureExplorerRootRow(container);
+      const { row, icon, title, badge, visibility } = ensureExplorerRootRow(container);
       const titleLabel = this.app.vault.getName();
       const accessibleLabel = titleLabel + " · " + labels.root;
       if (icon.childElementCount === 0) setIcon(icon, "home");
@@ -388,6 +390,22 @@ export class ExplorerAdapter extends Component {
       row.toggleClass("is-missing", missing);
       row.setAttr("aria-label", missing ? accessibleLabel + ": " + labels.missingNodeNote : accessibleLabel);
       row.setAttr("title", missing ? labels.missingNodeNote : labels.root);
+      const reveal = this.service.revealingHiddenNodes?.() ?? false;
+      const visibilityLabel = reveal
+        ? labels.hideHiddenNodesThisSession ?? "Hide hidden nodes again"
+        : labels.showHiddenNodesThisSession ?? "Temporarily show hidden nodes";
+      visibility.hidden = !this.getSettings().hiddenNodesEnabled;
+      row.toggleClass("has-hidden-visibility", this.getSettings().hiddenNodesEnabled);
+      visibility.setAttr("aria-label", visibilityLabel);
+      visibility.setAttr("title", visibilityLabel);
+      visibility.setAttr("aria-pressed", String(reveal));
+      visibility.toggleClass("is-active", reveal);
+      const iconKey = reveal ? "eye" : "eye-off";
+      if (visibility.dataset.icon !== iconKey) {
+        visibility.empty();
+        setIcon(visibility, iconKey);
+        visibility.dataset.icon = iconKey;
+      }
     }
   }
 
@@ -426,6 +444,12 @@ export class ExplorerAdapter extends Component {
   private onClick(event: MouseEvent): void {
     const target = asElement(event.target);
     if (target === null) return;
+    if (target.closest(".folder-nodes-explorer-root-visibility") !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleHiddenNodes();
+      return;
+    }
     if (target.closest(".folder-nodes-explorer-root") !== null) {
       this.selectedFolderPath = "";
       this.scheduleDecorate();
@@ -456,6 +480,7 @@ export class ExplorerAdapter extends Component {
 
   private onKeyDown(event: KeyboardEvent): void {
     const target = asElement(event.target);
+    if (target?.closest(".folder-nodes-explorer-root-visibility") !== null) return;
     if ((event.key !== "Enter" && event.key !== " ") || target?.closest(".folder-nodes-explorer-root") === null) return;
     event.preventDefault();
     event.stopPropagation();

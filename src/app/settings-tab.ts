@@ -2,8 +2,6 @@ import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinition
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
-import { normalizeNodeGraphLinks } from "../core/node-graph-links";
-import { nodeGraphParentPath, nodeGraphPathDepth, nodeGraphPathIsConfigured } from "../core/node-graph-scope";
 import type { NamingPart } from "../core/types";
 import {
   assertSettingsWritable,
@@ -15,11 +13,10 @@ import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { setLanguage, t } from "../ui/i18n";
 import { renderVisual } from "../presentation/render-visual";
 
-type TabId = "general" | "homepage" | "icons" | "naming" | "nodeGraph";
+type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";
 type ExemptionKind = "leaf" | "folder";
-type NodeGraphRuleKind = "excludedNodes" | "excludedSubtrees" | "includedSubtrees";
 
-const TABS: TabId[] = ["general", "homepage", "icons", "naming", "nodeGraph"];
+const TABS: TabId[] = ["general", "management", "icons", "naming", "nodeGraph"];
 
 // Declarative settings are intentionally inactive. Obsidian 1.13 bypasses
 // display() for non-empty definitions, removing the established top-tab surface
@@ -41,7 +38,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   public getDeclarativeSettingDefinitions(): SettingDefinitionItem[] {
     return [
       { type: "page", name: t("general"), items: this.generalDefinitions() },
-      { type: "page", name: t("homepage"), items: this.homepageDefinitions() },
+      { type: "page", name: t("management"), items: this.managementDefinitions() },
       { type: "page", name: t("icons"), items: this.iconDefinitions() },
       { type: "page", name: t("naming"), items: this.namingDefinitions() },
       { type: "page", name: t("nodeGraph"), items: this.nodeGraphDefinitions() },
@@ -150,7 +147,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       () => this.retrySettingsSave(),
     );
     if (this.activeTab === "general") this.renderGeneral(panel);
-    else if (this.activeTab === "homepage") this.renderHomepage(panel);
+    else if (this.activeTab === "management") this.renderManagement(panel);
     else if (this.activeTab === "icons") this.renderIcons(panel);
     else if (this.activeTab === "naming") this.renderNaming(panel);
     else this.renderNodeGraph(panel);
@@ -206,7 +203,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private tabLabel(id: TabId): string {
     return id === "general" ? t("general")
-      : id === "homepage" ? t("homepage")
+      : id === "management" ? t("management")
         : id === "icons" ? t("icons")
           : id === "naming" ? t("naming") : t("nodeGraph");
   }
@@ -217,23 +214,26 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     return [
       { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } } },
       { name: t("applyHiddenNodes"), desc: t("applyHiddenNodesDesc"), control: { type: "toggle", key: "hiddenNodesEnabled", defaultValue: true } },
+      { name: t("enableHomepage"), desc: t("enableHomepageDesc"), control: { type: "toggle", key: "homepageEnabled", defaultValue: false } },
+      { name: t("openHomepageOnStartup"), desc: t("openHomepageOnStartupDesc"), visible: this.plugin.settings.homepageEnabled, control: { type: "toggle", key: "openHomepageOnStartup", defaultValue: false } },
+      this.actionDefinition(t("openHomepage"), t("openHomepageDesc"), (setting) => {
+        setting.addButton((button) => { button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()); });
+      }),
+    ];
+  }
+
+  private managementDefinitions(): SettingDefinitionItem[] {
+    return [
       ...this.unmanagedRuleDefinitions("leaf"),
       ...this.unmanagedRuleDefinitions("folder"),
       this.actionDefinition(t("batchOrganize"), t("batchOrganizeDesc"), (setting) => {
         setting.addButton((button) => { button.setCta().setButtonText(t("previewOrganizePlan")).onClick(() => { this.plugin.openBatchOrganize(); }); });
       }),
+      this.actionDefinition(t("propertyMigration"), t("propertyMigrationDesc"), (setting) => {
+        setting.addButton((button) => { button.setButtonText(t("previewPropertyMigration")).onClick(() => { this.plugin.openPropertyMigration(); }); });
+      }),
       this.actionDefinition(t("health"), t("healthDesc"), (setting) => {
         setting.addButton((button) => { button.setButtonText(t("health")).onClick(() => { this.plugin.showHealth(); }); });
-      }),
-    ];
-  }
-
-  private homepageDefinitions(): SettingDefinitionItem[] {
-    return [
-      { name: t("enableHomepage"), desc: t("enableHomepageDesc"), control: { type: "toggle", key: "homepageEnabled", defaultValue: false } },
-      { name: t("openHomepageOnStartup"), desc: t("openHomepageOnStartupDesc"), visible: this.plugin.settings.homepageEnabled, control: { type: "toggle", key: "openHomepageOnStartup", defaultValue: false } },
-      this.actionDefinition(t("openHomepage"), t("openHomepageDesc"), (setting) => {
-        setting.addButton((button) => { button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()); });
       }),
     ];
   }
@@ -319,17 +319,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
         await this.plugin.reconcileSettingsChange();
       }));
-    this.renderUnmanagedGroup(panel, "leaf");
-    this.renderUnmanagedGroup(panel, "folder");
-    new Setting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
-    new Setting(panel)
-      .setName(t("batchOrganize"))
-      .setDesc(t("batchOrganizeDesc"))
-      .addButton((button) => button.setCta().setButtonText(t("previewOrganizePlan")).onClick(() => this.plugin.openBatchOrganize()));
-    new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
-  }
-
-  private renderHomepage(panel: HTMLElement): void {
     new Setting(panel).setName(t("enableHomepage")).setDesc(t("enableHomepageDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.homepageEnabled).onChange(async (value) => {
       this.plugin.settings.homepageEnabled = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals(); this.display();
     }));
@@ -337,6 +326,21 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       this.plugin.settings.openHomepageOnStartup = value; await this.plugin.saveSettings();
     }));
     new Setting(panel).setName(t("openHomepage")).setDesc(t("openHomepageDesc")).addButton((button) => button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()));
+  }
+
+  private renderManagement(panel: HTMLElement): void {
+    this.renderUnmanagedGroup(panel, "leaf");
+    this.renderUnmanagedGroup(panel, "folder");
+    new Setting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
+    new Setting(panel)
+      .setName(t("batchOrganize"))
+      .setDesc(t("batchOrganizeDesc"))
+      .addButton((button) => button.setCta().setButtonText(t("previewOrganizePlan")).onClick(() => this.plugin.openBatchOrganize()));
+    new Setting(panel)
+      .setName(t("propertyMigration"))
+      .setDesc(t("propertyMigrationDesc"))
+      .addButton((button) => button.setButtonText(t("previewPropertyMigration")).onClick(() => this.plugin.openPropertyMigration()));
+    new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
   }
 
   private renderIcons(panel: HTMLElement): void {
@@ -503,17 +507,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.renderGraphNumberSetting(panel, "largeGraphThreshold", t("nodeGraphCanvasThreshold"), t("nodeGraphCanvasThresholdDesc"), 50, 10_000);
     this.renderGraphNumberSetting(panel, "overviewEdgeLimit", t("nodeGraphEdgeLimit"), t("nodeGraphEdgeLimitDesc"), 100, 100_000);
 
-    const managedPaths = this.managedNodePaths();
-    const summary = this.nodeGraphSummary(managedPaths);
-    new Setting(panel)
-      .setName(t("nodeGraphCurrentScope"))
-      .setDesc(t("nodeGraphCurrentScopeDesc", { nodes: summary.nodes, edges: summary.edges }));
-
-    new Setting(panel).setName(t("nodeGraphScopeRules")).setDesc(t("nodeGraphScopeRulesDesc")).setHeading();
-    this.renderNodeGraphRuleList(panel, "includedSubtrees", t("nodeGraphIncludedSubtrees"), t("nodeGraphIncludedSubtreesDesc"));
-    this.renderNodeGraphRuleList(panel, "excludedNodes", t("nodeGraphExcludedNodes"), t("nodeGraphExcludedNodesDesc"));
-    this.renderNodeGraphRuleList(panel, "excludedSubtrees", t("nodeGraphExcludedSubtrees"), t("nodeGraphExcludedSubtreesDesc"));
-    this.renderNodeGraphTree(panel, managedPaths);
   }
 
   private renderGraphNumberSetting(
@@ -535,145 +528,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         await this.saveNodeGraphSettings(true);
       });
     });
-  }
-
-  private renderNodeGraphRuleList(panel: HTMLElement, kind: NodeGraphRuleKind, name: string, description: string): void {
-    const paths = this.plugin.settings.nodeGraph[kind];
-    new Setting(panel).setName(name).setDesc(description).addButton((button) => button
-      .setButtonText(t("addPathRule"))
-      .onClick(() => this.promptNodeGraphRule(kind)));
-    if (paths.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("nodeGraphNoRules") });
-    for (const path of paths) new Setting(panel)
-      .setName(path)
-      .addExtraButton((button) => button
-        .setIcon("trash-2")
-        .setTooltip(t("remove"))
-        .onClick(() => void this.removeNodeGraphRule(kind, path)));
-  }
-
-  private renderNodeGraphTree(panel: HTMLElement, paths: readonly string[]): void {
-    const controls = new Setting(panel).setName(t("nodeGraphNodePicker")).setDesc(t("nodeGraphNodePickerDesc"));
-    const tree = panel.createDiv({ cls: "folder-nodes-node-graph-settings-tree", attr: { role: "tree" } });
-    const render = (query: string): void => {
-      tree.empty();
-      const normalizedQuery = query.trim().toLocaleLowerCase();
-      const matches = paths.filter((path) => normalizedQuery === "" || path.toLocaleLowerCase().includes(normalizedQuery));
-      const visible = matches.slice(0, 200);
-      for (const path of visible) this.renderNodeGraphTreeRow(tree, path);
-      if (visible.length === 0) tree.createDiv({ cls: "setting-item-description", text: t("nodeGraphNoMatchingNodes") });
-      else if (visible.length < matches.length) {
-        tree.createDiv({ cls: "setting-item-description", text: t("nodeGraphMoreMatches") });
-      }
-    };
-    controls.addSearch((search) => search.setPlaceholder(t("nodeGraphFindNode")).onChange(render));
-    render("");
-  }
-
-  private renderNodeGraphTreeRow(container: HTMLElement, path: string): void {
-    const settings = this.plugin.settings.nodeGraph;
-    const row = container.createDiv({ cls: "folder-nodes-node-graph-settings-row" });
-    row.setAttribute("role", "treeitem");
-    row.setAttribute("aria-level", String(Math.max(1, nodeGraphPathDepth(path))));
-    row.style.setProperty("--folder-nodes-node-depth", String(Math.max(0, nodeGraphPathDepth(path) - 1)));
-    row.createSpan({ cls: "folder-nodes-node-graph-settings-path", text: path });
-    const actions = row.createDiv({ cls: "folder-nodes-node-graph-settings-actions" });
-    this.graphRuleButton(actions, "list-tree", t("nodeGraphIncludeSubtree"), settings.includedSubtrees.includes(path), () => {
-      void this.toggleNodeGraphRule("includedSubtrees", path);
-    });
-    this.graphRuleButton(actions, "eye-off", t("nodeGraphHideNode"), settings.excludedNodes.includes(path), () => {
-      void this.toggleNodeGraphRule("excludedNodes", path);
-    });
-    this.graphRuleButton(actions, "folder-x", t("nodeGraphHideSubtree"), settings.excludedSubtrees.includes(path), () => {
-      void this.toggleNodeGraphRule("excludedSubtrees", path);
-    });
-  }
-
-  private graphRuleButton(container: HTMLElement, iconName: string, title: string, active: boolean, action: () => void): void {
-    const button = container.createEl("button", {
-      cls: `clickable-icon${active ? " is-active" : ""}`,
-      attr: { "aria-label": title, "aria-pressed": String(active), title, type: "button" },
-    });
-    setIcon(button, iconName);
-    button.addEventListener("click", action);
-  }
-
-  private managedNodePaths(): string[] {
-    const paths: string[] = [];
-    const pending = [""];
-    const seen = new Set<string>();
-    while (pending.length > 0) {
-      const path = pending.pop();
-      if (path === undefined || seen.has(path)) continue;
-      seen.add(path);
-      if (path !== "") paths.push(path);
-      const children = this.plugin.service.children(path).map(({ childPath }) => childPath).sort((left, right) => right.localeCompare(left, "en"));
-      pending.push(...children);
-    }
-    return paths.sort((left, right) => left.localeCompare(right, "en"));
-  }
-
-  private nodeGraphSummary(managedPaths: readonly string[]): { readonly edges: number; readonly nodes: number } {
-    const settings = this.plugin.settings.nodeGraph;
-    const paths = [
-      ...(nodeGraphPathIsConfigured("", settings) ? [""] : []),
-      ...managedPaths.filter((path) => nodeGraphPathIsConfigured(path, settings)),
-    ];
-    const pathSet = new Set(paths);
-    const sources = paths.flatMap((path) => {
-      const note = this.plugin.service.getCanonicalFile(path);
-      return note === null ? [] : [{ nodeId: path, notePath: note.path }];
-    });
-    const noteToNode = new Map(sources.map(({ nodeId, notePath }) => [notePath, nodeId]));
-    const links = normalizeNodeGraphLinks(sources, this.app.metadataCache.resolvedLinks, noteToNode);
-    const edges = new Set<string>();
-    for (const path of paths) {
-      const parent = nodeGraphParentPath(path);
-      if (parent !== null && pathSet.has(parent)) edges.add(this.graphEdgeKey(path, parent));
-    }
-    for (const [source, targets] of links) for (const target of targets) edges.add(this.graphEdgeKey(source, target));
-    return { nodes: paths.length, edges: edges.size };
-  }
-
-  private graphEdgeKey(left: string, right: string): string {
-    return left.localeCompare(right, "en") <= 0 ? `${left}\u0000${right}` : `${right}\u0000${left}`;
-  }
-
-  private promptNodeGraphRule(kind: NodeGraphRuleKind): void {
-    new PromptModal(this.app, t("nodeGraphAddRule"), "", t("add"), async (value) => {
-      const path = value.trim().replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "");
-      if (path === "") return;
-      if (this.plugin.service.getFolder(path) === null || this.plugin.service.isIgnoredPath(path)) {
-        new Notice(t("errorUnknownTarget", { path }));
-        return;
-      }
-      const paths = this.plugin.settings.nodeGraph[kind];
-      if (!paths.includes(path)) paths.push(path);
-      paths.sort((left, right) => left.localeCompare(right, "en"));
-      await this.saveNodeGraphSettings(true);
-      this.display();
-    }).open();
-  }
-
-  private async toggleNodeGraphRule(kind: NodeGraphRuleKind, path: string): Promise<void> {
-    const paths = this.plugin.settings.nodeGraph[kind];
-    const index = paths.indexOf(path);
-    if (index >= 0) paths.splice(index, 1);
-    else paths.push(path);
-    paths.sort((left, right) => left.localeCompare(right, "en"));
-    if (kind === "excludedNodes" && index < 0) {
-      this.plugin.settings.nodeGraph.excludedSubtrees = this.plugin.settings.nodeGraph.excludedSubtrees.filter((candidate) => candidate !== path);
-    }
-    if (kind === "excludedSubtrees" && index < 0) {
-      this.plugin.settings.nodeGraph.excludedNodes = this.plugin.settings.nodeGraph.excludedNodes.filter((candidate) => candidate !== path);
-    }
-    await this.saveNodeGraphSettings(true);
-    this.display();
-  }
-
-  private async removeNodeGraphRule(kind: NodeGraphRuleKind, path: string): Promise<void> {
-    this.plugin.settings.nodeGraph[kind] = this.plugin.settings.nodeGraph[kind].filter((candidate) => candidate !== path);
-    await this.saveNodeGraphSettings(true);
-    this.display();
   }
 
   private async saveNodeGraphSettings(refresh: boolean): Promise<void> {

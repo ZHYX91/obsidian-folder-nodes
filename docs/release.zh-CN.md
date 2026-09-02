@@ -28,9 +28,10 @@ vendored release-core `2.0.0` 和薄 adapter 创建唯一 Candidate Bundle v3，
 
 ## 产品验收
 
-同一 Bundle 必须通过桌面和 Android 模拟器验收，覆盖隐藏节点及继承后代、session reveal、
-preview-first migration、selection 创建、sparse ordering，以及 Node Graph 的 scope、handle、搜索、
-2D/3D、触摸目标和重启。Android 真机与 iOS 不在范围内。
+同一 Bundle 必须通过桌面和 Android 模拟器验收，覆盖规范 `folder-nodes` 列表、旧字段兼容与
+显式属性迁移、隐藏节点及继承后代、Root 行会话眼睛、分组节点动作、结构预览、selection 创建、
+sparse ordering，以及 Node Graph 的 scope、只由属性控制的子树隐藏、handle、搜索、2D/3D、
+触摸目标和重启。Android 真机与 iOS 不在范围内。
 
 ## 独立工作流
 

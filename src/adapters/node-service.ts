@@ -10,14 +10,29 @@ import {
 
 import { VaultOperationCoordinator, type VaultEventKind } from "./vault-operation-coordinator";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exemptions";
-import { createNodeDocument, patchFrontmatterScalar } from "../core/frontmatter";
+import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
 import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planReorder } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
-import { CHILDREN_SORT_PROPERTY, HIDDEN_PROPERTY, SIBLING_RANK_PROPERTY } from "../core/properties";
-import type { ChildOrderRecord, FolderNodeHiddenState, FolderNodesSettings, MigrationScan, NodeDropZone, OrderPatch } from "../core/types";
+import {
+  FOLDER_NODES_PROPERTY,
+  ICON_PROPERTY,
+  LEGACY_FOLDER_NODES_PROPERTIES,
+  resolveFolderNodesProperties,
+} from "../core/properties";
+import type {
+  ChildOrderRecord,
+  FolderNodeHiddenState,
+  FolderNodesSettings,
+  MigrationScan,
+  NodeDropZone,
+  OrderPatch,
+  PropertyHealthFinding,
+  PropertyMigrationScan,
+} from "../core/types";
+import { editableVisualCandidates } from "../core/visual";
 
-const STRUCTURAL_PROPERTIES = new Set([CHILDREN_SORT_PROPERTY, SIBLING_RANK_PROPERTY, HIDDEN_PROPERTY]);
+const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
 
 interface OpenMarkdownTarget {
@@ -95,8 +110,7 @@ export class NodeService {
     let current = normalized;
     while (current !== "") {
       const note = this.getCanonicalFile(current);
-      const hidden = note !== null
-        && this.app.metadataCache.getFileCache(note)?.frontmatter?.[HIDDEN_PROPERTY] === true;
+      const hidden = note !== null && this.propertiesForNote(note).hidden;
       if (hidden) return { explicit: current === normalized, sourcePath: current, unmanaged };
       current = dirname(current);
     }
@@ -123,7 +137,7 @@ export class NodeService {
       const note = this.requireCanonicalNote(folder);
       const undos: Undo[] = [];
       try {
-        await this.patchScalarTransactional(note, HIDDEN_PROPERTY, hidden ? true : null, undos);
+        await this.patchFolderNodesTransactional(note, { hidden: hidden ? true : null }, undos);
       } catch (error) {
         await this.rollback(undos, error);
       }
@@ -440,6 +454,122 @@ export class NodeService {
     });
   }
 
+  public async scanPropertiesAsync(
+    onProgress?: (completed: number, total: number) => void,
+    externalSignal?: AbortSignal,
+  ): Promise<PropertyMigrationScan> {
+    const signal = externalSignal === undefined ? this.lifecycle.signal : AbortSignal.any([this.lifecycle.signal, externalSignal]);
+    const files = this.app.vault.getMarkdownFiles();
+    const changes: PropertyMigrationScan["changes"] = [];
+    const conflicts: PropertyHealthFinding[] = [];
+    const nonCanonical: PropertyHealthFinding[] = [];
+    const invalidIcons: PropertyHealthFinding[] = [];
+    let canonicalPropertyNotes = 0;
+    let legacyPropertyNotes = 0;
+    let redundantLegacyNotes = 0;
+    for (const [index, file] of files.entries()) {
+      throwIfAborted(signal);
+      const source = await this.readCurrentSource(file);
+      const analysis = analyzeFolderNodesSource(source);
+      const resolution = resolveFolderNodesProperties(analysis.frontmatter, analysis.issues);
+      const hasFolderNodesData = resolution.canonicalPresent
+        || resolution.legacyKeysPresent.length > 0
+        || analysis.issues.length > 0;
+      if (resolution.canonicalPresent) canonicalPropertyNotes += 1;
+      if (resolution.legacyKeysPresent.length > 0) legacyPropertyNotes += 1;
+      if (resolution.redundantLegacyKeys.length > 0) redundantLegacyNotes += 1;
+
+      if (hasFolderNodesData && !this.isCanonicalFile(file)) {
+        nonCanonical.push({
+          path: file.path,
+          messages: [
+            "Folder Nodes properties are only migrated on canonical Node Notes",
+            ...resolution.issues.map(({ message }) => message),
+          ],
+        });
+      } else if (resolution.issues.length > 0) {
+        conflicts.push({ path: file.path, messages: resolution.issues.map(({ message }) => message) });
+      } else if (resolution.legacyKeysPresent.length > 0) {
+        changes.push({
+          path: file.path,
+          sourceFingerprint: sourceFingerprint(source),
+          summary: `${resolution.legacyKeysPresent.join(", ")} → ${FOLDER_NODES_PROPERTY}`,
+        });
+      }
+
+      const rawIcon: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.[ICON_PROPERTY];
+      if (rawIcon !== undefined && editableVisualCandidates(rawIcon) === null) {
+        invalidIcons.push({ path: file.path, messages: ["Unsupported icon property shape"] });
+      }
+      const completed = index + 1;
+      if (completed % 128 === 0 || completed === files.length) {
+        onProgress?.(completed, Math.max(1, files.length));
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      }
+    }
+    throwIfAborted(signal);
+    return {
+      scannedNotes: files.length,
+      canonicalPropertyNotes,
+      legacyPropertyNotes,
+      redundantLegacyNotes,
+      changes: changes.sort(comparePaths),
+      conflicts: conflicts.sort(comparePaths),
+      nonCanonical: nonCanonical.sort(comparePaths),
+      invalidIcons: invalidIcons.sort(comparePaths),
+    };
+  }
+
+  public migrateProperties(
+    expected: PropertyMigrationScan,
+    onStep?: (completed: number, total: number) => void,
+    externalSignal?: AbortSignal,
+  ): Promise<void> {
+    const signal = externalSignal === undefined ? this.lifecycle.signal : AbortSignal.any([this.lifecycle.signal, externalSignal]);
+    return this.exclusive(async () => {
+      throwIfAborted(signal);
+      const current = await this.scanPropertiesAsync(undefined, signal);
+      if (propertyScanSignature(current) !== propertyScanSignature(expected)) {
+        throw new Error("The Vault changed after preview. Review Folder Nodes properties again before applying changes.");
+      }
+      if (current.conflicts.length > 0) {
+        throw new Error(`Property migration contains blocking conflicts: ${current.conflicts[0]?.messages[0] ?? "unknown conflict"}`);
+      }
+      const undos: Undo[] = [];
+      try {
+        for (const [index, change] of current.changes.entries()) {
+          throwIfAborted(signal);
+          const file = this.getFile(change.path);
+          if (file === null || !this.isCanonicalFile(file)) throw new Error(`Property migration target changed: ${change.path}`);
+          const result = await this.applyFileChange(file, change.path, (source) => {
+            if (sourceFingerprint(source) !== change.sourceFingerprint) {
+              throw new Error(`Property migration target changed after preview: ${change.path}`);
+            }
+            return patchFolderNodesFrontmatter(source, { migrateLegacy: true });
+          });
+          if (result.after !== result.before) {
+            const { after, before } = result;
+            undos.push(async () => {
+              await this.applyFileChange(file, change.path, (source) => {
+                if (source !== after) throw new Error(`Cannot safely roll back concurrently modified file: ${change.path}`);
+                return before;
+              });
+            });
+          }
+          onStep?.(index + 1, current.changes.length);
+          throwIfAborted(signal);
+        }
+        const post = await this.scanPropertiesAsync(undefined, signal);
+        const changedPaths = new Set(current.changes.map(({ path }) => path));
+        if (post.changes.some(({ path }) => changedPaths.has(path)) || post.conflicts.some(({ path }) => changedPaths.has(path))) {
+          throw new Error("Folder Nodes property validation failed after migration");
+        }
+      } catch (error) {
+        await this.rollback(undos, error);
+      }
+    });
+  }
+
   public children(parentPath: string): ChildOrderRecord[] {
     parentPath = normalizeVaultPath(parentPath);
     const records = this.childRecords(parentPath);
@@ -448,8 +578,14 @@ export class NodeService {
 
   public sortMode(parentPath: string): "natural" | "manual" {
     const note = this.getCanonicalFile(parentPath);
-    const frontmatter = note === null ? undefined : this.app.metadataCache.getFileCache(note)?.frontmatter;
-    return frontmatter?.[CHILDREN_SORT_PROPERTY] === "manual" ? "manual" : "natural";
+    return note !== null && this.propertiesForNote(note).order === "manual" ? "manual" : "natural";
+  }
+
+  public canReorder(folder: TFolder, delta: -1 | 1): boolean {
+    const children = this.children(normalizeVaultPath(folder.parent?.path ?? ""));
+    const index = children.findIndex(({ childPath }) => childPath === folder.path);
+    const target = index + delta;
+    return index >= 0 && target >= 0 && target < children.length;
   }
 
   public reorder(folder: TFolder, delta: -1 | 1): Promise<void> {
@@ -684,11 +820,11 @@ export class NodeService {
         const nextOrder = (index + 1) * 1024;
         return child.order === nextOrder ? [] : [{ childPath: child.childPath, previousOrder: child.order, nextOrder }];
       });
-      await this.patchScalarTransactional(this.getCanonicalFile(targetParentPath), CHILDREN_SORT_PROPERTY, "manual", undos);
+      await this.patchFolderNodesTransactional(this.getCanonicalFile(targetParentPath), { order: "manual" }, undos);
     } else patches = planReorder([...siblings, moved], sourcePath, targetIndex).patches;
     for (const patch of patches) {
       const note = patch.childPath === sourcePath ? this.requireCanonicalNote(folder) : this.getCanonicalFile(patch.childPath);
-      await this.patchScalarTransactional(note, SIBLING_RANK_PROPERTY, patch.nextOrder, undos);
+      await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos);
     }
   }
 
@@ -703,8 +839,7 @@ export class NodeService {
   }
 
   private readRank(note: TFile | null): number | null {
-    const raw: unknown = note === null ? undefined : this.app.metadataCache.getFileCache(note)?.frontmatter?.[SIBLING_RANK_PROPERTY];
-    return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? raw : null;
+    return note === null ? null : this.propertiesForNote(note).rank;
   }
 
   private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<void> {
@@ -712,10 +847,12 @@ export class NodeService {
     const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== note.parent?.path);
     const max = siblings.reduce((value, child) => Math.max(value, child.order ?? 0), 0);
     if (max > Number.MAX_SAFE_INTEGER - 1024) {
-      for (const patch of materializeManualOrder(this.children(parentPath)).patches) await this.patchScalarTransactional(this.getCanonicalFile(patch.childPath), SIBLING_RANK_PROPERTY, patch.nextOrder, undos);
+      for (const patch of materializeManualOrder(this.children(parentPath)).patches) {
+        await this.patchFolderNodesTransactional(this.getCanonicalFile(patch.childPath), { rank: patch.nextOrder }, undos);
+      }
       return;
     }
-    await this.patchScalarTransactional(note, SIBLING_RANK_PROPERTY, max + 1024, undos);
+    await this.patchFolderNodesTransactional(note, { rank: max + 1024 }, undos);
   }
 
   private async migrateUnlocked(
@@ -806,13 +943,17 @@ export class NodeService {
     this.operations.expect(kind, newPath, oldPath, recursive);
   }
 
-  private async patchScalarTransactional(file: TFile | null, key: string, value: string | number | boolean | null, undos: Undo[]): Promise<void> {
-    if (file === null) throw new Error(`Cannot update missing node note: ${key}`);
+  private propertiesForNote(file: TFile): ReturnType<typeof resolveFolderNodesProperties> {
+    return resolveFolderNodesProperties(this.app.metadataCache.getFileCache(file)?.frontmatter);
+  }
+
+  private async patchFolderNodesTransactional(file: TFile | null, patch: FolderNodesFrontmatterPatch, undos: Undo[]): Promise<void> {
+    if (file === null) throw new Error(`Cannot update missing Node Note: ${FOLDER_NODES_PROPERTY}`);
     const path = file.path;
     const result = await this.applyFileChange(
       file,
       path,
-      (current) => patchFrontmatterScalar(current, key, value),
+      (current) => patchFolderNodesFrontmatter(current, patch),
     );
     const { after, before } = result;
     if (after === before) return;
@@ -824,6 +965,11 @@ export class NodeService {
         return before;
       });
     });
+  }
+
+  private async readCurrentSource(file: TFile): Promise<string> {
+    const target = this.findOpenMarkdownTarget(file, file.path);
+    return target?.editor.getValue() ?? this.app.vault.cachedRead(file);
   }
 
   private async applyFileChange(
@@ -974,6 +1120,34 @@ function scanSignature(scan: MigrationScan): string {
     leafMarkdown: scan.leafMarkdown,
     missingNodeNotes: scan.missingNodeNotes,
   });
+}
+
+function propertyScanSignature(scan: PropertyMigrationScan): string {
+  return JSON.stringify({
+    scannedNotes: scan.scannedNotes,
+    canonicalPropertyNotes: scan.canonicalPropertyNotes,
+    legacyPropertyNotes: scan.legacyPropertyNotes,
+    redundantLegacyNotes: scan.redundantLegacyNotes,
+    changes: scan.changes.map(({ path, sourceFingerprint: fingerprint, summary }) => [path, fingerprint, summary]),
+    conflicts: scan.conflicts.map(({ path, messages }) => [path, messages]),
+    nonCanonical: scan.nonCanonical.map(({ path, messages }) => [path, messages]),
+    invalidIcons: scan.invalidIcons.map(({ path, messages }) => [path, messages]),
+  });
+}
+
+function sourceFingerprint(source: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+  return `${source.length}:${(first >>> 0).toString(16)}:${(second >>> 0).toString(16)}`;
+}
+
+function comparePaths<T extends { readonly path: string }>(left: T, right: T): number {
+  return left.path.localeCompare(right.path, "en");
 }
 
 function validateFileName(rawName: string): string {

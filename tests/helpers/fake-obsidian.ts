@@ -16,11 +16,14 @@ export class FakeObsidian {
       configDir: ".obsidian",
       getAbstractFileByPath: (path: string) => this.files.get(normalize(path)) ?? null,
       getAllLoadedFiles: () => [...this.files.values()],
+      getMarkdownFiles: () => [...this.files.values()].filter((entry): entry is TFile =>
+        entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md"),
       getName: () => this.vaultName,
       getRoot: () => this.root,
       createFolder: async (path: string) => this.addFolder(path),
       create: async (path: string, source: string) => this.addFile(path, source),
       read: async (file: TFile) => this.contents.get(file.path) ?? "",
+      cachedRead: async (file: TFile) => this.contents.get(file.path) ?? "",
       modify: async (file: TFile, source: string) => {
         this.contents.set(file.path, source);
         this.frontmatters.set(file.path, parseFrontmatter(source));
@@ -175,11 +178,24 @@ function parseFrontmatter(source: string): Record<string, unknown> {
   const end = source.indexOf("\n---\n", 4);
   if (end < 0) return {};
   const result: Record<string, unknown> = {};
-  for (const line of source.slice(4, end).split("\n")) {
+  const lines = source.slice(4, end).split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
     const separator = line.indexOf(":");
     if (separator < 0) continue;
     const key = line.slice(0, separator).trim();
     const raw = line.slice(separator + 1).trim();
+    if (raw === "" && /^\S/u.test(line)) {
+      const values: unknown[] = [];
+      while (/^\s+-\s+/u.test(lines[index + 1] ?? "")) {
+        index += 1;
+        const item = (lines[index] ?? "").replace(/^\s+-\s+/u, "");
+        try { values.push(JSON.parse(item)); }
+        catch { values.push(item); }
+      }
+      result[key] = values;
+      continue;
+    }
     if (/^\d+$/u.test(raw)) result[key] = Number(raw);
     else {
       try { result[key] = JSON.parse(raw); }

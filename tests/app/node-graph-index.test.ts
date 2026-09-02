@@ -154,7 +154,7 @@ describe("Node Graph index", () => {
 
     expect(second.records).toBe(first.records);
     expect([...second.records.keys()]).toEqual([
-      "", "Work", "Work/One", "Personal", "Work/Two", "Work/Three", "Personal/Home",
+      "", "Work", "Work/One", "Work/Two", "Work/Three", "Personal", "Personal/Home",
     ]);
     expect(fixture.children.mock.calls.filter(([path]) => path === "Work")).toHaveLength(2);
     expect(fixture.index.metrics()).toEqual({ fullScans: 1, partialScans: 1, visitedFolders: 7 });
@@ -200,94 +200,88 @@ describe("Node Graph index", () => {
     expect(fixture.index.metrics()).toEqual({ fullScans: 1, partialScans: 0, visitedFolders: 4 });
   });
 
-  it("does not let stale included roots bypass managed canonical traversal", () => {
+  it("never lets incomplete or unmanaged branches bypass canonical traversal", () => {
     const incomplete = graphIndexFixture();
     incomplete.removeCanonical("Work/One");
-    const includedIncomplete = { ...incomplete.settings, includedSubtrees: ["Work/One"] };
-    expect([...incomplete.index.snapshot(includedIncomplete).records.keys()]).toEqual([]);
+    expect([...incomplete.index.snapshot(incomplete.settings).records.keys()]).toEqual(["", "Work", "Personal"]);
 
     const unmanaged = graphIndexFixture();
     unmanaged.ignorePath("Work");
-    const includedUnmanaged = { ...unmanaged.settings, includedSubtrees: ["Work/One"] };
-    expect([...unmanaged.index.snapshot(includedUnmanaged).records.keys()]).toEqual([]);
+    expect([...unmanaged.index.snapshot(unmanaged.settings).records.keys()]).toEqual(["", "Personal"]);
   });
 
-  it("keeps manual sibling order for multiple included roots across full and partial builds", () => {
+  it("keeps manual sibling order across full and partial builds", () => {
     const fixture = graphIndexFixture();
     fixture.setChildOrder("", ["Work", "Personal"]);
-    const settings = { ...fixture.settings, includedSubtrees: ["Personal", "Work"] };
     const directRoots = (records: ReadonlyMap<string, { parentPath: string | null; path: string }>): string[] =>
       [...records.values()].filter(({ parentPath }) => parentPath === "").map(({ path }) => path);
-    const first = fixture.index.snapshot(settings);
+    const first = fixture.index.snapshot(fixture.settings);
     expect(directRoots(first.records)).toEqual(["Work", "Personal"]);
 
     fixture.index.invalidatePaths(new Set(["Work/Work.md"]));
-    const partial = fixture.index.snapshot(settings);
+    const partial = fixture.index.snapshot(fixture.settings);
     const rebuilt = new NodeGraphIndex(
       fixture.fake.app,
       fixture.service,
       fixture.visuals,
       fixture.references,
-    ).snapshot(settings);
+    ).snapshot(fixture.settings);
 
     expect(directRoots(partial.records)).toEqual(["Work", "Personal"]);
     expect([...partial.records.entries()]).toEqual([...rebuilt.records.entries()]);
   });
 
-  it("keeps cross-parent included forest roots and 3D coordinates stable after partial refresh", () => {
+  it("keeps cross-parent branches and 3D coordinates stable after partial refresh", () => {
     const fixture = graphIndexFixture();
     fixture.addNode("Personal/Home");
-    const settings = { ...fixture.settings, includedSubtrees: ["Work/One", "Personal/Home"] };
-    const first = fixture.index.snapshot(settings);
-    expect([...first.records.keys()]).toEqual(["Work/One", "Personal/Home"]);
+    const first = fixture.index.snapshot(fixture.settings);
+    expect([...first.records.keys()]).toEqual(["", "Work", "Work/One", "Personal", "Personal/Home"]);
 
     fixture.index.invalidatePaths(new Set(["Personal/Home/Home.md"]));
-    const partial = fixture.index.snapshot(settings);
+    const partial = fixture.index.snapshot(fixture.settings);
     const rebuilt = new NodeGraphIndex(
       fixture.fake.app,
       fixture.service,
       fixture.visuals,
       fixture.references,
-    ).snapshot(settings);
+    ).snapshot(fixture.settings);
 
     expect([...partial.records.entries()]).toEqual([...rebuilt.records.entries()]);
     expect(graph3DPoints(partial)).toEqual(graph3DPoints(rebuilt));
   });
 
-  it("places a genuinely new included forest root in full-build hierarchy order", () => {
+  it("places a genuinely new branch in full-build hierarchy order", () => {
     const fixture = graphIndexFixture();
     fixture.addNode("A");
     fixture.addNode("B");
     fixture.addNode("B/Child");
-    const settings = { ...fixture.settings, includedSubtrees: ["A/New", "B/Child"] };
-    const first = fixture.index.snapshot(settings);
-    expect([...first.records.keys()]).toEqual(["B/Child"]);
+    const first = fixture.index.snapshot(fixture.settings);
+    expect(first.records.has("A/New")).toBe(false);
+    expect(first.records.has("B/Child")).toBe(true);
 
     fixture.addNode("A/New");
     fixture.index.invalidatePaths(new Set(["A/New/New.md"]));
-    const partial = fixture.index.snapshot(settings);
+    const partial = fixture.index.snapshot(fixture.settings);
     const rebuilt = new NodeGraphIndex(
       fixture.fake.app,
       fixture.service,
       fixture.visuals,
       fixture.references,
-    ).snapshot(settings);
+    ).snapshot(fixture.settings);
 
-    expect([...partial.records.keys()]).toEqual(["A/New", "B/Child"]);
+    expect(partial.records.has("A/New")).toBe(true);
     expect([...partial.records.entries()]).toEqual([...rebuilt.records.entries()]);
     expect(graph3DPoints(partial)).toEqual(graph3DPoints(rebuilt));
   });
 
-  it("ignores invalidations disjoint from every included traversal root", () => {
+  it("ignores deprecated rule-shaped settings because visibility is property-driven", () => {
     const fixture = graphIndexFixture();
-    const settings = { ...fixture.settings, includedSubtrees: ["Work"] };
-    const first = fixture.index.snapshot(settings);
+    const first = fixture.index.snapshot(fixture.settings);
     const metrics = fixture.index.metrics();
     fixture.children.mockClear();
     fixture.visuals.resolve.mockClear();
 
-    fixture.index.invalidatePaths(new Set(["Personal/Personal.md"]));
-    const second = fixture.index.snapshot(settings);
+    const second = fixture.index.snapshot({ ...fixture.settings, excludedSubtrees: ["Work"] } as NodeGraphSettings);
 
     expect(second.revision).toBe(first.revision);
     expect(second.records).toBe(first.records);
@@ -297,32 +291,18 @@ describe("Node Graph index", () => {
     expect(fixture.visuals.resolve).not.toHaveBeenCalled();
   });
 
-  it("matches a full rebuild when excluded ancestor metadata reorders and restyles visible descendants", () => {
+  it("prunes a canonically hidden ancestor before resolving descendant visuals", () => {
     const fixture = graphIndexFixture();
     fixture.addNode("Work/Two");
-    const settings = { ...fixture.settings, excludedNodes: ["Work"] };
-    const first = fixture.index.snapshot(settings);
-    expect(first.records.has("Work")).toBe(false);
-    fixture.setChildOrder("Work", ["Work/Two", "Work/One"]);
-    fixture.visuals.resolve.mockImplementation((folder) => folder.path.startsWith("Work/")
-      ? { accent: null, inheritedFrom: "Work", kind: "emoji", value: "🚀" }
-      : FALLBACK_VISUAL);
+    fixture.index.snapshot(fixture.settings);
+    fixture.visuals.resolve.mockClear();
+    fixture.fake.frontmatters.set("Work/Work.md", { "folder-nodes": ["hidden=true"] });
 
-    expect(fixture.index.invalidateRecordMetadata(new Set(["Work"]))).toBe(true);
-    const partial = fixture.index.snapshot(settings);
-    const rebuilt = new NodeGraphIndex(
-      fixture.fake.app,
-      fixture.service,
-      fixture.visuals,
-      fixture.references,
-    ).snapshot(settings);
-    const children = (snapshot: typeof partial): string[] => [...snapshot.records.values()]
-      .filter(({ parentPath }) => parentPath === "Work")
-      .map(({ path }) => path);
-
-    expect(children(partial)).toEqual(["Work/Two", "Work/One"]);
-    expect(partial.records.get("Work/One")?.visual).toMatchObject({ inheritedFrom: "Work", value: "🚀" });
-    expect([...partial.records.entries()]).toEqual([...rebuilt.records.entries()]);
+    expect(fixture.index.invalidateRecordMetadata(new Set(["Work"]))).toBe(false);
+    const hidden = fixture.index.snapshot(fixture.settings);
+    expect([...hidden.records.keys()]).toEqual(["", "Personal"]);
+    expect(fixture.visuals.resolve).not.toHaveBeenCalledWith(fixture.fake.requireFolder("Work/One"));
+    expect(fixture.visuals.resolve).not.toHaveBeenCalledWith(fixture.fake.requireFolder("Work/Two"));
   });
 
   it("rebuilds links without walking folders or replacing records", () => {
@@ -341,7 +321,7 @@ describe("Node Graph index", () => {
     expect(fixture.visuals.resolve).toHaveBeenCalledTimes(4);
   });
 
-  it("distinguishes structural settings invalidation from render-only settings", () => {
+  it("treats all remaining graph settings as render-only", () => {
     const fixture = graphIndexFixture();
     const first = fixture.index.snapshot(fixture.settings);
     const renderOnly = { ...fixture.settings, largeGraphThreshold: 900 };
@@ -349,10 +329,10 @@ describe("Node Graph index", () => {
     expect(unchanged.revision).toBe(first.revision);
     expect(fixture.index.metrics().fullScans).toBe(1);
 
-    const structural = { ...renderOnly, excludedSubtrees: ["Work"] };
-    const rebuilt = fixture.index.snapshot(structural);
-    expect([...rebuilt.records.keys()]).toEqual(["", "Personal"]);
-    expect(fixture.index.metrics()).toEqual({ fullScans: 2, partialScans: 0, visitedFolders: 7 });
+    const otherRenderOnly = { ...renderOnly, layoutDirection: "top-to-bottom" as const };
+    const unchangedAgain = fixture.index.snapshot(otherRenderOnly);
+    expect(unchangedAgain.revision).toBe(first.revision);
+    expect(fixture.index.metrics()).toEqual({ fullScans: 1, partialScans: 0, visitedFolders: 4 });
   });
 
   it("re-resolves cached visuals without traversing child collections", () => {
@@ -425,7 +405,8 @@ function graphIndexFixture() {
     let current = path;
     while (current !== "") {
       const note = notes.get(current);
-      if (note !== undefined && fake.frontmatters.get(note.path)?.folderNodeHidden === true) return current;
+      const frontmatter = note === undefined ? undefined : fake.frontmatters.get(note.path);
+      if (frontmatter?.folderNodeHidden === true || (Array.isArray(frontmatter?.["folder-nodes"]) && frontmatter["folder-nodes"].includes("hidden=true"))) return current;
       const slash = current.lastIndexOf("/");
       current = slash < 0 ? "" : current.slice(0, slash);
     }

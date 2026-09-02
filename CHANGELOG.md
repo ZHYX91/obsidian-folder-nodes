@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.8.0
+
+- Consolidated manual order, sparse rank, and hidden-subtree state into the concise `folder-nodes`
+  Text List while retaining compatibility reads for every published legacy property.
+- Added an explicit preview-first property migration with conflict and stale-preview checks,
+  source-preserving writes, exact rollback, non-canonical reports, and combined read-only Health.
+- Simplified Node Graph by removing persistent include and node/subtree exclusion rules; the same
+  Node Note `hidden=true` token now controls subtree visibility across Explorer, Contents, and Graph.
+- Added a stateful eye beside the pinned Root row to reveal hidden subtrees for the current session
+  without changing YAML, including touch-sized and accessible controls.
+- Shortened Folder Node context menus and moved the complete action set into one grouped,
+  touch-friendly panel shared across Contents, Graph, native folders, and Node Note tabs.
+- Merged homepage controls into General and moved unmanaged rules and maintenance into a dedicated
+  Management tab while preserving the imperative five-tab settings surface.
+- Kept incremental Node Graph record order identical to a complete hierarchy rebuild so newly
+  discovered branches cannot shift otherwise stable 3D coordinates.
+
 ## 0.7.2
 
 - Migrated release handoff to the single Candidate Bundle v3 contract backed by release-core 2.0,

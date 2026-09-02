@@ -1,14 +1,15 @@
-import { Menu, Notice, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
+import { Notice, setIcon, TFile, TFolder } from "obsidian";
 
 import FolderNodesPlugin from "./plugin";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
 import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view";
 import { isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
-import { isWithin, nodeGraphPathIsConfigured, type NodeGraphScope } from "../core/node-graph-scope";
+import type { NodeGraphScope } from "../core/node-graph-scope";
 import { resolvedLanguage } from "../ui/i18n";
 import type { RefreshBatch } from "./refresh-scheduler";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { NodeGraphIndex } from "./node-graph-index";
+import type { NodeAction, NodeActionSurface } from "../ui/node-actions-modal";
 
 export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   private nodeGraphIndex!: NodeGraphIndex;
@@ -23,7 +24,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
         getIndexSnapshot: () => this.nodeGraphIndex.snapshot(this.settings.nodeGraph),
         onNodeMenu: (event, path) => {
           const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
-          if (folder !== null) this.openNodeMenu(event, folder);
+          if (folder !== null) this.openNodeMenu(event, folder, "graph");
         },
       });
       return view;
@@ -47,7 +48,6 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       name: label("openLocalGraph"),
       checkCallback: (checking) => this.checkOpenCurrentNodeGraph("local", checking),
     });
-    this.registerEvent(this.app.workspace.on("file-menu", (menu, entry) => this.addNodeGraphMenu(menu, entry)));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.decorateContentsViews()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.decorateContentsViews()));
     this.registerEvent(this.app.vault.on("create", (entry) => {
@@ -143,8 +143,13 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     this.decorateContentsViews();
   }
 
-  protected override addOwnedNodeMenuItems(menu: Menu, folder: TFolder): void {
-    this.addNodeGraphItem(menu, folder);
+  protected override contributeNodeActions(actions: NodeAction[], folder: TFolder, surface: NodeActionSurface): void {
+    if (!this.settings.nodeGraph.enabled || surface === "graph") return;
+    actions.push(
+      { id: "node-graph", group: "open", icon: "git-fork", title: label("openInGraph"), run: () => this.openNodeGraph(folder.path) },
+      { id: "node-graph-subtree", group: "open", icon: "git-branch", title: label("openSubtreeGraph"), run: () => this.openNodeGraph(folder.path, { mode: "subtree", rootPath: folder.path }) },
+      { id: "node-graph-local", group: "open", icon: "focus", title: label("openLocalGraph"), run: () => this.openNodeGraph(folder.path, { mode: "local", rootPath: folder.path }) },
+    );
   }
 
   private invalidateNodeGraphStructure(): void {
@@ -196,7 +201,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     }
   }
 
-  private async openNodeGraph(path: string | null = null, scope: NodeGraphScope = { mode: "global" }): Promise<void> {
+  protected async openNodeGraph(path: string | null = null, scope: NodeGraphScope = { mode: "global" }): Promise<void> {
     if (!this.settings.nodeGraph.enabled) {
       new Notice(label("graphDisabled"));
       return;
@@ -215,7 +220,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   private async openCurrentNodeGraph(mode: "local" | "subtree"): Promise<void> {
     const folder = this.currentGraphFolder();
-    if (folder === null || !nodeGraphPathIsConfigured(folder.path, this.settings.nodeGraph)) {
+    if (folder === null) {
       new Notice(label("noGraphNode"));
       return;
     }
@@ -225,97 +230,12 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   private checkOpenCurrentNodeGraph(mode: "local" | "subtree", checking: boolean): boolean {
     if (!this.settings.nodeGraph.enabled) return false;
     const folder = this.currentGraphFolder();
-    if (folder === null || !nodeGraphPathIsConfigured(folder.path, this.settings.nodeGraph)) return false;
+    if (folder === null) return false;
     if (!checking) void this.openCurrentNodeGraph(mode);
     return true;
   }
 
-  private addNodeGraphMenu(menu: Menu, entry: TAbstractFile): void {
-    if (!this.settings.nodeGraph.enabled) return;
-    const folder = this.graphFolder(entry);
-    if (folder === null) return;
-    menu.addSeparator();
-    this.addNodeGraphItem(menu, folder);
-  }
-
-  private addNodeGraphItem(menu: Menu, folder: TFolder): void {
-    if (!this.settings.nodeGraph.enabled) return;
-    const path = normalizeVaultPath(folder.path);
-    const configured = nodeGraphPathIsConfigured(path, this.settings.nodeGraph);
-    menu.addItem((item) => item
-      .setTitle(label("openInGraph"))
-      .setIcon("git-fork")
-      .setDisabled(!configured)
-      .onClick(() => void this.openNodeGraph(folder.path)));
-    menu.addItem((item) => item
-      .setTitle(label("openSubtreeGraph"))
-      .setIcon("git-branch")
-      .setDisabled(!configured)
-      .onClick(() => void this.openNodeGraph(folder.path, { mode: "subtree", rootPath: folder.path })));
-    menu.addItem((item) => item
-      .setTitle(label("openLocalGraph"))
-      .setIcon("focus")
-      .setDisabled(!configured)
-      .onClick(() => void this.openNodeGraph(folder.path, { mode: "local", rootPath: folder.path })));
-    if (path === "") return;
-    const hidden = this.settings.nodeGraph.excludedNodes.includes(path);
-    const hiddenSubtree = this.settings.nodeGraph.excludedSubtrees.includes(path);
-    const hiddenByParent = this.settings.nodeGraph.excludedSubtrees.some((root) => root !== path && isWithin(path, root));
-    const outsideIncludedScope = this.settings.nodeGraph.includedSubtrees.length > 0
-      && !this.settings.nodeGraph.includedSubtrees.some((root) => isWithin(path, root));
-    menu.addSeparator();
-    if (hidden || hiddenSubtree) {
-      menu.addItem((item) => item
-        .setTitle(label("restoreGraphNode"))
-        .setIcon("eye")
-        .onClick(() => void this.updateGraphExclusion(path, "restore")));
-      return;
-    }
-    if (hiddenByParent) {
-      menu.addItem((item) => item
-        .setTitle(label("hiddenByParent"))
-        .setIcon("eye-off")
-        .setDisabled(true));
-      return;
-    }
-    if (outsideIncludedScope) {
-      menu.addItem((item) => item
-        .setTitle(label("includeGraphSubtree"))
-        .setIcon("list-tree")
-        .onClick(() => void this.includeGraphSubtree(path)));
-      return;
-    }
-    menu.addItem((item) => item
-      .setTitle(label("hideGraphNode"))
-      .setIcon("eye-off")
-      .onClick(() => void this.updateGraphExclusion(path, "node")));
-    menu.addItem((item) => item
-      .setTitle(label("hideGraphSubtree"))
-      .setIcon("folder-x")
-      .onClick(() => void this.updateGraphExclusion(path, "subtree")));
-  }
-
-  private async includeGraphSubtree(path: string): Promise<void> {
-    const included = this.settings.nodeGraph.includedSubtrees;
-    if (!included.includes(path)) included.push(path);
-    included.sort((left, right) => left.localeCompare(right, "en"));
-    await this.saveSettings();
-    await this.reconcileSettingsChange();
-  }
-
-  private async updateGraphExclusion(path: string, action: "node" | "restore" | "subtree"): Promise<void> {
-    const settings = this.settings.nodeGraph;
-    settings.excludedNodes = settings.excludedNodes.filter((candidate) => candidate !== path);
-    settings.excludedSubtrees = settings.excludedSubtrees.filter((candidate) => candidate !== path);
-    if (action === "node") settings.excludedNodes.push(path);
-    if (action === "subtree") settings.excludedSubtrees.push(path);
-    settings.excludedNodes.sort((left, right) => left.localeCompare(right, "en"));
-    settings.excludedSubtrees.sort((left, right) => left.localeCompare(right, "en"));
-    await this.saveSettings();
-    await this.reconcileSettingsChange();
-  }
-
-  private graphFolder(entry: TAbstractFile): TFolder | null {
+  private graphFolder(entry: TFile | TFolder): TFolder | null {
     if (entry instanceof TFolder) {
       return this.graphFolderIsEligible(entry) ? entry : null;
     }
@@ -370,18 +290,13 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 }
 
 function label(
-  key: "graphDisabled" | "hiddenByParent" | "hideGraphNode" | "hideGraphSubtree" | "includeGraphSubtree" | "noGraphNode" | "nodeGraph" | "openGraph" | "openInGraph" | "openLocalGraph" | "openSubtreeGraph" | "restoreGraphNode",
+  key: "graphDisabled" | "noGraphNode" | "nodeGraph" | "openGraph" | "openInGraph" | "openLocalGraph" | "openSubtreeGraph",
 ): string {
   const zh = resolvedLanguage() === "zh-CN";
   if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
   if (key === "openInGraph") return zh ? "在节点图谱中打开" : "Open in Node Graph";
   if (key === "openSubtreeGraph") return zh ? "打开此节点的子图谱" : "Open subtree Node Graph";
   if (key === "openLocalGraph") return zh ? "打开此节点的局部图谱" : "Open local Node Graph";
-  if (key === "hideGraphNode") return zh ? "从节点图谱隐藏" : "Hide from Node Graph";
-  if (key === "hideGraphSubtree") return zh ? "从节点图谱隐藏整个子树" : "Hide subtree from Node Graph";
-  if (key === "hiddenByParent") return zh ? "已由上级子树规则隐藏" : "Hidden by a parent subtree rule";
-  if (key === "includeGraphSubtree") return zh ? "将此子树加入节点图谱范围" : "Include subtree in Node Graph";
-  if (key === "restoreGraphNode") return zh ? "恢复到节点图谱" : "Restore to Node Graph";
   if (key === "graphDisabled") return zh ? "节点图谱已在设置中关闭。" : "Node Graph is disabled in settings.";
   if (key === "noGraphNode") return zh ? "当前笔记不属于可显示的 Folder Node。" : "The current note is not in a visible Folder Node.";
   return zh ? "打开节点图谱" : "Open Node Graph";

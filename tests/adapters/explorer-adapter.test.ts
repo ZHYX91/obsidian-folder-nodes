@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MarkdownView, TFile, TFolder, type App } from "obsidian";
 
 import { ExplorerAdapter } from "../../src/adapters/explorer-adapter";
@@ -26,13 +26,17 @@ describe("ExplorerAdapter lifecycle", () => {
       children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, isCanonicalFile: () => false,
       isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md",
       openFolderNode: async () => undefined, placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      revealingHiddenNodes: () => false,
     } as unknown as NodeService;
+    const toggleHidden = vi.fn();
     const adapter = new ExplorerAdapter(
       app, service,
       { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
       () => structuredClone(DEFAULT_SETTINGS),
-      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged", showHiddenNodesThisSession: "Show hidden", hideHiddenNodesThisSession: "Hide hidden" }),
       () => undefined, () => undefined, () => undefined, () => undefined,
+      true,
+      toggleHidden,
     );
 
     adapter.start();
@@ -42,6 +46,12 @@ describe("ExplorerAdapter lifecycle", () => {
     adapter.refresh();
     expect(root.querySelectorAll(".folder-nodes-explorer-root")).toHaveLength(1);
     expect(root.querySelectorAll(".folder-nodes-create-node")).toHaveLength(1);
+    const visibility = root.querySelector<HTMLButtonElement>(".folder-nodes-explorer-root-visibility");
+    expect(visibility?.hidden).toBe(false);
+    expect(visibility?.getAttribute("aria-label")).toBe("Show hidden");
+    expect(visibility?.getAttribute("aria-pressed")).toBe("false");
+    visibility?.click();
+    expect(toggleHidden).toHaveBeenCalledOnce();
 
     adapter.stop();
     expect(root.querySelector(".folder-nodes-explorer-root")).toBeNull();

@@ -6,8 +6,6 @@ import {
   GLOBAL_NODE_GRAPH_SCOPE,
   isWithin,
   nodeGraphParentPath,
-  nodeGraphPathIsConfigured,
-  nodeGraphSubtreeIsExcluded,
   nodeGraphTraversalRoots,
 } from "../core/node-graph-scope";
 import { normalizeVaultPath } from "../core/paths";
@@ -48,8 +46,6 @@ export class NodeGraphIndex {
   private dirtyAll = true;
   private dirtyLinks = true;
   private readonly dirtyPaths = new Set<string>();
-  private settingsIdentity = "";
-  private currentSettings: NodeGraphSettings | null = null;
   private revision = 0;
   private fullScans = 0;
   private partialScans = 0;
@@ -62,15 +58,9 @@ export class NodeGraphIndex {
     private readonly references: NodeGraphIndexReferences,
   ) {}
 
-  public snapshot(settings: NodeGraphSettings): NodeGraphIndexSnapshot {
-    this.currentSettings = settings;
-    const identity = indexSettingsIdentity(settings);
-    if (identity !== this.settingsIdentity) {
-      this.settingsIdentity = identity;
-      this.dirtyAll = true;
-    }
-    if (this.dirtyAll) this.rebuild(settings);
-    else if (this.dirtyPaths.size > 0) this.refreshDirtyPaths(settings);
+  public snapshot(_settings: NodeGraphSettings): NodeGraphIndexSnapshot {
+    if (this.dirtyAll) this.rebuild();
+    else if (this.dirtyPaths.size > 0) this.refreshDirtyPaths();
     if (this.dirtyLinks) this.rebuildLinks();
     return { links: this.links, records: this.records, revision: this.revision };
   }
@@ -108,10 +98,9 @@ export class NodeGraphIndex {
       this.invalidatePaths(requestedPaths);
       return false;
     }
-    if (this.currentSettings !== null && [...requestedPaths].some((path) => {
+    if ([...requestedPaths].some((path) => {
       const expected = !(this.service.isIgnoredPath?.(path) ?? false)
-        && (this.service.isNodeVisible?.(path) ?? true)
-        && nodeGraphPathIsConfigured(path, this.currentSettings!);
+        && (this.service.isNodeVisible?.(path) ?? true);
       return expected !== this.records.has(path);
     })) {
       this.invalidatePaths(requestedPaths);
@@ -159,6 +148,7 @@ export class NodeGraphIndex {
     }
     this.restoreSiblingOrder(orderParents);
     this.restoreForestRootOrder();
+    this.restoreHierarchyOrder();
     this.revision += 1;
     return true;
   }
@@ -167,14 +157,14 @@ export class NodeGraphIndex {
     return { fullScans: this.fullScans, partialScans: this.partialScans, visitedFolders: this.visitedFolders };
   }
 
-  private rebuild(settings: NodeGraphSettings): void {
+  private rebuild(): void {
     this.records.clear();
     const childPathsByParent = new Map<string, ReadonlySet<string>>();
-    const traversalRoots = nodeGraphTraversalRoots(GLOBAL_NODE_GRAPH_SCOPE, settings);
+    const traversalRoots = nodeGraphTraversalRoots(GLOBAL_NODE_GRAPH_SCOPE);
     for (const rootPath of traversalRoots) {
       if (!this.isReachableTraversalRoot(rootPath, childPathsByParent)) continue;
       const root = rootPath === "" ? this.app.vault.getRoot() : this.service.getFolder(rootPath);
-      if (root !== null) this.collect(root, settings);
+      if (root !== null) this.collect(root);
     }
     const traversalParents = new Set(traversalRoots.flatMap((path) => {
       const parentPath = nodeGraphParentPath(path);
@@ -182,6 +172,7 @@ export class NodeGraphIndex {
     }));
     this.restoreSiblingOrder(traversalParents);
     this.restoreForestRootOrder();
+    this.restoreHierarchyOrder();
     this.fullScans += 1;
     this.dirtyAll = false;
     this.dirtyPaths.clear();
@@ -189,8 +180,8 @@ export class NodeGraphIndex {
     this.revision += 1;
   }
 
-  private refreshDirtyPaths(settings: NodeGraphSettings): void {
-    const configuredTraversalRoots = nodeGraphTraversalRoots(GLOBAL_NODE_GRAPH_SCOPE, settings);
+  private refreshDirtyPaths(): void {
+    const configuredTraversalRoots = nodeGraphTraversalRoots(GLOBAL_NODE_GRAPH_SCOPE);
     const roots = minimalRoots([...this.dirtyPaths].flatMap((path) => this.folderPathsForRefresh(path)))
       .filter((rootPath) => configuredTraversalRoots.some((traversalRoot) =>
         isWithin(rootPath, traversalRoot) || isWithin(traversalRoot, rootPath)));
@@ -209,7 +200,7 @@ export class NodeGraphIndex {
       if (pathHasAncestorInSet(path, rootSet)) this.records.delete(path);
     }
     const childPathsByParent = new Map<string, ReadonlySet<string>>();
-    const traversalRoots = nodeGraphTraversalRoots(GLOBAL_NODE_GRAPH_SCOPE, settings)
+    const traversalRoots = nodeGraphTraversalRoots(GLOBAL_NODE_GRAPH_SCOPE)
       .filter((rootPath) => this.isReachableTraversalRoot(rootPath, childPathsByParent));
     const collectRoots = minimalRoots(roots.flatMap((rootPath) => {
       const nestedTraversalRoots = traversalRoots.filter((traversalRoot) => isWithin(traversalRoot, rootPath));
@@ -220,11 +211,12 @@ export class NodeGraphIndex {
       const parentPath = nodeGraphParentPath(rootPath);
       if (parentPath !== null) affectedParents.add(parentPath);
       const folder = rootPath === "" ? this.app.vault.getRoot() : this.service.getFolder(rootPath);
-      if (folder !== null && !nodeGraphSubtreeIsExcluded(rootPath, settings)) this.collect(folder, settings);
+      if (folder !== null) this.collect(folder);
     }
     this.restoreKnownRecordSlots(previousOrder);
     this.restoreSiblingOrder(affectedParents);
     this.restoreForestRootOrder();
+    this.restoreHierarchyOrder();
     this.partialScans += 1;
     this.dirtyLinks = true;
     this.revision += 1;
@@ -267,6 +259,38 @@ export class NodeGraphIndex {
       replacementIndex += 1;
       if (replacement !== undefined) this.records.set(replacement[0], replacement[1]);
     }
+  }
+
+  /** Make incremental record iteration identical to a full depth-first build without walking the Vault. */
+  private restoreHierarchyOrder(): void {
+    if (this.records.size < 2) return;
+    const entries = [...this.records];
+    const records = new Map(entries);
+    const children = new Map<string, string[]>();
+    const roots: string[] = [];
+    for (const [path, record] of entries) {
+      if (record.parentPath === null || !records.has(record.parentPath)) {
+        roots.push(path);
+        continue;
+      }
+      const siblings = children.get(record.parentPath) ?? [];
+      siblings.push(path);
+      children.set(record.parentPath, siblings);
+    }
+    const ordered: Array<readonly [string, NodeGraphIndexRecord]> = [];
+    const visited = new Set<string>();
+    const visit = (path: string): void => {
+      if (visited.has(path)) return;
+      visited.add(path);
+      const record = records.get(path);
+      if (record === undefined) return;
+      ordered.push([path, record]);
+      for (const childPath of children.get(path) ?? []) visit(childPath);
+    };
+    for (const root of roots) visit(root);
+    for (const [path] of entries) visit(path);
+    this.records.clear();
+    for (const [path, record] of ordered) this.records.set(path, record);
   }
 
   private forestOrderKey(
@@ -384,31 +408,28 @@ export class NodeGraphIndex {
     return childPaths;
   }
 
-  private collect(root: TFolder, settings: NodeGraphSettings): void {
+  private collect(root: TFolder): void {
     const pending = [root];
     while (pending.length > 0) {
       const folder = pending.pop();
       if (folder === undefined) break;
       this.visitedFolders += 1;
       const path = normalizeVaultPath(folder.path);
-      if (nodeGraphSubtreeIsExcluded(path, settings)) continue;
       if (!(this.service.isNodeVisible?.(path) ?? true)) continue;
-      if (nodeGraphPathIsConfigured(path, settings)) {
-        const note = this.service.getCanonicalFile(path);
-        const resolvedVisual = this.visuals.resolve(folder);
-        const hiddenState = (this.service.revealingHiddenNodes?.() ?? false)
-          ? this.service.hiddenState?.(path) ?? { explicit: false, sourcePath: null }
-          : { explicit: false, sourcePath: null };
-        this.records.set(path, {
-          hiddenExplicit: hiddenState.explicit,
-          hiddenSourcePath: hiddenState.sourcePath,
-          label: path === "" ? this.app.vault.getName() : folder.name,
-          notePath: note?.path ?? null,
-          parentPath: nodeGraphParentPath(path),
-          path,
-          visual: normalizeIndexVisual(path, resolvedVisual),
-        });
-      }
+      const note = this.service.getCanonicalFile(path);
+      const resolvedVisual = this.visuals.resolve(folder);
+      const hiddenState = (this.service.revealingHiddenNodes?.() ?? false)
+        ? this.service.hiddenState?.(path) ?? { explicit: false, sourcePath: null }
+        : { explicit: false, sourcePath: null };
+      this.records.set(path, {
+        hiddenExplicit: hiddenState.explicit,
+        hiddenSourcePath: hiddenState.sourcePath,
+        label: path === "" ? this.app.vault.getName() : folder.name,
+        notePath: note?.path ?? null,
+        parentPath: nodeGraphParentPath(path),
+        path,
+        visual: normalizeIndexVisual(path, resolvedVisual),
+      });
       const children = this.service.children(path);
       for (let index = children.length - 1; index >= 0; index -= 1) {
         const childPath = children[index]?.childPath;
@@ -445,14 +466,6 @@ export class NodeGraphIndex {
     const slash = path.lastIndexOf("/");
     return path.toLocaleLowerCase().endsWith(".md") ? [slash < 0 ? "" : path.slice(0, slash)] : [path];
   }
-}
-
-function indexSettingsIdentity(settings: NodeGraphSettings): string {
-  return JSON.stringify({
-    excludedNodes: settings.excludedNodes,
-    excludedSubtrees: settings.excludedSubtrees,
-    includedSubtrees: settings.includedSubtrees,
-  });
 }
 
 function normalizeIndexVisual(path: string, visual: NodeVisual): NodeVisual {

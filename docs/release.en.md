@@ -30,9 +30,11 @@ scenario contract, and every fixture hash; there is no receipt or envelope dual 
 
 ## Product acceptance
 
-The same Bundle requires desktop and Android-emulator acceptance covering hidden nodes and
-inherited descendants, session reveal, preview-first migration, selection creation, sparse
-ordering, and Node Graph scopes, handles, search, 2D/3D, touch targets, and restart. Android
+The same Bundle requires desktop and Android-emulator acceptance covering the canonical
+`folder-nodes` list, legacy compatibility and explicit property migration, hidden nodes and
+inherited descendants, the Root-row session eye, grouped node actions, structural preview,
+selection creation, sparse ordering, and Node Graph scopes, property-only subtree hiding, handles,
+search, 2D/3D, touch targets, and restart. Android
 physical devices and iOS are out of scope.
 
 ## Standalone workflow

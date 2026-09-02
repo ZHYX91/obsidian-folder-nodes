@@ -70,6 +70,7 @@ export interface ExplorerRootRow {
   icon: HTMLElement;
   title: HTMLElement;
   badge: HTMLElement;
+  visibility: HTMLButtonElement;
 }
 
 export function ensureNoteTitleIcon(title: HTMLElement): HTMLElement {
@@ -157,14 +158,19 @@ export function ensureExplorerRootRow(container: HTMLElement): ExplorerRootRow {
     const badge = container.ownerDocument.createElement("span");
     badge.className = "folder-nodes-explorer-root-badge";
     badge.dataset.role = "badge";
-    row.append(icon, title, badge);
+    const visibility = container.ownerDocument.createElement("button");
+    visibility.type = "button";
+    visibility.className = "clickable-icon folder-nodes-explorer-root-visibility";
+    visibility.dataset.role = "visibility";
+    row.append(icon, title, badge, visibility);
   }
   if (container.firstElementChild !== row) container.prepend(row);
   const icon = row.querySelector<HTMLElement>(":scope > [data-role=icon]");
   const title = row.querySelector<HTMLElement>(":scope > [data-role=title]");
   const badge = row.querySelector<HTMLElement>(":scope > [data-role=badge]");
-  if (icon === null || title === null || badge === null) throw new Error("Invalid Folder Nodes root row");
-  return { row, icon, title, badge };
+  const visibility = row.querySelector<HTMLButtonElement>(":scope > [data-role=visibility]");
+  if (icon === null || title === null || badge === null || visibility === null) throw new Error("Invalid Folder Nodes root row");
+  return { row, icon, title, badge, visibility };
 }
 
 function isElementTarget(target: EventTarget | null): target is Element {

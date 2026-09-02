@@ -1,7 +1,7 @@
 import { isEmojiFontPreference } from "../core/emoji-font";
 import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core/types";
 
-export const CURRENT_SETTINGS_SCHEMA_VERSION = 1 as const;
+export const CURRENT_SETTINGS_SCHEMA_VERSION = 2 as const;
 
 export interface PersistedFolderNodesSettings extends FolderNodesSettings {
   schemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
@@ -11,7 +11,7 @@ export type SettingsCompatibility =
   | {
       readonly status: "compatible";
       readonly currentSchemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
-      readonly storedSchemaVersion: 0 | typeof CURRENT_SETTINGS_SCHEMA_VERSION;
+      readonly storedSchemaVersion: 0 | 1 | typeof CURRENT_SETTINGS_SCHEMA_VERSION;
     }
   | {
       readonly status: "incompatible";
@@ -24,6 +24,7 @@ export interface SettingsLoadResult {
   readonly settings: FolderNodesSettings;
   readonly compatibility: SettingsCompatibility;
   readonly migration: PersistedFolderNodesSettings | null;
+  readonly discardedNodeGraphRuleCount: number;
 }
 
 export class SettingsSchemaIncompatibleError extends Error {
@@ -41,9 +42,6 @@ export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = deepFreeze({
   enabled: true,
   defaultDimension: "2d",
   layoutDirection: "left-to-right",
-  includedSubtrees: [],
-  excludedNodes: [],
-  excludedSubtrees: [],
   largeGraphThreshold: 500,
   overviewEdgeLimit: 6_000,
 });
@@ -111,6 +109,7 @@ export function loadSettingsData(value: unknown): SettingsLoadResult {
     && Object.prototype.hasOwnProperty.call(input, "schemaVersion");
   const storedSchemaVersion = hasSchemaVersion ? input.schemaVersion : undefined;
   const settings = normalizeSettings(input ?? {});
+  const discardedNodeGraphRuleCount = countDeprecatedNodeGraphRules(input?.nodeGraph);
 
   if (hasSchemaVersion && !isValidSchemaVersion(storedSchemaVersion)) {
     return {
@@ -124,6 +123,7 @@ export function loadSettingsData(value: unknown): SettingsLoadResult {
         reason: "invalid-schema",
       },
       migration: null,
+      discardedNodeGraphRuleCount,
     };
   }
 
@@ -140,6 +140,7 @@ export function loadSettingsData(value: unknown): SettingsLoadResult {
         reason: "future-schema",
       },
       migration: null,
+      discardedNodeGraphRuleCount,
     };
   }
 
@@ -150,9 +151,10 @@ export function loadSettingsData(value: unknown): SettingsLoadResult {
     compatibility: {
       status: "compatible",
       currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
-      storedSchemaVersion: hasSchemaVersion ? CURRENT_SETTINGS_SCHEMA_VERSION : 0,
+      storedSchemaVersion: typeof storedSchemaVersion === "number" ? storedSchemaVersion as 1 | 2 : 0,
     },
     migration: canonical ? null : snapshot,
+    discardedNodeGraphRuleCount,
   };
 }
 
@@ -171,9 +173,6 @@ function normalizeNodeGraphSettings(value: unknown): NodeGraphSettings {
     enabled: input.enabled !== false,
     defaultDimension: input.defaultDimension === "3d" ? "3d" : "2d",
     layoutDirection: input.layoutDirection === "top-to-bottom" ? "top-to-bottom" : "left-to-right",
-    includedSubtrees: normalizePaths(input.includedSubtrees, DEFAULT_NODE_GRAPH_SETTINGS.includedSubtrees),
-    excludedNodes: normalizePaths(input.excludedNodes, DEFAULT_NODE_GRAPH_SETTINGS.excludedNodes),
-    excludedSubtrees: normalizePaths(input.excludedSubtrees, DEFAULT_NODE_GRAPH_SETTINGS.excludedSubtrees),
     largeGraphThreshold: normalizeInteger(input.largeGraphThreshold, 50, 10_000, DEFAULT_NODE_GRAPH_SETTINGS.largeGraphThreshold),
     overviewEdgeLimit: normalizeInteger(input.overviewEdgeLimit, 100, 100_000, DEFAULT_NODE_GRAPH_SETTINGS.overviewEdgeLimit),
   };
@@ -223,6 +222,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isValidSchemaVersion(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+}
+
+function countDeprecatedNodeGraphRules(value: unknown): number {
+  if (!isRecord(value)) return 0;
+  let total = 0;
+  for (const candidate of [value.includedSubtrees, value.excludedNodes, value.excludedSubtrees]) {
+    if (Array.isArray(candidate)) total += candidate.length;
+  }
+  return total;
 }
 
 function deepFreeze<T>(value: T): T {

@@ -60,7 +60,7 @@ describe("settings", () => {
     expect(settings.leafNotePrefixes).toEqual(["_"]);
     expect(settings.ignoredFolderPrefixes).toEqual([".", "_"]);
   });
-  it("normalizes Node Graph defaults, paths, and performance bounds while dropping obsolete settings", () => {
+  it("normalizes Node Graph defaults and performance bounds while dropping obsolete rules", () => {
     const settings = normalizeSettings({
       nodeGraph: {
         enabled: false,
@@ -76,13 +76,10 @@ describe("settings", () => {
         overviewEdgeLimit: 1_000_000,
       },
     });
-    expect(settings.nodeGraph).toMatchObject({
+    expect(settings.nodeGraph).toEqual({
       enabled: false,
       defaultDimension: "3d",
       layoutDirection: "top-to-bottom",
-      includedSubtrees: ["Work"],
-      excludedNodes: ["Work/Private"],
-      excludedSubtrees: ["Work/Archive"],
       largeGraphThreshold: 50,
       overviewEdgeLimit: 100_000,
     });
@@ -160,13 +157,22 @@ describe("settings", () => {
     expect(first).toEqual(second);
     expect(source).toEqual(before);
     first.ignoredFolders.push("Other");
-    first.nodeGraph.includedSubtrees.push("Other");
     first.prefix.customText = "changed";
     expect(second.ignoredFolders).toEqual(["Generated"]);
-    expect(second.nodeGraph.includedSubtrees).toEqual(["Work"]);
+    expect(second.nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
     expect(second.prefix.customText).toBe("");
     expect(Object.isFrozen(DEFAULT_SETTINGS)).toBe(true);
     expect(Object.isFrozen(DEFAULT_SETTINGS.nodeGraph)).toBe(true);
     expect(Object.isFrozen(DEFAULT_SETTINGS.ignoredFolders)).toBe(true);
+  });
+
+  it("reports deprecated graph rules while migrating schema 1 settings without touching notes", () => {
+    const loaded = loadSettingsData({
+      schemaVersion: 1,
+      nodeGraph: { includedSubtrees: ["Work"], excludedNodes: ["Private"], excludedSubtrees: ["Archive"] },
+    });
+    expect(loaded.discardedNodeGraphRuleCount).toBe(3);
+    expect(loaded.compatibility).toMatchObject({ status: "compatible", storedSchemaVersion: 1, currentSchemaVersion: 2 });
+    expect(loaded.migration?.nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
   });
 });

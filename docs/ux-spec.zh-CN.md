@@ -7,7 +7,7 @@ translation_status: source
 
 ## Obsidian 一致性
 
-界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。所有受支持 Obsidian 版本都使用 imperative 五页签设置界面：“常规”“主页”“图标与外观”“选区与命名”“节点图谱”；声明式设置保持关闭，因为它会绕过这套布局。界面直接从页签行开始，既不在页签上方重复大型插件名称，也不在面板内重复当前页签名称。页签在主题覆盖下仍保持基线与强调色下划线，活动标签同时使用半粗字重，标签行与面板之间保留稳定间距；窄宽度可横向滚动，随大号界面字体增高，并支持符合文字方向的左右键以及 Home、End。设置 schema 无效或更高时，每个页签内部都明确显示只读警告，同时保留页签导航；全部设置控件被禁用，且不回写 `data.json`。保存失败时保留本次会话的最新值，显示“尚未保存”状态并提供“重试保存”。语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
+界面使用 Obsidian 原生 Setting、Menu、Modal、Notice、主题变量、图标和键盘焦点。桌面最小目标 36px，粗指针为 44px。所有受支持 Obsidian 版本都使用 imperative 五页签设置界面：“常规”“管理”“图标与外观”“选区与命名”“节点图谱”。主页控件合并到“常规”；不管理规则、批量整理、属性迁移与 Health 集中在“管理”。声明式设置保持关闭，因为它会绕过这套布局。界面直接从页签行开始，既不在页签上方重复大型插件名称，也不在面板内重复当前页签名称。页签在主题覆盖下仍保持基线与强调色下划线，活动标签同时使用半粗字重，标签行与面板之间保留稳定间距；窄宽度可横向滚动，随大号界面字体增高，并支持符合文字方向的左右键以及 Home、End。设置 schema 无效或更高时，每个页签内部都明确显示只读警告，同时保留页签导航；全部设置控件被禁用，且不回写 `data.json`。保存失败时保留本次会话的最新值，显示“尚未保存”状态并提供“重试保存”。语言下拉框使用 `跟随 Obsidian`、`简体中文`、`English`，其中“跟随 Obsidian”使用 Obsidian 当前的界面语言。
 
 ## 主页
 
@@ -21,13 +21,13 @@ translation_status: source
 
 ## Explorer Node Tree
 
-File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称和“根节点”状态分别占用固定图标位、弹性名称位和尾部状态位，卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定且无边框的图标位，把名称留在原生 title 位，并把“不完整节点”“不管理”“冲突”等状态固定为尾部胶囊，不把这些内容拼进名称。完整节点和仅有文件夹的一侧可使用节点图标；仅有 Markdown 的不完整节点与不管理项不补充通用文件图标。所有图标位使用相同几何尺寸，默认 SVG、文字、Emoji 和图片都不得改变原生行高。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。桌面端拖拽必须显示 before line、into highlight 或 after line，drop 前不得修改 Vault；Android 不注册 HTML5 drag/drop listener，也不增加 draggable。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件在旁边增加一次性创建文件夹与同名 Node Note 的“新建节点”，并提供 Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
+File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。仅在应用隐藏标记时显示眼睛；隐藏子树被抑制时使用 eye-off，临时显示时使用 eye，并通过当前动作和 `aria-pressed` 表达状态；激活它不会写 YAML，也不会打开 Root。卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定且无边框的图标位，把名称留在原生 title 位，并把“不完整节点”“不管理”“冲突”等状态固定为尾部胶囊，不把这些内容拼进名称。完整节点和仅有文件夹的一侧可使用节点图标；仅有 Markdown 的不完整节点与不管理项不补充通用文件图标。所有图标位使用相同几何尺寸，默认 SVG、文字、Emoji 和图片都不得改变原生行高。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。桌面端拖拽必须显示 before line、into highlight 或 after line，drop 前不得修改 Vault；Android 不注册 HTML5 drag/drop listener，也不增加 draggable。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件在旁边增加一次性创建文件夹与同名 Node Note 的“新建节点”，并提供 Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
 
 ## Node Contents View
 
 侧栏顶部显示 breadcrumb、可选的当前 Node visual、标题、Home、Edit visual 和 New child node。Nodes 仅在存在有效或继承 visual 时显示视觉标识；没有 visual 的节点使用紧凑文字卡，不显示大 fallback 文件夹。Album 使用接近相册的密集 4:3 缩略图：普通图片无 badge，GIF 显示 `GIF` badge 且转为静态帧，视频只显示静态类型 tile。HEIC/HEIF、音频与其他资源位于紧凑 Files 列表。不管理的文件夹与 Markdown 行共用中性的“不管理”状态 badge，并在独立且对齐的类型列显示“文件夹”或 `MD`。插件不渲染 `<video>`/`<audio>` 控件且不自动播放；“打开”只导航到 Obsidian 的文件视图。Sections 可折叠，每批最多渲染 200 项。
 
-Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions 按钮以及 Shift+F10/菜单键打开同一个 Obsidian Menu。插件自有 Contents 菜单可以提供完整节点操作，因为那里没有原生文件树菜单需要避免重复。File Explorer 文件夹菜单保留原生 rename/move/delete，只增加不同的节点动作。Node Note 标签页保留原生的笔记级 move/delete/merge，Folder Nodes 额外提供措辞明确的“移动/合并/删除所在节点”；原生 rename 会同步明确配对的文件夹/Node Note。文件夹侧的不完整节点提供“补全节点”和“设为不管理”，Markdown 侧的不完整节点提供“转换为 Folder Node”和“设为不管理”；hover/focus 主动作与菜单动作一致，状态 badge 本身不响应双击。不管理项提供“纳入管理”，匹配名称开头规则或位于不管理文件夹内时提示用户调整规则。原生创建与删除只改变实际存在的一侧，不自动补全或重建；删除文件夹时，其子树（包括 canonical Node Note）由 Obsidian 一并删除。普通文件菜单包含打开、在新标签打开、在 File Explorer 中显示、复制链接、rename、move 和 trash；支持的图片还可设为当前 Node visual。普通文件、Album 条目和不管理文件夹仍可通过 `file-menu` 接收其他插件注入的动作。所有写入失败都显示失败关闭 Notice。
+Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions 按钮以及 Shift+F10/菜单键打开同一个 Obsidian Menu。健康 Folder Node 菜单使用渐进披露：一级只保留“打开”“在新标签打开”“创建子节点”和“Folder Nodes 操作”；“Folder Nodes 操作”打开按“打开、外观、结构、管理”分组的面板。Contents、Graph、原生文件夹和 Node Note surface 共用同一个中央动作模型，并过滤该 surface 已经提供的动作。排序边界动作继续显示但禁用；继承隐藏显示禁用的来源说明；设为不管理与删除明确写明作用于整个子树。File Explorer 文件夹菜单保留原生 rename/move/delete，Node Note 标签页保留原生笔记级动作；问题节点菜单继续短小并聚焦修复，不进入完整动作面板。hover/focus 主动作与菜单动作一致，状态 badge 本身不响应双击。不管理项提供“纳入管理”，匹配名称开头规则或位于不管理文件夹内时提示用户调整规则。原生创建与删除只改变实际存在的一侧，不自动补全或重建；删除文件夹时，其子树（包括 canonical Node Note）由 Obsidian 一并删除。普通文件菜单包含打开、在新标签打开、在 File Explorer 中显示、复制链接、rename、move 和 trash；支持的图片还可设为当前 Node visual。普通文件、Album 条目和不管理文件夹仍可通过 `file-menu` 接收其他插件注入的动作。所有写入失败都显示失败关闭 Notice。
 
 桌面端 Node 卡片上方 25% 是 before line，中间 50% 是 into highlight，下方 25% 是 after line；普通文件与 Album 条目只有 into。节点不能放入自身或后代，文件重名冲突禁止写入，Escape、dragend、离开目标和失败都清理视觉状态。Android 不显示拖拽 handle 或 drop marker，改用 Obsidian 原生移动文件夹、Folder Nodes 的 Move/Move up/Move down 以及普通文件 Move 菜单。原生跨父级移动进入手动排序父级时，移动节点获得目标顺序末尾的新 rank。选择模式在两端都可多选 Album/Files 条目以插入或复制链接；跨视图内部 drop 不接受。
 
@@ -41,7 +41,7 @@ Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions �
 
 搜索使用 Obsidian SearchComponent。Enter 选择最佳结果，自动显示全部隐藏祖先、居中并保持选中。首次进入有效查询时保存展开、焦点和镜头快照；Escape 或清空搜索精确恢复该快照。外部聚焦请求使用同一套祖先展开逻辑。Folder Node 与 canonical Node Note 菜单可打开并聚焦已有图谱 leaf，也可打开对应子树或局部范围。
 
-“节点图谱”设置页包含总开关、默认维度、2D 布局方向、Canvas 与大图阈值、当前配置的节点实时估算、可搜索的层级 Folder Node 规则、纳入子树、精确隐藏节点和隐藏子树。隐藏单个节点时仍可提升其可显示后代；隐藏子树会直接停止遍历。纳入列表非空时，图谱仅显示这些子树。文件夹重命名或移动会同步重映射规则，删除会清理失效规则。关闭总开关会移除插件自己的图谱入口并关闭已打开的图谱 leaf，但不会影响 Obsidian 原生 Graph。一个增量刷新的图谱索引提供结构、Visual 与 canonical-note 链接，可见性与一份共享场景几何再供 DOM、Canvas 2D 和分层 3D 使用。大图保持常量 DOM、保留所有可见结构边、只限制可选链接叠加，2D 保持可读缩放，3D 将远处节点绘制为圆点并仅在聚焦或悬停时显示完整卡片。图谱不增加第二套 Vault 扫描、轮询或覆盖画布的密度提示。
+“节点图谱”设置页只包含总开关、默认维度、2D 布局方向与 Canvas/大图阈值，不再提供持久的纳入、精确节点排除或子树排除编辑器；文件列表、节点内容与节点图谱统一服从 `hidden=true` 子树 token。schema 1 中的旧图谱规则数组随设置迁移消失，只显示一次通知，不改写任何笔记。关闭总开关会移除插件自己的图谱入口并关闭已打开的图谱 leaf，但不会影响 Obsidian 原生 Graph。一个增量刷新的图谱索引提供结构、Visual 与 canonical-note 链接，可见性与一份共享场景几何再供 DOM、Canvas 2D 和分层 3D 使用。大图保持常量 DOM、保留所有可见结构边、只限制可选链接叠加，2D 保持可读缩放，3D 将远处节点绘制为圆点并仅在聚焦或悬停时显示完整卡片。图谱不增加第二套 Vault 扫描、轮询或覆盖画布的密度提示。
 
 ## Visual Picker
 
@@ -49,10 +49,10 @@ Picker 打开时载入当前 `icon` 的完整 Text/List，而不是显示空输�
 
 ## 批量整理与健康
 
-插件没有初始化或接管状态；启用后立即把受管理范围内的结构识别为完整节点、不完整节点或冲突，并只对明确配对的完整节点同步重命名。常规页在不管理规则之后提供可选的“批量整理不完整节点”：分批扫描 Vault，持续显示进度并允许取消，跳过指定路径、匹配名称开头规则及不管理文件夹子树。扫描完成后，预览逐项展开叶子 Markdown 的源/目标、待创建 Node Note 和阻塞冲突；确认前不会修改任何文件。确认时先重新核对预览，再执行并验证结果，失败安全停止并回滚。Health 始终严格只读。Contents 和 Explorer 使用中性的“不完整节点”，只有真正的配对冲突才使用警告和恢复动作。
+插件没有初始化或接管状态；启用后立即把受管理范围内的结构识别为完整节点、不完整节点或冲突，并只对明确配对的完整节点同步重命名。“管理”在不管理规则之后提供可选的“批量整理不完整节点”：分批扫描 Vault，持续显示进度并允许取消，跳过指定路径、匹配名称开头规则及不管理文件夹子树。扫描完成后，预览逐项展开叶子 Markdown 的源/目标、待创建 Node Note 和阻塞冲突；确认前不会修改任何文件。独立的“迁移 Folder Nodes 属性”扫描新旧声明、报告冲突与非规范位置，并只在第二次明确确认及预览时效核对后写入。Health 合并两项只读扫描与 icon 形状诊断，绝不提供写入动作。Contents 和 Explorer 使用中性的“不完整节点”，只有真正的配对冲突才使用警告和恢复动作。
 
 ## 不管理的内容
 
-完整节点的右键菜单提供“隐藏节点”或“取消隐藏节点”；继承隐藏的后代只显示不可操作的来源说明。隐藏眼睛是状态而不是直接写入按钮，并且只在用户启用当前会话的“临时显示隐藏节点”后显示在显式隐藏根上；继承隐藏的后代使用弱化样式与“由 X 隐藏”提示，不为每一项重复眼睛。Ribbon 和命令面板提供同一个会话开关；“常规”中的“应用隐藏标记”是持久总开关。移动端不得依赖 hover，所有可操作控件维持至少 44 px 触控目标。不管理项从不显示隐藏眼睛；重新纳入管理时，如 YAML 自身或上级标记会使其再次隐藏，先给出明确警告。
+完整节点的动作面板提供“隐藏节点及其子树”或“取消隐藏节点”；继承隐藏的后代只显示不可操作的来源说明。显式隐藏根在子树被临时显示时出现的眼睛仍只是状态，不是直接写入按钮；继承隐藏的后代使用弱化样式与“由 X 隐藏”提示，不为每一项重复眼睛。Root 行眼睛和命令面板提供同一个会话开关；“常规”中的“应用隐藏标记”是持久总开关。移动端不得依赖 hover，所有可操作控件维持至少 44 px 触控目标。不管理项从不显示隐藏眼睛；重新纳入管理时，如 YAML 自身或上级标记会使其再次隐藏，先给出明确警告。
 
 常规页显示“不管理的 Markdown 文件”和“不管理的文件夹”两个规则组。每组都把指定路径和名称开头规则合并到同一列表，用规则类型标签区分，并在一起提供“添加路径”“添加名称开头规则”。规则行使用“名称以‘.’开头”这类自然语言，不显示需要用户理解的通配符。两组默认都包含 `.`、`_` 名称开头规则。当前 Vault 配置目录、`.git`、`.trash` 由系统保护。不管理规则只停止结构管理，不隐藏文件或文件夹；精确的不管理项和通用规则都保存在插件 `data.json`，不写入笔记 YAML。

@@ -6,11 +6,18 @@ export class ScanProgressModal extends Modal {
   private progress: HTMLProgressElement | null = null;
   private completed = false;
 
-  public constructor(app: App, private readonly onCancel: () => void) { super(app); }
+  public constructor(
+    app: App,
+    private readonly onCancel: () => void,
+    private readonly mode: "health" | "properties" | "structure" = "structure",
+  ) { super(app); }
 
   public override onOpen(): void {
-    this.setTitle(t("scanningStructure"));
-    this.contentEl.createEl("p", { cls: "setting-item-description", text: t("scanningStructureDesc") });
+    this.setTitle(t(this.mode === "structure" ? "scanningStructure" : this.mode === "properties" ? "scanningProperties" : "scanningHealth"));
+    this.contentEl.createEl("p", {
+      cls: "setting-item-description",
+      text: t(this.mode === "structure" ? "scanningStructureDesc" : this.mode === "properties" ? "scanningPropertiesDesc" : "scanningHealthDesc"),
+    });
     this.progress = this.contentEl.createEl("progress");
     this.progress.max = 1;
     this.progress.value = 0;

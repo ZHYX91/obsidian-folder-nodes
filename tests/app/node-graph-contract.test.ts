@@ -56,8 +56,9 @@ describe("Node Graph negative architecture contracts", () => {
   });
 
   it("continues to extend only owned Node Contents menus", () => {
-    expect(plugin).toContain("protected addOwnedNodeMenuItems");
-    expect(graphPlugin).toContain("protected override addOwnedNodeMenuItems");
-    expect(graphPlugin).toContain("this.addNodeGraphItem(menu, folder)");
+    expect(plugin).toContain("protected contributeNodeActions");
+    expect(graphPlugin).toContain("protected override contributeNodeActions");
+    expect(graphPlugin).toContain('surface === "graph"');
+    expect(graphPlugin).not.toContain('workspace.on("file-menu"');
   });
 });

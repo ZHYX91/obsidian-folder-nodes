@@ -17,13 +17,17 @@ describe("Node Contents menu boundary", () => {
 
   it("keeps healthy and problem Node menus owned by Folder Nodes", () => {
     const problemMenu = methodSource(source, "public openProblemMenu", "private addProblemMenuItems");
-    const nodeMenu = methodSource(source, "public openNodeMenu", "public promptVisual");
+    const nodeMenu = methodSource(source, "public openNodeMenu", "protected contributeNodeActions");
+    const actions = methodSource(source, "private buildNodeActions", "private openEntryMenu");
 
     expect(problemMenu).not.toContain('workspace.trigger("file-menu"');
     expect(nodeMenu).not.toContain('workspace.trigger("file-menu"');
     expect(problemMenu).toContain('t("revealInExplorer")');
-    expect(nodeMenu).toContain('t("revealInExplorer")');
-    expect(nodeMenu).toContain("this.addOwnedNodeMenuItems(menu, folder)");
+    expect(nodeMenu).toContain('t("nodeActions")');
+    expect(nodeMenu).toContain('t("createChild")');
+    expect(actions).toContain('t("revealInExplorer")');
+    expect(actions).toContain('t("hideNodeSubtree")');
+    expect(actions).toContain('t("deleteNodeSubtree")');
   });
 
   it("continues to expose ordinary Files entries to other plugins", () => {
@@ -33,13 +37,15 @@ describe("Node Contents menu boundary", () => {
   });
 
   it("keeps native folder operations and labels whole-node actions on Node Note tabs", () => {
-    const contextMenu = methodSource(source, "private addContextMenu", "private addNodeMenuItems");
-    const nodeItems = methodSource(source, "private addNodeMenuItems", "private openEntryMenu");
+    const contextMenu = methodSource(source, "private addContextMenu", "private addNativeNodeMenuItems");
+    const nodeItems = methodSource(source, "private addNativeNodeMenuItems", "private openEntryMenu");
+    const actions = methodSource(source, "private buildNodeActions", "private openEntryMenu");
 
     expect(contextMenu).toContain('"native-folder"');
     expect(contextMenu).toContain('"native-note"');
-    expect(nodeItems).toContain('surface === "native-note" ? t("mergeContainingNode")');
-    expect(nodeItems).toContain('surface !== "native-folder"');
-    expect(nodeItems).not.toContain('surface === "native-folder" ? t("rename")');
+    expect(nodeItems).toContain('t("nodeActions")');
+    expect(actions).toContain('surface !== "native-folder"');
+    expect(actions).toContain('t("rename")');
+    expect(actions).toContain('t("setUnmanagedSubtree")');
   });
 });

@@ -25,18 +25,18 @@
       },
       "steps": [
         "Confirm the explicit hidden root and its descendant are absent from Folder Nodes projections",
-        "Enable the session reveal and inspect the explicit eye and inherited source treatment",
+        "Use the eye beside Root to enable session reveal and inspect the explicit eye and inherited source treatment",
         "Disable Apply hidden markers and reload without editing frontmatter"
       ],
       "expected": [
         "Only Folder Nodes Explorer, Contents, and Graph projections hide the marked subtree",
         "The explicit root has one status eye and the descendant shows inherited muted feedback",
-        "Session reveal resets on reload and the strict Boolean marker remains byte-preserved"
+        "Session reveal resets on reload and the hidden=true token remains byte-preserved"
       ]
     },
     {
       "id": "migration-selection-and-ordering",
-      "title": "Preview-first migration, selection creation, and sparse ordering",
+      "title": "Preview-first structure and property migration, selection creation, and sparse ordering",
       "surfaces": [
         "desktop",
         "android-emulator"
@@ -48,14 +48,38 @@
         ]
       },
       "steps": [
-        "Preview leaf-note and missing-node migration before committing it",
+        "Preview leaf-note and missing-node organization before committing it",
+        "Preview legacy Folder Nodes properties, confirm the conflict blocks writes, resolve it, then explicitly migrate",
         "Create a child node from the selected fixture text after confirming the exact wikilink",
         "Exercise before, into, and after placement using the available platform interaction"
       ],
       "expected": [
-        "No Vault write occurs before an explicit preview confirmation",
+        "No Vault write occurs before either explicit preview confirmation",
+        "Legacy tokens migrate to one folder-nodes list while unrelated YAML stays unchanged",
         "Selection replacement matches the previewed wikilink exactly",
-        "Manual order uses only the parent mode and child-owned sparse rank fields"
+        "Manual order uses only order=manual on the parent and child-owned sparse rank tokens"
+      ]
+    },
+    {
+      "id": "grouped-node-actions",
+      "title": "Short context menus and grouped Folder Nodes actions",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Open a complete Folder Node menu from Contents, Graph, File Explorer, and its Node Note tab",
+        "Open Folder Nodes actions and inspect Open, Appearance, Structure, and Management groups",
+        "Inspect first/last sibling, inherited-hidden, native folder, and Node Note surfaces"
+      ],
+      "expected": [
+        "The first level stays short and native file or folder actions remain present",
+        "Boundary reorder actions are disabled and subtree-wide actions use explicit wording",
+        "The grouped action panel is keyboard accessible and touch targets are at least 44px"
       ]
     }
   ]

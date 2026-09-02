@@ -42,12 +42,69 @@ describe("NodeService structural safety", () => {
     const nodes = service(fake);
 
     await nodes.setNodeHidden(folder, true);
-    expect(fake.frontmatters.get("A/A.md")?.folderNodeHidden).toBe(true);
+    expect(fake.frontmatters.get("A/A.md")?.["folder-nodes"]).toEqual(["hidden=true"]);
     await nodes.setNodeHidden(folder, false);
-    expect(fake.frontmatters.get("A/A.md")).not.toHaveProperty("folderNodeHidden");
+    expect(fake.frontmatters.get("A/A.md")).not.toHaveProperty("folder-nodes");
     await expect(nodes.setNodeHidden(fake.root, true)).rejects.toThrow("Root Node");
     const incomplete = fake.addFolder("Incomplete");
     await expect(nodes.setNodeHidden(incomplete, true)).rejects.toThrow("Missing canonical");
+  });
+
+  it("previews and explicitly migrates legacy properties without touching unrelated YAML", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFolder("A");
+    fake.addFile(
+      "A/A.md",
+      "---\n# keep\naliases: [A]\nfolder-nodes:\n  - future=yes\nfolderNodeChildrenSort: manual\nfolderNodeSiblingRank: 1024\nfolderNodeHidden: true\n---\nBody\n",
+      {
+        aliases: ["A"],
+        "folder-nodes": ["future=yes"],
+        folderNodeChildrenSort: "manual",
+        folderNodeSiblingRank: 1024,
+        folderNodeHidden: true,
+      },
+    );
+    fake.addFile("Leaf.md", "---\nfolderNodeHidden: true\n---\nLeaf\n", { folderNodeHidden: true });
+    const nodes = service(fake);
+
+    const preview = await nodes.scanPropertiesAsync();
+    expect(preview).toMatchObject({ scannedNotes: 3, canonicalPropertyNotes: 1, legacyPropertyNotes: 2 });
+    expect(preview.changes.map(({ path }) => path)).toEqual(["A/A.md"]);
+    expect(preview.nonCanonical.map(({ path }) => path)).toEqual(["Leaf.md"]);
+
+    await nodes.migrateProperties(preview);
+    expect(fake.contents.get("A/A.md")).toBe(
+      "---\n# keep\naliases: [A]\nfolder-nodes:\n  - order=manual\n  - rank=1024\n  - hidden=true\n  - future=yes\n---\nBody\n",
+    );
+    expect(fake.contents.get("Leaf.md")).toContain("folderNodeHidden: true");
+    expect((await nodes.scanPropertiesAsync()).changes).toEqual([]);
+  });
+
+  it("fails closed when property migration has conflicts or its preview becomes stale", async () => {
+    const conflict = new FakeObsidian();
+    conflict.addFile("Vault.md");
+    conflict.addFolder("A");
+    conflict.addFile(
+      "A/A.md",
+      "---\nfolder-nodes: [hidden=true]\nfolderNodeHidden: false\n---\nBody",
+      { "folder-nodes": ["hidden=true"], folderNodeHidden: false },
+    );
+    const conflictNodes = service(conflict);
+    const blocked = await conflictNodes.scanPropertiesAsync();
+    expect(blocked.conflicts).toHaveLength(1);
+    await expect(conflictNodes.migrateProperties(blocked)).rejects.toThrow("blocking conflicts");
+    expect(conflict.contents.get("A/A.md")).toContain("folderNodeHidden: false");
+
+    const stale = new FakeObsidian();
+    stale.addFile("Vault.md");
+    stale.addFolder("A");
+    stale.addFile("A/A.md", "---\nfolderNodeHidden: true\n---\nBody", { folderNodeHidden: true });
+    const staleNodes = service(stale);
+    const preview = await staleNodes.scanPropertiesAsync();
+    stale.contents.set("A/A.md", "---\nfolderNodeHidden: true\n---\nExternally changed");
+    await expect(staleNodes.migrateProperties(preview)).rejects.toThrow("Vault changed after preview");
+    expect(stale.contents.get("A/A.md")).toContain("folderNodeHidden: true");
   });
   it("uses natural order when stale sibling ranks exist under a natural parent", () => {
     const fake = new FakeObsidian();
@@ -427,7 +484,7 @@ describe("NodeService structural safety", () => {
     fake.addFile("C/C.md");
     const nodes = service(fake);
     expect((await nodes.placeNode(a, "Parent", 0)).path).toBe("Parent/A");
-    expect(fake.frontmatters.get("Parent/Parent.md")?.folderNodeChildrenSort).toBe("manual");
+    expect(fake.frontmatters.get("Parent/Parent.md")?.["folder-nodes"]).toEqual(["order=manual"]);
     await nodes.reorder(c, -1);
     expect(nodes.sortMode("")).toBe("manual");
     expect(nodes.children("")[0]?.childPath).toBe("C");
@@ -454,7 +511,7 @@ describe("NodeService structural safety", () => {
 
     expect(fake.contents.get("Parent/Parent.md")).toContain("External edit");
     expect(fake.contents.get("Parent/Parent.md")).toContain(
-      "folderNodeChildrenSort: \"manual\"",
+      "folder-nodes:\n  - order=manual",
     );
   });
 
@@ -486,9 +543,9 @@ describe("NodeService structural safety", () => {
     await service(fake).placeNode(child, "Parent", 0);
 
     expect(editorContent).toContain("Unsaved editor body");
-    expect(editorContent).toContain("folderNodeChildrenSort: \"manual\"");
+    expect(editorContent).toContain("folder-nodes:\n  - order=manual");
     expect(fake.contents.get("Parent/Parent.md")).not.toContain(
-      "folderNodeChildrenSort: manual",
+      "folder-nodes:",
     );
     expect(requestSave).toHaveBeenCalledOnce();
   });
@@ -643,7 +700,7 @@ describe("NodeService structural safety", () => {
 
     await service(fake).reconcileRenamed(fake.requireFolder("Parent/Child"), "Child");
 
-    expect(fake.frontmatters.get("Parent/Child/Child.md")?.folderNodeSiblingRank).toBe(5120);
+    expect(fake.frontmatters.get("Parent/Child/Child.md")?.["folder-nodes"]).toEqual(["rank=5120"]);
     expect(service(fake).children("Parent").map(({ childPath }) => childPath)).toEqual([
       "Parent/Existing",
       "Parent/Child",

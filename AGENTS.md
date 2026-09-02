@@ -5,9 +5,12 @@ local sibling repositories, personal Vaults, user profiles, or private acceptanc
 
 The structural identity of a node is `A/A.md` at its current normalized Vault path. Folder Nodes
 must never write `_pkwf.id`, another stable node ID, a PKWF manifest, or a parent-owned complete
-children list. Natural sorting writes no order metadata. Manual sorting uses child-owned sparse
-`folderNodeSiblingRank` keys and the parent-only `folderNodeChildrenSort: manual` mode flag. These
-are the first public field names; do not add compatibility reads for unpublished prototypes.
+children list. Natural sorting writes no order metadata. The only current structural property is a
+flat `folder-nodes` Text List containing non-default `order=manual`, positive `rank=N`, and
+`hidden=true` tokens. Defaults are omitted and an empty property is removed. Published legacy
+`folderNodeChildrenSort`, `folderNodeSiblingRank`, and `folderNodeHidden` fields remain
+compatibility-readable; migration is explicit, preview-first, source-preserving, and fail-closed.
+Never migrate note properties at startup or silently discard unknown future tokens.
 
 Declarative settings are intentionally disabled because Obsidian 1.13 bypasses `display()` for
 non-empty definitions, which removes Folder Nodes' five-tab settings layout and degrades the user
