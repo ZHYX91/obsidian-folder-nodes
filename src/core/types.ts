@@ -20,6 +20,7 @@ export interface NamingPart {
   source: "current-file" | "current-node" | "current-heading" | "timestamp" | "custom";
   separator: string;
   customText: string;
+  timestampFormat: string;
 }
 
 export interface FolderNodesSettings {
@@ -39,7 +40,6 @@ export interface FolderNodesSettings {
   nodeGraph: NodeGraphSettings;
   prefix: NamingPart;
   suffix: NamingPart;
-  timestampFormat: string;
 }
 
 export interface FolderNodeHiddenState {

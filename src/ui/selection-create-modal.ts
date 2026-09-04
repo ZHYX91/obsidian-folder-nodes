@@ -5,9 +5,15 @@ import { SubmittingModal } from "./submitting-modal";
 export interface SelectionPreview {
   parentPath: string;
   nodeName: string;
-  notePath: string;
   alias: string | null;
-  wikiLink: string;
+}
+
+export function selectionPreviewRows(preview: SelectionPreview): ReadonlyArray<readonly [string, string]> {
+  return [
+    [t("creationLocation"), preview.parentPath === "" ? t("root") : preview.parentPath],
+    [t("newNode"), preview.nodeName],
+    [t("aliasValue"), preview.alias ?? t("aliasNone")],
+  ];
 }
 
 export class SelectionCreateModal extends SubmittingModal {
@@ -20,10 +26,7 @@ export class SelectionCreateModal extends SubmittingModal {
   public override onOpen(): void {
     this.setTitle(t("selectionPreview"));
     const grid = this.contentEl.createDiv({ cls: "folder-nodes-preview-grid" });
-    this.row(grid, t("targetNode"), this.preview.parentPath === "" ? t("root") : this.preview.parentPath);
-    this.row(grid, t("notePath"), this.preview.notePath);
-    this.row(grid, t("aliasValue"), this.preview.alias ?? "—");
-    this.row(grid, t("wikiLink"), this.preview.wikiLink);
+    for (const [label, value] of selectionPreviewRows(this.preview)) this.row(grid, label, value);
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
       .addButton((button) => button.setCta().setButtonText(t("create")).onClick(async () => {

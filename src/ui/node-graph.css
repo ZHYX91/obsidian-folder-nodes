@@ -614,21 +614,6 @@
   line-height: 18px;
 }
 
-.folder-nodes-node-graph-entry {
-  display: flex;
-  justify-content: flex-end;
-  padding: 8px 12px 0;
-}
-
-.folder-nodes-node-graph-entry-button {
-  width: auto;
-  padding-inline: 8px;
-}
-
-.folder-nodes-node-graph-entry-label {
-  margin-inline-start: 6px;
-}
-
 .folder-nodes-node-graph-canvas-announcement {
   position: absolute;
   width: 1px;

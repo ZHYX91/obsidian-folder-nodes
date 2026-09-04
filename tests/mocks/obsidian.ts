@@ -1,5 +1,22 @@
 let language = "en";
 
+export function moment(date: Date): { format(pattern: string): string } {
+  const pad = (value: number, length = 2) => value.toString().padStart(length, "0");
+  return {
+    format(pattern) {
+      const values: Record<string, string> = {
+        YYYY: date.getFullYear().toString(), YY: pad(date.getFullYear() % 100),
+        MM: pad(date.getMonth() + 1), M: String(date.getMonth() + 1),
+        DD: pad(date.getDate()), D: String(date.getDate()),
+        HH: pad(date.getHours()), H: String(date.getHours()),
+        mm: pad(date.getMinutes()), m: String(date.getMinutes()),
+        ss: pad(date.getSeconds()), s: String(date.getSeconds()), SSS: pad(date.getMilliseconds(), 3),
+      };
+      return pattern.replace(/\[([^\]]*)\]|YYYY|SSS|YY|MM|DD|HH|mm|ss|M|D|H|m|s/gu, (token, literal: string | undefined) => literal ?? values[token] ?? token);
+    },
+  };
+}
+
 export class TAbstractFile {
   public name = "";
   public parent: TFolder | null = null;

@@ -15,17 +15,19 @@ translation_status: source
 
 ## 选区创建
 
-选中文字后的编辑器右键菜单与命令面板都显示“从选中文字创建 Folder Node”。确认弹窗同时显示父 Node、最终 Node Note 路径、alias 和 WikiLink；确认后把选中文字写入新 Node Note 正文，并用预览的 WikiLink 替换来源选区。选区、来源路径或表格结构在确认前改变则停止创建。源码模式和 Live Preview 支持单个 Markdown 表格单元格，并预览带转义 `\|` 的 WikiLink 分隔符；跨单元格或跨行选区显示提示且不写入。aliases 开关不改变 basename，前后缀也不改变 alias。
+选中文字后的编辑器右键菜单与命令面板都显示“从选中文字创建 Folder Node”。确认弹窗只显示“创建位置”“新节点”和“Alias”；Alias 关闭时明确显示“不添加”，不重复最终 Node Note 路径或 WikiLink。确认后仍使用内部固定的 Vault 相对 WikiLink，把选中文字写入新 Node Note 正文并替换来源选区。选区、来源路径或表格结构在确认前改变则停止创建。源码模式和 Live Preview 支持单个 Markdown 表格单元格；跨单元格或跨行选区显示提示且不写入。aliases 开关不改变 basename，前后缀也不改变 alias。
 
 “选区与命名”页顶部使用紧凑说明卡片展示 `[[a]]` → `a/a.md` 与 `[[a|b]]` → `a/a.md`，下方紧接两种创建方式共用的 aliases 开关。在受管理范围内，普通点击或带修饰键点击未解析的内部 Markdown 链接时，在对应 pane 中创建并打开完整 Node。开启 aliases 后，只有显式显示文字 `b` 成为 alias；目标 `a` 仍是 Node 名称，新正文为空。点击已有链接绝不修改它。不管理或不支持的目标保留 Obsidian 原生行为；结构冲突显示 Notice，且不得留下部分 Node。
 
+前缀与后缀各自以标题分组；组关闭时不显示来源、连接符、自定义文字或时间戳格式。自定义文字和时间戳格式只在对应来源下显示。两个时间戳格式分别保存，使用 Obsidian/Moment 语法并各自提供实时预览和无效提示；一次创建只捕获一个 `Date`，再分别格式化。schema 2 的共享 `%` 格式迁移为两份 Moment 格式，不保留第二套运行时解析器。
+
 ## Explorer Node Tree
 
-File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。仅在应用隐藏标记时显示眼睛；隐藏子树被抑制时使用 eye-off，临时显示时使用 eye，并通过当前动作和 `aria-pressed` 表达状态；激活它不会写 YAML，也不会打开 Root。Root 眼睛是唯一的可见性眼睛控件。卡片边框与强调色边线提供清晰层级；选中态仍跟随 Obsidian。普通 Folder Node 同样把属性图标放入固定且无边框的图标位，把名称留在原生 title 位，并把紫色“隐藏”、灰色“不管理”、橙色“不完整”和红色“冲突”固定为不可点击的行尾文字胶囊，不把这些内容拼进名称；显式隐藏节点显示“隐藏”，继承隐藏的后代只降低透明度并提示来源。完整节点和仅有文件夹的一侧可使用节点图标；仅有 Markdown 的不完整节点与不管理项不补充通用文件图标。所有图标位使用相同几何尺寸，默认 SVG、文字、Emoji 和图片都不得改变原生行高。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为，disclosure arrow 始终只展开或折叠。canonical Node Note 行隐藏。每个 File Explorer leaf 独立工作，包括 popout window；插件不得观察整页 `document.body`。桌面端拖拽必须显示 before line、into highlight 或 after line，drop 前不得修改 Vault；Android 不注册 HTML5 drag/drop listener，也不增加 draggable。Obsidian 原生“新建笔记/新建文件夹”按钮以及文件夹 rename/move/delete 菜单保持可见；插件在旁边增加一次性创建文件夹与同名 Node Note 的“新建节点”，并提供 Contents、Visual、merge、reorder 等不同语义的节点动作。停用插件后必须移除 Root、自有按钮/图标/class/监听器并恢复 Explorer 顺序和 draggable。
+File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。普通 Folder Node 的 canonical Node Note 行隐藏。完整节点若除该隐藏笔记外没有可见直接子项，原 disclosure 等宽位置显示 4px、低强调、`aria-hidden` 且不可点击/聚焦的圆点；出现普通文件、附件、可见子节点或会话显示的隐藏子节点后立即恢复原生箭头和交互。插件不改动 Obsidian 自己的 expanded/collapsed 状态。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为。每个 File Explorer leaf 独立工作，包括 popout window；桌面端保留 before/into/after 拖拽，Android 不注册 HTML5 drag/drop listener。停用插件必须移除圆点与全部自有状态并恢复宿主属性。
 
 ## Node Contents View
 
-侧栏顶部显示 breadcrumb、可选的当前 Node visual、标题、Home、Edit visual 和 New child node。Nodes 仅在存在有效或继承 visual 时显示视觉标识；没有 visual 的节点使用紧凑文字卡，不显示大 fallback 文件夹。Album 使用接近相册的密集 4:3 缩略图：普通图片无 badge，GIF 显示 `GIF` badge 且转为静态帧，视频只显示静态类型 tile。HEIC/HEIF、音频与其他资源位于紧凑 Files 列表。不管理的文件夹与 Markdown 行共用中性的“不管理”状态 badge，并在独立且对齐的类型列显示“文件夹”或 `MD`。插件不渲染 `<video>`/`<audio>` 控件且不自动播放；“打开”只导航到 Obsidian 的文件视图。Sections 可折叠，每批最多渲染 200 项。
+侧栏 breadcrumb 只显示祖先，深路径以中间省略保持单行；当前 Node 只在下一行显示一次，其卡片本身可打开 Node Note，不再保留重复的 file-text 打开按钮。Node Graph、选择内容与新建子节点进入同一个 header action 区；设置图标等低频动作进入 More。Nodes、Album 与 Files 只在非空时显示，计数弱化并靠右；三者全空时显示统一空态。Sections 可折叠并在当前 Contents view 会话记住状态，每批最多渲染 200 项，不写入 `data.json`。
 
 Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions 按钮以及 Shift+F10/菜单键打开同一个 Obsidian Menu。健康 Folder Node 菜单使用渐进披露：一级只保留“打开”“在新标签打开”“创建子节点”和“Folder Nodes 操作”；“Folder Nodes 操作”打开按“打开、外观、结构、管理”分组的面板。Contents、Graph、原生文件夹和 Node Note surface 共用同一个中央动作模型，并过滤该 surface 已经提供的动作。排序边界动作继续显示但禁用；继承隐藏显示禁用的来源说明；设为不管理与删除明确写明作用于整个子树。File Explorer 文件夹菜单保留原生 rename/move/delete，Node Note 标签页保留原生笔记级动作；问题节点菜单继续短小并聚焦修复，不进入完整动作面板。hover/focus 主动作与菜单动作一致，状态 badge 本身不响应双击。不管理项提供“纳入管理”，匹配名称开头规则或位于不管理文件夹内时提示用户调整规则。原生创建与删除只改变实际存在的一侧，不自动补全或重建；删除文件夹时，其子树（包括 canonical Node Note）由 Obsidian 一并删除。普通文件菜单包含打开、在新标签打开、在 File Explorer 中显示、复制链接、rename、move 和 trash；支持的图片还可设为当前 Node visual。普通文件、Album 条目和不管理文件夹仍可通过 `file-menu` 接收其他插件注入的动作。所有写入失败都显示失败关闭 Notice。
 
@@ -35,7 +37,7 @@ Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions �
 
 节点图谱是 Folder Nodes 自己的工作区视图，不修改 Obsidian 原生 Graph View。第一行工具栏包含标题、原生搜索、“显示链接”、2D/3D 与适应视图；第二行包含全局/子树/局部范围和“展开范围”菜单；窄窗口可以换行，但不遮挡图谱。结构始终是层级骨架。新建图谱的“显示链接”默认关闭；开启后独立叠加紫色虚线的已解析 canonical-note 链接、内联图例与当前可见链接数，当前范围没有链接时显示轻量的内联提示。关闭时只保留结构骨架。稳定的 2D 层级默认从左到右，设置中也可选择从上到下；把手和边的几何方向随布局一起旋转。
 
-结构场景在布局前按渐进展开计算。全局默认显示 Root 与直接子级；子树默认显示选中节点与直接子级；局部额外加入一个父级作为上下文，并把当前选中节点的完整子树作为可展开范围，不能通过父级扩出全部兄弟，只有开启“显示链接”时才加入直接入链/出链邻居。未选中节点时，“子树”和“局部”禁用；范围标签显示当前实际节点。多个分支可以同时保持展开。“展开范围”可从范围锚点展开 1/2/3 层或全部后代，显示预计可见数量，也可收回一级；全部展开直接执行，不再二次确认。范围、焦点、维度和“显示链接”写入 workspace state；每个范围的展开状态仅存在于当前图谱 leaf 会话，不序列化，重启后恢复安全的一层默认。旧 workspace 的 Structure 映射为关闭链接，Links/Hybrid 映射为开启链接。
+结构场景在布局前按渐进展开计算。全局默认显示 Root 与直接子级；子树默认显示选中节点与直接子级；局部额外加入一个父级作为上下文。多个分支可以同时保持展开。直接收起、Alt 整支收起或“收回到第 1 层”若隐藏了当前焦点，焦点自动提升到最近仍可见的结构祖先；若焦点仍可见则保持不变。范围、焦点、维度和“显示链接”写入 workspace state；分支展开只存在于当前图谱 leaf 会话。搜索临时展开/清空继续精确恢复自己的快照，不被手动收起规则覆盖。
 
 从左到右的 2D 卡片依次表现为父级连线、左侧 visual/连接把手、主体名称、右侧子级展开把手和子级连线。叶子不显示右把手；其他节点显示直接子级数量和展开状态。Visual 统一进入固定图标位，依次回退为自身值、继承值、Folder，Root 使用 Home。点击右把手只切换直接子级，Alt+点击展开整支；点击卡片主体进行选择，双击或 Enter 打开 canonical Node Note；右键、Shift+F10 或菜单键复用节点菜单。把手和所有控件都有原生 Tooltip、键盘激活、可见焦点及明确 accessible name；粗指针命中区至少 44px。
 

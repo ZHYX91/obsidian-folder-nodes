@@ -1,7 +1,7 @@
 import { isEmojiFontPreference } from "../core/emoji-font";
 import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core/types";
 
-export const CURRENT_SETTINGS_SCHEMA_VERSION = 2 as const;
+export const CURRENT_SETTINGS_SCHEMA_VERSION = 3 as const;
 
 export interface PersistedFolderNodesSettings extends FolderNodesSettings {
   schemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
@@ -11,7 +11,7 @@ export type SettingsCompatibility =
   | {
       readonly status: "compatible";
       readonly currentSchemaVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
-      readonly storedSchemaVersion: 0 | 1 | typeof CURRENT_SETTINGS_SCHEMA_VERSION;
+      readonly storedSchemaVersion: 0 | 1 | 2 | typeof CURRENT_SETTINGS_SCHEMA_VERSION;
     }
   | {
       readonly status: "incompatible";
@@ -66,14 +66,15 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = deepFreeze({
     source: "current-file",
     separator: "_",
     customText: "",
+    timestampFormat: "YYYY-MM-DD",
   },
   suffix: {
     enabled: false,
     source: "timestamp",
     separator: "_",
     customText: "",
+    timestampFormat: "HHmmss",
   },
-  timestampFormat: "%Y%m%d-%H%M%S",
 });
 
 export function normalizeSettings(value: unknown): FolderNodesSettings {
@@ -97,9 +98,8 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes, DEFAULT_SETTINGS.ignoredFolderPrefixes),
     addSelectionAlias: input.addSelectionAlias !== false,
     nodeGraph: normalizeNodeGraphSettings(input.nodeGraph),
-    prefix: normalizeNamingPart(input.prefix, DEFAULT_SETTINGS.prefix),
-    suffix: normalizeNamingPart(input.suffix, DEFAULT_SETTINGS.suffix),
-    timestampFormat: typeof input.timestampFormat === "string" ? input.timestampFormat : DEFAULT_SETTINGS.timestampFormat,
+    prefix: normalizeNamingPart(input.prefix, DEFAULT_SETTINGS.prefix, legacyMomentFormat((input as { timestampFormat?: unknown }).timestampFormat)),
+    suffix: normalizeNamingPart(input.suffix, DEFAULT_SETTINGS.suffix, legacyMomentFormat((input as { timestampFormat?: unknown }).timestampFormat)),
   };
 }
 
@@ -151,7 +151,7 @@ export function loadSettingsData(value: unknown): SettingsLoadResult {
     compatibility: {
       status: "compatible",
       currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
-      storedSchemaVersion: typeof storedSchemaVersion === "number" ? storedSchemaVersion as 1 | 2 : 0,
+      storedSchemaVersion: typeof storedSchemaVersion === "number" ? storedSchemaVersion as 1 | 2 | 3 : 0,
     },
     migration: canonical ? null : snapshot,
     discardedNodeGraphRuleCount,
@@ -184,7 +184,7 @@ function normalizeInteger(value: unknown, minimum: number, maximum: number, fall
     : fallback;
 }
 
-function normalizeNamingPart(value: unknown, fallback: NamingPart): NamingPart {
+function normalizeNamingPart(value: unknown, fallback: NamingPart, legacyTimestampFormat: string | null): NamingPart {
   const input = typeof value === "object" && value !== null ? value as Partial<NamingPart> : {};
   const source = input.source === "current-file" || input.source === "current-node" || input.source === "current-heading" ||
     input.source === "timestamp" || input.source === "custom" ? input.source : fallback.source;
@@ -193,7 +193,42 @@ function normalizeNamingPart(value: unknown, fallback: NamingPart): NamingPart {
     source,
     separator: typeof input.separator === "string" ? input.separator : fallback.separator,
     customText: typeof input.customText === "string" ? input.customText : fallback.customText,
+    timestampFormat: typeof input.timestampFormat === "string"
+      ? input.timestampFormat
+      : legacyTimestampFormat ?? fallback.timestampFormat,
   };
+}
+
+export function migrateLegacyTimestampFormat(format: string): string {
+  const tokens: Readonly<Record<string, string>> = Object.freeze({
+    "%Y": "YYYY", "%m": "MM", "%d": "DD", "%H": "HH", "%M": "mm", "%S": "ss",
+  });
+  const output: string[] = [];
+  let literal = "";
+  const flushLiteral = () => {
+    if (literal === "") return;
+    output.push(/[A-Za-z[\\\]]/u.test(literal)
+      ? `[${literal.replaceAll("\\", "\\\\").replaceAll("]", "\\]")}]`
+      : literal);
+    literal = "";
+  };
+  for (let index = 0; index < format.length;) {
+    const token = Object.keys(tokens).find((candidate) => format.startsWith(candidate, index));
+    if (token === undefined) {
+      literal += format[index] ?? "";
+      index += 1;
+      continue;
+    }
+    flushLiteral();
+    output.push(tokens[token] ?? "");
+    index += token.length;
+  }
+  flushLiteral();
+  return output.join("");
+}
+
+function legacyMomentFormat(value: unknown): string | null {
+  return typeof value === "string" ? migrateLegacyTimestampFormat(value) : null;
 }
 
 function normalizePaths(value: unknown, fallback: readonly string[]): string[] {

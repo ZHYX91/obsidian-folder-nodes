@@ -50,14 +50,36 @@
       "steps": [
         "Preview leaf-note and missing-node organization before committing it",
         "Preview legacy Folder Nodes properties, confirm the conflict blocks writes, resolve it, then explicitly migrate",
-        "Create a child node from the selected fixture text after confirming the exact wikilink",
+        "Create a child node from the selected fixture text after confirming creation location, short node name, and alias policy",
         "Exercise before, into, and after placement using the available platform interaction"
       ],
       "expected": [
         "No Vault write occurs before either explicit preview confirmation",
         "Legacy tokens migrate to one folder-nodes list while unrelated YAML stays unchanged",
-        "Selection replacement matches the previewed wikilink exactly",
+        "The modal omits the full Node Note path and raw wikilink while selection replacement still uses the correct Vault-relative wikilink",
         "Manual order uses only order=manual on the parent and child-owned sparse rank tokens"
+      ]
+    },
+    {
+      "id": "navigation-affordances",
+      "title": "Leaf affordance, compact Contents header, and stable graph focus",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Inspect a complete visual leaf in File Explorer, then add a visible direct file",
+        "Open Node Contents for a deep node, toggle one non-empty section, and navigate away and back",
+        "Focus a deep graph node, then collapse its parent directly, as a whole Alt branch, and with Collapse to level 1"
+      ],
+      "expected": [
+        "The hidden canonical note yields a passive dot, and visible content restores the native disclosure arrow",
+        "Breadcrumbs contain ancestors only, the current node appears once, empty sections are absent, and section disclosure survives the view session",
+        "Each manual collapse moves focus to the nearest visible ancestor in DOM or Canvas rendering"
       ]
     },
     {

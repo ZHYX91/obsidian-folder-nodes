@@ -8,6 +8,7 @@ import { NodeService } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
+import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
 import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
@@ -224,7 +225,7 @@ export default class FolderNodesPlugin extends Plugin {
       currentNode: file?.parent?.name ?? this.app.vault.getName(),
       currentHeading: t("currentHeading"),
       now: new Date(),
-    }, this.settings.prefix, this.settings.suffix, this.settings.timestampFormat));
+    }, this.settings.prefix, this.settings.suffix, formatObsidianTimestamp));
   }
 
   public refreshVisuals(path?: string, reason?: RefreshReason): void {
@@ -900,19 +901,25 @@ export default class FolderNodesPlugin extends Plugin {
     const heading = this.app.metadataCache.getFileCache(file)?.headings
       ?.filter((item) => item.position.start.line <= cursorLine)
       .at(-1)?.heading ?? "";
-    const name = sanitizeNodeName(buildNodeName({
-      selection,
-      currentFile: file.basename,
-      currentNode: normalizeVaultPath(folder.path) === "" ? this.app.vault.getName() : folder.name,
-      currentHeading: heading,
-      now: new Date(),
-    }, this.settings.prefix, this.settings.suffix, this.settings.timestampFormat));
+    let name: string;
+    try {
+      name = sanitizeNodeName(buildNodeName({
+        selection,
+        currentFile: file.basename,
+        currentNode: normalizeVaultPath(folder.path) === "" ? this.app.vault.getName() : folder.name,
+        currentHeading: heading,
+        now: new Date(),
+      }, this.settings.prefix, this.settings.suffix, formatObsidianTimestamp));
+    } catch {
+      new Notice(t("invalidTimestampFormat"), 8000);
+      return;
+    }
     const parentPath = normalizeVaultPath(folder.path);
     const nodePath = parentPath === "" ? name : `${parentPath}/${name}`;
     const notePath = `${nodePath}/${name}.md`;
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
     const wikiLink = buildSelectionWikiLink(notePath.slice(0, -3), selection, tableContext);
-    new SelectionCreateModal(this.app, { parentPath, nodeName: name, notePath, alias, wikiLink }, async () => {
+    new SelectionCreateModal(this.app, { parentPath, nodeName: name, alias }, async () => {
       if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
       if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new Error("Source note changed after preview");
       const currentFrom = editor.getCursor("from");

@@ -72,6 +72,7 @@ const doubles = vi.hoisted(() => {
   class FakeContentsView {
     public readonly contentEl = document.createElement("div");
     public readonly extensions = new Map<string, () => void>();
+    public constructor() { this.contentEl.createDiv({ cls: "folder-nodes-header-actions" }); }
     public setRenderExtension(key: string, extension: () => void): void {
       this.extensions.set(key, extension);
       extension();
@@ -175,7 +176,7 @@ describe("Node Graph plugin integration", () => {
     const fixture = pluginFixture();
     const graphLeaf = { detach: vi.fn(), view: new doubles.FakeGraphView({}) };
     const contents = new doubles.FakeContentsView();
-    contents.contentEl.className = "folder-nodes-node-graph-entry";
+    contents.contentEl.querySelector(".folder-nodes-header-actions")?.createEl("button", { cls: "folder-nodes-node-graph-entry-button" });
     fixture.leaves.set(GRAPH_VIEW_TYPE, [graphLeaf]);
     fixture.leaves.set(CONTENTS_VIEW_TYPE, [{ view: contents }]);
     const plugin = fixture.createPlugin();
@@ -187,7 +188,7 @@ describe("Node Graph plugin integration", () => {
     for (const command of plugin.commands.filter(({ id }) => String(id).startsWith("open-node-graph"))) {
       expect((command.checkCallback as (checking: boolean) => boolean)(true)).toBe(false);
     }
-    expect(contents.contentEl.querySelector(".folder-nodes-node-graph-entry")).toBeNull();
+    expect(contents.contentEl.querySelector(".folder-nodes-node-graph-entry-button")).toBeNull();
   });
 
   it("rejects current-note graph commands for ordinary, unmanaged, or incomplete contexts and keeps canonical Root eligible", async () => {

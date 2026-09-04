@@ -5,6 +5,7 @@ import {
   lockSettingsPanel,
   renderSettingsPersistenceStatus,
 } from "../../src/app/settings-persistence-status";
+import { CURRENT_SETTINGS_SCHEMA_VERSION } from "../../src/shared/settings";
 
 describe("settings persistence status", () => {
   it("renders a future schema as an explicit read-only state", () => {
@@ -15,8 +16,8 @@ describe("settings persistence status", () => {
     const input = panel.createEl("input");
     const compatibility = {
       status: "incompatible" as const,
-      currentSchemaVersion: 2 as const,
-      storedSchemaVersion: 3,
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION + 1,
       reason: "future-schema" as const,
     };
 
@@ -25,8 +26,8 @@ describe("settings persistence status", () => {
 
     const warning = container.querySelector<HTMLElement>(".folder-nodes-settings-warning");
     expect(warning?.getAttribute("role")).toBe("alert");
-    expect(warning?.textContent).toContain("unsupported schema 3");
-    expect(warning?.textContent).toContain("supports schema 2");
+    expect(warning?.textContent).toContain(`unsupported schema ${CURRENT_SETTINGS_SCHEMA_VERSION + 1}`);
+    expect(warning?.textContent).toContain(`supports schema ${CURRENT_SETTINGS_SCHEMA_VERSION}`);
     expect(warning?.textContent).toContain("was not rewritten");
     expect(panel.getAttribute("aria-disabled")).toBe("true");
     expect(button.disabled).toBe(true);
@@ -42,8 +43,8 @@ describe("settings persistence status", () => {
     const retry = vi.fn().mockResolvedValue(undefined);
     renderSettingsPersistenceStatus(container, {
       status: "compatible",
-      currentSchemaVersion: 2,
-      storedSchemaVersion: 2,
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
     }, "pending", retry);
 
     const warning = container.querySelector<HTMLElement>(".folder-nodes-settings-warning");
@@ -59,8 +60,8 @@ describe("settings persistence status", () => {
     const container = document.body.createDiv();
     renderSettingsPersistenceStatus(container, {
       status: "compatible",
-      currentSchemaVersion: 2,
-      storedSchemaVersion: 2,
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
     }, "saved", vi.fn());
     expect(container.children).toHaveLength(0);
   });

@@ -224,6 +224,7 @@ export class ExplorerAdapter extends Component {
       const hiddenState = this.service.hiddenState?.(folder.path) ?? { explicit: false, sourcePath: null, unmanaged: false };
       const hidden = identity === "node" && !(this.service.isNodeVisible?.(folder.path) ?? true);
       row.toggleClass("folder-nodes-hidden-node", hidden);
+      this.syncLeafIndicator(element, folder, identity === "node");
       element.removeClass("folder-nodes-hidden-inherited");
       element.querySelector(":scope > .folder-nodes-hidden-status")?.remove();
       restoreHiddenTitle(element);
@@ -552,6 +553,23 @@ export class ExplorerAdapter extends Component {
     void operation.catch((error) => this.reportError(error));
   }
 
+  private syncLeafIndicator(title: HTMLElement, folder: TFolder, managedNode: boolean): void {
+    const visualLeaf = managedNode && !folder.children.some((entry) => {
+      if (entry instanceof TFile) return !this.service.isCanonicalFile(entry);
+      if (!(entry instanceof TFolder)) return false;
+      if (this.service.isIgnoredPath(entry.path)) return true;
+      if (this.service.getCanonicalFile(entry.path) === null) return true;
+      return this.service.isNodeVisible?.(entry.path) ?? true;
+    });
+    for (const indicator of title.querySelectorAll<HTMLElement>(
+      ".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon",
+    )) {
+      indicator.toggleClass("folder-nodes-leaf-indicator", visualLeaf);
+      if (visualLeaf) ownAriaHidden(indicator);
+      else restoreAriaHidden(indicator);
+    }
+  }
+
   private restoreOrders(): void {
     for (const [container, original] of this.originalOrders) {
       if (!container.isConnected) continue;
@@ -572,6 +590,10 @@ export class ExplorerAdapter extends Component {
       restoreHiddenTitle(element);
       restoreOwnedDraggable(element);
     }
+    for (const indicator of root.querySelectorAll<HTMLElement>(".folder-nodes-leaf-indicator")) {
+      indicator.removeClass("folder-nodes-leaf-indicator");
+      restoreAriaHidden(indicator);
+    }
     for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge, .folder-nodes-explorer-repair")) element.remove();
   }
 
@@ -580,6 +602,23 @@ export class ExplorerAdapter extends Component {
     for (const icon of root.querySelectorAll<HTMLElement>(".folder-nodes-note-title-icon")) icon.remove();
     for (const host of root.querySelectorAll<HTMLElement>(".folder-nodes-note-title-host")) host.removeClass("folder-nodes-note-title-host");
   }
+}
+
+function ownAriaHidden(element: HTMLElement): void {
+  if (element.dataset.folderNodesOriginalAriaHidden === undefined) {
+    element.dataset.folderNodesOriginalAriaHidden = element.hasAttribute("aria-hidden")
+      ? `value:${element.getAttribute("aria-hidden") ?? ""}`
+      : "missing";
+  }
+  element.setAttr("aria-hidden", "true");
+}
+
+function restoreAriaHidden(element: HTMLElement): void {
+  const original = element.dataset.folderNodesOriginalAriaHidden;
+  if (original === undefined) return;
+  delete element.dataset.folderNodesOriginalAriaHidden;
+  if (original === "missing") element.removeAttribute("aria-hidden");
+  else element.setAttr("aria-hidden", original.slice("value:".length));
 }
 
 function ownHiddenTitle(element: HTMLElement, title: string): void {

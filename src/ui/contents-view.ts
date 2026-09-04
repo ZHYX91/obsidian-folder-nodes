@@ -71,6 +71,7 @@ export const CONTENTS_VIEW_TYPE = "folder-nodes-contents";
 export class FolderNodeContentsView extends ItemView {
   private folderPath = "";
   private readonly renderExtensions = new Map<string, () => void>();
+  private readonly sectionOpen: Record<ContentsSection, boolean> = { album: true, files: true, nodes: true };
   private visibleLimits: Record<ContentsSection, number> = { album: 200, files: 200, nodes: 200 };
   private selectionMode = false;
   private selectedContent = new Map<string, "file" | "media">();
@@ -183,9 +184,13 @@ export class FolderNodeContentsView extends ItemView {
     this.renderBreadcrumb(container, folder);
     this.renderHeader(container, folder, this.selectableOrder.length > 0);
     if (this.selectionMode) this.renderSelectionToolbar(container);
-    this.renderNodes(container, nodeEntries, folderPath);
-    this.renderAlbum(container, album);
-    this.renderFiles(container, ordinaryFiles);
+    if (nodeEntries.length + album.length + ordinaryFiles.length === 0) {
+      container.createDiv({ cls: "folder-nodes-contents-empty", text: t("emptyNodeContents"), attr: { role: "status" } });
+    } else {
+      if (nodeEntries.length > 0) this.renderNodes(container, nodeEntries, folderPath);
+      if (album.length > 0) this.renderAlbum(container, album);
+      if (ordinaryFiles.length > 0) this.renderFiles(container, ordinaryFiles);
+    }
     this.runRenderExtensions();
   }
 
@@ -194,18 +199,15 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderBreadcrumb(container: HTMLElement, folder: TFolder): void {
-    const breadcrumb = container.createDiv({ cls: "folder-nodes-breadcrumb", attr: { "aria-label": t("nodePath") } });
     const folderPath = normalizeVaultPath(folder.path);
-    const items = breadcrumbItems(this.app.vault.getName(), folderPath);
-    for (const [index, item] of items.entries()) {
+    const items = breadcrumbItems(this.app.vault.getName(), folderPath).filter(({ current }) => !current);
+    if (items.length === 0) return;
+    const breadcrumb = container.createDiv({ cls: "folder-nodes-breadcrumb", attr: { "aria-label": t("nodePath"), title: folderPath } });
+    const visibleItems = items.length <= 4 ? items : [items[0]!, null, ...items.slice(-2)];
+    for (const [index, item] of visibleItems.entries()) {
       if (index > 0) breadcrumb.createSpan({ cls: "folder-nodes-breadcrumb-separator", text: "/", attr: { "aria-hidden": "true" } });
-      if (item.current) {
-        const current = breadcrumb.createSpan({
-          cls: "folder-nodes-breadcrumb-current",
-          text: item.label,
-          attr: { "aria-current": "page" },
-        });
-        if (this.dragEnabled) this.bindContentDropTarget(current, item.path);
+      if (item === null) {
+        breadcrumb.createSpan({ cls: "folder-nodes-breadcrumb-ellipsis", text: "…", attr: { "aria-hidden": "true" } });
         continue;
       }
       const button = breadcrumb.createEl("button", { text: item.label });
@@ -250,15 +252,12 @@ export class FolderNodeContentsView extends ItemView {
       select.addEventListener("click", () => this.selectionMode ? this.finishSelection() : this.startSelection());
     }
     if (managedNode) {
-      const open = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("openCurrentNodeNote") } });
-      setIcon(open, "file-text");
-      open.addEventListener("click", (event) => this.runAction(this.service.openFolderNode(folderPath, event.ctrlKey || event.metaKey)));
-      const visual = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("editVisual") } });
-      setIcon(visual, "palette");
-      visual.addEventListener("click", () => this.actions.editVisual(folder));
       const create = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("createChild") } });
       setIcon(create, "folder-plus");
       create.addEventListener("click", () => this.actions.createChild(folder));
+      const more = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("moreActions", { name: folder.name }) } });
+      setIcon(more, "ellipsis");
+      more.addEventListener("click", () => this.actions.nodeMenu(more, folder));
     } else if (!this.service.isIgnoredPath(folderPath)) {
       const create = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("createMissingNodeNote") } });
       setIcon(create, "file-plus");
@@ -268,8 +267,7 @@ export class FolderNodeContentsView extends ItemView {
 
   private renderNodes(container: HTMLElement, entries: readonly NodeEntry[], parentPath: string): void {
     const problems = entries.filter((entry) => entry.kind === "conflict" || entry.kind === "missing-folder").length;
-    const label = problems === 0 ? `${t("nodes")} (${entries.length})` : `${t("nodes")} (${entries.length}) · ${t("needsRepair")} ${problems}`;
-    const section = this.section(container, label);
+    const section = this.section(container, "nodes", t("nodes"), entries.length, problems === 0 ? null : `${t("needsRepair")} ${problems}`);
     const grid = section.createDiv({ cls: "folder-nodes-node-grid" });
     for (const item of entries.slice(0, this.visibleLimits.nodes)) {
       const entry = item.entry;
@@ -327,7 +325,7 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderAlbum(container: HTMLElement, entries: readonly TFile[]): void {
-    const section = this.section(container, `${t("album")} (${entries.length})`);
+    const section = this.section(container, "album", t("album"), entries.length);
     const grid = section.createDiv({ cls: "folder-nodes-album-grid" });
     for (const entry of entries.slice(0, this.visibleLimits.album)) {
       const extension = entry.extension.toLocaleLowerCase();
@@ -369,7 +367,7 @@ export class FolderNodeContentsView extends ItemView {
 
   private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[]): void {
     const hasFolders = entries.some((entry) => entry instanceof TFolder);
-    const section = this.section(container, `${t(filesSectionKey(hasFolders))} (${entries.length})`);
+    const section = this.section(container, "files", t(filesSectionKey(hasFolders)), entries.length);
     const list = section.createDiv({ cls: "folder-nodes-file-list" });
     for (const entry of entries.slice(0, this.visibleLimits.files)) {
       const shell = list.createDiv({ cls: "folder-nodes-entry-shell folder-nodes-file-shell" });
@@ -754,9 +752,13 @@ export class FolderNodeContentsView extends ItemView {
     this.clearContentDrag();
   }
 
-  private section(container: HTMLElement, label: string): HTMLElement {
-    const details = container.createEl("details", { cls: "folder-nodes-section", attr: { open: "" } });
-    details.createEl("summary", { text: label });
+  private section(container: HTMLElement, key: ContentsSection, label: string, count: number, detail: string | null = null): HTMLElement {
+    const details = container.createEl("details", { cls: "folder-nodes-section" });
+    details.open = this.sectionOpen[key];
+    const summary = details.createEl("summary");
+    summary.createSpan({ cls: "folder-nodes-section-label", text: detail === null ? label : `${label} · ${detail}` });
+    summary.createSpan({ cls: "folder-nodes-section-count", text: String(count), attr: { "aria-label": `${label}: ${count}` } });
+    details.addEventListener("toggle", () => { this.sectionOpen[key] = details.open; });
     return details;
   }
 

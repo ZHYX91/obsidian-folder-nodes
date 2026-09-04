@@ -575,6 +575,22 @@ export class FolderNodeGraphView extends ItemView {
 
   private setExpansion(expansion: NodeGraphExpansionState): void {
     this.currentExpansion = expansion;
+    if (this.topology !== null && this.focusPath !== null) {
+      const visible = new Set(buildNodeGraphVisibleScene(
+        this.topology,
+        this.graphScope,
+        expansion,
+        { showLinks: this.showLinks },
+      ).nodes.map(({ id }) => id));
+      let nextFocus: string | null = this.focusPath;
+      while (nextFocus !== null && !visible.has(nextFocus)) {
+        nextFocus = this.topology.nodes.get(nextFocus)?.parentId ?? null;
+      }
+      if (nextFocus !== this.focusPath) {
+        this.focusPath = nextFocus;
+        this.markWorkspaceStateDirty();
+      }
+    }
     this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expansion);
     this.displayGraphData = null;
     this.render();

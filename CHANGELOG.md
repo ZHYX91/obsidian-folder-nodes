@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.9.0
+
+- Replaced empty File Explorer disclosure arrows with passive leaf dots when a hidden canonical
+  Node Note is the only child, restoring the native arrow as soon as visible content appears.
+- Made Node Graph focus follow the nearest visible ancestor when direct, whole-branch, or range
+  collapse hides the selected descendant, without changing temporary search restoration.
+- Simplified Node Contents with ancestor-only breadcrumbs, one clickable current-node card, an
+  integrated graph action, session-preserved section disclosure, hidden zero-count sections, and
+  one unified empty state.
+- Reduced selection-creation confirmation to creation location, short node name, and alias policy
+  while retaining exact Vault-relative wikilink generation, stale checks, and rollback internally.
+- Split Prefix and Suffix into conditional groups with independent validated Obsidian/Moment
+  timestamp formats and live previews, including a result-preserving schema-2 migration.
+
 ## 0.8.0
 
 - Consolidated manual order, sparse rank, and hidden-subtree state into the concise `folder-nodes`

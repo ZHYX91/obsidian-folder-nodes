@@ -121,6 +121,53 @@ describe("ExplorerAdapter lifecycle", () => {
     root.remove();
   });
 
+  it("replaces a managed visual leaf disclosure with a passive dot and restores the arrow dynamically", () => {
+    const root = document.createElement("div");
+    root.createDiv({ cls: "nav-files-container" });
+    const row = root.createDiv({ cls: "nav-folder" });
+    const title = row.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Leaf" } });
+    const disclosure = title.createSpan({ cls: "tree-item-icon collapse-icon" });
+    disclosure.append(disclosure.ownerDocument.createElementNS("http://www.w3.org/2000/svg", "svg"));
+    title.createSpan({ cls: "nav-folder-title-content", text: "Leaf" });
+    document.body.append(root);
+    const folder = Object.assign(new TFolder(), { children: [], name: "Leaf", path: "Leaf" });
+    const canonical = Object.assign(new TFile(), {
+      basename: "Leaf", extension: "md", name: "Leaf.md", parent: folder, path: "Leaf/Leaf.md",
+    });
+    folder.children.push(canonical);
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => path === folder.path ? folder : null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonical,
+      isCanonicalFile: (file: TFile) => file === canonical, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
+      isLeafNoteExempt: () => false, isNodeVisible: () => true, notePathForFolder: () => canonical.path,
+      openFolderNode: async () => undefined, placeNodeRelative: async () => folder, rootNotePath: () => "Vault.md",
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    expect(disclosure.classList.contains("folder-nodes-leaf-indicator")).toBe(true);
+    expect(disclosure.getAttribute("aria-hidden")).toBe("true");
+
+    folder.children.push(Object.assign(new TFile(), {
+      basename: "attachment", extension: "pdf", name: "attachment.pdf", parent: folder, path: "Leaf/attachment.pdf",
+    }));
+    adapter.refresh();
+    expect(disclosure.classList.contains("folder-nodes-leaf-indicator")).toBe(false);
+    expect(disclosure.hasAttribute("aria-hidden")).toBe(false);
+
+    adapter.stop();
+    root.remove();
+  });
+
   it("keeps Explorer decoration but does not claim draggable ownership on mobile", () => {
     const root = document.createElement("div");
     root.createDiv({ cls: "nav-files-container" });

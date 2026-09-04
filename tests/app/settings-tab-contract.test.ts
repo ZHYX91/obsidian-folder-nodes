@@ -124,6 +124,18 @@ describe("settings tab compatibility contract", () => {
     expect(source).toContain('this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));');
   });
 
+  it("groups prefix and suffix with independent conditional Moment formats", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
+
+    expect(source).toContain("new Setting(panel).setName(label).setHeading()");
+    expect(source).toContain('settings.prefix.source === "timestamp"');
+    expect(source).toContain('settings.suffix.source === "timestamp"');
+    expect(source).toContain('key: "prefixTimestampFormat"');
+    expect(source).toContain('key: "suffixTimestampFormat"');
+    expect(source).toContain("isValidMomentTimestampFormat(value)");
+    expect(source).not.toContain("this.plugin.settings.timestampFormat");
+  });
+
   it("describes name-start rules without wildcard notation", () => {
     const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
 

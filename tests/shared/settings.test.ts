@@ -20,6 +20,23 @@ describe("settings", () => {
     expect(settings.prefix.separator).toBe("_");
     expect(settings.suffix).toEqual(DEFAULT_SETTINGS.suffix);
   });
+  it("migrates the shared percent-token timestamp into independent Moment formats", () => {
+    const loaded = loadSettingsData({
+      schemaVersion: 2,
+      timestampFormat: "%Y%m%d-%H%M%S",
+      prefix: { enabled: true, source: "timestamp", separator: "_", customText: "" },
+      suffix: { enabled: true, source: "timestamp", separator: "_", customText: "" },
+    });
+    expect(loaded.settings.prefix.timestampFormat).toBe("YYYYMMDD-HHmmss");
+    expect(loaded.settings.suffix.timestampFormat).toBe("YYYYMMDD-HHmmss");
+    expect(loaded.migration).not.toHaveProperty("timestampFormat");
+    expect(loaded.migration?.schemaVersion).toBe(CURRENT_SETTINGS_SCHEMA_VERSION);
+  });
+  it("preserves literal legacy timestamp text that Moment would otherwise parse", () => {
+    const settings = normalizeSettings({ timestampFormat: "stamp-%Y-%Q" });
+    expect(settings.prefix.timestampFormat).toBe("[stamp-]YYYY[-%Q]");
+    expect(settings.suffix.timestampFormat).toBe("[stamp-]YYYY[-%Q]");
+  });
   it("rejects malformed nested naming values", () => {
     const settings = normalizeSettings({
       prefix: { enabled: "yes", source: "broken", separator: 42, customText: null },
@@ -172,7 +189,7 @@ describe("settings", () => {
       nodeGraph: { includedSubtrees: ["Work"], excludedNodes: ["Private"], excludedSubtrees: ["Archive"] },
     });
     expect(loaded.discardedNodeGraphRuleCount).toBe(3);
-    expect(loaded.compatibility).toMatchObject({ status: "compatible", storedSchemaVersion: 1, currentSchemaVersion: 2 });
+    expect(loaded.compatibility).toMatchObject({ status: "compatible", storedSchemaVersion: 1, currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION });
     expect(loaded.migration?.nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
   });
 });

@@ -21,7 +21,7 @@ Folder Nodes 只拥有一个名为 `folder-nodes` 的扁平 Text List。它只�
 
 ## 选区创建
 
-编辑器命令和右键菜单都可从选中文字创建 Child Node。创建前预览最终 `A/A.md`、alias 和 WikiLink。确认后，选中文字写入新 Node Note 正文，来源笔记中的原选区替换为刚才预览的 WikiLink；若预览后选区或来源文件变化则停止。源码模式和 Live Preview 都支持单个 Markdown 表格单元格，生成 WikiLink 时使用转义的 `\|` alias 分隔符；选区跨过未转义的单元格边界或表格行时，在创建任何内容前失败关闭。在这条流程中，aliases 只使用选中的可见文字；前缀、后缀、各自连接符和时间戳只影响 basename。来源包括当前文件、当前 Node、最近当前标题、时间戳和自定义文本。
+编辑器命令和右键菜单都可从选中文字创建 Child Node。确认页只显示创建位置、新节点 basename 和 alias 是否添加，不显示最终 Node Note 全路径或原始 WikiLink。确认后，插件仍使用内部固定的 Vault 相对 WikiLink，把选中文字写入新 Node Note 正文并替换来源选区；若预览后选区、来源文件或表格结构变化则停止。源码模式和 Live Preview 都支持单个 Markdown 表格单元格，生成 WikiLink 时使用转义的 `\|` alias 分隔符；选区跨过未转义的单元格边界或表格行时，在创建任何内容前失败关闭。在这条流程中，aliases 只使用选中的可见文字；前缀、后缀、各自连接符和时间戳只影响 basename。来源包括当前文件、当前 Node、最近当前标题、时间戳和自定义文本。前缀与后缀分别保存 Obsidian/Moment 时间戳格式，但一次创建共用同一个捕获时刻；旧 `%Y%m%d-%H%M%S` 设置一次迁移为两个 `YYYYMMDD-HHmmss`，不改变既有输出。
 
 在受管理范围内，点击未解析的内部 Markdown 链接时直接创建完整 Node，不先创建叶子笔记。`[[a]]` 创建空白的 `a/a.md`；显式 Vault 路径会在同一事务中创建所有缺失的完整祖先 Node。共用 aliases 设置开启时，`[[a|b]]` 把显式显示文字 `b` 写入新 Node Note 的 `aliases`；没有显示文字或设置关闭时不写 alias。不管理文件夹、不管理叶子笔记路径、不安全或非 Markdown 目标，以及 Markdown view 之外的链接仍由 Obsidian 原生处理。外部或第三方创建不再自动转换；用户可明确选择“转换为 Folder Node”。冲突必须失败关闭。
 
@@ -33,11 +33,13 @@ Root Node Note 位于 Vault 根目录，basename 是清理非法文件名字符�
 
 ## Node Visual 与 Contents View
 
-`icon` 是唯一 Node Visual 属性，使用 Obsidian Properties 可表达的 Text 或扁平 Text List，不接受嵌套对象。列表中的基础候选可以是 Vault 图片 WikiLink、已知 Lucide、一个可见扩展字素（文字、符号或 Emoji）；按顺序使用第一个实际可显示的基础候选，缺失图片会继续尝试本节点后续项。第一个有效 `color:` 项直接为 Lucide/文字前景着色。Emoji/位图/SVG 保留原像素，不增加圆点、背景或边框；只有所有基础候选都失败时，颜色才成为居中的实心圆形色标。未知项或多字素项会被诊断，不能通过 Picker 保存；多个颜色以第一个为准。只有当前节点的整组声明都无法显示时才继承最近祖先，不把当前颜色与祖先图标组合。属性图标统一放入固定且无边框的图标位，并以文字的字重、大小和颜色与文件名开头的相同字符区分。File Explorer 图标可位于名称前、名称后或隐藏，也可作为 Node Note 可编辑标题之外的独立图标显示。文字图标继承 Obsidian 界面字体；Emoji 默认使用系统彩色字体栈，“图标与外观”只显示从 Segoe UI Emoji、Apple Color Emoji、Noto Color Emoji、Twemoji Mozilla、OpenMoji 固定集合中检测到的字体，提供复杂序列预览，并在已保存字体不可用时安全回退。高级用户仍可覆盖字体 CSS 变量。File Explorer 是唯一全局 Node Tree，并以置顶 Root 行开始。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files，三段分别分页。三类条目都提供右键、More actions 与 Shift+F10 菜单入口。桌面端 Node 可用 before/into/after 拖放排序或换父级，单个 Album/Files 条目可拖入 Node、当前节点或 breadcrumb；Android 仅通过菜单/原生移动执行相同写操作，不暴露 draggable。内容多选用于插入或复制 WikiLink。无有效 visual 的子节点不绘制大 fallback 图标；GIF 只提取静态帧，视频只显示类型 tile，音频留在 Files。插件不在侧栏中提供动图、视频或音频播放。
+`icon` 是唯一 Node Visual 属性，使用 Obsidian Properties 可表达的 Text 或扁平 Text List，不接受嵌套对象。列表中的基础候选可以是 Vault 图片 WikiLink、已知 Lucide、一个可见扩展字素（文字、符号或 Emoji）；按顺序使用第一个实际可显示的基础候选，缺失图片会继续尝试本节点后续项。第一个有效 `color:` 项直接为 Lucide/文字前景着色。Emoji/位图/SVG 保留原像素，不增加圆点、背景或边框；只有所有基础候选都失败时，颜色才成为居中的实心圆形色标。未知项或多字素项会被诊断，不能通过 Picker 保存；多个颜色以第一个为准。只有当前节点的整组声明都无法显示时才继承最近祖先，不把当前颜色与祖先图标组合。属性图标统一放入固定且无边框的图标位，并以文字的字重、大小和颜色与文件名开头的相同字符区分。File Explorer 图标可位于名称前、名称后或隐藏，也可作为 Node Note 可编辑标题之外的独立图标显示。文字图标继承 Obsidian 界面字体；Emoji 默认使用系统彩色字体栈。File Explorer 是唯一全局 Node Tree，并以置顶 Root 行开始；完整节点若除隐藏 canonical note 外没有可见直接内容，以等宽、不可交互的圆点代替 disclosure arrow，并在内容出现时恢复原生箭头。侧栏只浏览当前 Node 的 direct contents，分为 Nodes、静态 Album 与紧凑 Files，非空段分别分页；全部为空时显示一个统一空态。breadcrumb 只显示祖先，当前节点只由一个可打开 Node Note 的卡片表达。Node Graph、内容选择与新建子节点位于同一 header action 区，低频节点操作进入 More；段落展开状态只保留在当前 view 会话。
 
 ## 节点图谱
 
 节点图谱是插件自有 workspace view，不修改 Obsidian 原生 Graph View。结构始终是有方向的父子骨架；“显示链接”是独立叠加，新建视图默认关闭。旧 workspace 的 Structure 状态迁移为关闭，Links/Hybrid 迁移为开启。已解析 canonical-note 链接使用独立视觉，不改变结构布局；只有链接叠加开启时，局部范围才加入直接链接邻居。稳定的从左到右或从上到下 2D 与按深度分层的 3D 共用同一份过滤场景。
+
+用户收起一个包含当前焦点的分支时，焦点必须转移到最近仍可见的结构祖先；直接收起、Alt 整支收起和“收回到第 1 层”一致。搜索展开与清空仍精确恢复进入搜索前的焦点和展开快照，不使用这条手动收起规则覆盖快照。
 
 节点图谱不再有持久的纳入子树、排除单个节点或排除子树规则。运行时的全局/子树/局部范围只控制当前视图；同一个 Node Note `hidden=true` token 会在图谱模型与布局之前剪枝完整子树。设置只保留启用、默认维度、2D 方向和大图限制。schema 1 中旧规则数组随显式设置 schema 迁移被丢弃并显示通知，绝不因此改写笔记。
 

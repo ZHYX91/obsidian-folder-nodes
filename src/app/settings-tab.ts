@@ -2,7 +2,9 @@ import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinition
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
+import { isValidMomentTimestampFormat } from "../core/naming";
 import type { NamingPart } from "../core/types";
+import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import {
   assertSettingsWritable,
   lockSettingsPanel,
@@ -64,11 +66,12 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       prefixSource: settings.prefix.source,
       prefixSeparator: settings.prefix.separator,
       prefixCustomText: settings.prefix.customText,
+      prefixTimestampFormat: settings.prefix.timestampFormat,
       suffixEnabled: settings.suffix.enabled,
       suffixSource: settings.suffix.source,
       suffixSeparator: settings.suffix.separator,
       suffixCustomText: settings.suffix.customText,
-      timestampFormat: settings.timestampFormat,
+      suffixTimestampFormat: settings.suffix.timestampFormat,
     };
     return values[key];
   }
@@ -114,11 +117,12 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       case "prefixSource": settings.prefix.source = this.namingSource(value); break;
       case "prefixSeparator": settings.prefix.separator = String(value); break;
       case "prefixCustomText": settings.prefix.customText = String(value); break;
+      case "prefixTimestampFormat": settings.prefix.timestampFormat = this.timestampFormat(value); break;
       case "suffixEnabled": settings.suffix.enabled = Boolean(value); break;
       case "suffixSource": settings.suffix.source = this.namingSource(value); break;
       case "suffixSeparator": settings.suffix.separator = String(value); break;
       case "suffixCustomText": settings.suffix.customText = String(value); break;
-      case "timestampFormat": settings.timestampFormat = String(value); break;
+      case "suffixTimestampFormat": settings.suffix.timestampFormat = this.timestampFormat(value); break;
       default: throw new Error(`Unsupported Folder Nodes setting: ${key}`);
     }
     await this.plugin.saveSettings();
@@ -255,11 +259,12 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       { name: `${t("prefix")}: ${t("source")}`, visible: settings.prefix.enabled, control: { type: "dropdown", key: "prefixSource", defaultValue: "current-file", options: sourceOptions } },
       { name: `${t("prefix")}: ${t("separator")}`, visible: settings.prefix.enabled, control: { type: "text", key: "prefixSeparator" } },
       { name: `${t("prefix")}: ${t("customText")}`, visible: settings.prefix.enabled && settings.prefix.source === "custom", control: { type: "text", key: "prefixCustomText" } },
+      { name: `${t("prefix")}: ${t("timestampFormat")}`, desc: t("timestampFormatDesc"), visible: settings.prefix.enabled && settings.prefix.source === "timestamp", control: { type: "text", key: "prefixTimestampFormat" } },
       { name: `${t("suffix")}: ${t("enabled")}`, control: { type: "toggle", key: "suffixEnabled", defaultValue: false } },
       { name: `${t("suffix")}: ${t("source")}`, visible: settings.suffix.enabled, control: { type: "dropdown", key: "suffixSource", defaultValue: "timestamp", options: sourceOptions } },
       { name: `${t("suffix")}: ${t("separator")}`, visible: settings.suffix.enabled, control: { type: "text", key: "suffixSeparator" } },
       { name: `${t("suffix")}: ${t("customText")}`, visible: settings.suffix.enabled && settings.suffix.source === "custom", control: { type: "text", key: "suffixCustomText" } },
-      { name: t("timestampFormat"), desc: t("timestampFormatDesc"), control: { type: "text", key: "timestampFormat" } },
+      { name: `${t("suffix")}: ${t("timestampFormat")}`, desc: t("timestampFormatDesc"), visible: settings.suffix.enabled && settings.suffix.source === "timestamp", control: { type: "text", key: "suffixTimestampFormat" } },
       { name: t("preview"), desc: this.plugin.previewSelectionName(t("sampleSelection")), searchable: false },
     ];
   }
@@ -463,9 +468,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     }));
     this.renderNamingPart(panel, t("prefix"), this.plugin.settings.prefix);
     this.renderNamingPart(panel, t("suffix"), this.plugin.settings.suffix);
-    new Setting(panel).setName(t("timestampFormat")).setDesc(t("timestampFormatDesc")).addText((text) => text.setValue(this.plugin.settings.timestampFormat).onChange(async (value) => {
-      this.plugin.settings.timestampFormat = value; await this.plugin.saveSettings(); this.updatePreview(panel);
-    }));
     const preview = panel.createDiv({ cls: "folder-nodes-name-preview" });
     preview.createEl("strong", { text: `${t("preview")}: ` });
     preview.createSpan({ cls: "folder-nodes-name-preview-value", text: this.plugin.previewSelectionName(t("sampleSelection")) });
@@ -564,6 +566,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNamingPart(panel: HTMLElement, label: string, part: NamingPart): void {
+    new Setting(panel).setName(label).setHeading();
     new Setting(panel).setName(`${label}: ${t("enabled")}`).addToggle((toggle) => toggle.setValue(part.enabled).onChange(async (value) => {
       part.enabled = value; await this.plugin.saveSettings(); this.display();
     }));
@@ -577,6 +580,35 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     if (part.source === "custom") new Setting(panel).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange(async (value) => {
       part.customText = value; await this.plugin.saveSettings(); this.updatePreview(panel);
     }));
+    if (part.source === "timestamp") {
+      const setting = new Setting(panel).setName(`${label}: ${t("timestampFormat")}`);
+      const updateDescription = (value: string) => {
+        const valid = isValidMomentTimestampFormat(value);
+        setting.setDesc(valid
+          ? `${t("timestampFormatDesc")} · ${t("preview")}: ${formatObsidianTimestamp(new Date(), value)}`
+          : t("invalidTimestampFormat"));
+        return valid;
+      };
+      setting.addText((text) => {
+        text.setValue(part.timestampFormat);
+        updateDescription(part.timestampFormat);
+        text.onChange(async (value) => {
+          const valid = updateDescription(value);
+          text.inputEl.toggleClass("is-invalid", !valid);
+          text.inputEl.setAttr("aria-invalid", String(!valid));
+          if (!valid) return;
+          part.timestampFormat = value;
+          await this.plugin.saveSettings();
+          this.updatePreview(panel);
+        });
+      });
+    }
+  }
+
+  private timestampFormat(value: unknown): string {
+    const format = String(value);
+    if (!isValidMomentTimestampFormat(format)) throw new Error("Unsupported Obsidian/Moment timestamp format");
+    return format;
   }
 
   private renderUnmanagedGroup(panel: HTMLElement, kind: ExemptionKind): void {

@@ -263,20 +263,21 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   }
 
   private ensureContentsEntry(view: FolderNodeContentsView): void {
-    const existing = view.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-entry");
-    if (!this.settings.nodeGraph.enabled) {
+    const existing = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-entry-button");
+    const actions = view.contentEl.querySelector<HTMLElement>(".folder-nodes-header-actions");
+    if (!this.settings.nodeGraph.enabled || actions === null) {
       existing?.remove();
       return;
     }
-    if (existing !== null) return;
-    const entry = view.contentEl.ownerDocument.createElement("div");
-    entry.className = "folder-nodes-node-graph-entry";
-    const button = entry.createEl("button", {
+    if (existing !== null) {
+      if (existing.parentElement !== actions) actions.prepend(existing);
+      return;
+    }
+    const button = actions.createEl("button", {
       cls: "clickable-icon folder-nodes-node-graph-entry-button",
       attr: { "aria-label": label("openGraph") },
     });
     setIcon(button, "git-fork");
-    button.createSpan({ cls: "folder-nodes-node-graph-entry-label", text: label("nodeGraph") });
     button.addEventListener("click", () => {
       const active = this.app.workspace.getActiveFile();
       const folder = active === null ? null : this.service.folderForFile(active);
@@ -285,7 +286,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
         : null;
       void this.openNodeGraph(focus);
     });
-    view.contentEl.prepend(entry);
+    actions.prepend(button);
   }
 }
 

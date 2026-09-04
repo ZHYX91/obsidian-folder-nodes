@@ -128,11 +128,13 @@ describe("Node Graph progressive view", () => {
       "", "Work", "Personal", "Work/A", "Work/B", "Personal/Home",
       "Work/A/One", "Work/A/Two", "Work/A/One/Deep",
     ]);
+    nodeBody(fixture.view, "Work/A/One/Deep").click();
 
     expandHandle(fixture.view, "Work/A").dispatchEvent(new MouseEvent("click", {
       altKey: true, bubbles: true,
     }));
     expectVisible(fixture.view, ["", "Work", "Personal", "Work/A", "Work/B", "Personal/Home"]);
+    expect(graphNode(fixture.view, "Work/A").classList.contains("is-focused")).toBe(true);
     expect(expandHandle(fixture.view, "Work").getAttribute("aria-expanded")).toBe("true");
     expect(expandHandle(fixture.view, "Personal").getAttribute("aria-expanded")).toBe("true");
   });
@@ -362,11 +364,13 @@ describe("Node Graph progressive view", () => {
     ]);
     menu.items[3]?.click?.();
     expectVisible(fixture.view, ["Work", "Work/A", "Work/A/One", "Work/A/Two", "Work/A/One/Deep"]);
+    nodeBody(fixture.view, "Work/A/One/Deep").click();
     expect(fixture.view.contentEl.querySelector("[data-node-path='Work/B']")).toBeNull();
 
     fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-range-button")?.click();
     lastMenu().items[4]?.click?.();
     expectVisible(fixture.view, ["Work", "Work/A", "Work/A/One", "Work/A/Two"]);
+    expect(graphNode(fixture.view, "Work/A/One").classList.contains("is-focused")).toBe(true);
   });
 
   it("does not leak temporary search expansion into a scope session", async () => {
