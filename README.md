@@ -14,23 +14,27 @@ Browse child nodes, visual media, ordinary files, and explicit unmanaged boundar
 
 ### File Explorer
 
-Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. Property icons use a fixed frameless slot, while a character that belongs to the file name remains plain text.
+Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. The Root eye reveals property-hidden subtrees for the session, while aligned badges distinguish Hidden, Incomplete, Unmanaged, and Conflict states.
 
-![Obsidian File Explorer distinguishing property icons from characters in node names](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian File Explorer showing the Root eye and aligned Folder Nodes status badges](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+
+### Node Graph
+
+Explore a node's structure in Global, Subtree, or Local scope, expand branches on demand, and switch between 2D and 3D views.
+
+![Folder Nodes Graph showing an expanded Projects subtree](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ### Icons & appearance
 
-The settings card explains where icons come from and directly compares `icon: A` or `icon: 📓` with the same character at the start of a file name.
+The settings card explains where icons come from and directly compares `icon: A` or `icon: 📓` with the same character at the start of a file name. An optional title icon stays in its own aligned slot before the Node Note title.
 
-### Node Note title icon
-
-An optional title icon stays in its own aligned slot before the Node Note title. It does not become part of editable title text.
-
-![Folder Nodes property glyph displayed in a separate slot before the Node Note title](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
+![Folder Nodes Icons and appearance settings with property and file-name comparisons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
 ### Predictable Node creation
 
 See exactly how selected text and uncreated links map to Node paths, note bodies, and aliases before changing naming options.
+
+![Folder Nodes Selection and naming settings explaining predictable Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Features
 

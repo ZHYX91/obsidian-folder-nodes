@@ -14,23 +14,27 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 
 ### 文件列表
 
-在 Obsidian 熟悉的文件列表中浏览 Root 与嵌套 Folder Node。属性图标使用固定且无边框的图标位，属于文件名的开头字符仍保持普通文字。
+在 Obsidian 熟悉的文件列表中浏览 Root 与嵌套 Folder Node。Root 旁的眼睛可在当前会话显示属性隐藏的子树；对齐的胶囊分别标示隐藏、不完整、不管理和冲突。
 
-![Obsidian 文件列表区分属性图标与节点名中的字符](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian 文件列表显示 Root 眼睛与对齐的 Folder Nodes 状态胶囊](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+
+### 节点图谱
+
+用全局、子树或局部范围浏览节点结构，按需展开分支，并在 2D 与 3D 视图间切换。
+
+![Folder Nodes 图谱显示已展开的 Projects 子树](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ### 图标与外观
 
-设置说明卡介绍图标来源，并直接比较 `icon: A`、`icon: 📓` 与文件名开头相同字符的显示差异。
+设置说明卡介绍图标来源，并直接比较 `icon: A`、`icon: 📓` 与文件名开头相同字符的显示差异。可选标题图标在节点笔记标题前使用单独且对齐的图标位。
 
-### 节点笔记标题图标
-
-可选标题图标在节点笔记标题前使用单独且对齐的图标位，不会进入可编辑的标题文字。
-
-![Folder Nodes 属性文字图标在节点笔记标题前显示为独立图标位](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-title-icon-en.png)
+![Folder Nodes 图标与外观设置显示属性图标和文件名字符对比](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
 ### 可预测的 Node 创建
 
 在调整命名选项前，先明确看到选中文字和未创建链接如何映射到 Node 路径、笔记正文与 aliases。
+
+![Folder Nodes 选择与命名设置说明可预测的 Node 创建](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 功能特性
 
