@@ -21,7 +21,7 @@ canonical version and bind the exact commit/tree. A clean worktree must pass
 
 ## Candidate Bundle v3
 
-The vendored release-core `3.0.0` and thin adapter create the sole Candidate Bundle v3 containing
+The vendored release-core `3.0.1` and thin adapter create the sole Candidate Bundle v3 containing
 `main.js`, `manifest.json`, `styles.css`, `folder-nodes-x.y.z.zip`, `SHA256SUMS`, and
 `candidate-bundle.json`. It also binds the toolchain, core/config/workflow, product payload,
 scenario contract, and every fixture hash; there is no receipt or envelope dual stack.
