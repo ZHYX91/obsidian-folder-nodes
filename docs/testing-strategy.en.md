@@ -32,7 +32,7 @@ Check at least default light, default dark, and one third-party theme. Keyboard 
 
 ## Android mobile acceptance
 
-Every `isDesktopOnly: false` candidate must retain Android-compatible code and CSS, with automated narrow-screen, coarse-pointer, and touch coverage. Release closure also requires the current Android 15/API 35 emulator and a disposable Vault to cover plugin load, File Explorer/Contents, native moves, menus, settings persistence, Node Graph scopes/handles/search/2D/3D, narrow layout, touch targets, system trash, and disable cleanup. Android physical devices and iOS are out of scope.
+Every `isDesktopOnly: false` candidate must retain Android-compatible code and CSS, with automated narrow-screen, coarse-pointer, and touch coverage. Optional host regression uses the current Android 15/API 35 emulator and a disposable Vault to cover plugin load, File Explorer/Contents, native moves, menus, settings persistence, Node Graph scopes/handles/search/2D/3D, narrow layout, touch targets, system trash, and disable cleanup. Android physical devices and iOS are out of scope.
 
 ## Production deployment
 

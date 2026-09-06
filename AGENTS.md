@@ -32,8 +32,7 @@ three loose release assets. Release checks must preserve and verify all four pub
 
 ## Release acceptance scope
 
-This plugin is mobile-capable. An exact release candidate requires current desktop and Android
-emulator acceptance. Android physical devices and iOS are out of scope. Keep source,
+Desktop and Android emulator acceptance are optional quality checks on an exact candidate. Record failures, skipped checks, and incomplete coverage honestly; they do not block explicitly authorized publication. Source/build checks, version identity, asset integrity and build provenance remain required. Android physical devices and iOS are out of scope. Keep source,
 packaged-candidate, real-host, emulator, publication, and production-Vault claims separate.
 
 Migration is preview-first. Destructive or ambiguous changes fail closed. Tests and fixtures must
