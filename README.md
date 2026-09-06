@@ -156,7 +156,6 @@ Stable project documents:
 - [UX specification](docs/ux-spec.en.md)
 - [Architecture](docs/architecture.en.md)
 - [Testing strategy](docs/testing-strategy.en.md)
-- [Release procedure](docs/release.en.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

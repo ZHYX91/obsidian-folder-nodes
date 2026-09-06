@@ -156,7 +156,6 @@ npm run release:check
 - [交互规范](../ux-spec.zh-CN.md)
 - [架构](../architecture.zh-CN.md)
 - [测试策略](../testing-strategy.zh-CN.md)
-- [发布流程](../release.zh-CN.md)
 - [变更记录](../../CHANGELOG.md)
 - [贡献指南](../../CONTRIBUTING.md)
 - [安全策略](../../SECURITY.md)
