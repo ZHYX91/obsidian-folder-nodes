@@ -50,7 +50,7 @@ describe("Node Graph progressive view", () => {
     expect(fixture.onNodeMenu).toHaveBeenCalledWith(expect.any(MouseEvent), "Work");
   });
 
-  it("keeps siblings equal while sizing separate branches independently in 2D and 3D", async () => {
+  it("keeps sibling bodies equal and extends branches in 2D and 3D", async () => {
     const snapshot = nodeGraphSnapshot();
     snapshot.records.set("Work/B", record(
       "Work/B",
@@ -69,18 +69,47 @@ describe("Node Graph progressive view", () => {
     expandHandle(view, "Work").click();
     expandHandle(view, "Personal").click();
 
-    expect(graphNode(view, "").style.width).toBe("180px");
-    expect(graphNode(view, "Work").style.width).toBe("144px");
-    expect(graphNode(view, "Personal").style.width).toBe("144px");
-    expect(graphNode(view, "Work/A").style.width).toBe("220px");
+    expect(graphNode(view, "").style.width).toBe("214px");
+    expect(graphNode(view, "Work").style.width).toBe("178px");
+    expect(graphNode(view, "Personal").style.width).toBe("178px");
+    expect(graphNode(view, "Work/A").style.width).toBe("254px");
     expect(graphNode(view, "Work/B").style.width).toBe("220px");
     expect(graphNode(view, "Personal/Home").style.width).toBe("144px");
+
+    expandHandle(view, "Work/A").click();
+    expect(graphNode(view, "Work/A").style.width).toBe("254px");
+    const parentRight = Number.parseFloat(graphNode(view, "Work/A").style.left) + 254;
+    expect(Number.parseFloat(graphNode(view, "Work/A/One").style.left) - parentRight).toBe(72);
+    expandHandle(view, "Work/A").click();
+    expect(graphNode(view, "Work/A").style.width).toBe("254px");
 
     const threeD = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
       .find((button) => button.textContent === "3D");
     threeD?.click();
-    expect(graphNode(view, "Work/A").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("220px");
+    expect(graphNode(view, "Work/A").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("254px");
+    expect(graphNode(view, "Work/B").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("220px");
     expect(graphNode(view, "Personal/Home").style.getPropertyValue("--folder-nodes-node-graph-card-width")).toBe("144px");
+  });
+
+  it("matches touch handle geometry and leaves vertical card widths unchanged", async () => {
+    const matchMedia = vi.spyOn(window, "matchMedia").mockReturnValue({ matches: true } as MediaQueryList);
+    try {
+      const { view, settings } = await graphViewFixture();
+      expandHandle(view, "Work").click();
+      expect(view.contentEl.style.getPropertyValue("--folder-nodes-node-graph-handle-width")).toBe("44px");
+      expect(graphNode(view, "Work/A").style.width).toBe("188px");
+      expect(graphNode(view, "Work/B").style.width).toBe("144px");
+      matchMedia.mockReturnValue({ matches: false } as MediaQueryList);
+      view.onResize();
+      expect(graphNode(view, "Work/A").style.width).toBe("178px");
+      expect(graphNode(view, "Work/B").style.width).toBe("144px");
+      settings.layoutDirection = "top-to-bottom";
+      await view.onOpen();
+      expect(graphNode(view, "Work/A").style.width).toBe("144px");
+      expect(graphNode(view, "Work/B").style.width).toBe("144px");
+    } finally {
+      matchMedia.mockRestore();
+    }
   });
 
   it("keeps siblings as context and clears focus from the background or Escape", async () => {

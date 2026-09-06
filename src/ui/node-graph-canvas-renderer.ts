@@ -37,7 +37,7 @@ import {
   type NodeGraphModelEdge,
 } from "../core/node-graph-model";
 import type { NodeVisual } from "../core/types";
-import { fitNodeGraphCardLabel } from "../core/node-graph-card-width";
+import { fitNodeGraphCardLabel, nodeGraphCardExpansionWidth, NODE_GRAPH_CARD_HANDLE_WIDTH } from "../core/node-graph-card-width";
 import { renderVisual } from "../presentation/render-visual";
 
 export type NodeGraphCanvasDimension = "2d" | "3d";
@@ -60,6 +60,7 @@ export interface NodeGraphCanvasRecord {
 }
 
 export interface NodeGraphCanvasData {
+  readonly handleWidth?: number;
   readonly layout: NodeGraphLayout;
   readonly model: NodeGraphModel;
   readonly points3D: readonly NodeGraphPoint3D[];
@@ -859,7 +860,11 @@ export class NodeGraphCanvasRenderer {
       const fontSize = Math.max(10, Math.min(14, 13 * presentation.scale));
       const childCount = Math.max(0, record.childCount ?? 0);
       const leftInset = this.dimension === "2d" && this.data.layout.direction === "left-to-right" ? 22 : 7;
-      const rightInset = childCount > 0 && this.data.layout.direction === "left-to-right" ? 44 : 7;
+      const expansionWidth = nodeGraphCardExpansionWidth(childCount, {
+        direction: this.data.layout.direction,
+        handleWidth: this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH,
+      }) * presentation.scale;
+      const rightInset = 7 + expansionWidth;
       const labelX = left + leftInset + Math.max(0, width - leftInset - rightInset) / 2;
       this.context.fillStyle = this.palette.text;
       this.context.font = `${fontSize}px sans-serif`;
@@ -872,15 +877,20 @@ export class NodeGraphCanvasRenderer {
         (text) => this.context?.measureText(text).width ?? Number.POSITIVE_INFINITY,
       );
       this.context.fillText(visibleLabel, labelX, point.y);
-      if (record.hiddenExplicit === true) this.drawHiddenStatus(left + width - 13, top + 10, Math.max(0.75, presentation.scale));
+      if (record.hiddenExplicit === true) this.drawHiddenStatus(left + width - expansionWidth - 13, top + 10, Math.max(0.75, presentation.scale));
       if (childCount > 0) {
         this.context.fillStyle = this.palette.mutedText;
         if (this.data.layout.direction === "top-to-bottom") {
           this.context.textAlign = "center";
           this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, point.x, top + height - 5, 38);
         } else {
-          this.context.textAlign = "right";
-          this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, point.x + width / 2 - 5, point.y, 38);
+          const handleLeft = left + width - expansionWidth;
+          this.context.beginPath();
+          this.context.moveTo(handleLeft, top);
+          this.context.lineTo(handleLeft, top + height);
+          this.context.stroke();
+          this.context.textAlign = "center";
+          this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, handleLeft + expansionWidth / 2, point.y, Math.max(1, expansionWidth - 4));
         }
       }
     }
@@ -1078,8 +1088,12 @@ export class NodeGraphCanvasRenderer {
       const zoneHeight = Math.max(20, Math.min(32, presentation.box.height * 0.38));
       return y >= presentation.box.y + presentation.box.height / 2 - zoneHeight;
     }
-    const zoneWidth = Math.max(24, Math.min(44, presentation.box.width * 0.3));
-    return x >= presentation.box.x + presentation.box.width / 2 - zoneWidth;
+    const zoneWidth = nodeGraphCardExpansionWidth(record.childCount, {
+      direction: this.data.layout.direction,
+      handleWidth: this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH,
+    }) * presentation.scale;
+    return nodeGraphBoxContains(presentation.box, { x, y })
+      && x >= presentation.box.x + presentation.box.width / 2 - zoneWidth;
   }
 
   private presentationForPoint(point: NodeGraphCanvasPoint): CanvasNodePresentation {

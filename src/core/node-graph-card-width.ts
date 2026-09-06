@@ -1,4 +1,7 @@
+import type { NodeGraphLayoutDirection } from "./types";
+
 export interface NodeGraphCardWidthRecord {
+  readonly childCount?: number;
   readonly id: string;
   readonly label: string;
   readonly parentId: string | null;
@@ -7,6 +10,20 @@ export interface NodeGraphCardWidthRecord {
 export const NODE_GRAPH_CARD_WIDTH_COMPACT = 144;
 export const NODE_GRAPH_CARD_WIDTH_REGULAR = 180;
 export const NODE_GRAPH_CARD_WIDTH_WIDE = 220;
+export const NODE_GRAPH_CARD_HANDLE_WIDTH = 34;
+export const NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH = 44;
+
+export interface NodeGraphCardWidthOptions {
+  readonly direction?: NodeGraphLayoutDirection;
+  readonly handleWidth?: number;
+}
+
+export function nodeGraphCardExpansionWidth(
+  childCount: number | undefined,
+  { direction = "left-to-right", handleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH }: NodeGraphCardWidthOptions = {},
+): number {
+  return direction === "left-to-right" && (childCount ?? 0) > 0 ? handleWidth : 0;
+}
 
 const CARD_CHROME_WIDTH = 80;
 const NARROW_GLYPH_WIDTH = 7;
@@ -15,6 +32,7 @@ const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "graphem
 
 export function nodeGraphSiblingCardWidths(
   records: readonly NodeGraphCardWidthRecord[],
+  options: NodeGraphCardWidthOptions = {},
 ): ReadonlyMap<string, number> {
   const ids = new Set<string>();
   const groups = new Map<string, NodeGraphCardWidthRecord[]>();
@@ -32,7 +50,10 @@ export function nodeGraphSiblingCardWidths(
     let required = CARD_CHROME_WIDTH;
     for (const { label } of siblings) required = Math.max(required, requiredCardWidth(label));
     const width = snappedCardWidth(required);
-    for (const { id } of siblings) widths.set(id, width);
+    // The width tier belongs to the shared icon/title body; only branches extend it.
+    for (const { id, childCount } of siblings) {
+      widths.set(id, width + nodeGraphCardExpansionWidth(childCount, options));
+    }
   }
   return widths;
 }

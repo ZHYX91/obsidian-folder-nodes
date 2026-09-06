@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { layoutNodeGraph3D } from "../../src/core/node-graph-3d";
+import { nodeGraphSiblingCardWidths } from "../../src/core/node-graph-card-width";
+import type { NodeGraphCanvasPoint } from "../../src/core/node-graph-canvas";
 import { layoutNodeGraph, type NodeGraphTree } from "../../src/core/node-graph-layout";
 import { buildNodeGraphModel } from "../../src/core/node-graph-model";
 import { NodeGraphCanvasRenderer } from "../../src/ui/node-graph-canvas-renderer";
@@ -14,6 +16,65 @@ function fakeContext() {
 }
 
 describe("large Node Graph canvas renderer", () => {
+  it.each(["2d", "3d"] as const)("keeps %s labels equal and limits toggle hits to the appended handle", (dimension) => {
+    const tree: NodeGraphTree = { id: "root", children: [{ id: "branch", children: [] }, { id: "leaf", children: [] }] };
+    const model = buildNodeGraphModel(tree);
+    const fullLabel = "The same deliberately long node title";
+    const records = new Map(model.nodes.map(({ id }) => [id, {
+      childCount: id === "branch" ? 1 : 0,
+      label: fullLabel,
+      path: id,
+      visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
+    }]));
+    const context = fakeContext();
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const surface = document.body.createDiv();
+    try {
+      for (const handleWidth of [34, 44]) {
+        const nodeWidths = nodeGraphSiblingCardWidths([...records.values()].map((record) => ({
+          ...record, id: record.path, parentId: record.path === "root" ? null : "root",
+        })), { handleWidth });
+        const renderer = new NodeGraphCanvasRenderer(surface, {
+          handleWidth, layout: layoutNodeGraph(tree, { nodeWidths }), model,
+          points3D: layoutNodeGraph3D(model, { nodeWidths }), records,
+        }, dimension, false, null, {
+          label: () => "Node Graph", onOpen: vi.fn(), onSelect: vi.fn(), onToggle: vi.fn(), relationSummary: () => "",
+        });
+        try {
+          const internals = renderer as unknown as {
+            drawNode: (point: NodeGraphCanvasPoint) => void;
+            isToggleHit: (id: string, x: number, y: number) => boolean;
+            projectedById: Map<string, NodeGraphCanvasPoint>;
+          };
+          for (const scale of [0.65, 1]) {
+            const branch = { id: "branch", scale, width: 220 + handleWidth, x: 100 + (220 + handleWidth) * scale / 2, y: 100 };
+            const leaf = { id: "leaf", scale, width: 220, x: 100 + 220 * scale / 2, y: 200 };
+            internals.projectedById.set(branch.id, branch);
+            internals.projectedById.set(leaf.id, leaf);
+            context.fillText.mockClear();
+            internals.drawNode(branch);
+            const branchLabel = context.fillText.mock.calls.find(([text]) => String(text).startsWith("The same"));
+            context.fillText.mockClear();
+            internals.drawNode(leaf);
+            const leafLabel = context.fillText.mock.calls.find(([text]) => String(text).startsWith("The same"));
+            expect(branchLabel?.[0]).toBe(leafLabel?.[0]);
+            expect(branchLabel?.[1]).toBeCloseTo(Number(leafLabel?.[1]));
+            const bodyRight = 100 + 220 * scale;
+            expect(internals.isToggleHit("branch", bodyRight - 1, 100)).toBe(false);
+            expect(internals.isToggleHit("branch", bodyRight + handleWidth * scale / 2, 100)).toBe(true);
+            expect(internals.isToggleHit("branch", bodyRight + handleWidth * scale + 1, 100)).toBe(false);
+            expect(internals.isToggleHit("leaf", bodyRight - 1, 200)).toBe(false);
+          }
+        } finally {
+          renderer.destroy();
+        }
+      }
+    } finally {
+      surface.remove();
+      getContext.mockRestore();
+    }
+  });
+
   it("renders a deterministic 20k graph with constant graph DOM and tears down", async () => {
     const children = Array.from({ length: 19_999 }, (_, index): NodeGraphTree => ({
       id: `N${String(index).padStart(5, "0")}`,

@@ -12,6 +12,8 @@ import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
 
 import {
   nodeGraphSiblingCardWidths,
+  NODE_GRAPH_CARD_HANDLE_WIDTH,
+  NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH,
   NODE_GRAPH_CARD_WIDTH_REGULAR,
 } from "../core/node-graph-card-width";
 import {
@@ -144,6 +146,7 @@ const NODE_GRAPH_MOUSE_PRESS_SLOP = 4;
 const NODE_GRAPH_TOUCH_PRESS_SLOP = 8;
 
 export class FolderNodeGraphView extends ItemView {
+  private cardHandleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH;
   private focusPath: string | null = null;
   private showLinks = false;
   private dimension: NodeGraphDimension;
@@ -218,6 +221,10 @@ export class FolderNodeGraphView extends ItemView {
     if (this.contentEl.isConnected) this.render();
   }
   public override onResize(): void {
+    if (this.cardHandleWidth !== this.currentCardHandleWidth()) {
+      this.render();
+      return;
+    }
     this.canvasRenderer?.resize();
     this.resize3DViewport();
   }
@@ -371,6 +378,8 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private render(): void {
+    this.cardHandleWidth = this.currentCardHandleWidth();
+    this.contentEl.style.setProperty("--folder-nodes-node-graph-handle-width", `${this.cardHandleWidth}px`);
     this.canvasRenderer?.destroy();
     this.canvasRenderer = null;
     this.displayGraphData = null;
@@ -832,12 +841,13 @@ export class FolderNodeGraphView extends ItemView {
       scene.structureEdges,
       visibleLinks,
     );
+    const direction = this.settings().layoutDirection;
     const nodeWidths = nodeGraphSiblingCardWidths([...records.values()].map((record) => ({
+      childCount: record.childCount ?? 0,
       id: record.path,
       label: record.label,
       parentId: record.parentPath,
-    })));
-    const direction = this.settings().layoutDirection;
+    })), { direction, handleWidth: this.cardHandleWidth });
     return {
       records,
       model,
@@ -872,6 +882,13 @@ export class FolderNodeGraphView extends ItemView {
 
   private settings(): NodeGraphSettings {
     return this.options.getSettings?.() ?? DEFAULT_NODE_GRAPH_SETTINGS;
+  }
+
+  private currentCardHandleWidth(): number {
+    const ownerWindow = this.contentEl.ownerDocument.defaultView ?? window;
+    return ownerWindow.matchMedia("(pointer: coarse)").matches
+      ? NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH
+      : NODE_GRAPH_CARD_HANDLE_WIDTH;
   }
 
   private markWorkspaceStateDirty(): void {
@@ -963,6 +980,7 @@ export class FolderNodeGraphView extends ItemView {
     this.canvasRenderer = new NodeGraphCanvasRenderer(
       surface,
       {
+        handleWidth: this.cardHandleWidth,
         layout: data.layout,
         model: data.model,
         points3D: data.points3D,

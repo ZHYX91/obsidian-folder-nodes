@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.9.1
+
+- Extended horizontal Node Graph cards with children to place their expansion handles beside a
+  shared sibling icon/title area, keeping text widths equal and card widths stable when collapsed.
+- Aligned 2D and 3D label space, touch targets, and handle hit regions with the extended card bounds,
+  and refined card seams, leaf corners, and expanded-state icons.
+- Refreshed the Node Graph screenshots with colored icons and an all-English example.
+
 ## 0.9.0
 
 - Replaced empty File Explorer disclosure arrows with passive leaf dots when a hidden canonical

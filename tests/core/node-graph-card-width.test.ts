@@ -7,6 +7,21 @@ import {
 } from "../../src/core/node-graph-card-width";
 
 describe("Node Graph sibling card widths", () => {
+  it.each([34, 44])("extends only branches by %ipx while keeping sibling bodies equal", (handleWidth) => {
+    const records = [
+      { id: "branch", label: "Short", parentId: "root", childCount: 2 },
+      { id: "leaf", label: "A deliberately long sibling title", parentId: "root", childCount: 0 },
+    ];
+    const widths = nodeGraphSiblingCardWidths(records, { handleWidth });
+    expect(widths.get("branch")).toBe(220 + handleWidth);
+    expect(widths.get("leaf")).toBe(220);
+    // Children need not be visible for the collapsed branch to retain its extension.
+    expect(nodeGraphSiblingCardWidths(records.slice(0, 1), { handleWidth }).get("branch")).toBe(144 + handleWidth);
+    const vertical = nodeGraphSiblingCardWidths(records, { direction: "top-to-bottom", handleWidth });
+    expect(vertical.get("branch")).toBe(220);
+    expect(vertical.get("leaf")).toBe(220);
+  });
+
   it("keeps siblings equal while allowing cousin groups and roots to size independently", () => {
     const widths = nodeGraphSiblingCardWidths([
       { id: "root", label: "Root", parentId: null },

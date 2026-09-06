@@ -296,7 +296,8 @@
 }
 
 .folder-nodes-node-graph-focus-overlay-toggle {
-  flex: 0 0 44px;
+  flex: 0 0 var(--folder-nodes-node-graph-handle-width, 34px);
+  padding: 0;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   border-inline-start: 1px solid var(--background-modifier-border);
@@ -307,7 +308,8 @@
   background: var(--background-modifier-hover);
 }
 
-.folder-nodes-node-graph-focus-overlay[hidden] {
+.folder-nodes-node-graph-focus-overlay[hidden],
+.folder-nodes-node-graph-focus-overlay-toggle[hidden] {
   display: none;
 }
 
@@ -377,9 +379,10 @@
 }
 
 .folder-nodes-node-graph-node {
+  box-sizing: border-box;
   position: absolute;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  grid-template-columns: var(--folder-nodes-node-graph-handle-width, 34px) minmax(0, 1fr) var(--folder-nodes-node-graph-handle-width, 34px);
   align-items: stretch;
   padding: 0;
   overflow: visible;
@@ -404,6 +407,10 @@
   background: transparent;
   border: 0;
   border-radius: 0;
+}
+
+.folder-nodes-node-graph-view .folder-nodes-node-graph-node > button {
+  box-shadow: none;
 }
 
 .folder-nodes-node-graph-node-body {
@@ -438,7 +445,11 @@
 }
 
 .folder-nodes-node-graph-node.is-leaf {
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: var(--folder-nodes-node-graph-handle-width, 34px) minmax(0, 1fr);
+}
+
+.folder-nodes-node-graph-node.is-leaf .folder-nodes-node-graph-node-body {
+  border-radius: 0 9px 9px 0;
 }
 
 .folder-nodes-node-graph-node-child-count {
@@ -456,11 +467,6 @@
 .folder-nodes-node-graph-node-expand-handle svg {
   width: 14px;
   height: 14px;
-  transition: transform 120ms ease;
-}
-
-.folder-nodes-node-graph-node.is-expanded .folder-nodes-node-graph-node-expand-handle svg {
-  transform: rotate(90deg);
 }
 
 .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node {
@@ -493,10 +499,6 @@
 .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
   bottom: -12px;
   background: var(--background-secondary);
-}
-
-.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node.is-expanded .folder-nodes-node-graph-node-expand-handle svg {
-  transform: rotate(180deg);
 }
 
 .folder-nodes-node-graph-node.is-3d {
@@ -681,14 +683,6 @@
   .folder-nodes-node-graph-toolbar .clickable-icon {
     min-width: 44px;
     min-height: 44px;
-  }
-
-  .folder-nodes-node-graph-node {
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-  }
-
-  .folder-nodes-node-graph-node.is-leaf {
-    grid-template-columns: 44px minmax(0, 1fr);
   }
 
   .folder-nodes-node-graph-node-icon-handle,
