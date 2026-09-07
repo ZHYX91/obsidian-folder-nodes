@@ -12,6 +12,8 @@ Browse child nodes, visual media, ordinary files, and explicit unmanaged boundar
 
 ![Folder Nodes sidebar showing child nodes, visual media, and unmanaged files](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
+[Album photo credits](docs/assets/PHOTO-CREDITS.md).
+
 ### File Explorer
 
 Navigate the Root and nested Folder Nodes in Obsidian's familiar file tree. The Root eye reveals property-hidden subtrees for the session, while aligned badges distinguish Hidden, Incomplete, Unmanaged, and Conflict states.

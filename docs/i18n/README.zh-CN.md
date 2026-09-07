@@ -12,6 +12,8 @@ Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结�
 
 ![Folder Nodes 侧栏显示子节点、视觉媒体和不管理的文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
+[相册图片来源与许可](../assets/PHOTO-CREDITS.md)。
+
 ### 文件列表
 
 在 Obsidian 熟悉的文件列表中浏览 Root 与嵌套 Folder Node。Root 旁的眼睛可在当前会话显示属性隐藏的子树；对齐的胶囊分别标示隐藏、不完整、不管理和冲突。
