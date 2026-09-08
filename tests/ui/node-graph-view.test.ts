@@ -14,6 +14,74 @@ afterEach(async () => {
 });
 
 describe("Node Graph progressive view", () => {
+  it("keeps the range root independent from selection and names the next scope action", async () => {
+    const { view } = await graphViewFixture();
+    nodeBody(view, "Work").click();
+    scopeButton(view, "subtree").click();
+    expect(scopeButton(view, "subtree").disabled).toBe(true);
+    expect(scopeButton(view, "subtree").hasAttribute("aria-pressed")).toBe(false);
+    nodeBody(view, "Work/A").click();
+    expect(view.getState()).toMatchObject({ focus: "Work/A", scope: { mode: "subtree", rootPath: "Work" } });
+    expect(view.contentEl.querySelector(".folder-nodes-node-graph-scope-path")?.textContent).toBe("Current scope: Work's subtree");
+    expect(scopeButton(view, "subtree").disabled).toBe(false);
+    expect(scopeButton(view, "subtree").getAttribute("aria-label")).toBe("View A's subtree");
+    scopeButton(view, "subtree").click();
+    expect(view.getState()).toMatchObject({ scope: { mode: "subtree", rootPath: "Work/A" } });
+    scopeButton(view, "local").click();
+    expect(scopeButton(view, "local").disabled).toBe(true);
+    nodeBody(view, "Work/A/One").click();
+    expect(scopeButton(view, "local").disabled).toBe(false);
+    expect(view.getState()).toMatchObject({ scope: { mode: "local", rootPath: "Work/A" } });
+  });
+
+  it("selects icon, toggle and context-menu targets and exposes explicit branch actions", async () => {
+    const { view, onNodeMenu, openFolderNode } = await graphViewFixture();
+    graphNode(view, "Work").querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-icon-handle")?.click();
+    expect(view.getState()).toMatchObject({ focus: "Work" });
+    expandHandle(view, "Personal").click();
+    expect(view.getState()).toMatchObject({ focus: "Personal" });
+    graphNode(view, "Work").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(view.getState()).toMatchObject({ focus: "Work" });
+    const menu = new Menu();
+    const contribute = onNodeMenu.mock.calls.at(-1)?.[2] as (menu: Menu) => void;
+    contribute(menu);
+    const items = (menu as unknown as MockMenu).items;
+    items.find((item) => item.title === "Expand this branch")?.click?.();
+    expect(visiblePaths(view)).toContain("Work/A/One/Deep");
+    items.find((item) => item.title === "Expand this branch")?.click?.();
+    expect(visiblePaths(view)).toContain("Work/A/One/Deep");
+    items.find((item) => item.title === "Collapse this branch")?.click?.();
+    expect(visiblePaths(view)).not.toContain("Work/A");
+    expect(visiblePaths(view)).toContain("Personal/Home");
+    expect(openFolderNode).not.toHaveBeenCalled();
+  });
+
+  it("restores the keyboard toggle and keeps fitted viewport state across branch redraws", async () => {
+    const { view } = await graphViewFixture();
+    document.body.append(view.contentEl);
+    try {
+      const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+      const canvas = surface?.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+      if (surface == null || canvas == null) throw new Error("Missing graph surface");
+      canvas.style.transform = "scale(0.7)";
+      canvas.style.left = "80px";
+      canvas.style.top = "60px";
+      surface.scrollTop = 32;
+      surface.scrollLeft = 25;
+      expandHandle(view, "Work").focus();
+      expandHandle(view, "Work").click();
+      expect(document.activeElement).toBe(expandHandle(view, "Work"));
+      expect(expandHandle(view, "Work").getAttribute("aria-expanded")).toBe("true");
+      const next = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+      expect(next?.scrollTop).toBe(32);
+      expect(next?.scrollLeft).toBe(25);
+      expect(next?.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas")?.style.transform).toBe("scale(0.7)");
+      expandHandle(view, "Work").click();
+      expect(document.activeElement).toBe(expandHandle(view, "Work"));
+      expect(view.getState()).toMatchObject({ focus: "Work" });
+    } finally { view.contentEl.remove(); }
+  });
+
   it("starts at one level with structure only and renders accessible sibling interaction zones", async () => {
     const fixture = await graphViewFixture();
     expectVisible(fixture.view, ["", "Work", "Personal"]);
@@ -47,7 +115,7 @@ describe("Node Graph progressive view", () => {
     nodeBody(fixture.view, "Work").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(fixture.openFolderNode).toHaveBeenCalledWith("Work", false);
     work.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
-    expect(fixture.onNodeMenu).toHaveBeenCalledWith(expect.any(MouseEvent), "Work");
+    expect(fixture.onNodeMenu).toHaveBeenCalledWith(expect.any(MouseEvent), "Work", expect.any(Function));
   });
 
   it("keeps sibling bodies equal and extends branches in 2D and 3D", async () => {
@@ -172,7 +240,7 @@ describe("Node Graph progressive view", () => {
     const fixture = await graphViewFixture();
     fixture.requestSaveLayout.mockClear();
     expandHandle(fixture.view, "Work").click();
-    expect(fixture.requestSaveLayout).not.toHaveBeenCalled();
+    expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(1);
 
     nodeBody(fixture.view, "Work").click();
     expect(fixture.requestSaveLayout).toHaveBeenCalledTimes(1);

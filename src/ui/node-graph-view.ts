@@ -12,6 +12,7 @@ import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
 
 import {
   nodeGraphSiblingCardWidths,
+  nodeGraphExpansionHandleWidth,
   NODE_GRAPH_CARD_HANDLE_WIDTH,
   NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH,
   NODE_GRAPH_CARD_WIDTH_REGULAR,
@@ -62,6 +63,7 @@ import {
   nodeGraphStructuralScopeIds,
   nodeGraphShowLinksFromPersistedState,
   restoreNodeGraphSearchSnapshot,
+  setNodeGraphBranch,
   setNodeGraphRangeDepth,
   toggleNodeGraphBranch,
   toggleNodeGraphNode,
@@ -120,7 +122,7 @@ interface NodeGraphViewportState {
 export interface NodeGraphViewOptions {
   readonly getIndexSnapshot: () => NodeGraphIndexSnapshot;
   readonly getSettings?: () => NodeGraphSettings;
-  readonly onNodeMenu?: (event: MouseEvent, path: string) => void;
+  readonly onNodeMenu?: (event: MouseEvent, path: string, contribute?: (menu: Menu) => void) => void;
 }
 
 type GraphDrag = {
@@ -498,13 +500,14 @@ export class FolderNodeGraphView extends ItemView {
     });
     secondary.append(scope);
     scope.createSpan({ cls: "folder-nodes-node-graph-scope-path", text: this.scopeLabel() });
-    this.scopeButton(scope, label("globalScope"), label("globalScopeTooltip"), this.graphScope.mode === "global", () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE));
-    this.scopeButton(scope, label("subtreeScope"), label("subtreeScopeTooltip"), this.graphScope.mode === "subtree", () => {
+    this.scopeButton(scope, t("nodeGraphReturnGlobal"), label("globalScopeTooltip"), () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE), this.graphScope.mode === "global");
+    this.scopeButton(scope, t("nodeGraphViewSubtree"), label("subtreeScopeTooltip"), () => {
       if (this.focusPath !== null) this.setGraphScope({ mode: "subtree", rootPath: this.focusPath });
     }, this.focusPath === null, "subtree");
-    this.scopeButton(scope, label("localScope"), label("localScopeTooltip"), this.graphScope.mode === "local", () => {
+    this.scopeButton(scope, t("nodeGraphViewLocal"), label("localScopeTooltip"), () => {
       if (this.focusPath !== null) this.setGraphScope({ mode: "local", rootPath: this.focusPath });
     }, this.focusPath === null, "local");
+    this.updateScopeControls();
     const range = secondary.createEl("button", {
       cls: "folder-nodes-node-graph-range-button",
       attr: { "aria-haspopup": "menu", "aria-label": label("expandRangeTooltip"), type: "button" },
@@ -550,18 +553,17 @@ export class FolderNodeGraphView extends ItemView {
     container: HTMLElement,
     text: string,
     tooltip: string,
-    active: boolean,
     onClick: () => void,
     disabled = false,
     action: "local" | "subtree" | null = null,
   ): void {
     const button = container.createEl("button", {
-      cls: `folder-nodes-node-graph-scope-button${active ? " is-active" : ""}`,
+      cls: "folder-nodes-node-graph-scope-button",
       text,
-      attr: { "aria-pressed": String(active), type: "button", ...(action === null ? {} : { "data-node-graph-scope-action": action }) },
+      attr: { type: "button", ...(action === null ? {} : { "data-node-graph-scope-action": action }) },
     });
     button.disabled = disabled;
-    const description = disabled ? label("selectNodeFirst") : tooltip;
+    const description = disabled && action !== null ? label("selectNodeFirst") : tooltip;
     button.setAttribute("aria-label", description);
     button.title = description;
     setTooltip(button, description);
@@ -570,19 +572,37 @@ export class FolderNodeGraphView extends ItemView {
 
   private updateScopeControls(): void {
     for (const button of this.contentEl.querySelectorAll<HTMLButtonElement>("[data-node-graph-scope-action]")) {
-      button.disabled = this.focusPath === null;
+      const action = button.dataset.nodeGraphScopeAction;
+      const current = this.graphScope.mode === action && this.graphScope.mode !== "global"
+        && this.graphScope.rootPath === this.focusPath;
+      button.disabled = this.focusPath === null || current;
+      const name = this.focusPath === null ? "" : this.displayGraphData?.records.get(this.focusPath)?.label ?? this.focusPath;
+      const description = this.focusPath === null ? label("selectNodeFirst") : current
+        ? t(action === "subtree" ? "nodeGraphAlreadySubtree" : "nodeGraphAlreadyLocal", { name })
+        : t(action === "subtree" ? "nodeGraphSubtreeTarget" : "nodeGraphLocalTarget", { name });
+      button.setAttribute("aria-label", description);
+      button.title = description;
+      setTooltip(button, description);
     }
   }
 
   private toggleExpansion(path: string, branch: boolean): void {
     if (this.topology === null) return;
+    this.selectNode(path);
     const expansion = branch
       ? toggleNodeGraphBranch(this.topology, this.currentExpansion, path)
       : toggleNodeGraphNode(this.topology, this.currentExpansion, path);
-    this.setExpansion(expansion);
+    this.setExpansion(expansion, path);
   }
 
-  private setExpansion(expansion: NodeGraphExpansionState): void {
+  private setExpansion(expansion: NodeGraphExpansionState, anchorPath: string | null = this.focusPath): void {
+    const viewport = this.captureViewportState();
+    const anchor = anchorPath === null ? null : this.nodeScreenPosition(anchorPath);
+    const active = this.contentEl.ownerDocument.activeElement;
+    const restoreToggle = active instanceof HTMLElement && (
+      active.classList.contains("folder-nodes-node-graph-node-expand-handle")
+      || active.classList.contains("folder-nodes-node-graph-focus-overlay-toggle")
+    );
     this.currentExpansion = expansion;
     if (this.topology !== null && this.focusPath !== null) {
       const visible = new Set(buildNodeGraphVisibleScene(
@@ -603,6 +623,75 @@ export class FolderNodeGraphView extends ItemView {
     this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expansion);
     this.displayGraphData = null;
     this.render();
+    this.restoreViewportState(viewport);
+    if (anchorPath !== null && anchor !== null) this.restoreNodePosition(anchorPath, anchor);
+    if (this.dimension === "3d" && this.canvasRenderer === null) this.update3DProjection();
+    if (restoreToggle && this.focusPath !== null) {
+      if (this.canvasRenderer !== null) this.canvasRenderer.focusToggle();
+      else this.nodeElements.get(this.focusPath)
+        ?.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-expand-handle")?.focus({ preventScroll: true });
+    }
+  }
+
+  private selectNode(path: string): void {
+    const changed = this.focusPath !== path;
+    this.focusPath = path;
+    if (changed) this.markWorkspaceStateDirty();
+    this.applyFocus(false);
+    this.applyNeighborhood();
+    this.updateScopeControls();
+  }
+
+  private openNodeMenu(event: MouseEvent, path: string): void {
+    this.selectNode(path);
+    this.options.onNodeMenu?.(event, path, (menu) => {
+      const node = this.topology?.nodes.get(path);
+      if (node === undefined || !node.children.some((id) => this.structuralScopeIds.has(id))
+        || this.displayGraphData?.records.get(path)?.boundary) return;
+      menu.addSeparator();
+      for (const expand of [true, false]) menu.addItem((item) => item
+        .setTitle(t(expand ? "nodeGraphExpandBranch" : "nodeGraphCollapseBranch"))
+        .setIcon(expand ? "unfold-vertical" : "fold-vertical")
+        .onClick(() => {
+          if (this.topology === null) return;
+          this.selectNode(path);
+          this.setExpansion(setNodeGraphBranch(this.topology, this.currentExpansion, path, expand), path);
+        }));
+      menu.addSeparator();
+    });
+  }
+
+  private nodeScreenPosition(path: string): { x: number; y: number } | null {
+    if (this.canvasRenderer !== null) return this.canvasRenderer.nodeScreenPosition(path);
+    const rect = this.nodeElements.get(path)?.getBoundingClientRect();
+    return rect === undefined ? null : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  private restoreNodePosition(path: string, anchor: { x: number; y: number }): void {
+    if (this.canvasRenderer !== null) {
+      this.canvasRenderer.restoreNodePosition(path, anchor);
+      return;
+    }
+    if (this.dimension === "3d") this.update3DProjection();
+    const current = this.nodeScreenPosition(path);
+    if (current === null) return;
+    const dx = anchor.x - current.x;
+    const dy = anchor.y - current.y;
+    if (this.dimension === "3d") {
+      this.camera = panNodeGraphCamera(this.camera, dx, dy);
+      this.update3DProjection();
+      return;
+    }
+    const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
+    if (canvas === null) return;
+    canvas.style.left = `${(Number.parseFloat(canvas.style.left) || 0) + dx}px`;
+    canvas.style.top = `${(Number.parseFloat(canvas.style.top) || 0) + dy}px`;
+    const stage = canvas.parentElement;
+    if (stage !== null) {
+      const scale = new DOMMatrix(canvas.style.transform || undefined).a;
+      stage.style.width = `${Math.max(Number.parseFloat(stage.style.width) || 0, (this.displayGraphData?.layout.width ?? 0) * scale + (Number.parseFloat(canvas.style.left) || 0))}px`;
+      stage.style.height = `${Math.max(Number.parseFloat(stage.style.height) || 0, (this.displayGraphData?.layout.height ?? 0) * scale + (Number.parseFloat(canvas.style.top) || 0))}px`;
+    }
   }
 
   private openExpansionMenu(anchor: HTMLElement): void {
@@ -746,9 +835,19 @@ export class FolderNodeGraphView extends ItemView {
 
   private restoreViewportState(state: NodeGraphViewportState): void {
     if (state.dimension !== this.dimension) return;
-    this.camera = { ...state.view3D };
-    if (state.canvas !== null && this.canvasRenderer !== null) {
-      this.canvasRenderer.restoreViewportState(state.canvas);
+    this.camera = { ...(state.canvas?.camera3D ?? state.view3D) };
+    if (this.canvasRenderer !== null) {
+      const current = this.canvasRenderer.captureViewportState();
+      this.canvasRenderer.restoreViewportState(state.canvas ?? {
+        ...current,
+        camera3D: state.view3D,
+        camera2D: { ...current.camera2D, zoom: new DOMMatrix(state.dom2D?.canvasTransform || undefined).a },
+      });
+      return;
+    }
+    if (state.canvas !== null && this.dimension === "2d") {
+      const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
+      if (canvas !== null) canvas.style.transform = `scale(${state.canvas.camera2D.zoom})`;
       return;
     }
     if (state.dom2D === null || this.dimension !== "2d") return;
@@ -901,7 +1000,7 @@ export class FolderNodeGraphView extends ItemView {
     const rootLabel = this.graphScope.rootPath === ""
       ? this.app.vault.getName()
       : this.indexSnapshot?.records.get(this.graphScope.rootPath)?.label ?? this.graphScope.rootPath;
-    return `${label("scopePrefix")}${rootLabel} · ${this.graphScope.mode === "subtree" ? label("subtreeScope") : label("localScope")}`;
+    return t(this.graphScope.mode === "subtree" ? "nodeGraphSubtreeStatus" : "nodeGraphLocalStatus", { name: rootLabel });
   }
 
   private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
@@ -1000,7 +1099,7 @@ export class FolderNodeGraphView extends ItemView {
           this.updateScopeControls();
         },
         onToggle: (path, branch) => this.toggleExpansion(path, branch),
-        onContextMenu: (path, event) => this.options.onNodeMenu?.(event, path),
+        onContextMenu: (path, event) => this.openNodeMenu(event, path),
         overviewEdgeLimit: this.settings().overviewEdgeLimit,
         relationSummary,
         toggleLabel: (nodeLabel, childCount, expanded) => childActionLabel(
@@ -1120,13 +1219,16 @@ export class FolderNodeGraphView extends ItemView {
       ].filter(Boolean).join(" "),
       attr: { "data-node-path": record.path, title: hiddenTitle },
     });
-    const icon = node.createSpan({
+    node.style.setProperty("--folder-nodes-node-graph-expansion-width", `${nodeGraphExpansionHandleWidth(childIds.length, this.cardHandleWidth)}px`);
+    const icon = node.createEl("button", {
       cls: "folder-nodes-node-graph-node-icon-handle",
-      attr: { "aria-hidden": "true" },
+      attr: { type: "button", "aria-label": hiddenTitle },
     });
     const visual = record.visual;
     if (visual.kind === "fallback") setIcon(icon, record.path === "" ? "home" : "folder");
     else renderVisual(icon, visual, record.label);
+    icon.setAttribute("aria-label", hiddenTitle);
+    icon.addEventListener("click", () => this.selectNode(record.path));
     const body = node.createEl("button", {
       cls: "folder-nodes-node-graph-node-body",
       attr: { "aria-label": hiddenTitle, type: "button" },
@@ -1137,12 +1239,7 @@ export class FolderNodeGraphView extends ItemView {
     } else if (record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined) node.addClass("folder-nodes-hidden-inherited");
     setTooltip(body, hiddenTitle);
     body.addEventListener("click", () => {
-      const changed = this.focusPath !== record.path;
-      this.focusPath = record.path;
-      if (changed) this.markWorkspaceStateDirty();
-      this.applyFocus(false);
-      this.applyNeighborhood();
-      this.updateScopeControls();
+      this.selectNode(record.path);
     });
     body.addEventListener("dblclick", (event) => {
       void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
@@ -1179,7 +1276,7 @@ export class FolderNodeGraphView extends ItemView {
     }
     node.addEventListener("contextmenu", (event) => {
       event.preventDefault();
-      this.options.onNodeMenu?.(event, record.path);
+      this.openNodeMenu(event, record.path);
     });
     this.nodeElements.set(record.path, node);
     return node;

@@ -22,9 +22,9 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       const view = new FolderNodeGraphView(leaf, this.service, {
         getSettings: () => this.settings.nodeGraph,
         getIndexSnapshot: () => this.nodeGraphIndex.snapshot(this.settings.nodeGraph),
-        onNodeMenu: (event, path) => {
+        onNodeMenu: (event, path, contribute) => {
           const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
-          if (folder !== null) this.openNodeMenu(event, folder, "graph");
+          if (folder !== null) this.openNodeMenu(event, folder, "graph", contribute);
         },
       });
       return view;

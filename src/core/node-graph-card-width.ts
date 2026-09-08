@@ -22,7 +22,13 @@ export function nodeGraphCardExpansionWidth(
   childCount: number | undefined,
   { direction = "left-to-right", handleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH }: NodeGraphCardWidthOptions = {},
 ): number {
-  return direction === "left-to-right" && (childCount ?? 0) > 0 ? handleWidth : 0;
+  return direction === "left-to-right" && (childCount ?? 0) > 0
+    ? nodeGraphExpansionHandleWidth(childCount ?? 0, handleWidth) : 0;
+}
+
+export function nodeGraphExpansionHandleWidth(childCount: number, minimum = NODE_GRAPH_CARD_HANDLE_WIDTH): number {
+  const digits = String(Math.max(0, Math.floor(childCount))).length;
+  return Math.max(minimum, digits * 7 + 26);
 }
 
 const CARD_CHROME_WIDTH = 80;

@@ -74,12 +74,16 @@
       "steps": [
         "Inspect a complete visual leaf in File Explorer, then add a visible direct file",
         "Open Node Contents for a deep node, toggle one non-empty section, and navigate away and back",
-        "Focus a deep graph node, then collapse its parent directly, as a whole Alt branch, and with Collapse to level 1"
+        "Focus a deep graph node, then collapse its parent directly, as a whole Alt branch, and with Collapse to level 1",
+        "Select a parent, view its subtree, then select a child without changing scope; explicitly view the child subtree and return to global",
+        "Use the icon, expansion handle, keyboard, context menu and File Explorer reveal; inspect matching handle backgrounds and stable expansion anchors"
       ],
       "expected": [
         "The hidden canonical note yields a passive dot, and visible content restores the native disclosure arrow",
         "Breadcrumbs contain ancestors only, the current node appears once, empty sections are absent, and section disclosure survives the view session",
-        "Each manual collapse moves focus to the nearest visible ancestor in DOM or Canvas rendering"
+        "Direct and whole-branch operations select their card; range collapse moves hidden focus to the nearest visible ancestor in DOM or Canvas rendering",
+        "The scope status names its root independently from the selected card; actions name the selected target and disable only for the same root and mode",
+        "Selection and expansion agree across renderers; position, scale and toggle keyboard focus survive redraws; File Explorer reveals the targeted folder"
       ]
     },
     {

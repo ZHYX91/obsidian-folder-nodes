@@ -37,7 +37,7 @@ import {
   type NodeGraphModelEdge,
 } from "../core/node-graph-model";
 import type { NodeVisual } from "../core/types";
-import { fitNodeGraphCardLabel, nodeGraphCardExpansionWidth, NODE_GRAPH_CARD_HANDLE_WIDTH } from "../core/node-graph-card-width";
+import { fitNodeGraphCardLabel, nodeGraphCardExpansionWidth, nodeGraphExpansionHandleWidth, NODE_GRAPH_CARD_HANDLE_WIDTH } from "../core/node-graph-card-width";
 import { renderVisual } from "../presentation/render-visual";
 
 export type NodeGraphCanvasDimension = "2d" | "3d";
@@ -104,6 +104,7 @@ interface CanvasPalette {
   readonly mutedText: string;
   readonly node: string;
   readonly nodeHover: string;
+  readonly handle: string;
   readonly text: string;
 }
 
@@ -339,9 +340,32 @@ export class NodeGraphCanvasRenderer {
     this.scheduleDraw();
   }
 
+  public nodeScreenPosition(path: string): { x: number; y: number } | null {
+    const position = this.layoutPositions.get(path);
+    const point = this.dimension === "2d" && position !== undefined
+      ? { x: position.x * this.camera2D.zoom + this.camera2D.panX, y: position.y * this.camera2D.zoom + this.camera2D.panY }
+      : projectNodeGraph3D(this.data.points3D, this.camera3D, this.width, this.height).find((item) => item.id === path);
+    if (point === undefined) return null;
+    const bounds = this.surface.getBoundingClientRect();
+    return { x: bounds.left + point.x, y: bounds.top + point.y };
+  }
+
+  public restoreNodePosition(path: string, anchor: { x: number; y: number }): void {
+    const point = this.nodeScreenPosition(path);
+    if (point === null) return;
+    if (this.dimension === "2d") this.camera2D = panNodeGraphCanvasCamera(this.camera2D, anchor.x - point.x, anchor.y - point.y);
+    else this.camera3D = panNodeGraphCamera(this.camera3D, anchor.x - point.x, anchor.y - point.y);
+    this.scheduleDraw();
+  }
+
+  public focusToggle(): void {
+    this.drawFrame();
+    (this.focusOverlayToggle.hidden ? this.canvas : this.focusOverlayToggle).focus({ preventScroll: true });
+  }
+
   private readonly handleDoubleClick = (event: MouseEvent): void => {
     const path = this.hitTest(event.offsetX, event.offsetY);
-    if (path !== null) this.callbacks.onOpen(path, event.ctrlKey || event.metaKey);
+    if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) this.callbacks.onOpen(path, event.ctrlKey || event.metaKey);
   };
 
   private readonly handleOverlayDoubleClick = (event: MouseEvent): void => {
@@ -363,7 +387,17 @@ export class NodeGraphCanvasRenderer {
     if (this.overlayPath === null || this.callbacks.onToggle === undefined) return;
     event.preventDefault();
     event.stopPropagation();
+    this.selectFromCanvas(this.overlayPath, false);
     this.callbacks.onToggle(this.overlayPath, event.altKey);
+  };
+
+  private readonly handleOverlayToggleKeyDown = (event: KeyboardEvent): void => {
+    if (!event.altKey || (event.key !== "Enter" && event.key !== " ") || this.overlayPath === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat) return;
+    this.selectFromCanvas(this.overlayPath, false);
+    this.callbacks.onToggle?.(this.overlayPath, true);
   };
 
   private readonly handleContextMenu = (event: MouseEvent): void => {
@@ -377,6 +411,7 @@ export class NodeGraphCanvasRenderer {
   private readonly handleOverlayContextMenu = (event: MouseEvent): void => {
     if (this.overlayPath === null || this.callbacks.onContextMenu === undefined) return;
     event.preventDefault();
+    this.selectFromCanvas(this.overlayPath, false);
     this.callbacks.onContextMenu(this.overlayPath, event);
   };
 
@@ -516,6 +551,7 @@ export class NodeGraphCanvasRenderer {
     if (wasClick) {
       const path = this.hitTest(event.offsetX, event.offsetY);
       if (path !== null && this.isToggleHit(path, event.offsetX, event.offsetY)) {
+        this.selectFromCanvas(path, false);
         this.callbacks.onToggle?.(path, event.altKey);
       } else if (path !== null) this.selectFromCanvas(path, false);
       else this.selectFromCanvas(null, false);
@@ -580,6 +616,7 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlay.addEventListener("contextmenu", this.handleOverlayContextMenu);
     this.focusOverlay.addEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.addEventListener("click", this.handleOverlayToggle);
+    this.focusOverlayToggle.addEventListener("keydown", this.handleOverlayToggleKeyDown);
   }
 
   private unbindEvents(): void {
@@ -599,6 +636,7 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlay.removeEventListener("contextmenu", this.handleOverlayContextMenu);
     this.focusOverlay.removeEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.removeEventListener("click", this.handleOverlayToggle);
+    this.focusOverlayToggle.removeEventListener("keydown", this.handleOverlayToggleKeyDown);
   }
 
   private scheduleDraw(): void {
@@ -634,7 +672,8 @@ export class NodeGraphCanvasRenderer {
     this.visiblePoints = this.orderVisiblePoints(
       projected.filter((point) => pointIsVisible(point, { width: this.width, height: this.height })),
     );
-    for (const point of this.visiblePoints) this.drawNode(point);
+    const overlayPath = this.hoveredPath ?? this.focusPath;
+    for (const point of this.visiblePoints) if (point.id !== overlayPath) this.drawNode(point);
     this.updateFocusOverlay(this.projectedById);
   }
 
@@ -835,7 +874,7 @@ export class NodeGraphCanvasRenderer {
     const presentation = this.presentationForPoint(point);
     const depthAlpha = this.dimension === "3d" ? Math.max(0.5, Math.min(1, presentation.scale)) : 1;
     const hiddenAlpha = record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined && record.hiddenExplicit !== true ? 0.62 : 1;
-    const alpha = unrelated ? 0.22 : (record.boundary === true ? 0.62 : 1) * depthAlpha * hiddenAlpha;
+    const alpha = unrelated ? 0.45 : (record.boundary === true ? 0.62 : 1) * depthAlpha * hiddenAlpha;
     this.context.save();
     this.context.globalAlpha = alpha;
     if (presentation.kind === "dot") {
@@ -853,13 +892,26 @@ export class NodeGraphCanvasRenderer {
     this.context.fillStyle = point.id === this.hoveredPath ? this.palette.nodeHover : this.palette.node;
     this.context.strokeStyle = focused || match ? this.palette.accent : neighbor ? this.palette.mutedText : this.palette.border;
     this.context.lineWidth = focused ? 2.5 : match ? 2 : 1;
-    this.context.fillRect(left, top, width, height);
-    this.context.strokeRect(left, top, width, height);
+    this.context.beginPath();
+    this.context.roundRect(left, top, width, height, Math.min(10 * presentation.scale, height / 2));
+    this.context.fill();
+    this.context.save();
+    this.context.clip();
+    if (this.dimension === "2d" && this.data.layout.direction === "left-to-right") {
+      const handle = (this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH) * presentation.scale;
+      this.context.fillStyle = this.palette.handle;
+      this.context.fillRect(left, top, handle, height);
+      const expansionWidth = nodeGraphCardExpansionWidth(record.childCount, { handleWidth: this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH }) * presentation.scale;
+      if (expansionWidth > 0) this.context.fillRect(left + width - expansionWidth, top, expansionWidth, height);
+    }
+    this.context.restore();
+    this.context.stroke();
     if (this.dimension === "2d") this.drawVisualHandle(record, presentation);
     if (presentation.label) {
       const fontSize = Math.max(10, Math.min(14, 13 * presentation.scale));
       const childCount = Math.max(0, record.childCount ?? 0);
-      const leftInset = this.dimension === "2d" && this.data.layout.direction === "left-to-right" ? 22 : 7;
+      const leftInset = this.dimension === "2d" && this.data.layout.direction === "left-to-right"
+        ? (this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH) * presentation.scale + 7 : 7;
       const expansionWidth = nodeGraphCardExpansionWidth(childCount, {
         direction: this.data.layout.direction,
         handleWidth: this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH,
@@ -880,9 +932,10 @@ export class NodeGraphCanvasRenderer {
       if (record.hiddenExplicit === true) this.drawHiddenStatus(left + width - expansionWidth - 13, top + 10, Math.max(0.75, presentation.scale));
       if (childCount > 0) {
         this.context.fillStyle = this.palette.mutedText;
+        this.context.font = `${10 * presentation.scale}px sans-serif`;
         if (this.data.layout.direction === "top-to-bottom") {
           this.context.textAlign = "center";
-          this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, point.x, top + height - 5, 38);
+          this.context.fillText(`${childCount} ${record.expanded === true ? "−" : "+"}`, point.x, top + height - 5);
         } else {
           const handleLeft = left + width - expansionWidth;
           this.context.beginPath();
@@ -890,7 +943,7 @@ export class NodeGraphCanvasRenderer {
           this.context.lineTo(handleLeft, top + height);
           this.context.stroke();
           this.context.textAlign = "center";
-          this.context.fillText(`${record.expanded === true ? "−" : "+"}${childCount}`, handleLeft + expansionWidth / 2, point.y, Math.max(1, expansionWidth - 4));
+          this.context.fillText(`${childCount} ${record.expanded === true ? "−" : "+"}`, handleLeft + expansionWidth / 2, point.y);
         }
       }
     }
@@ -915,7 +968,8 @@ export class NodeGraphCanvasRenderer {
     if (this.context === null) return;
     const topToBottom = this.data.layout.direction === "top-to-bottom";
     const radius = 7;
-    const x = topToBottom ? presentation.box.x : presentation.box.x - presentation.box.width / 2;
+    const x = topToBottom ? presentation.box.x : presentation.box.x - presentation.box.width / 2
+      + (this.data.handleWidth ?? NODE_GRAPH_CARD_HANDLE_WIDTH) * presentation.scale / 2;
     const y = topToBottom ? presentation.box.y - presentation.box.height / 2 : presentation.box.y;
     const visual = record.visual;
     this.context.fillStyle = visual.kind === "color"
@@ -1004,7 +1058,8 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlay.setAttribute("title", title);
     const childCount = Math.max(0, record.childCount ?? 0);
     this.focusOverlayToggle.hidden = childCount === 0 || this.callbacks.onToggle === undefined;
-    this.focusOverlayToggle.setText(`${record.expanded === true ? "−" : "+"} ${childCount}`);
+    this.focusOverlayToggle.setText(`${childCount} ${record.expanded === true ? "−" : "+"}`);
+    this.focusOverlay.style.setProperty("--folder-nodes-node-graph-expansion-width", `${nodeGraphExpansionHandleWidth(childCount, this.data.handleWidth)}px`);
     this.focusOverlayToggle.setAttribute("aria-label", this.callbacks.toggleLabel?.(
       record.label,
       childCount,
@@ -1023,6 +1078,8 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlay.style.left = `${point.x}px`;
     this.focusOverlay.style.top = `${point.y}px`;
     this.focusOverlay.style.width = `${point.width ?? NODE_GRAPH_CANVAS_NODE_WIDTH}px`;
+    this.focusOverlay.style.transform = `translate(-50%, -50%) scale(${this.presentationForPoint(point).scale})`;
+    this.focusOverlay.classList.toggle("is-selected", path === this.focusPath);
     this.focusOverlay.hidden = false;
   }
 
@@ -1097,7 +1154,8 @@ export class NodeGraphCanvasRenderer {
   }
 
   private presentationForPoint(point: NodeGraphCanvasPoint): CanvasNodePresentation {
-    const geometry = nodeGraphCanvasGeometry(point.scale, point.width);
+    const active = point.id === (this.hoveredPath ?? this.focusPath);
+    const geometry = nodeGraphCanvasGeometry(active ? Math.max(0.85, point.scale) : point.scale, point.width);
     const denseDot = this.dimension === "3d"
       && this.data.model.nodes.length > DENSE_3D_DOT_THRESHOLD
       && point.id !== this.focusPath
@@ -1195,6 +1253,7 @@ export class NodeGraphCanvasRenderer {
       mutedText: color("--text-muted", "#999"),
       node: color("--background-secondary", "#2b2b2b"),
       nodeHover: color("--background-modifier-hover", "#3b3b3b"),
+      handle: color("--folder-nodes-node-graph-handle-background", "#242424"),
       text: color("--text-normal", "#ddd"),
     };
   }

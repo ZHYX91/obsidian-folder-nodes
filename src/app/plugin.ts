@@ -303,10 +303,12 @@ export default class FolderNodesPlugin extends Plugin {
     });
   }
 
-  public openNodeMenu(anchor: ContentsMenuAnchor, folder: TFolder, surface: NodeActionSurface = "contents"): void {
+  public openNodeMenu(anchor: ContentsMenuAnchor, folder: TFolder, surface: NodeActionSurface = "contents", contribute?: (menu: Menu) => void): void {
     const menu = new Menu();
     menu.addItem((item) => item.setTitle(t("open")).setIcon("file-text").onClick(() => this.runAction(this.service.openFolderNode(folder.path))));
     menu.addItem((item) => item.setTitle(t("openNewTab")).setIcon("file-plus").onClick(() => this.runAction(this.service.openFolderNode(folder.path, true))));
+    menu.addItem((item) => item.setTitle(t("revealInExplorer")).setIcon("folder-search").onClick(() => this.runAction(this.revealEntry(folder))));
+    contribute?.(menu);
     menu.addItem((item) => item.setTitle(t("createChild")).setIcon("folder-plus").onClick(() => this.promptCreateChild(folder)));
     menu.addItem((item) => item.setTitle(t("nodeActions")).setIcon("sliders-horizontal").onClick(() => this.openNodeActions(folder, surface)));
     this.showMenu(menu, anchor);

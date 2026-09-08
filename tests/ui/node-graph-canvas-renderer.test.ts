@@ -9,7 +9,7 @@ import { NodeGraphCanvasRenderer } from "../../src/ui/node-graph-canvas-renderer
 
 function fakeContext() {
   return {
-    arc: vi.fn(), beginPath: vi.fn(), bezierCurveTo: vi.fn(), clearRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
+    arc: vi.fn(), beginPath: vi.fn(), bezierCurveTo: vi.fn(), clearRect: vi.fn(), clip: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillRect: vi.fn(), fillText: vi.fn(),
     drawImage: vi.fn(), lineTo: vi.fn(), measureText: vi.fn((text: string) => ({ width: [...text].length * 7 })), moveTo: vi.fn(), quadraticCurveTo: vi.fn(), restore: vi.fn(), save: vi.fn(), setLineDash: vi.fn(), setTransform: vi.fn(),
     stroke: vi.fn(), strokeRect: vi.fn(),
   };
@@ -296,7 +296,8 @@ describe("large Node Graph canvas renderer", () => {
     expect(model.edges).toHaveLength(124_750);
     expect(surface.dataset.nodeGraphEdgeLod).toBeUndefined();
     expect(surface.querySelector(".folder-nodes-node-graph-edge-lod")).toBeNull();
-    expect(context.stroke.mock.calls.length).toBeLessThanOrEqual(6);
+    // Rounded cards each have one stroke; edge batches retain their own bounded draw calls.
+    expect(context.stroke.mock.calls.length - context.roundRect.mock.calls.length).toBeLessThanOrEqual(6);
     expect((renderer as unknown as { structureEdges: readonly unknown[] }).structureEdges).toHaveLength(499);
     expect((renderer as unknown as { overviewLinkEdges: readonly unknown[] }).overviewLinkEdges.length).toBeLessThanOrEqual(6_000);
     expect(context.quadraticCurveTo.mock.calls.length).toBeLessThanOrEqual(6_000);
@@ -305,9 +306,10 @@ describe("large Node Graph canvas renderer", () => {
     context.lineTo.mockClear();
     context.quadraticCurveTo.mockClear();
     context.stroke.mockClear();
+    context.roundRect.mockClear();
     renderer.setFocus("N000", false);
     await new Promise((resolve) => window.setTimeout(resolve, 30));
-    expect(context.stroke.mock.calls.length).toBeLessThanOrEqual(6);
+    expect(context.stroke.mock.calls.length - context.roundRect.mock.calls.length).toBeLessThanOrEqual(6);
     expect((renderer as unknown as { drawnLinkEdges: () => readonly unknown[] }).drawnLinkEdges().length).toBeGreaterThan(overviewCount);
     expect((renderer as unknown as { drawnLinkEdges: () => readonly unknown[] }).drawnLinkEdges().length).toBeLessThanOrEqual(overviewCount + 499);
 
@@ -506,7 +508,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("draws a fixed 2D visual handle at the structure entry without consuming the label slot", async () => {
+  it("draws the 2D icon inside its reserved visual handle", async () => {
     const tree: NodeGraphTree = { id: "", children: [{ id: "A", children: [] }] };
     const model = buildNodeGraphModel(tree);
     const layout = layoutNodeGraph(tree);
@@ -559,7 +561,7 @@ describe("large Node Graph canvas renderer", () => {
         readonly label: string;
         readonly path: string;
         readonly visual: { readonly accent: null; readonly inheritedFrom: null; readonly kind: "lucide"; readonly value: string };
-      }, presentation: { readonly box: { readonly height: number; readonly width: number; readonly x: number; readonly y: number } }) => void;
+      }, presentation: { readonly scale: number; readonly box: { readonly height: number; readonly width: number; readonly x: number; readonly y: number } }) => void;
       visualImages: Map<string, HTMLImageElement>;
     };
     internals.visualImages.set("lucide\u0000folder-tree\u0000", cachedIcon);
@@ -567,8 +569,8 @@ describe("large Node Graph canvas renderer", () => {
       label: "Tree",
       path: "Tree",
       visual: { accent: null, inheritedFrom: null, kind: "lucide", value: "folder-tree" },
-    }, { box: { height: 46, width: 180, x: 200, y: 100 } });
-    expect(context.drawImage).toHaveBeenCalledWith(cachedIcon, 103, 93, 14, 14);
+    }, { scale: 1, box: { height: 46, width: 180, x: 200, y: 100 } });
+    expect(context.drawImage).toHaveBeenCalledWith(cachedIcon, 120, 93, 14, 14);
     renderer.refreshPalette();
     expect(internals.visualImages.size).toBe(0);
 
@@ -599,7 +601,7 @@ describe("large Node Graph canvas renderer", () => {
       { layout, model, points3D: layoutNodeGraph3D(model, { nodeWidths: new Map([["", 144]]) }), records },
       "2d",
       false,
-      "",
+      null,
       {
         label: () => "Large Node Graph",
         onOpen: vi.fn(),
@@ -611,6 +613,12 @@ describe("large Node Graph canvas renderer", () => {
 
     expect(context.fillText.mock.calls.some(([text]) => typeof text === "string" && text.endsWith("…"))).toBe(true);
     expect(context.fillText.mock.calls.some(([text]) => text === fullLabel)).toBe(false);
+    context.fillText.mockClear();
+    context.roundRect.mockClear();
+    renderer.setFocus("", false);
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    expect(context.fillText).not.toHaveBeenCalled();
+    expect(context.roundRect).not.toHaveBeenCalled();
     const overlay = surface.querySelector<HTMLElement>(".folder-nodes-node-graph-focus-overlay");
     expect(overlay?.style.width).toBe("144px");
     expect(overlay?.getAttribute("title")).toContain(fullLabel);
@@ -704,6 +712,7 @@ describe("large Node Graph canvas renderer", () => {
     internals.pointers.set(7, { pointerType: "mouse", x: 180, y: 100 });
     internals.finishPointer(pointerEvent, true);
     expect(onToggle).toHaveBeenCalledWith("", true);
+    expect(onSelect).toHaveBeenCalledWith("");
 
     const overlay = surface.querySelector<HTMLElement>(".folder-nodes-node-graph-focus-overlay");
     (renderer as unknown as { updateFocusOverlay: (points: ReadonlyMap<string, typeof point>) => void })
@@ -716,6 +725,10 @@ describe("large Node Graph canvas renderer", () => {
       .toContain("Alt");
     (renderer as unknown as { showTooltip: (x: number, y: number) => void }).showTooltip(180, 100);
     expect(surface.querySelector(".folder-nodes-node-graph-canvas-tooltip")?.textContent).toContain("Alt");
+    onToggle.mockClear();
+    overlay?.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay-toggle")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { altKey: true, key: "Enter", bubbles: true, cancelable: true }));
+    expect(onToggle).toHaveBeenCalledWith("", true);
 
     onSelect.mockClear();
     canvas?.dispatchEvent(new PointerEvent("pointerdown", {

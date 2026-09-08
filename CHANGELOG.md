@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.2
+
+- Separated the current graph scope from selection-based subtree and local actions, with named targets and an explicit return to global scope.
+- Unified icon, expansion-handle, and context-menu selection across graph renderers; added first-level File Explorer reveal and explicit whole-branch actions.
+- Preserved graph viewport anchors and keyboard toggle focus during expansion, matched handle backgrounds, and kept unrelated nodes readable.
+- Centered emoji icons, removed duplicate Canvas focus-card rendering, and widened expansion handles to show complete child counts without reducing title space.
+
 ## 0.9.1
 
 - Extended horizontal Node Graph cards with children to place their expansion handles beside a

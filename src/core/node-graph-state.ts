@@ -89,12 +89,22 @@ export function toggleNodeGraphBranch(
 ): NodeGraphExpansionState {
   const branch = nodeGraphTopologyDescendants(topology, nodeId)
     .filter((id) => hasChildren(topology, id));
+  return setNodeGraphBranch(topology, expansion, nodeId, !branch.every((id) => expansion.expandedIds.has(id)));
+}
+
+export function setNodeGraphBranch(
+  topology: NodeGraphTopology,
+  expansion: NodeGraphExpansionState,
+  nodeId: string,
+  expand: boolean,
+): NodeGraphExpansionState {
+  const branch = nodeGraphTopologyDescendants(topology, nodeId)
+    .filter((id) => hasChildren(topology, id));
   if (branch.length === 0) return cloneExpansion(expansion);
   const expandedIds = new Set(expansion.expandedIds);
   const collapsedIds = new Set(expansion.collapsedIds ?? []);
-  const fullyExpanded = branch.every((id) => expandedIds.has(id));
   for (const id of branch) {
-    if (fullyExpanded) {
+    if (!expand) {
       expandedIds.delete(id);
       collapsedIds.add(id);
     } else {

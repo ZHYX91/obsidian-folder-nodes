@@ -2,11 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import {
   fitNodeGraphCardLabel,
+  nodeGraphExpansionHandleWidth,
   nodeGraphCardWidthForLabels,
   nodeGraphSiblingCardWidths,
 } from "../../src/core/node-graph-card-width";
 
 describe("Node Graph sibling card widths", () => {
+  it.each([[60, 40], [100, 47], [1000, 54], [10000, 61]])("reserves room for all %i children without shrinking sibling titles", (childCount, handleWidth) => {
+    const widths = nodeGraphSiblingCardWidths([
+      { id: "branch", label: "Branch", parentId: "root", childCount },
+      { id: "leaf", label: "Leaf", parentId: "root", childCount: 0 },
+    ]);
+    expect(nodeGraphExpansionHandleWidth(childCount)).toBe(handleWidth);
+    expect((widths.get("branch") ?? 0) - handleWidth).toBe(widths.get("leaf"));
+    expect(nodeGraphExpansionHandleWidth(childCount, 44)).toBe(Math.max(44, handleWidth));
+  });
+
   it.each([34, 44])("extends only branches by %ipx while keeping sibling bodies equal", (handleWidth) => {
     const records = [
       { id: "branch", label: "Short", parentId: "root", childCount: 2 },
