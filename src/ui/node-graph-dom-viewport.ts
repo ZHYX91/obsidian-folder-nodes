@@ -4,10 +4,11 @@ const GRAPH_CANVAS_CLASS = "folder-nodes-node-graph-canvas";
 
 export function rebaseNodeGraphDomViewport(root: ParentNode): boolean {
   const canvas = root.querySelector<HTMLElement>(`.${GRAPH_STAGE_CLASS} > .${GRAPH_CANVAS_CLASS}`);
-  const stage = canvas?.parentElement;
-  const surface = stage?.parentElement;
-  if (canvas === null || canvas === undefined || stage === null || surface === null) return false;
-  if (!surface.classList.contains(GRAPH_SCROLL_CLASS)) return false;
+  if (canvas === null) return false;
+  const stage = canvas.parentElement;
+  if (stage === null) return false;
+  const surface = stage.parentElement;
+  if (surface === null || !surface.classList.contains(GRAPH_SCROLL_CLASS)) return false;
 
   const left = finitePixels(canvas.style.left);
   const top = finitePixels(canvas.style.top);
