@@ -29,4 +29,22 @@ describe("visual rendering semantics", () => {
     expect(container.classList.contains("has-accent")).toBe(false);
     expect((container.querySelector(".folder-nodes-visual-color") as HTMLElement | null)?.style.backgroundColor).toBe("#4caf50");
   });
+
+  it("keeps the current-node icon inside a dedicated left handle", () => {
+    const current = document.createElement("button");
+    current.className = "folder-nodes-current";
+    const container = document.createElement("span");
+    container.className = "folder-nodes-current-visual";
+    current.append(container);
+
+    renderVisual(container, { kind: "emoji", value: "📓", accent: null, inheritedFrom: null }, "Current node");
+
+    expect(current.style.overflow).toBe("hidden");
+    expect(container.style.flex).toBe("0 0 40px");
+    expect(container.style.width).toBe("40px");
+    expect(container.style.overflow).toBe("hidden");
+    expect(container.style.borderInlineEnd).toBe("1px solid var(--background-modifier-border)");
+    expect(container.style.getPropertyValue("border-start-start-radius")).toBe("var(--radius-s)");
+    expect(container.querySelector<HTMLElement>(".folder-nodes-visual-emoji")?.style.fontSize).toBe("20px");
+  });
 });
