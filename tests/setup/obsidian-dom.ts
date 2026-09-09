@@ -20,6 +20,14 @@ function createSvg(this: Element, tag: string, options: DomOptions = {}): SVGEle
   return child;
 }
 
+function setCssStyles(this: HTMLElement | SVGElement, styles: Partial<CSSStyleDeclaration>): void {
+  Object.assign(this.style, styles);
+}
+
+function setCssProps(this: HTMLElement | SVGElement, props: Record<string, string>): void {
+  for (const [key, value] of Object.entries(props)) this.style.setProperty(key, value);
+}
+
 Object.defineProperties(HTMLElement.prototype, {
   addClass: { value(this: HTMLElement, ...classes: string[]) { this.classList.add(...classes); } },
   createDiv: { value(this: HTMLElement, options?: DomOptions) { const child = applyOptions(this.ownerDocument.createElement("div"), options); this.append(child); return child; } },
@@ -30,8 +38,14 @@ Object.defineProperties(HTMLElement.prototype, {
   instanceOf: { value(this: HTMLElement, constructor: typeof HTMLElement) { return this instanceof constructor; } },
   removeClass: { value(this: HTMLElement, ...classes: string[]) { this.classList.remove(...classes); } },
   setAttr: { value(this: HTMLElement, name: string, value: string) { this.setAttribute(name, value); } },
+  setCssProps: { value: setCssProps },
+  setCssStyles: { value: setCssStyles },
   setText: { value(this: HTMLElement, value: string) { this.textContent = value; } },
   toggleClass: { value(this: HTMLElement, name: string, value: boolean) { this.classList.toggle(name, value); } },
 });
 
-Object.defineProperty(SVGElement.prototype, "createSvg", { value: createSvg });
+Object.defineProperties(SVGElement.prototype, {
+  createSvg: { value: createSvg },
+  setCssProps: { value: setCssProps },
+  setCssStyles: { value: setCssStyles },
+});
