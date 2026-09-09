@@ -7,6 +7,7 @@ export default class FolderNodesRuntimeGeometryPlugin extends FolderNodesWithNod
 
   public override async onload(): Promise<void> {
     await super.onload();
+    if (!this.pluginLifecycleActive) return;
     this.syncNodeGraphViewportObservers();
     this.registerEvent(this.app.workspace.on("layout-change", () => this.syncNodeGraphViewportObservers()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.syncNodeGraphViewportObservers()));
