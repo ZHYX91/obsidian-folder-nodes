@@ -5,6 +5,7 @@
 ## 0.9.3
 
 - Contained current-node icons in a dedicated handle with bounded image, emoji, glyph, and SVG dimensions.
+- Resolved short and explicit Lucide icon names against Obsidian's prefixed icon registry instead of incorrectly inheriting a parent icon.
 - Kept expanded Node Graph content reachable above and to the left while preserving the screen anchor, including graphs smaller than the viewport.
 - Hardened GitHub publication against transient reads and interrupted uploads with verified draft recovery.
 

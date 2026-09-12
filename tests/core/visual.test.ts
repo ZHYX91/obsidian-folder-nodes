@@ -10,6 +10,15 @@ import {
 const options = { iconIds: new Set(["folder-tree", "brain"]), isColor: (value: string) => value === "#ff0000" };
 
 describe("node visual", () => {
+  it.each(["folder-tree", "lucide:folder-tree", "lucide-folder-tree"])(
+    "resolves %s against the host's prefixed Lucide registry",
+    (candidate) => {
+      const hostOptions = { ...options, iconIds: new Set(["lucide-folder-tree"]) };
+      expect(parseVisualCandidate(candidate, hostOptions)).toEqual({ kind: "lucide", value: "lucide-folder-tree" });
+      expect(parseVisualDeclaration([candidate], hostOptions).unknown).toEqual([]);
+      expect(parseVisualCandidate("lucide:missing", hostOptions)).toBeNull();
+    },
+  );
   it("uses color as a foreground accent for glyph and Lucide bases", () => {
     expect(resolveVisualDeclaration(["unknown", "brain", "color:#ff0000"], {
       ...options,

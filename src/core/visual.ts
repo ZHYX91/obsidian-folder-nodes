@@ -54,13 +54,17 @@ function isVisibleGrapheme(candidate: string): boolean {
 export function parseVisualCandidate(value: string, options: VisualParseOptions): ParsedVisual | null {
   const candidate = value.trim();
   const explicitLucide = candidate.startsWith("lucide:") ? candidate.slice(7).trim() : null;
-  if (explicitLucide !== null) return options.iconIds.has(explicitLucide) ? { kind: "lucide", value: explicitLucide } : null;
+  if (explicitLucide !== null) return parseLucideCandidate(explicitLucide, options.iconIds);
   if (candidate.startsWith("color:")) return null;
   const image = IMAGE_LINK.exec(candidate)?.[1]?.trim();
   if (image !== undefined && IMAGE_EXTENSION.test(image)) return { kind: "image", value: image };
   if (isVisibleGrapheme(candidate)) return { kind: EMOJI.test(candidate) ? "emoji" : "glyph", value: candidate };
-  if (options.iconIds.has(candidate)) return { kind: "lucide", value: candidate };
-  return null;
+  return parseLucideCandidate(candidate, options.iconIds);
+}
+
+function parseLucideCandidate(candidate: string, iconIds: ReadonlySet<string>): ParsedVisual | null {
+  const registered = iconIds.has(candidate) ? candidate : `lucide-${candidate}`;
+  return iconIds.has(registered) ? { kind: "lucide", value: registered } : null;
 }
 
 function parseColorCandidate(value: string, options: VisualParseOptions): string | null {
