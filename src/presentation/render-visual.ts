@@ -39,7 +39,9 @@ export function renderVisual(container: HTMLElement, visual: NodeVisual, label: 
 function styleCurrentNodeHandle(container: HTMLElement): void {
   if (!container.classList.contains(CURRENT_NODE_HANDLE_CLASS)) return;
   const parent = container.parentElement;
-  if (parent?.classList.contains("folder-nodes-current")) parent.setCssStyles({ overflow: "hidden" });
+  if (parent?.classList.contains("folder-nodes-current")) {
+    parent.setCssStyles({ justifyContent: "flex-start", overflow: "hidden" });
+  }
   container.setCssStyles({
     alignSelf: "stretch",
     background: "color-mix(in srgb, var(--background-modifier-border) 40%, var(--background-primary))",

@@ -40,6 +40,7 @@ describe("visual rendering semantics", () => {
     renderVisual(container, { kind: "emoji", value: "📓", accent: null, inheritedFrom: null }, "Current node");
 
     expect(current.style.overflow).toBe("hidden");
+    expect(current.style.justifyContent).toBe("flex-start");
     expect(container.style.flex).toBe("0 0 40px");
     expect(container.style.width).toBe("40px");
     expect(container.style.overflow).toBe("hidden");
