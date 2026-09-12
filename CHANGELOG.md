@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.3
+
+- Contained current-node icons in a dedicated handle with bounded image, emoji, glyph, and SVG dimensions.
+- Kept expanded Node Graph content reachable above and to the left while preserving the screen anchor, including graphs smaller than the viewport.
+- Hardened GitHub publication against transient reads and interrupted uploads with verified draft recovery.
+
 ## 0.9.2
 
 - Separated the current graph scope from selection-based subtree and local actions, with named targets and an explicit return to global scope.

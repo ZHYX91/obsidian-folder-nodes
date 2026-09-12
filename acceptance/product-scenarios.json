@@ -107,6 +107,28 @@
         "Boundary reorder actions are disabled and subtree-wide actions use explicit wording",
         "The grouped action panel is keyboard accessible and touch targets are at least 44px"
       ]
+    },
+    {
+      "id": "current-node-and-graph-geometry",
+      "title": "Current-node icon containment and small-graph viewport anchors",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Inspect Node Contents for Geometry and its Emoji, Glyph, Image, and Lucide children in a narrow pane.",
+        "Open the Geometry subtree in DOM 2D, expand and collapse branches with the graph smaller than the viewport and then larger than it, and scroll to the upper and left edges.",
+        "Repeat appearance checks with Default and Minimal themes in light and dark modes."
+      ],
+      "expected": [
+        "Each current-node visual stays inside its left handle without overlapping or clipping the title.",
+        "Expansion and collapse preserve the selected node screen position and all graph content remains reachable by scrolling.",
+        "Handles and titles remain legible in all four theme and mode combinations."
+      ]
     }
   ]
 }
