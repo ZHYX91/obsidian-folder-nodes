@@ -57,4 +57,35 @@ describe("DOM Node Graph viewport rebasing", () => {
     expect(surface.scrollLeft).toBe(12);
     expect(surface.scrollTop).toBe(16);
   });
+
+  it("preserves the anchor when CSS stretches a small stage to the viewport", () => {
+    const { root, surface, stage, canvas } = viewportFixture();
+    stage.style.width = "300px";
+    stage.style.height = "300px";
+    canvas.style.left = "-48px";
+    canvas.style.top = "-72px";
+    let scrollLeft = 0;
+    let scrollTop = 0;
+    Object.defineProperties(surface, {
+      clientWidth: { value: 800 },
+      clientHeight: { value: 600 },
+      scrollLeft: {
+        get: () => scrollLeft,
+        set: (value: number) => { scrollLeft = Math.max(0, Math.min(value, stage.offsetWidth - 800)); },
+      },
+      scrollTop: {
+        get: () => scrollTop,
+        set: (value: number) => { scrollTop = Math.max(0, Math.min(value, stage.offsetHeight - 600)); },
+      },
+    });
+    Object.defineProperties(stage, {
+      offsetWidth: { get: () => Math.max(800, Number.parseFloat(stage.style.width)) },
+      offsetHeight: { get: () => Math.max(600, Number.parseFloat(stage.style.height)) },
+    });
+
+    expect(rebaseNodeGraphDomViewport(root)).toBe(true);
+    expect(Number.parseFloat(canvas.style.left) - surface.scrollLeft).toBe(-48);
+    expect(Number.parseFloat(canvas.style.top) - surface.scrollTop).toBe(-72);
+    expect(rebaseNodeGraphDomViewport(root)).toBe(false);
+  });
 });

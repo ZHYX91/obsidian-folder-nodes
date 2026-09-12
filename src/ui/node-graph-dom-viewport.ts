@@ -17,13 +17,13 @@ export function rebaseNodeGraphDomViewport(root: ParentNode): boolean {
   if (shiftX === 0 && shiftY === 0) return false;
 
   if (shiftX > 0) {
-    const stageWidth = finitePixels(stage.style.width, stage.scrollWidth || surface.clientWidth);
+    const stageWidth = Math.max(finitePixels(stage.style.width), stage.offsetWidth, surface.clientWidth);
     canvas.style.left = `${left + shiftX}px`;
     stage.style.width = `${stageWidth + shiftX}px`;
     surface.scrollLeft += shiftX;
   }
   if (shiftY > 0) {
-    const stageHeight = finitePixels(stage.style.height, stage.scrollHeight || surface.clientHeight);
+    const stageHeight = Math.max(finitePixels(stage.style.height), stage.offsetHeight, surface.clientHeight);
     canvas.style.top = `${top + shiftY}px`;
     stage.style.height = `${stageHeight + shiftY}px`;
     surface.scrollTop += shiftY;
