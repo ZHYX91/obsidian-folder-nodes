@@ -15,7 +15,9 @@ import {
 } from "./contents-interactions";
 import { t } from "./i18n";
 import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
+import type { FileIdentity, FolderIdentity } from "../core/identity";
 import type { ChildOrderRecord, FolderNodeHiddenState, NodeVisual } from "../core/types";
+import { gapAfter, gapBefore, insertionMarker, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import { renderVisual } from "../presentation/render-visual";
 import type { ReferenceIndex } from "../core/reference-index";
 
@@ -30,17 +32,22 @@ interface ContentsService {
   getFolder(path: string): TFolder | null;
   getFile(path: string): TFile | null;
   getCanonicalFile(folderPath: string): TFile | null;
+  nodeNoteCandidates(folderPath: string): TFile[];
+  nodeNoteRole(file: TFile): "unique" | "conflict" | "none";
+  folderIdentity(folderPath: string): FolderIdentity;
+  fileIdentity(file: TFile): FileIdentity;
   isCanonicalFile(file: TFile): boolean;
   notePathForFolder(path: string): string;
   isIgnoredPath(path: string): boolean;
   isIgnoredRootPath(path: string): boolean;
-  hiddenState?(path: string): FolderNodeHiddenState;
-  isNodeVisible?(path: string): boolean;
-  revealingHiddenNodes?(): boolean;
+  hiddenState(path: string): FolderNodeHiddenState;
+  isNodeVisible(path: string): boolean;
+  revealingHiddenNodes(): boolean;
   isLeafNoteExempt(path: string): boolean;
   children(path: string): ChildOrderRecord[];
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
-  placeNode(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder>;
+  previewPlacement(sourcePath: string, intent: PlacementIntent): PlacementPreview;
+  placeNode(folder: TFolder, intent: PlacementIntent): Promise<TFolder>;
   moveFile(file: TFile, targetFolderPath: string): Promise<void>;
 }
 
@@ -62,7 +69,7 @@ interface ContentsActions {
 }
 
 type NodeEntry =
-  | { kind: "healthy" | "incomplete"; entry: TFolder }
+  | { kind: "conflict" | "healthy" | "incomplete"; entry: TFolder }
   | { kind: "conflict" | "missing-folder"; entry: TFile };
 type ContentsSection = "album" | "files" | "nodes";
 
@@ -86,6 +93,7 @@ export class FolderNodeContentsView extends ItemView {
   private dropTarget: HTMLElement | null = null;
   private contentDropTarget: HTMLElement | null = null;
   private readonly pendingImages = new Set<HTMLImageElement>();
+  private renderedFolderPath: string | null = null;
 
   public constructor(
     leaf: WorkspaceLeaf,
@@ -136,12 +144,16 @@ export class FolderNodeContentsView extends ItemView {
     this.clearAllDrag();
     this.captureActiveEditor();
     const container = this.contentEl;
+    const requestedPath = normalizeVaultPath(this.folderPath);
+    const renderState = this.renderedFolderPath === requestedPath ? this.captureRenderState(container) : null;
     container.empty();
     container.addClass("folder-nodes-contents");
-    const folder = normalizeVaultPath(this.folderPath) === "" ? this.app.vault.getRoot() : this.service.getFolder(this.folderPath);
+    const folder = requestedPath === "" ? this.app.vault.getRoot() : this.service.getFolder(this.folderPath);
     if (folder === null) {
       container.createEl("p", { cls: "setting-item-description", text: t("noCurrentNode") });
       this.runRenderExtensions();
+      this.renderedFolderPath = requestedPath;
+      this.restoreRenderState(container, renderState);
       return;
     }
     const folderPath = normalizeVaultPath(folder.path);
@@ -149,12 +161,12 @@ export class FolderNodeContentsView extends ItemView {
     const childFolders = folder.children.filter((entry): entry is TFolder => entry instanceof TFolder);
     const childOrder = new Map(this.service.children(folderPath).map(({ childPath }, index) => [childPath, index]));
     const managedFolders = (currentIgnored ? [] : childFolders.filter((entry) =>
-      !this.service.isIgnoredPath(entry.path) && (this.service.isNodeVisible?.(entry.path) ?? true)))
+      !this.service.isIgnoredPath(entry.path) && this.service.isNodeVisible(entry.path)))
       .sort((a, b) => (childOrder.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (childOrder.get(b.path) ?? Number.MAX_SAFE_INTEGER));
-    const nodeEntries: NodeEntry[] = managedFolders.map((entry) => ({
-      kind: this.service.getCanonicalFile(entry.path) === null ? "incomplete" : "healthy",
-      entry,
-    }));
+    const nodeEntries: NodeEntry[] = managedFolders.map((entry) => {
+      const identity = this.service.folderIdentity(entry.path);
+      return { kind: identity === "conflict" ? "conflict" : identity === "node" ? "healthy" : "incomplete", entry };
+    });
     const directFiles = folder.children.filter((entry): entry is TFile => entry instanceof TFile && !this.service.isCanonicalFile(entry));
     const pendingNotes = currentIgnored ? [] : directFiles.filter((entry) => {
       if (entry.extension.toLocaleLowerCase() !== "md" || this.service.isLeafNoteExempt(entry.path)) return false;
@@ -192,6 +204,29 @@ export class FolderNodeContentsView extends ItemView {
       if (ordinaryFiles.length > 0) this.renderFiles(container, ordinaryFiles);
     }
     this.runRenderExtensions();
+    this.renderedFolderPath = folderPath;
+    this.restoreRenderState(container, renderState);
+  }
+
+  private captureRenderState(container: HTMLElement): { focusKey: string | null; scrollTop: number } {
+    const active = container.ownerDocument.activeElement;
+    const focusKey = active instanceof HTMLElement && container.contains(active)
+      ? active.dataset.folderNodesFocusKey ?? null
+      : null;
+    return { focusKey, scrollTop: container.scrollTop };
+  }
+
+  private restoreRenderState(
+    container: HTMLElement,
+    state: { focusKey: string | null; scrollTop: number } | null,
+  ): void {
+    if (state === null) return;
+    if (state.focusKey !== null) {
+      const target = [...container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]")]
+        .find((element) => element.dataset.folderNodesFocusKey === state.focusKey);
+      target?.focus({ preventScroll: true });
+    }
+    container.scrollTop = state.scrollTop;
   }
 
   private runRenderExtensions(): void {
@@ -211,6 +246,7 @@ export class FolderNodeContentsView extends ItemView {
         continue;
       }
       const button = breadcrumb.createEl("button", { text: item.label });
+      button.dataset.folderNodesFocusKey = `breadcrumb:${item.path}`;
       button.addEventListener("click", () => this.setFolder(item.path));
       if (this.dragEnabled) this.bindContentDropTarget(button, item.path);
     }
@@ -219,10 +255,12 @@ export class FolderNodeContentsView extends ItemView {
   private renderHeader(container: HTMLElement, folder: TFolder, hasSelectableContent: boolean): void {
     const header = container.createDiv({ cls: "folder-nodes-contents-header" });
     const folderPath = normalizeVaultPath(folder.path);
-    const managedNode = !this.service.isIgnoredPath(folderPath) && this.service.getCanonicalFile(folderPath) !== null;
+    const currentIdentity = this.service.folderIdentity(folderPath);
+    const managedNode = currentIdentity === "node";
     const identity = managedNode
       ? header.createEl("button", { cls: "folder-nodes-current", attr: { "aria-label": t("openCurrentNodeNote") } })
       : header.createDiv({ cls: "folder-nodes-current" });
+    if (identity instanceof HTMLButtonElement) identity.dataset.folderNodesFocusKey = `current:${folderPath}`;
     if (this.dragEnabled) this.bindContentDropTarget(identity, folderPath);
     const resolved = managedNode ? this.visuals.resolve(folder) : null;
     if (resolved !== null && resolved.kind !== "fallback") {
@@ -231,8 +269,9 @@ export class FolderNodeContentsView extends ItemView {
     }
     const title = identity.createSpan({ cls: "folder-nodes-current-title", text: folderPath === "" ? this.app.vault.getName() : folder.name });
     title.setAttr("title", folderPath);
-    if (!managedNode && !this.service.isIgnoredPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteStatus") });
-    else if (!managedNode && this.service.isIgnoredRootPath(folderPath)) title.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
+    if (currentIdentity === "conflict") title.createSpan({ cls: "folder-nodes-status-badge is-conflict", text: t("conflictStatus") });
+    else if (currentIdentity === "incomplete") title.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteStatus") });
+    else if (currentIdentity === "unmanaged") title.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
     if (managedNode) identity.addEventListener("click", (event) => {
       const mouseEvent = event as MouseEvent;
       this.runAction(this.service.openFolderNode(folderPath, mouseEvent.ctrlKey || mouseEvent.metaKey));
@@ -275,9 +314,11 @@ export class FolderNodeContentsView extends ItemView {
       const presentation = nodeEntryVisual(item.kind, resolved);
       const problemLabel = item.kind === "incomplete" ? t("missingNodeNote") : item.kind === "conflict" ? t("nodeConflict") : t("missingNodeFolder");
       const shell = grid.createDiv({ cls: `folder-nodes-entry-shell folder-nodes-node-shell${item.kind === "conflict" || item.kind === "missing-folder" ? " is-problem" : ""}` });
+      shell.dataset.nodePath = entry.path;
       const card = shell.createEl("button", { cls: "folder-nodes-node-card" });
-      if (item.kind === "healthy" && entry instanceof TFolder && (this.service.revealingHiddenNodes?.() ?? false)) {
-        const hiddenState = this.service.hiddenState?.(entry.path) ?? { explicit: false, sourcePath: null, unmanaged: false };
+      card.dataset.folderNodesFocusKey = `node:${entry.path}`;
+      if (item.kind === "healthy" && entry instanceof TFolder && this.service.revealingHiddenNodes()) {
+        const hiddenState = this.service.hiddenState(entry.path);
         if (hiddenState.sourcePath !== null) {
           const hiddenLabel = hiddenState.explicit ? t("hiddenNode") : t("hiddenByNode", { path: hiddenState.sourcePath });
           card.setAttr("title", hiddenLabel);
@@ -309,6 +350,7 @@ export class FolderNodeContentsView extends ItemView {
             cls: "folder-nodes-node-drag-handle clickable-icon",
             attr: { "aria-label": t("reorderNode", { name: entry.name }), draggable: "true" },
           });
+          handle.dataset.folderNodesFocusKey = `node-drag:${entry.path}`;
           setIcon(handle, "grip-vertical");
           handle.addEventListener("click", (event) => {
             event.preventDefault();
@@ -335,6 +377,7 @@ export class FolderNodeContentsView extends ItemView {
         cls: `folder-nodes-album-card${selected ? " is-selected" : ""}`,
         attr: { "aria-label": entry.name },
       });
+      card.dataset.folderNodesFocusKey = `media:${entry.path}`;
       if (this.selectionMode) card.setAttr("aria-pressed", String(selected));
       const preview = card.createSpan({ cls: "folder-nodes-album-preview" });
       if (IMAGE_EXTENSIONS.has(extension)) {
@@ -375,16 +418,19 @@ export class FolderNodeContentsView extends ItemView {
       const row = shell.createEl("button", {
         cls: `folder-nodes-file-row${selected ? " is-selected" : ""}`,
       });
+      row.dataset.folderNodesFocusKey = `${entry instanceof TFolder ? "folder" : "file"}:${entry.path}`;
       if (this.selectionMode && entry instanceof TFile) row.setAttr("aria-pressed", String(selected));
       if (this.selectionMode && entry instanceof TFile) this.renderSelectionIndicator(row, entry.path);
       const icon = row.createSpan({ cls: "folder-nodes-file-icon" });
       if (entry instanceof TFolder) setIcon(icon, "folder");
       else setIcon(icon, FILE_ICONS[entry.extension.toLocaleLowerCase()] ?? "file");
       row.createSpan({ cls: "folder-nodes-file-name", text: entry.name, attr: { title: entry.name } });
-      if (entry instanceof TFolder && this.service.isIgnoredRootPath(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
-      if (entry instanceof TFile && !this.service.isIgnoredPath(entry.parent?.path ?? "") && this.service.isLeafNoteExempt(entry.path)) row.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
-      else if (entry instanceof TFile && entry.extension.toLocaleLowerCase() === "md" && !this.service.isIgnoredPath(entry.parent?.path ?? "")) {
-        row.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteStatus") });
+      if (entry instanceof TFolder && this.service.folderIdentity(entry.path) === "unmanaged") row.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
+      if (entry instanceof TFile) {
+        const fileIdentity = this.service.fileIdentity(entry);
+        if (fileIdentity === "conflict") row.createSpan({ cls: "folder-nodes-status-badge is-conflict", text: t("conflictStatus") });
+        else if (fileIdentity === "unmanaged") row.createSpan({ cls: "folder-nodes-status-badge is-unmanaged", text: t("unmanaged") });
+        else if (fileIdentity === "incomplete") row.createSpan({ cls: "folder-nodes-status-badge is-incomplete", text: t("incompleteStatus") });
       }
       if (entry instanceof TFolder) row.createSpan({ cls: "folder-nodes-file-extension", text: t("folderType") });
       if (entry instanceof TFile && entry.extension !== "") row.createSpan({ cls: "folder-nodes-file-extension", text: entry.extension.toLocaleUpperCase() });
@@ -586,6 +632,8 @@ export class FolderNodeContentsView extends ItemView {
       cls: "folder-nodes-entry-menu clickable-icon",
       attr: { "aria-label": t("moreActions", { name: entry.name }), draggable: "false" },
     });
+    const primaryFocusKey = primary.dataset.folderNodesFocusKey;
+    if (primaryFocusKey !== undefined) more.dataset.folderNodesFocusKey = `${primaryFocusKey}:menu`;
     setIcon(more, "more-horizontal");
     more.addEventListener("click", (event) => {
       event.preventDefault();
@@ -608,25 +656,57 @@ export class FolderNodeContentsView extends ItemView {
 
   private bindNodeReorderTarget(element: HTMLElement, target: TFolder, parentPath: string): void {
     element.addEventListener("dragover", (event) => {
-      if (this.draggedNodePath === null || this.draggedNodePath === target.path) return;
+      const sourcePath = this.draggedNodePath;
+      if (sourcePath === null) return;
       event.preventDefault();
+      event.stopPropagation();
       const placement = this.nodeDropPlacement(element, event);
-      this.markDrop(element, placement.zone, placement.axis);
-      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
+      const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
+      const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(sourcePath, intent);
+      if (preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis)) {
+        if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
+        return;
+      }
+      this.clearDropTarget();
+      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "none";
     });
     element.addEventListener("dragleave", (event) => this.onDragLeave(event, element));
     element.addEventListener("drop", (event) => {
       const sourcePath = this.draggedNodePath;
-      if (sourcePath === null || sourcePath === target.path) return;
+      if (sourcePath === null) return;
       event.preventDefault();
       event.stopPropagation();
-      const { zone } = this.nodeDropPlacement(element, event);
-      const siblings = this.service.children(parentPath).filter(({ childPath }) => childPath !== sourcePath);
-      const targetIndex = siblings.findIndex(({ childPath }) => childPath === target.path);
+      const placement = this.nodeDropPlacement(element, event);
+      const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
+      const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(sourcePath, intent);
       const source = this.service.getFolder(sourcePath);
+      const renderable = preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis);
       this.clearNodeDrag();
-      if (source !== null && targetIndex >= 0) this.finishDrop(this.service.placeNode(source, parentPath, targetIndex + (zone === "after" ? 1 : 0)));
+      if (source !== null && preview.kind === "ready" && renderable) this.finishDrop(this.service.placeNode(source, preview.intent));
+      else if (preview.kind === "blocked") this.actions.reportError(new Error(preview.reason));
     });
+  }
+
+  private nodeReorderIntent(targetPath: string, parentPath: string, zone: "after" | "before"): PlacementIntent | null {
+    if (this.draggedNodePath === null || this.draggedNodePath === targetPath) return null;
+    const siblings = this.service.children(parentPath).filter(({ childPath }) => childPath !== this.draggedNodePath);
+    const paths = siblings.map(({ childPath }) => childPath);
+    if (!paths.includes(targetPath)) return null;
+    return { kind: "insert", gap: zone === "before" ? gapBefore(paths, targetPath, parentPath) : gapAfter(paths, targetPath, parentPath) };
+  }
+
+  private markNodePlacement(hit: HTMLElement, intent: PlacementIntent, axis: SiblingDropAxis): boolean {
+    if (intent.kind !== "insert") return false;
+    const grid = hit.parentElement;
+    if (grid === null) return false;
+    const marker = insertionMarker(intent.gap);
+    if (marker === null) return false;
+    for (const shell of grid.querySelectorAll<HTMLElement>(":scope > .folder-nodes-node-shell[data-node-path]")) {
+      if (shell.dataset.nodePath !== marker.path) continue;
+      this.markDrop(shell, marker.edge, axis);
+      return true;
+    }
+    return false;
   }
 
   private nodeDropPlacement(element: HTMLElement, event: DragEvent): { axis: SiblingDropAxis; zone: "after" | "before" } {

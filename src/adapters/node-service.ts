@@ -10,10 +10,12 @@ import {
 
 import { VaultOperationCoordinator, type VaultEventKind } from "./vault-operation-coordinator";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exemptions";
+import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type FolderIdentity } from "../core/identity";
 import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
 import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
-import { compareChildren, materializeManualOrder, naturalOrder, planReorder } from "../core/ordering";
+import { compareChildren, materializeManualOrder, naturalOrder, planInsert } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
+import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import {
   FOLDER_NODES_PROPERTY,
   ICON_PROPERTY,
@@ -25,7 +27,6 @@ import type {
   FolderNodeHiddenState,
   FolderNodesSettings,
   MigrationScan,
-  NodeDropZone,
   OrderPatch,
   PropertyHealthFinding,
   PropertyMigrationScan,
@@ -77,17 +78,50 @@ export class NodeService {
   }
 
   public getCanonicalFile(folderPath: string): TFile | null {
-    const candidates = this.canonicalFiles(folderPath);
+    const candidates = this.nodeNoteCandidates(folderPath);
     return candidates.length === 1 ? candidates[0] ?? null : null;
   }
 
+  public nodeNoteCandidates(folderPath: string): TFile[] {
+    return this.canonicalFiles(folderPath);
+  }
+
+  public nodeNoteRole(file: TFile): "unique" | "conflict" | "none" {
+    if (!this.isCanonicalNameMatch(file) || file.parent === null) return "none";
+    const candidates = this.canonicalFiles(file.parent.path);
+    if (candidates.length === 1 && candidates[0] === file) return "unique";
+    return candidates.includes(file) ? "conflict" : "none";
+  }
+
   public isCanonicalFile(file: TFile): boolean {
-    if (file.extension.toLocaleLowerCase() !== "md" || file.parent === null) return false;
-    const expectedName = normalizeVaultPath(file.parent.path) === "" ? sanitizeNodeName(this.app.vault.getName()) : file.parent.name;
-    return isSameVaultName(file.basename, expectedName);
+    return this.nodeNoteRole(file) === "unique";
   }
 
   public folderForFile(file: TFile | null): TFolder | null { return file?.parent ?? null; }
+
+  public folderIdentity(folderPath: string): FolderIdentity {
+    const folder = this.getFolder(folderPath);
+    if (folder === null) return "ordinary";
+    return classifyFolderIdentity(
+      this.isIgnoredPath(folder.path),
+      this.isIgnoredRootPath(folder.path),
+      this.nodeNoteCandidates(folder.path).length,
+    );
+  }
+
+  public fileIdentity(file: TFile): FileIdentity {
+    const parent = file.parent;
+    if (parent === null) return "ordinary";
+    const counterpartPath = parent.path === "" ? file.basename : `${parent.path}/${file.basename}`;
+    const counterpart = this.getFolder(counterpartPath);
+    return classifyFileIdentity({
+      canonicalRole: this.nodeNoteRole(file),
+      counterpartNodeExists: counterpart !== null && this.getCanonicalFile(counterpart.path) !== null,
+      parentUnmanaged: this.isIgnoredPath(parent.path),
+      leafExempt: this.isLeafNoteExempt(file.path),
+      markdown: file.extension.toLocaleLowerCase() === "md",
+    });
+  }
 
   public async openFolderNode(folderPath: string, newLeaf = false): Promise<void> {
     const note = this.getCanonicalFile(folderPath);
@@ -260,25 +294,43 @@ export class NodeService {
   }
 
   public moveNode(folder: TFolder, targetParentPath: string): Promise<TFolder> {
-    return this.placeNode(folder, targetParentPath, Number.MAX_SAFE_INTEGER);
+    return this.placeNode(folder, { kind: "move-into", parentPath: targetParentPath });
   }
 
-  public placeNodeRelative(source: TFolder, target: TFolder, zone: NodeDropZone): Promise<TFolder> {
+  public previewPlacement(sourcePath: string, intent: PlacementIntent): PlacementPreview {
+    const source = this.getFolder(sourcePath);
+    if (source === null) return { kind: "blocked", reason: `Unknown source node: ${sourcePath}` };
+    try {
+      const resolved = this.resolvePlacement(source, intent);
+      return resolved === null ? { kind: "noop" } : { kind: "ready", intent: resolved.intent };
+    } catch (error) {
+      return { kind: "blocked", reason: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  public placeNode(folder: TFolder, intent: PlacementIntent): Promise<TFolder> {
+    return this.exclusive(() => this.placeNodeUnlocked(folder, intent));
+  }
+
+  public setChildOrderMode(parentPath: string, mode: "natural" | "manual"): Promise<void> {
     return this.exclusive(async () => {
-      if (zone === "into") {
-        const index = this.children(target.path).filter(({ childPath }) => childPath !== source.path).length;
-        return this.placeNodeUnlocked(source, target.path, index);
+      parentPath = normalizeVaultPath(parentPath);
+      if (this.sortMode(parentPath) === mode) return;
+      const parentNote = this.getCanonicalFile(parentPath);
+      if (parentNote === null) throw new Error("A complete parent Node is required to change child ordering");
+      const undos: Undo[] = [];
+      try {
+        if (mode === "natural") {
+          await this.patchFolderNodesTransactional(parentNote, { order: null }, undos);
+          return;
+        }
+        const ordered = naturalOrder(this.childRecords(parentPath));
+        await this.patchFolderNodesTransactional(parentNote, { order: "manual" }, undos);
+        await this.applyOrderPatches(materializeManualOrder(ordered).patches, null, undos);
+      } catch (error) {
+        await this.rollback(undos, error);
       }
-      const parentPath = normalizeVaultPath(target.parent?.path ?? "");
-      const siblings = this.children(parentPath).filter(({ childPath }) => childPath !== source.path);
-      const targetIndex = siblings.findIndex(({ childPath }) => childPath === target.path);
-      if (targetIndex < 0) throw new Error(`Unknown target node: ${target.path}`);
-      return this.placeNodeUnlocked(source, parentPath, targetIndex + (zone === "after" ? 1 : 0));
     });
-  }
-
-  public placeNode(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder> {
-    return this.exclusive(() => this.placeNodeUnlocked(folder, targetParentPath, targetIndex));
   }
 
   public deleteNode(folder: TFolder): Promise<void> {
@@ -582,7 +634,9 @@ export class NodeService {
   }
 
   public canReorder(folder: TFolder, delta: -1 | 1): boolean {
-    const children = this.children(normalizeVaultPath(folder.parent?.path ?? ""));
+    const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
+    if (this.sortMode(parentPath) !== "manual") return false;
+    const children = this.children(parentPath);
     const index = children.findIndex(({ childPath }) => childPath === folder.path);
     const target = index + delta;
     return index >= 0 && target >= 0 && target < children.length;
@@ -591,13 +645,21 @@ export class NodeService {
   public reorder(folder: TFolder, delta: -1 | 1): Promise<void> {
     return this.exclusive(async () => {
       const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
+      if (this.sortMode(parentPath) !== "manual") throw new Error("Enable manual child ordering before reordering nodes");
       const children = this.children(parentPath);
       const index = children.findIndex(({ childPath }) => childPath === folder.path);
       const target = index + delta;
       if (index < 0 || target < 0 || target >= children.length) return;
-      const undos: Undo[] = [];
-      try { await this.applyPlacementOrder(folder, parentPath, target, undos); }
-      catch (error) { await this.rollback(undos, error); }
+      const siblings = children.filter(({ childPath }) => childPath !== folder.path);
+      const intent: PlacementIntent = {
+        kind: "insert",
+        gap: {
+          parentPath,
+          previousSiblingPath: siblings[target - 1]?.childPath ?? null,
+          nextSiblingPath: siblings[target]?.childPath ?? null,
+        },
+      };
+      await this.placeNodeUnlocked(folder, intent);
     });
   }
 
@@ -658,22 +720,65 @@ export class NodeService {
     });
   }
 
-  private async placeNodeUnlocked(folder: TFolder, targetParentPath: string, targetIndex: number): Promise<TFolder> {
-    targetParentPath = normalizeVaultPath(targetParentPath);
+  private resolvePlacement(folder: TFolder, intent: PlacementIntent): {
+    intent: PlacementIntent;
+    parentPath: string;
+    targetIndex: number | null;
+    siblings: ChildOrderRecord[];
+  } | null {
     const sourcePath = normalizeVaultPath(folder.path);
     if (sourcePath === "") throw new Error("The Root Node cannot be moved");
-    if (this.isIgnoredPath(sourcePath) || this.isIgnoredPath(targetParentPath)) throw new Error("An unmanaged folder cannot be placed as a Folder Node");
-    if (targetParentPath === sourcePath || isDescendantPath(targetParentPath, sourcePath)) throw new Error("A node cannot be moved into itself or a descendant");
-    if (targetParentPath !== "" && this.getFolder(targetParentPath) === null) throw new Error(`Unknown target folder: ${targetParentPath}`);
+    if (this.isIgnoredPath(sourcePath)) throw new Error("An unmanaged folder cannot be placed as a Folder Node");
     this.requireCanonicalNote(folder);
+
+    const parentPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
+    if (this.isIgnoredPath(parentPath)) throw new Error("An unmanaged folder cannot contain a placed Folder Node");
+    if (parentPath === sourcePath || isDescendantPath(parentPath, sourcePath)) throw new Error("A node cannot be moved into itself or a descendant");
+    const targetParent = parentPath === "" ? this.app.vault.getRoot() : this.getFolder(parentPath);
+    if (targetParent === null) throw new Error(`Unknown target folder: ${parentPath}`);
+    if (parentPath !== "" && this.getCanonicalFile(parentPath) === null) throw new Error(`Target is not a complete Folder Node: ${parentPath}`);
+
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
-    const nextPath = normalizePath(targetParentPath === "" ? folder.name : `${targetParentPath}/${folder.name}`);
-    if (oldParentPath !== targetParentPath) await this.assertAvailable(nextPath);
+    if (intent.kind === "move-into" && oldParentPath === parentPath) return null;
+
+    const siblings = this.children(parentPath).filter(({ childPath }) => childPath !== sourcePath);
+    if (intent.kind === "move-into") {
+      return { intent: { kind: "move-into", parentPath }, parentPath, targetIndex: this.sortMode(parentPath) === "manual" ? siblings.length : null, siblings };
+    }
+
+    if (this.sortMode(parentPath) !== "manual") throw new Error("Enable manual child ordering before placing a node at an exact position");
+    const gap = {
+      parentPath,
+      previousSiblingPath: intent.gap.previousSiblingPath === null ? null : normalizeVaultPath(intent.gap.previousSiblingPath),
+      nextSiblingPath: intent.gap.nextSiblingPath === null ? null : normalizeVaultPath(intent.gap.nextSiblingPath),
+    };
+    const targetIndex = insertionIndex(siblings.map(({ childPath }) => childPath), gap);
+    if (targetIndex === null) throw new Error("The insertion position is stale; retry the drag");
+    if (oldParentPath === parentPath) {
+      const current = this.children(parentPath).findIndex(({ childPath }) => childPath === sourcePath);
+      if (current === targetIndex) return null;
+    }
+    return { intent: { kind: "insert", gap }, parentPath, targetIndex, siblings };
+  }
+
+  private async placeNodeUnlocked(folder: TFolder, intent: PlacementIntent): Promise<TFolder> {
+    const resolved = this.resolvePlacement(folder, intent);
+    if (resolved === null) return folder;
+    const { parentPath, siblings, targetIndex } = resolved;
+    const sourcePath = normalizeVaultPath(folder.path);
+    const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
+    const nextPath = normalizePath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
+    if (oldParentPath !== parentPath) await this.assertAvailable(nextPath);
 
     const undos: Undo[] = [];
     try {
-      await this.applyPlacementOrder(folder, targetParentPath, targetIndex, undos);
-      if (oldParentPath === targetParentPath) return folder;
+      if (this.sortMode(parentPath) === "manual") {
+        const note = this.requireCanonicalNote(folder);
+        const moved: ChildOrderRecord = { basename: folder.name, childPath: sourcePath, order: this.readRank(note) };
+        const plan = planInsert(siblings, moved, targetIndex ?? siblings.length);
+        await this.applyOrderPatches(plan.patches, folder, undos);
+      }
+      if (oldParentPath === parentPath) return folder;
       this.expectEvent("rename", nextPath, sourcePath, true);
       await this.app.fileManager.renameFile(folder, nextPath);
       undos.push(async () => {
@@ -805,25 +910,16 @@ export class NodeService {
     }
   }
 
-  private async applyPlacementOrder(folder: TFolder, targetParentPath: string, targetIndex: number, undos: Undo[]): Promise<void> {
-    const sourcePath = normalizeVaultPath(folder.path);
-    const siblings = this.children(targetParentPath).filter(({ childPath }) => childPath !== sourcePath);
-    const moved: ChildOrderRecord = { basename: folder.name, childPath: sourcePath, order: this.readRank(this.requireCanonicalNote(folder)) };
-    let patches: readonly OrderPatch[];
-    if (this.sortMode(targetParentPath) === "natural") {
-      const desired = naturalOrder([...siblings, { ...moved, order: null }]);
-      const currentIndex = desired.findIndex(({ childPath }) => childPath === sourcePath);
-      const [record] = currentIndex < 0 ? [] : desired.splice(currentIndex, 1);
-      if (record === undefined) throw new Error(`Unknown child: ${sourcePath}`);
-      desired.splice(Math.max(0, Math.min(targetIndex, desired.length)), 0, record);
-      patches = desired.flatMap((child, index) => {
-        const nextOrder = (index + 1) * 1024;
-        return child.order === nextOrder ? [] : [{ childPath: child.childPath, previousOrder: child.order, nextOrder }];
-      });
-      await this.patchFolderNodesTransactional(this.getCanonicalFile(targetParentPath), { order: "manual" }, undos);
-    } else patches = planReorder([...siblings, moved], sourcePath, targetIndex).patches;
+  private async applyOrderPatches(
+    patches: readonly OrderPatch[],
+    movedFolder: TFolder | null,
+    undos: Undo[],
+  ): Promise<void> {
+    const movedPath = movedFolder === null ? null : normalizeVaultPath(movedFolder.path);
     for (const patch of patches) {
-      const note = patch.childPath === sourcePath ? this.requireCanonicalNote(folder) : this.getCanonicalFile(patch.childPath);
+      const note = movedPath !== null && patch.childPath === movedPath
+        ? this.requireCanonicalNote(movedFolder!)
+        : this.getCanonicalFile(patch.childPath);
       await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos);
     }
   }
@@ -844,15 +940,11 @@ export class NodeService {
 
   private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<void> {
     if (this.sortMode(parentPath) !== "manual") return;
-    const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== note.parent?.path);
-    const max = siblings.reduce((value, child) => Math.max(value, child.order ?? 0), 0);
-    if (max > Number.MAX_SAFE_INTEGER - 1024) {
-      for (const patch of materializeManualOrder(this.children(parentPath)).patches) {
-        await this.patchFolderNodesTransactional(this.getCanonicalFile(patch.childPath), { rank: patch.nextOrder }, undos);
-      }
-      return;
-    }
-    await this.patchFolderNodesTransactional(note, { rank: max + 1024 }, undos);
+    const movedPath = normalizeVaultPath(note.parent?.path ?? "");
+    const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== movedPath);
+    const moved: ChildOrderRecord = { basename: note.parent?.name ?? note.basename, childPath: movedPath, order: this.readRank(note) };
+    const plan = planInsert(siblings, moved, siblings.length);
+    await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos);
   }
 
   private async migrateUnlocked(
@@ -924,7 +1016,13 @@ export class NodeService {
   private canonicalFiles(folderPath: string): TFile[] {
     const folder = this.getFolder(folderPath);
     if (folder === null) return [];
-    return folder.children.filter((entry): entry is TFile => entry instanceof TFile && this.isCanonicalFile(entry));
+    return folder.children.filter((entry): entry is TFile => entry instanceof TFile && this.isCanonicalNameMatch(entry));
+  }
+
+  private isCanonicalNameMatch(file: TFile): boolean {
+    if (file.extension.toLocaleLowerCase() !== "md" || file.parent === null) return false;
+    const expectedName = normalizeVaultPath(file.parent.path) === "" ? sanitizeNodeName(this.app.vault.getName()) : file.parent.name;
+    return isSameVaultName(file.basename, expectedName);
   }
 
   private async pathExists(path: string): Promise<boolean> {

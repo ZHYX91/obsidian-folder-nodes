@@ -10,7 +10,6 @@ import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
 import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
-import { classifyFileIdentity, classifyFolderIdentity } from "../core/identity";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
@@ -40,6 +39,7 @@ import { VisualPickerModal } from "../ui/visual-picker-modal";
 import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
+import { folderNodesMetadataFingerprint } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
 
@@ -58,6 +58,7 @@ export default class FolderNodesPlugin extends Plugin {
   private reconcileErrorCount = 0;
   private reconcileErrorMessages = new Set<string>();
   private readonly unresolvedLinkDocuments = new Set<Document>();
+  private readonly metadataFingerprints = new Map<string, string>();
   private unloaded = false;
   private initialized = false;
   private settingsLoaded = false;
@@ -157,6 +158,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.explorer.start();
       this.reconciliationReady = true;
       this.references.rebuild(this.app.metadataCache.resolvedLinks);
+      this.seedMetadataFingerprints();
       this.app.workspace.iterateAllLeaves((leaf) => this.registerUnresolvedLinkDocument(leaf.view.containerEl.ownerDocument));
       if (this.settings.homepageEnabled && this.settings.openHomepageOnStartup) this.runAction(this.openHomepage());
     });
@@ -179,6 +181,7 @@ export default class FolderNodesPlugin extends Plugin {
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
     this.reconcileBatches.clear();
     this.unresolvedLinkDocuments.clear();
+    this.metadataFingerprints.clear();
     this.runtimeStyles.removeAll();
     if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
     this.reconcileNoticeTimer = null;
@@ -282,17 +285,22 @@ export default class FolderNodesPlugin extends Plugin {
 
   private addProblemMenuItems(menu: Menu, entry: TFolder | TFile): void {
     if (entry instanceof TFolder) {
-      menu.addItem((item) => item.setTitle(t("createMissingNodeNote")).setIcon("file-plus").onClick(() => {
-        void this.runRepair(async () => { await this.service.completeFolder(entry); });
-      }));
+      const conflict = this.service.nodeNoteCandidates(entry.path).length > 1;
+      if (!conflict) {
+        menu.addItem((item) => item.setTitle(t("createMissingNodeNote")).setIcon("file-plus").onClick(() => {
+          void this.runRepair(async () => { await this.service.completeFolder(entry); });
+        }));
+      }
       menu.addItem((item) => item.setTitle(t("contents")).setIcon("layout-grid").onClick(() => this.runAction(this.openContents(entry))));
-      menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setFolderUnmanaged(entry.path)));
+      if (!conflict) menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setFolderUnmanaged(entry.path)));
     } else {
       menu.addItem((item) => item.setTitle(t("open")).setIcon("file").onClick(() => this.runAction(this.app.workspace.getLeaf(false).openFile(entry))));
-      menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
-        void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
-      }));
-      menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setLeafUnmanaged(entry.path)));
+      if (this.service.nodeNoteRole(entry) !== "conflict") {
+        menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
+          void this.runRepair(async () => { await this.service.convertLeafNote(entry); });
+        }));
+        menu.addItem((item) => item.setTitle(t("setUnmanaged")).setIcon("shield-off").onClick(() => void this.setLeafUnmanaged(entry.path)));
+      }
     }
   }
 
@@ -426,16 +434,19 @@ export default class FolderNodesPlugin extends Plugin {
 
   private registerEvents(): void {
     this.registerEvent(this.app.vault.on("create", (entry) => {
+      if (entry instanceof TFile) this.metadataFingerprints.set(entry.path, this.metadataFingerprint(entry));
       if (this.service.consumeExpectedEvent("create", entry.path)) { this.refreshVisuals(entry.path); return; }
       this.scheduleReconcile(entry.path, "create");
     }));
     this.registerEvent(this.app.vault.on("delete", (entry) => {
+      this.removeMetadataFingerprints(entry.path, entry instanceof TFolder);
       const affected = this.references.removeSource(entry.path);
       for (const path of affected) this.refreshVisuals(path, "reference");
       if (this.service.consumeExpectedEvent("delete", entry.path)) { this.refreshVisuals(entry.path); return; }
       this.scheduleReconcile(entry.path, "delete");
     }));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
+      this.remapMetadataFingerprints(entry.path, oldPath, entry instanceof TFolder);
       this.remapUnmanagedPaths(entry, oldPath);
       const affected = this.references.removeSource(oldPath);
       for (const path of affected) this.refreshVisuals(path, "reference");
@@ -470,13 +481,46 @@ export default class FolderNodesPlugin extends Plugin {
     }));
     this.registerEvent(this.app.metadataCache.on("changed", (file) => {
       const affected = this.references.updateSource(file.path, this.app.metadataCache.resolvedLinks[file.path] ?? {});
-      this.refreshVisuals(file.path, "metadata");
+      const nextFingerprint = this.metadataFingerprint(file);
+      const previousFingerprint = this.metadataFingerprints.get(file.path);
+      this.metadataFingerprints.set(file.path, nextFingerprint);
+      if (previousFingerprint !== nextFingerprint) this.refreshVisuals(file.path, "metadata");
       for (const path of affected) this.refreshVisuals(path, "reference");
     }));
     this.registerEvent(this.app.metadataCache.on("resolved", () => {
       this.references.rebuild(this.app.metadataCache.resolvedLinks);
+      this.seedMetadataFingerprints();
       this.refreshVisuals();
     }));
+  }
+
+  private metadataFingerprint(file: TFile): string {
+    return folderNodesMetadataFingerprint(this.app.metadataCache.getFileCache(file)?.frontmatter);
+  }
+
+  private seedMetadataFingerprints(): void {
+    this.metadataFingerprints.clear();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      this.metadataFingerprints.set(file.path, this.metadataFingerprint(file));
+    }
+  }
+
+  private removeMetadataFingerprints(path: string, recursive: boolean): void {
+    const normalized = normalizeVaultPath(path);
+    for (const key of [...this.metadataFingerprints.keys()]) {
+      if (key === normalized || (recursive && key.startsWith(`${normalized}/`))) this.metadataFingerprints.delete(key);
+    }
+  }
+
+  private remapMetadataFingerprints(newPath: string, oldPath: string, recursive: boolean): void {
+    const normalizedNew = normalizeVaultPath(newPath);
+    const normalizedOld = normalizeVaultPath(oldPath);
+    for (const [key, fingerprint] of [...this.metadataFingerprints]) {
+      if (key !== normalizedOld && (!recursive || !key.startsWith(`${normalizedOld}/`))) continue;
+      this.metadataFingerprints.delete(key);
+      const suffix = key.slice(normalizedOld.length);
+      this.metadataFingerprints.set(`${normalizedNew}${suffix}`, fingerprint);
+    }
   }
 
   private scheduleReconcile(path: string, kind: "create" | "delete"): void {
@@ -590,29 +634,17 @@ export default class FolderNodesPlugin extends Plugin {
   private addContextMenu(menu: Menu, entry: TAbstractFile): void {
     if (!(entry instanceof TFile) && !(entry instanceof TFolder)) return;
     if (entry instanceof TFolder) {
-      const identity = classifyFolderIdentity(
-        this.service.isIgnoredPath(entry.path),
-        this.service.isIgnoredRootPath(entry.path),
-        this.service.getCanonicalFile(entry.path) !== null,
-      );
+      const identity = this.service.folderIdentity(entry.path);
       if (identity === "ordinary") return;
       menu.addSeparator();
       if (identity === "unmanaged") menu.addItem((item) => item.setTitle(t("manageAgain")).setIcon("shield-check").onClick(() => void this.manageFolder(entry.path)));
-      else if (identity === "incomplete") this.addProblemMenuItems(menu, entry);
+      else if (identity === "incomplete" || identity === "conflict") this.addProblemMenuItems(menu, entry);
       else this.addNativeNodeMenuItems(menu, entry, "native-folder");
       return;
     }
     const folder = this.service.folderForFile(entry);
     if (folder === null) return;
-    const counterpartPath = folder.path === "" ? entry.basename : `${folder.path}/${entry.basename}`;
-    const counterpart = this.service.getFolder(counterpartPath);
-    const identity = classifyFileIdentity({
-      canonicalNodeNote: this.service.isCanonicalFile(entry),
-      counterpartNodeExists: counterpart !== null && this.service.getCanonicalFile(counterpart.path) !== null,
-      parentUnmanaged: this.service.isIgnoredPath(folder.path),
-      leafExempt: this.service.isLeafNoteExempt(entry.path),
-      markdown: entry.extension.toLocaleLowerCase() === "md",
-    });
+    const identity = this.service.fileIdentity(entry);
     if (identity === "node-note") {
       menu.addSeparator();
       this.addNativeNodeMenuItems(menu, folder, "native-note");
@@ -696,6 +728,15 @@ export default class FolderNodesPlugin extends Plugin {
       }
     }
     actions.push({ id: "create-child", group: "structure", icon: "folder-plus", title: t("createChild"), run: () => this.promptCreateChild(folder) });
+    const childOrder = this.service.sortMode(folder.path);
+    actions.push({
+      id: "child-order",
+      group: "structure",
+      icon: childOrder === "manual" ? "list-ordered" : "arrow-down-a-z",
+      title: childOrder === "manual" ? t("childOrderManual") : t("childOrderNatural"),
+      disabled: !hasNote,
+      run: () => this.runRepair(() => this.service.setChildOrderMode(folder.path, childOrder === "manual" ? "natural" : "manual")),
+    });
     if (!root) {
       actions.push(
         { id: "rename", group: "structure", icon: "pencil", title: t("rename"), run: () => this.promptRename(folder) },

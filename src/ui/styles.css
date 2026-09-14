@@ -314,7 +314,7 @@ body {
 }
 .folder-nodes-hidden-node { display: none !important; }
 .folder-nodes-hidden-inherited { opacity: 0.62; }
-.folder-nodes-hidden-status { pointer-events: none; }
+.folder-nodes-hidden-status { margin-inline-start: auto; pointer-events: none; }
 .folder-nodes-node-shell > .folder-nodes-hidden-status {
   position: absolute;
   z-index: 1;
@@ -339,10 +339,10 @@ body {
   column-gap: var(--size-2-3);
   padding: var(--size-2-2) var(--size-2-3);
   margin: var(--size-2-2) 6px var(--size-4-2);
-  border: 1px solid var(--background-modifier-border);
+  border: 0;
   border-radius: var(--radius-s);
-  background: color-mix(in srgb, var(--background-secondary) 82%, var(--background-primary));
-  box-shadow: inset 3px 0 var(--interactive-accent);
+  background: transparent;
+  box-shadow: none;
   color: var(--text-normal);
   cursor: pointer;
 }
@@ -354,6 +354,8 @@ body {
 .folder-nodes-explorer-root:hover { background: var(--nav-item-background-hover); }
 .folder-nodes-explorer-root.is-active { background: var(--nav-item-background-active); color: var(--nav-item-color-active); }
 .folder-nodes-explorer-root.is-missing { box-shadow: inset 3px 0 var(--color-orange); }
+.folder-nodes-explorer-root.is-conflict { box-shadow: inset 3px 0 var(--color-red); }
+.folder-nodes-explorer-root-badge.is-conflict { color: var(--color-red); border-color: color-mix(in srgb, var(--color-red) 35%, var(--background-modifier-border)); }
 .folder-nodes-explorer-root-icon {
   display: grid;
   inline-size: 22px;
@@ -382,11 +384,11 @@ body {
   justify-self: end;
   min-block-size: 20px;
   align-items: center;
-  padding-inline: 7px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 999px;
-  background: var(--background-primary);
-  color: var(--text-muted);
+  padding-inline: 4px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-medium);
   line-height: 1;
@@ -473,9 +475,11 @@ body {
 
 .folder-nodes-explorer-repair {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  margin-inline-start: 2px;
+  width: 30px;
+  height: 30px;
+  margin-block: -4px;
+  margin-inline-start: 0;
+  padding: 7px;
   opacity: 0;
 }
 
