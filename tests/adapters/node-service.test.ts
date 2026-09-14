@@ -483,11 +483,61 @@ describe("NodeService structural safety", () => {
     const c = fake.addFolder("C");
     fake.addFile("C/C.md");
     const nodes = service(fake);
-    expect((await nodes.placeNode(a, "Parent", 0)).path).toBe("Parent/A");
-    expect(fake.frontmatters.get("Parent/Parent.md")?.["folder-nodes"]).toEqual(["order=manual"]);
+    expect((await nodes.moveNode(a, "Parent")).path).toBe("Parent/A");
+    expect(nodes.sortMode("Parent")).toBe("natural");
+    expect(fake.frontmatters.get("Parent/Parent.md")?.["folder-nodes"]).toBeUndefined();
+    await nodes.setChildOrderMode("", "manual");
     await nodes.reorder(c, -1);
     expect(nodes.sortMode("")).toBe("manual");
     expect(nodes.children("")[0]?.childPath).toBe("C");
+  });
+
+  it("does not change sorting mode for a structural move into a natural parent", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFolder("Parent");
+    fake.addFile("Parent/Parent.md");
+    const child = fake.addFolder("Child");
+    fake.addFile("Child/Child.md", "", { "folder-nodes": ["rank=4096"] });
+    const nodes = service(fake);
+
+    await nodes.moveNode(child, "Parent");
+
+    expect(child.path).toBe("Parent/Child");
+    expect(nodes.sortMode("Parent")).toBe("natural");
+    expect(fake.frontmatters.get("Parent/Parent.md")?.["folder-nodes"]).toBeUndefined();
+  });
+
+  it("requires an explicit manual mode before exact placement", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const a = fake.addFolder("A");
+    fake.addFile("A/A.md");
+    const b = fake.addFolder("B");
+    fake.addFile("B/B.md");
+    const nodes = service(fake);
+    const gap = { parentPath: "", previousSiblingPath: null, nextSiblingPath: "A" };
+
+    expect(nodes.previewPlacement("B", { kind: "insert", gap }).kind).toBe("blocked");
+    await nodes.setChildOrderMode("", "manual");
+    expect(nodes.previewPlacement("B", { kind: "insert", gap }).kind).toBe("ready");
+    await nodes.placeNode(b, { kind: "insert", gap });
+    expect(nodes.children("").map(({ childPath }) => childPath).slice(0, 2)).toEqual(["B", "A"]);
+    expect(nodes.canReorder(a, -1)).toBe(true);
+  });
+
+  it("treats moving into the current parent as a true no-op", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const child = fake.addFolder("Child");
+    fake.addFile("Child/Child.md");
+    const rename = fake.app.fileManager.renameFile;
+    const nodes = service(fake);
+
+    expect(nodes.previewPlacement("Child", { kind: "move-into", parentPath: "" })).toEqual({ kind: "noop" });
+    await nodes.moveNode(child, "");
+    expect(fake.app.fileManager.renameFile).toBe(rename);
+    expect(nodes.sortMode("")).toBe("natural");
   });
 
   it("merges a concurrent closed-file edit into structural metadata", async () => {
@@ -495,7 +545,7 @@ describe("NodeService structural safety", () => {
     fake.addFile("Vault.md");
     fake.addFolder("Parent");
     fake.addFile("Parent/Parent.md", "---\ntitle: Parent\n---\nBody", { title: "Parent" });
-    const child = fake.addFolder("Child");
+    fake.addFolder("Child");
     fake.addFile("Child/Child.md", "# Child");
     const originalProcess = fake.app.vault.process.bind(fake.app.vault);
     let injected = false;
@@ -507,7 +557,7 @@ describe("NodeService structural safety", () => {
       return originalProcess(file, update);
     };
 
-    await service(fake).placeNode(child, "Parent", 0);
+    await service(fake).setChildOrderMode("Parent", "manual");
 
     expect(fake.contents.get("Parent/Parent.md")).toContain("External edit");
     expect(fake.contents.get("Parent/Parent.md")).toContain(
@@ -524,7 +574,7 @@ describe("NodeService structural safety", () => {
       "---\ntitle: Parent\n---\nStale disk body",
       { title: "Parent" },
     );
-    const child = fake.addFolder("Child");
+    fake.addFolder("Child");
     fake.addFile("Child/Child.md", "# Child");
     let editorContent = "---\ntitle: Parent\n---\nUnsaved editor body";
     const editor = {
@@ -540,7 +590,7 @@ describe("NodeService structural safety", () => {
     };
     fake.app.workspace.getLeavesOfType = vi.fn(() => [leaf] as never);
 
-    await service(fake).placeNode(child, "Parent", 0);
+    await service(fake).setChildOrderMode("Parent", "manual");
 
     expect(editorContent).toContain("Unsaved editor body");
     expect(editorContent).toContain("folder-nodes:\n  - order=manual");
@@ -555,7 +605,7 @@ describe("NodeService structural safety", () => {
     fake.addFile("Vault.md");
     fake.addFolder("Parent");
     fake.addFile("Parent/Parent.md", "---\ntitle: Parent\n---\nOriginal", { title: "Parent" });
-    const child = fake.addFolder("Child");
+    fake.addFolder("Child");
     fake.addFile("Child/Child.md", "# Child");
     const originalProcess = fake.app.vault.process.bind(fake.app.vault);
     fake.app.vault.process = async (file, update) => {
@@ -568,7 +618,7 @@ describe("NodeService structural safety", () => {
       return originalProcess(file, update);
     };
 
-    await expect(service(fake).placeNode(child, "Parent", 0))
+    await expect(service(fake).setChildOrderMode("Parent", "manual"))
       .rejects.toThrow("identity changed");
     expect(fake.contents.get("Parent/Parent.md")).toContain("External");
     expect(fake.files.has("Child")).toBe(true);
@@ -591,7 +641,7 @@ describe("NodeService structural safety", () => {
       }
     };
 
-    await expect(service(fake).placeNode(child, "Parent", 0))
+    await expect(service(fake).moveNode(child, "Parent"))
       .rejects.toThrow("rollback was incomplete");
     expect(fake.contents.get("Parent/Child/Child.md")).toBe("# Replacement child");
     expect(fake.files.has("Child")).toBe(false);

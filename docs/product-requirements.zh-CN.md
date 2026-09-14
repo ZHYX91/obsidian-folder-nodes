@@ -11,13 +11,13 @@ translation_status: source
 
 ## Folder Nodes 属性与排序
 
-Folder Nodes 只拥有一个名为 `folder-nodes` 的扁平 Text List。它只包含非默认 `key=value` token：父 Node Note 上的 `order=manual`、每个直接 Child Node Note 上形如 `rank=1024` 的稀疏正整数，以及隐藏子树根上的 `hidden=true`。token 的规范顺序是 order、rank、hidden，并保留语法有效的未知未来 token。自然名称排序、缺少 rank 和可见状态都不写入；空列表会被删除。自然排序使用规范化名称。通常一次手动排序只写移动的 Child；局部 rebalance 最多 64 个节点。缺失或重复 rank 使用规范化 basename 与 path 作确定性 tie-break；重命名保留已有 rank，手动模式中新建的 Child 默认追加到末尾。
+Folder Nodes 只拥有一个名为 `folder-nodes` 的扁平 Text List。它只包含非默认 `key=value` token：父 Node Note 上的 `order=manual`、每个直接 Child Node Note 上形如 `rank=1024` 的稀疏正整数，以及隐藏子树根上的 `hidden=true`。token 的规范顺序是 order、rank、hidden，并保留语法有效的未知未来 token。自然名称排序、缺少 rank 和可见状态都不写入；空列表会被删除。自然排序使用规范化名称。手动排序必须由用户在父节点上显式启用。存在安全 rank 空隙时，普通手动 placement 只写移动的 Child；否则先固定目标序列，再对该父节点完整重编号。缺失或重复 rank 的读取仍保持确定，但只有显式排序动作才会修复它们；重命名保留当前有效 rank，手动模式中新建的 Child 默认追加到末尾。
 
 已经公开的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 继续兼容读取。“管理”中的显式动作只读扫描所有 Markdown，报告新属性、旧字段、冗余双写、冲突、非规范 Node Note 及无效 icon 声明，再预览精确迁移目标；启动时绝不迁移。提交会重新扫描并核对每个目标指纹，保留无关 frontmatter、正文、BOM、换行符和未知未来 token，完成后验证，失败时按原文精确回滚。新旧值等价时可以规范化；冲突、无效、重复、畸形或预览后已改变的输入全部失败关闭。提交迁移前，用户必须先更新所有设备。
 
 ## 节点操作
 
-用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。桌面端 Explorer 与 Contents 子节点卡片的拖拽统一表示 before、into、after：同父节点是 reorder，跨父节点是 reparent 加 reorder；Android 不启用 HTML5 拖放，使用 Obsidian 原生移动文件夹和插件的 Move/Move up/Move down 动作。原生跨父级移动完成后，插件会为手动排序的目标父级重新分配该子节点的稀疏 rank，不能把来源父级的旧 rank 直接带入。所有结构写入必须串行，rename/move 必须使用 Obsidian FileManager；多步写入必须预检查并在失败时 rollback。冲突、循环移动和有歧义的 merge 必须失败关闭。Obsidian 原生“新建文件夹”和“新建笔记”与“新建节点”保持可见：前两者创建不完整的文件夹侧或 Markdown 侧，“新建节点”原子创建完整配对。文件列表中的文件夹移动/删除作用于整个子树；Node Note 标签页的移动/删除/合并只作用于 Markdown，可以留下不完整文件夹。重命名是同步例外：重命名已有 Node Note 或其文件夹都会更新另一侧。标签页另有明确标为“所在节点”的整节点动作。Root 不允许作为完整节点被重命名、移动或删除。Folder Nodes 创建空白 Node Note；内容模板交给专用模板插件。
+用户可以创建、重命名、移动、合并、安全删除和排序完整 Node。桌面端 Explorer 与 Contents 将结构移入和精确同级排序视为两种明确意图：拖入节点中央只改变父级；只有目标父节点已显式启用手动“子节点排序”时，边缘插入才调整同级位置。等价的 A 后方与 B 前方统一为同一个逻辑间隙和同一条插入指示。自然排序目标不会因普通移入而隐式改成手动；手动目标中的跨父级移入会为移动节点分配目标末尾 rank，不能直接沿用来源 rank。Android 不启用 HTML5 拖放，使用 Obsidian 原生移动文件夹和插件的 Move/Move up/Move down 动作。所有结构写入必须串行，rename/move 必须使用 Obsidian FileManager；多步写入必须预检查并在失败时 rollback。冲突、循环移动和有歧义的 merge 必须失败关闭。Obsidian 原生“新建文件夹”和“新建笔记”与“新建节点”保持可见：前两者创建不完整的文件夹侧或 Markdown 侧，“新建节点”原子创建完整配对。文件列表中的文件夹移动/删除作用于整个子树；Node Note 标签页的移动/删除/合并只作用于 Markdown，可以留下不完整文件夹。重命名是同步例外：重命名已有 Node Note 或其文件夹都会更新另一侧。标签页另有明确标为“所在节点”的整节点动作。Root 不允许作为完整节点被重命名、移动或删除。Folder Nodes 创建空白 Node Note；内容模板交给专用模板插件。
 
 ## 选区创建
 

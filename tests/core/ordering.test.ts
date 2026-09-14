@@ -20,10 +20,10 @@ describe("distributed sparse ordering", () => {
     const plan = materializeManualOrder(children.map((item) => ({ ...item, order: null })));
     expect(plan.patches.map((patch) => patch.nextOrder)).toEqual([ORDER_GAP, ORDER_GAP * 2, ORDER_GAP * 3]);
   });
-  it("performs bounded rebalance with no gap", () => {
+  it("re-ranks the desired sequence when no safe gap exists", () => {
     const crowded = children.map((item, index) => ({ ...item, order: index + 1 }));
     const plan = planReorder(crowded, "P/C", 1);
-    expect(plan.patches.length).toBeLessThanOrEqual(64);
     expect(plan.orderedPaths).toEqual(["P/A", "P/C", "P/B"]);
+    expect(plan.patches.map(({ nextOrder }) => nextOrder)).toEqual([ORDER_GAP, ORDER_GAP * 2, ORDER_GAP * 3]);
   });
 });

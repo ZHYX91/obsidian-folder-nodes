@@ -23,10 +23,10 @@ describe("ExplorerAdapter lifecycle", () => {
       },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, isCanonicalFile: () => false,
+      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, nodeNoteCandidates: () => [], nodeNoteRole: () => "none", folderIdentity: () => "ordinary", fileIdentity: () => "ordinary", isCanonicalFile: () => false,
       isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md",
-      openFolderNode: async () => undefined, placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
-      revealingHiddenNodes: () => false,
+      openFolderNode: async () => undefined, previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
     } as unknown as NodeService;
     const toggleHidden = vi.fn();
     const adapter = new ExplorerAdapter(
@@ -76,9 +76,9 @@ describe("ExplorerAdapter lifecycle", () => {
       workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonicalFile, isCanonicalFile: () => false,
+      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonicalFile, nodeNoteCandidates: () => canonicalFile === null ? [] : [canonicalFile], nodeNoteRole: () => "none", folderIdentity: () => ignored ? "unmanaged" : canonicalFile === null ? "incomplete" : "node", fileIdentity: () => "ordinary", isCanonicalFile: () => false,
       isIgnoredPath: () => ignored, isIgnoredRootPath: () => ignored, isLeafNoteExempt: () => false, notePathForFolder: () => "Hidden/Hidden.md",
-      openFolderNode: async () => undefined, placeNodeRelative: async () => folder, rootNotePath: () => "Vault.md",
+      openFolderNode: async () => undefined, previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => folder, rootNotePath: () => "Vault.md",
       hiddenState: () => ({ explicit, sourcePath: "Hidden", unmanaged: ignored }), isNodeVisible: () => ignored || reveal, revealingHiddenNodes: () => reveal,
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
@@ -140,10 +140,10 @@ describe("ExplorerAdapter lifecycle", () => {
       workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonical,
+      children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonical, nodeNoteCandidates: () => [canonical], nodeNoteRole: (file: TFile) => file === canonical ? "unique" : "none", folderIdentity: () => "node", fileIdentity: () => "ordinary",
       isCanonicalFile: (file: TFile) => file === canonical, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
-      isLeafNoteExempt: () => false, isNodeVisible: () => true, notePathForFolder: () => canonical.path,
-      openFolderNode: async () => undefined, placeNodeRelative: async () => folder, rootNotePath: () => "Vault.md",
+      isLeafNoteExempt: () => false, hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false, notePathForFolder: () => canonical.path,
+      openFolderNode: async () => undefined, previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => folder, rootNotePath: () => "Vault.md",
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
@@ -200,14 +200,19 @@ describe("ExplorerAdapter lifecycle", () => {
       getFolder: (path: string) => path === folder.path ? folder : null,
       getFile: () => null,
       getCanonicalFile: (path: string) => path === folder.path ? file : null,
+      nodeNoteCandidates: (path: string) => path === folder.path ? [file] : [],
+      nodeNoteRole: (candidate: TFile) => candidate === file ? "unique" : "none",
+      folderIdentity: () => "node", fileIdentity: () => "ordinary",
       isCanonicalFile: () => false,
       isIgnoredPath: () => false,
       isIgnoredRootPath: () => false,
       isLeafNoteExempt: () => false,
       notePathForFolder: () => "Vault.md",
       openFolderNode: async () => undefined,
-      placeNodeRelative: async () => folder,
+      previewPlacement: () => ({ kind: "blocked", reason: "test" }),
+      placeNode: async () => folder,
       rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app,
@@ -253,9 +258,10 @@ describe("ExplorerAdapter lifecycle", () => {
       },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, isCanonicalFile: () => false, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
+      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => null, nodeNoteCandidates: () => [], nodeNoteRole: () => "none", folderIdentity: () => "ordinary", fileIdentity: () => "ordinary", isCanonicalFile: () => false, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
       isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md", openFolderNode: async () => undefined,
-      placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
@@ -283,6 +289,97 @@ describe("ExplorerAdapter lifecycle", () => {
     root.remove();
   });
 
+
+  it("keeps conflicting canonical candidates visible and labels the folder conflict", () => {
+    const root = document.createElement("div");
+    root.createDiv({ cls: "nav-files-container" });
+    const folderRow = root.createDiv({ cls: "nav-folder" });
+    const folderTitle = folderRow.createDiv({ cls: "nav-folder-title", attr: { "data-path": "A" } });
+    folderTitle.createSpan({ cls: "nav-folder-title-content", text: "A" });
+    const upperTitle = root.createDiv({ cls: "nav-file-title", attr: { "data-path": "A/A.md" } });
+    const lowerTitle = root.createDiv({ cls: "nav-file-title", attr: { "data-path": "A/a.md" } });
+    document.body.append(root);
+
+    const folder = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "A", path: "A" });
+    const upper = Object.assign(new TFile(), { basename: "A", extension: "md", name: "A.md", parent: folder, path: "A/A.md" });
+    const lower = Object.assign(new TFile(), { basename: "a", extension: "md", name: "a.md", parent: folder, path: "A/a.md" });
+    folder.children.push(upper, lower);
+    const files = new Map<string, TFile | TFolder>([[folder.path, folder], [upper.path, upper], [lower.path, lower]]);
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => files.get(path) ?? null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: (path: string) => path === folder.path ? folder : null, getFile: (path: string) => files.get(path) instanceof TFile ? files.get(path) : null,
+      getCanonicalFile: () => null, nodeNoteCandidates: (path: string) => path === folder.path ? [upper, lower] : [],
+      nodeNoteRole: (file: TFile) => file === upper || file === lower ? "conflict" : "none", folderIdentity: () => "conflict", fileIdentity: (file: TFile) => file === upper || file === lower ? "conflict" : "ordinary", isCanonicalFile: () => false,
+      isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: (path: string) => `${path}/${path}.md`,
+      openFolderNode: async () => undefined, previewPlacement: () => ({ kind: "blocked", reason: "conflict" }), placeNode: async () => folder, rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete", incompleteStatus: "Incomplete", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Two canonical candidates", conflictStatus: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    expect(folderTitle.querySelector(".folder-nodes-status-badge.is-conflict")?.textContent).toBe("Conflict");
+    expect(folderTitle.querySelector(".folder-nodes-explorer-repair")).toBeNull();
+    expect(upperTitle.classList.contains("folder-nodes-canonical-note")).toBe(false);
+    expect(lowerTitle.classList.contains("folder-nodes-canonical-note")).toBe(false);
+    expect(upperTitle.querySelector(".folder-nodes-status-badge.is-conflict")?.textContent).toBe("Conflict");
+    expect(lowerTitle.querySelector(".folder-nodes-status-badge.is-conflict")?.textContent).toBe("Conflict");
+
+    adapter.stop();
+    root.remove();
+  });
+
+  it("settles after rendering an explicit hidden status instead of self-triggering forever", async () => {
+    const root = document.createElement("div");
+    root.createDiv({ cls: "nav-files-container" });
+    const row = root.createDiv({ cls: "nav-folder" });
+    const title = row.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Hidden" } });
+    title.createSpan({ cls: "nav-folder-title-content", text: "Hidden" });
+    document.body.append(root);
+    const folder = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "Hidden", path: "Hidden" });
+    const note = Object.assign(new TFile(), { basename: "Hidden", extension: "md", name: "Hidden.md", parent: folder, path: "Hidden/Hidden.md" });
+    folder.children.push(note);
+    const hiddenState = vi.fn(() => ({ explicit: true, sourcePath: "Hidden", unmanaged: false }));
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => path === folder.path ? folder : null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: (path: string) => path === folder.path ? folder : null, getFile: () => null, getCanonicalFile: () => note,
+      nodeNoteCandidates: () => [note], nodeNoteRole: (file: TFile) => file === note ? "unique" : "none", folderIdentity: () => "node", fileIdentity: () => "ordinary", isCanonicalFile: (file: TFile) => file === note,
+      isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: () => note.path,
+      hiddenState, isNodeVisible: () => true, revealingHiddenNodes: () => true, openFolderNode: async () => undefined,
+      previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => folder, rootNotePath: () => "Vault.md",
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged", hiddenNode: "Hidden", hiddenNodeDetail: "Hidden subtree" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    await new Promise((resolve) => window.setTimeout(resolve, 160));
+    const settledCalls = hiddenState.mock.calls.length;
+    const badge = title.querySelector(".folder-nodes-hidden-status");
+    expect(badge).not.toBeNull();
+    await new Promise((resolve) => window.setTimeout(resolve, 160));
+    expect(hiddenState.mock.calls.length).toBe(settledCalls);
+    expect(title.querySelector(".folder-nodes-hidden-status")).toBe(badge);
+
+    adapter.stop();
+    root.remove();
+  });
+
   it("observes late inline-title creation and keeps the icon outside editable title text", async () => {
     const explorerRoot = document.createElement("div");
     explorerRoot.createDiv({ cls: "nav-files-container" });
@@ -300,9 +397,10 @@ describe("ExplorerAdapter lifecycle", () => {
       },
     } as unknown as App;
     const service = {
-      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => file, isCanonicalFile: () => true, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
+      children: () => [], getFolder: () => null, getFile: () => null, getCanonicalFile: () => file, nodeNoteCandidates: () => [file], nodeNoteRole: (candidate: TFile) => candidate === file ? "unique" : "none", folderIdentity: () => "ordinary", fileIdentity: (candidate: TFile) => candidate === file ? "node-note" : "ordinary", isCanonicalFile: () => true, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
       isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md", openFolderNode: async () => undefined,
-      placeNodeRelative: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
