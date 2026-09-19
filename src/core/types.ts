@@ -1,7 +1,6 @@
 import type { EmojiFontPreference } from "./emoji-font";
 
 export type SortMode = "natural" | "manual";
-export type NodeDropZone = "before" | "into" | "after";
 export type InterfaceLanguage = "auto" | "zh-CN" | "en";
 export type ExplorerIconPosition = "before" | "after" | "hidden";
 export type NodeGraphDimension = "2d" | "3d";

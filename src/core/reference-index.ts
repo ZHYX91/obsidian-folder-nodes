@@ -18,6 +18,11 @@ export class ReferenceIndex {
     const source = normalizeVaultPath(sourcePath);
     const affected = new Set<string>();
     const previous = this.sources.get(source);
+    const next = new Map<string, number>();
+    for (const [rawPath, rawCount] of Object.entries(targets)) {
+      if (Number.isFinite(rawCount) && rawCount > 0) next.set(normalizeVaultPath(rawPath), rawCount);
+    }
+    if (next.size === (previous?.size ?? 0) && [...next].every(([path, count]) => previous?.get(path) === count)) return affected;
     if (previous !== undefined) {
       for (const [path, count] of previous) {
         affected.add(path);
@@ -27,13 +32,9 @@ export class ReferenceIndex {
         if (incoming?.size === 0) this.incomingSources.delete(path);
       }
     }
-    const next = new Map<string, number>();
-    for (const [rawPath, rawCount] of Object.entries(targets)) {
-      if (!Number.isFinite(rawCount) || rawCount <= 0) continue;
-      const path = normalizeVaultPath(rawPath);
-      next.set(path, rawCount);
+    for (const [path, count] of next) {
       affected.add(path);
-      this.adjust(path, rawCount);
+      this.adjust(path, count);
       const incoming = this.incomingSources.get(path) ?? new Set<string>();
       incoming.add(source);
       this.incomingSources.set(path, incoming);

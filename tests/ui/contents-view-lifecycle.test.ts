@@ -16,15 +16,22 @@ function createView(): FolderNodeContentsView {
   const service = {
     children: () => [],
     getCanonicalFile: () => null,
+    nodeNoteCandidates: () => [],
+    nodeNoteRole: () => "none" as const,
+    folderIdentity: () => "incomplete" as const,
+    fileIdentity: () => "ordinary" as const,
     getFile: () => null,
     getFolder: () => null,
     isCanonicalFile: () => false,
     isIgnoredPath: () => false,
     isIgnoredRootPath: () => false,
+    hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }),
+    isNodeVisible: () => true, revealingHiddenNodes: () => false,
     isLeafNoteExempt: () => false,
     moveFile: vi.fn(async () => undefined),
     notePathForFolder: () => "Root.md",
     openFolderNode: vi.fn(async () => undefined),
+    previewPlacement: () => ({ kind: "blocked" as const, reason: "test" }),
     placeNode: vi.fn(async (folder: TFolder) => folder),
   };
   const actions = {
@@ -66,11 +73,14 @@ describe("Node Contents render extension lifecycle", () => {
         { basename: "Visible", childPath: "Visible", order: null },
         { basename: "Hidden", childPath: "Hidden", order: null },
       ], getCanonicalFile: (path: string) => notes.get(path) ?? null,
+      nodeNoteCandidates: (path: string) => notes.has(path) ? [notes.get(path)!] : [], nodeNoteRole: () => "none" as const,
+      folderIdentity: (path: string) => notes.has(path) ? "node" as const : "incomplete" as const, fileIdentity: () => "ordinary" as const,
       getFile: () => null, getFolder: (path: string) => path === "Visible" ? visible : path === "Hidden" ? hidden : null,
       isCanonicalFile: () => false, isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false,
       hiddenState: (path: string) => ({ explicit: path === "Hidden", sourcePath: path === "Hidden" ? "Hidden" : null, unmanaged: false }),
       isNodeVisible: (path: string) => path !== "Hidden" || reveal, revealingHiddenNodes: () => reveal,
-      moveFile: vi.fn(async () => undefined), notePathForFolder: () => "Vault.md", openFolderNode: vi.fn(async () => undefined), placeNode: vi.fn(async (folder: TFolder) => folder),
+      moveFile: vi.fn(async () => undefined), notePathForFolder: () => "Vault.md", openFolderNode: vi.fn(async () => undefined),
+      previewPlacement: () => ({ kind: "blocked" as const, reason: "test" }), placeNode: vi.fn(async (folder: TFolder) => folder),
     };
     const actions = {
       createChild: vi.fn(), createMissingNote: vi.fn(), editVisual: vi.fn(), entryMenu: vi.fn(), homepageEnabled: () => false,
@@ -97,9 +107,16 @@ describe("Node Contents render extension lifecycle", () => {
       section.open = false;
       section.dispatchEvent(new Event("toggle"));
     }
+    document.body.append(view.containerEl);
+    const visibleCard = view.contentEl.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='node:Visible']");
+    visibleCard?.focus();
+    view.contentEl.scrollTop = 73;
     view.refresh();
     expect(view.contentEl.querySelector<HTMLDetailsElement>(".folder-nodes-section")?.open).toBe(false);
+    expect(view.contentEl.ownerDocument.activeElement?.getAttribute("data-folder-nodes-focus-key")).toBe("node:Visible");
+    expect(view.contentEl.scrollTop).toBe(73);
     await view.onClose();
+    view.containerEl.remove();
   });
 
   it("uses one unified empty state instead of three zero-count disclosure rows", async () => {
@@ -122,10 +139,13 @@ describe("Node Contents render extension lifecycle", () => {
     const app = { vault: { getAbstractFileByPath: () => null, getName: () => "Vault", getRoot: () => root }, workspace: { activeEditor: null } };
     const service = {
       children: () => [], getCanonicalFile: (path: string) => path === b.path ? note : null,
+      nodeNoteCandidates: (path: string) => path === b.path ? [note] : [], nodeNoteRole: (file: TFile) => file === note ? "unique" as const : "none" as const,
+      folderIdentity: (path: string) => path === b.path ? "node" as const : "incomplete" as const, fileIdentity: (file: TFile) => file === note ? "node-note" as const : "ordinary" as const,
       getFile: () => null, getFolder: (path: string) => path === a.path ? a : path === b.path ? b : null,
       isCanonicalFile: (file: TFile) => file === note, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
       isLeafNoteExempt: () => false, moveFile: vi.fn(async () => undefined), notePathForFolder: () => note.path,
-      openFolderNode, placeNode: vi.fn(async (folder: TFolder) => folder),
+      openFolderNode, previewPlacement: () => ({ kind: "blocked" as const, reason: "test" }), placeNode: vi.fn(async (folder: TFolder) => folder),
     };
     const actions = {
       createChild: vi.fn(), createMissingNote: vi.fn(), editVisual: vi.fn(), entryMenu: vi.fn(), homepageEnabled: () => false,

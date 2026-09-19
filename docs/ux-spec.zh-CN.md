@@ -23,7 +23,7 @@ translation_status: source
 
 ## Explorer Node Tree
 
-File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。普通 Folder Node 的 canonical Node Note 行隐藏。完整节点若除该隐藏笔记外没有可见直接子项，原 disclosure 等宽位置显示 4px、低强调、`aria-hidden` 且不可点击/聚焦的圆点；出现普通文件、附件、可见子节点或会话显示的隐藏子节点后立即恢复原生箭头和交互。插件不改动 Obsidian 自己的 expanded/collapsed 状态。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为。每个 File Explorer leaf 独立工作，包括 popout window；桌面端保留 before/into/after 拖拽，Android 不注册 HTML5 drag/drop listener。停用插件必须移除圆点与全部自有状态并恢复宿主属性。
+File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、不可折叠、不可拖动，可通过点击或键盘打开 Root Node Note。Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛分别占用固定图标位、弹性名称位、状态位与尾部控件。普通 Folder Node 的 canonical Node Note 行隐藏。完整节点若除该隐藏笔记外没有可见直接子项，原 disclosure 等宽位置显示 4px、低强调、`aria-hidden` 且不可点击/聚焦的圆点；出现普通文件、附件、可见子节点或会话显示的隐藏子节点后立即恢复原生箭头和交互。插件不改动 Obsidian 自己的 expanded/collapsed 状态。点击完整节点的 folder title 打开 Node Note；不完整文件夹保留 Obsidian 原生展开/选择行为。每个 File Explorer leaf 独立工作，包括 popout window。桌面端的中心 drop zone 表示移入该节点；边缘 zone 只有在目标父节点已使用手动子节点排序时才表示精确兄弟间隙。“A 之后”和“B 之前”若属于同一间隙，归一为同一个指示器；隐藏锚点或过期锚点会阻止 placement，而不是猜测。Android 不注册 HTML5 drag/drop listener。停用插件必须移除圆点与全部自有状态并恢复宿主属性。
 
 ## Node Contents View
 

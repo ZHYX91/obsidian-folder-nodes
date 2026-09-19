@@ -65,6 +65,7 @@ const zh = {
   hideNodeSubtree: "隐藏节点及其子树", setUnmanagedSubtree: "将文件夹子树设为不管理", deleteNodeSubtree: "删除节点及其子树",
   createChild: "创建子节点", createSelection: "从选中文字创建 Folder Node",
   contents: "打开节点内容视图", moveUp: "节点上移", moveDown: "节点下移",
+  childOrderNatural: "子节点排序：按名称（切换为手动）", childOrderManual: "子节点排序：手动（恢复按名称）",
   rename: "重命名节点", delete: "删除节点", move: "移动节点", merge: "合并节点",
   renameCurrentNode: "重命名当前节点", moveContainingNode: "移动所在节点", mergeContainingNode: "合并所在节点", deleteContainingNode: "删除所在节点",
   language: "界面语言", languageDesc: "选择“跟随 Obsidian”可使用 Obsidian 的界面语言。", auto: "跟随 Obsidian",
@@ -142,7 +143,8 @@ const zh = {
   errorPathExists: "目标已存在：{path}", errorInvalidMove: "节点不能移动或合并到自身或后代节点。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "预览后选区已改变，创建已停止。",
-  errorUnknownTarget: "找不到目标节点：{path}", errorGeneric: "操作安全停止：{message}",
+  errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
+  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "操作安全停止：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
 };
 
@@ -210,6 +212,7 @@ const en: typeof zh = {
   hideNodeSubtree: "Hide node and subtree", setUnmanagedSubtree: "Set folder subtree as unmanaged", deleteNodeSubtree: "Delete node and subtree",
   createChild: "Create child node", createSelection: "Create Folder Node from selection",
   contents: "Open node contents", moveUp: "Move node up", moveDown: "Move node down",
+  childOrderNatural: "Child order: Name (switch to manual)", childOrderManual: "Child order: Manual (restore name order)",
   rename: "Rename node", delete: "Delete node", move: "Move node", merge: "Merge node",
   renameCurrentNode: "Rename current node", moveContainingNode: "Move containing node", mergeContainingNode: "Merge containing node", deleteContainingNode: "Delete containing node",
   language: "Interface language", languageDesc: "Choose Follow Obsidian to use Obsidian's interface language.", auto: "Follow Obsidian",
@@ -287,7 +290,8 @@ const en: typeof zh = {
   errorPathExists: "Target already exists: {path}", errorInvalidMove: "A node cannot be moved or merged into itself or a descendant.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed after preview; creation stopped.",
-  errorUnknownTarget: "Target node not found: {path}", errorGeneric: "Operation stopped safely: {message}",
+  errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
+  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Operation stopped safely: {message}",
   reconcileErrorsSummary: "Automatic structure synchronization left {count} items incomplete: {message}",
 };
 
@@ -322,5 +326,7 @@ export function formatError(error: unknown): string {
   if (message === "Selection changed after preview") return t("errorSelectionChanged");
   const target = /^Unknown target node:\s*(.+)$/u.exec(message)?.[1];
   if (target !== undefined) return t("errorUnknownTarget", { path: target });
+  if (/^Enable manual child ordering before/u.test(message)) return t("errorManualOrderRequired");
+  if (message === "The insertion position is stale; retry the drag") return t("errorStalePlacement");
   return t("errorGeneric", { message });
 }

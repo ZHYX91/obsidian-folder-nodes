@@ -19,7 +19,7 @@ Core 只处理路径、命名、不管理边界规则、批量整理计划、反
 
 ## 排序引擎
 
-自然模式按 Unicode 规范化 basename 做 numeric-aware 排序且不写 token。第一次明确手动 placement 时，父 Node 在 `folder-nodes` 中写 `order=manual`，当前直接 Child Nodes 以 1024 间隔物化稀疏 `rank=N` token。有空隙时只 patch moved Node；无空隙时最多 rebalance 64 个邻居，再退化为当前父节点的完整 rank 物化，但从不把子节点数组写进父 Note。读取时按有效 rank、规范化 basename、path 依次比较，因此缺失或重复 rank 仍确定；rename 不改 Child Note 上的 rank，manual parent 下的新 Child 取末尾 rank。
+自然模式按 Unicode 规范化 basename 做 numeric-aware 排序且不写 token。手动子节点排序是父节点上的显式模式：把一个完整父节点切换为手动时写入 `order=manual`，并按当时的自然顺序以 1024 间隔为直接 Child Nodes 物化正整数 `rank=N`。存在安全空隙时，普通 placement 只 patch moved Child；若 rank 缺失、重复、间隙耗尽或接近安全整数边界，规划器先确定完整目标序列，再严格按该序列整体重新编号，绝不在重编号阶段按旧 rank 重新排序。普通结构移入不会把自然父节点隐式切换为手动；恢复自然排序只删除父节点模式 token，非活动 rank 被忽略，之后再次开启手动也不会复活旧序列。
 
 ## Node 操作
 
