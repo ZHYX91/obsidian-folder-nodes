@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.9.4
 
 - Separated structural node moves from manual sibling ordering so reparenting never changes a natural parent's sort mode implicitly.
 - Normalized equivalent drag gaps to one stable insertion marker and required explicit manual mode for exact before/after placement.
 - Simplified sparse ordering to a safe single-rank update or order-preserving full re-rank, closing dense, missing-rank, and safe-integer edge cases.
 - Kept ambiguous canonical-note candidates visible as explicit conflicts and made Explorer hidden-status decoration converge without a mutation refresh loop.
+- Kept unmanaged notes visible, rejected hidden-gap and stale-object drops, and checked known path collisions during drag previews.
+- Refreshed metadata and resolved links incrementally without rebuilding the Explorer for body-only edits.
 - Preserved Node Contents focus and scroll position across same-node refreshes and exposed an explicit per-parent child-order toggle.
 
 ## 0.9.3

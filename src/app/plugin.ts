@@ -39,7 +39,7 @@ import { VisualPickerModal } from "../ui/visual-picker-modal";
 import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
-import { folderNodesMetadataFingerprint } from "./metadata-refresh";
+import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
 
@@ -116,6 +116,7 @@ export default class FolderNodesPlugin extends Plugin {
         createNode: t("createNode"), incompleteNode: t("incompleteNode"), incompleteStatus: t("incompleteStatus"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"),
         node: t("node"), nodeConflict: t("nodeConflict"), conflictStatus: t("conflictStatus"), root: t("root"), unmanaged: t("unmanaged"), unmanagedDetail: t("unmanagedDetail"),
         hiddenNode: t("hiddenNode"), hiddenNodeDetail: t("hiddenNodeDetail"), hiddenByNode: (path) => t("hiddenByNode", { path }),
+        hiddenGap: t("errorHiddenGap"), stalePlacement: t("errorStalePlacement"), placementError: (reason) => formatError(new Error(reason)),
         hideHiddenNodesThisSession: t("hideHiddenNodesThisSession"),
         showHiddenNodesThisSession: t("showHiddenNodesThisSession"),
       }),
@@ -479,19 +480,10 @@ export default class FolderNodesPlugin extends Plugin {
       this.updateContentsView();
       this.refreshVisuals(undefined, "active-leaf");
     }));
-    this.registerEvent(this.app.metadataCache.on("changed", (file) => {
-      const affected = this.references.updateSource(file.path, this.app.metadataCache.resolvedLinks[file.path] ?? {});
-      const nextFingerprint = this.metadataFingerprint(file);
-      const previousFingerprint = this.metadataFingerprints.get(file.path);
-      this.metadataFingerprints.set(file.path, nextFingerprint);
-      if (previousFingerprint !== nextFingerprint) this.refreshVisuals(file.path, "metadata");
-      for (const path of affected) this.refreshVisuals(path, "reference");
-    }));
-    this.registerEvent(this.app.metadataCache.on("resolved", () => {
-      this.references.rebuild(this.app.metadataCache.resolvedLinks);
-      this.seedMetadataFingerprints();
-      this.refreshVisuals();
-    }));
+    for (const event of registerFolderNodesMetadataEvents(
+      this.app.metadataCache, this.metadataFingerprints, this.references,
+      (path, reason) => this.refreshVisuals(path, reason),
+    )) this.registerEvent(event);
   }
 
   private metadataFingerprint(file: TFile): string {

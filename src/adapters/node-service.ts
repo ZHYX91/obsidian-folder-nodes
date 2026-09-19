@@ -728,6 +728,7 @@ export class NodeService {
   } | null {
     const sourcePath = normalizeVaultPath(folder.path);
     if (sourcePath === "") throw new Error("The Root Node cannot be moved");
+    if (this.getFolder(sourcePath) !== folder) throw new Error("The source node changed; retry the drag");
     if (this.isIgnoredPath(sourcePath)) throw new Error("An unmanaged folder cannot be placed as a Folder Node");
     this.requireCanonicalNote(folder);
 
@@ -740,6 +741,13 @@ export class NodeService {
 
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
     if (intent.kind === "move-into" && oldParentPath === parentPath) return null;
+
+    if (oldParentPath !== parentPath) {
+      const destination = normalizeVaultPath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
+      if (targetParent.children.some((entry) => isSameVaultPath(entry.path, destination))) {
+        throw new Error(`Path already exists: ${destination}`);
+      }
+    }
 
     const siblings = this.children(parentPath).filter(({ childPath }) => childPath !== sourcePath);
     if (intent.kind === "move-into") {

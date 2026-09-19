@@ -143,6 +143,7 @@ const zh = {
   errorPathExists: "目标已存在：{path}", errorInvalidMove: "节点不能移动或合并到自身或后代节点。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "预览后选区已改变，创建已停止。",
+  errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
   errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "操作安全停止：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
 };
@@ -289,6 +290,7 @@ const en: typeof zh = {
   errorPathExists: "Target already exists: {path}", errorInvalidMove: "A node cannot be moved or merged into itself or a descendant.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed after preview; creation stopped.",
+  errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
   errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Operation stopped safely: {message}",
   reconcileErrorsSummary: "Automatic structure synchronization left {count} items incomplete: {message}",
 };

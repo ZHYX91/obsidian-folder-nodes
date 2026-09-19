@@ -4,8 +4,10 @@ import { alignNoteTitleIcon, ensureExplorerIconPosition, ensureExplorerRootRow, 
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeVisual } from "../core/types";
-import { gapAfter, gapBefore, insertionMarker, type PlacementIntent } from "../core/placement";
+import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent } from "../core/placement";
 import { renderVisual } from "../presentation/render-visual";
+import { PlacementSession } from "../core/placement-session";
+import { placementFeedback } from "../presentation/placement-feedback";
 
 interface ExplorerSurface {
   abort: AbortController;
@@ -27,6 +29,7 @@ export class ExplorerAdapter extends Component {
   private draggedPath: string | null = null;
   private selectedFolderPath: string | null = null;
   private dropTarget: HTMLElement | null = null;
+  private readonly placementSession = new PlacementSession((path) => this.service.getFolder(path));
 
   public constructor(
     private readonly app: App,
@@ -36,6 +39,7 @@ export class ExplorerAdapter extends Component {
     private readonly getRootLabels: () => {
       createNode: string; incompleteNode: string; incompleteStatus?: string; missingNodeFolder: string; missingNodeNote: string;
       node: string; nodeConflict: string; conflictStatus?: string; root: string; unmanaged: string; unmanagedDetail?: string;
+      hiddenGap?: string; stalePlacement?: string; placementError?: (reason: string) => string;
       hiddenNode?: string; hiddenNodeDetail?: string; hiddenByNode?: (path: string) => string;
       hideHiddenNodesThisSession?: string; showHiddenNodesThisSession?: string;
     },
@@ -125,6 +129,7 @@ export class ExplorerAdapter extends Component {
   private syncNoteTitleSurfaces(): void {
     const active = new Set<HTMLElement>();
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      if (!this.getSettings().showIconInNoteTitle) continue;
       if (!(leaf.view instanceof MarkdownView)) continue;
       const root = leaf.view.containerEl;
       active.add(root);
@@ -171,7 +176,7 @@ export class ExplorerAdapter extends Component {
       if (path === undefined) continue;
       const file = this.app.vault.getAbstractFileByPath(path);
       const parent = file instanceof TFile ? file.parent : null;
-      const canonical = file instanceof TFile && this.service.nodeNoteRole(file) === "unique";
+      const canonical = file instanceof TFile && this.service.fileIdentity(file) === "node-note";
       element.toggleClass("folder-nodes-canonical-note", canonical);
       const counterpartPath = file instanceof TFile && parent !== null ? (parent.path === "" ? file.basename : `${parent.path}/${file.basename}`) : "";
       const identity = file instanceof TFile ? this.service.fileIdentity(file) : "ordinary";
@@ -524,6 +529,7 @@ export class ExplorerAdapter extends Component {
     const path = title?.dataset.path;
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getFolder(path) === null || this.service.getCanonicalFile(path) === null) return;
     this.draggedPath = path;
+    this.placementSession.start(this.service.getFolder(path)!);
     event.dataTransfer?.setData("application/x-folder-nodes-path", path);
     if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
   }
@@ -536,11 +542,14 @@ export class ExplorerAdapter extends Component {
     event.stopPropagation();
     const intent = this.dropIntent(title, this.zone(title, event.clientY));
     const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(this.draggedPath, intent);
-    if (preview.kind === "ready" && this.markPlacement(title, preview.intent)) {
+    if (preview.kind === "ready" && this.markPlacement(title, preview.intent) && this.placementSession.preview(preview.intent)) {
+      placementFeedback(title.closest<HTMLElement>(".nav-files-container") ?? title, null);
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
       return;
     }
     this.clearDrop(false);
+    placementFeedback(title.closest<HTMLElement>(".nav-files-container") ?? title,
+      preview.kind === "blocked" ? this.getRootLabels().placementError?.(preview.reason) ?? preview.reason : preview.kind === "ready" ? this.getRootLabels().hiddenGap ?? "Show hidden nodes before choosing an exact position" : null);
     if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "none";
   }
 
@@ -553,10 +562,13 @@ export class ExplorerAdapter extends Component {
     const source = this.service.getFolder(this.draggedPath);
     const intent = this.dropIntent(title, this.zone(title, event.clientY));
     const preview = source === null || intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(this.draggedPath, intent);
-    if (source !== null && preview.kind === "ready" && this.markPlacement(title, preview.intent)) {
-      void this.service.placeNode(source, preview.intent).then(() => this.notifyChanged()).catch((error: unknown) => this.reportError(error));
+    const accepted = preview.kind === "ready" ? this.placementSession.commit(preview.intent) : null;
+    if (source !== null && preview.kind === "ready" && accepted !== null && this.markPlacement(title, preview.intent)) {
+      void this.service.placeNode(accepted.source, accepted.intent).then(() => this.notifyChanged()).catch((error: unknown) => this.reportError(error));
     } else if (preview.kind === "blocked") {
       this.reportError(new Error(preview.reason));
+    } else if (preview.kind === "ready") {
+      this.reportError(new Error(this.getRootLabels().stalePlacement ?? "The insertion position is stale; retry the drag"));
     }
     this.clearDrop();
   }
@@ -585,15 +597,13 @@ export class ExplorerAdapter extends Component {
       this.markDrop(hit, "into");
       return true;
     }
-    const { previousSiblingPath, nextSiblingPath } = intent.gap;
-    if (previousSiblingPath !== null && !this.service.isNodeVisible(previousSiblingPath)) return false;
-    if (nextSiblingPath !== null && !this.service.isNodeVisible(nextSiblingPath)) return false;
+    if (!isGapVisible(intent.gap, (path) => this.service.isNodeVisible(path))) return false;
     const container = hit.closest<HTMLElement>(".nav-files-container");
     const marker = insertionMarker(intent.gap);
     if (container === null || marker === null) return false;
     const target = findFolderTitle(container, marker.path);
     if (target === null) return false;
-    this.markDrop(target, marker.edge);
+    this.markDrop(marker.edge === "after" ? target.closest<HTMLElement>(".nav-folder") ?? target : target, marker.edge);
     return true;
   }
 
@@ -607,7 +617,11 @@ export class ExplorerAdapter extends Component {
   private clearDrop(clearSource = true): void {
     this.dropTarget?.removeClass("folder-nodes-drop-before", "folder-nodes-drop-into", "folder-nodes-drop-after");
     this.dropTarget = null;
-    if (clearSource) this.draggedPath = null;
+    if (clearSource) {
+      this.draggedPath = null;
+      this.placementSession.clear();
+      for (const { root } of this.surfaces.values()) for (const status of root.querySelectorAll(".folder-nodes-placement-feedback")) status.remove();
+    }
   }
 
   private runAction(operation: Promise<unknown>): void {

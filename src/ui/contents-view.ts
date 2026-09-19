@@ -17,9 +17,12 @@ import { t } from "./i18n";
 import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import type { FileIdentity, FolderIdentity } from "../core/identity";
 import type { ChildOrderRecord, FolderNodeHiddenState, NodeVisual } from "../core/types";
-import { gapAfter, gapBefore, insertionMarker, type PlacementIntent, type PlacementPreview } from "../core/placement";
+import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import { renderVisual } from "../presentation/render-visual";
 import type { ReferenceIndex } from "../core/reference-index";
+import { PlacementSession } from "../core/placement-session";
+import { placementFeedback } from "../presentation/placement-feedback";
+import { formatError } from "./i18n";
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "svg", "webp"]);
 const VIDEO_EXTENSIONS = new Set(["m4v", "mkv", "mov", "mp4", "webm"]);
@@ -72,6 +75,7 @@ type NodeEntry =
   | { kind: "conflict" | "healthy" | "incomplete"; entry: TFolder }
   | { kind: "conflict" | "missing-folder"; entry: TFile };
 type ContentsSection = "album" | "files" | "nodes";
+interface ContentsRenderState { focusKey: string | null; neighbors: string[]; scrollTop: number; }
 
 export const CONTENTS_VIEW_TYPE = "folder-nodes-contents";
 
@@ -94,6 +98,7 @@ export class FolderNodeContentsView extends ItemView {
   private contentDropTarget: HTMLElement | null = null;
   private readonly pendingImages = new Set<HTMLImageElement>();
   private renderedFolderPath: string | null = null;
+  private readonly placementSession = new PlacementSession((path) => this.service.getFolder(path));
 
   public constructor(
     leaf: WorkspaceLeaf,
@@ -208,23 +213,29 @@ export class FolderNodeContentsView extends ItemView {
     this.restoreRenderState(container, renderState);
   }
 
-  private captureRenderState(container: HTMLElement): { focusKey: string | null; scrollTop: number } {
+  private captureRenderState(container: HTMLElement): ContentsRenderState {
     const active = container.ownerDocument.activeElement;
-    const focusKey = active instanceof HTMLElement && container.contains(active)
-      ? active.dataset.folderNodesFocusKey ?? null
+    const focusKey = active !== null && container.contains(active)
+      ? active.getAttribute("data-folder-nodes-focus-key")
       : null;
-    return { focusKey, scrollTop: container.scrollTop };
+    const keys = [...container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]")].map((element) => element.dataset.folderNodesFocusKey!);
+    const index = focusKey === null ? -1 : keys.indexOf(focusKey);
+    const neighbors = index < 0 ? [] : [...keys.slice(index + 1), ...keys.slice(0, index).reverse()];
+    return { focusKey, neighbors, scrollTop: container.scrollTop };
   }
 
   private restoreRenderState(
     container: HTMLElement,
-    state: { focusKey: string | null; scrollTop: number } | null,
+    state: ContentsRenderState | null,
   ): void {
     if (state === null) return;
     if (state.focusKey !== null) {
-      const target = [...container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]")]
-        .find((element) => element.dataset.folderNodesFocusKey === state.focusKey);
-      target?.focus({ preventScroll: true });
+      const targets = [...container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]")];
+      const target = [state.focusKey, ...state.neighbors]
+        .map((key) => targets.find((element) => element.dataset.folderNodesFocusKey === key && !element.hasAttribute("disabled")))
+        .find((element) => element !== undefined);
+      container.tabIndex = -1;
+      (target ?? container).focus({ preventScroll: true });
     }
     container.scrollTop = state.scrollTop;
   }
@@ -281,6 +292,7 @@ export class FolderNodeContentsView extends ItemView {
       const homepage = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("openHomepage") } });
       setIcon(homepage, "home");
       homepage.addEventListener("click", () => this.actions.openHomepage());
+      homepage.dataset.folderNodesFocusKey = "header:homepage";
     }
     if (hasSelectableContent) {
       const select = actions.createEl("button", {
@@ -289,18 +301,22 @@ export class FolderNodeContentsView extends ItemView {
       });
       setIcon(select, this.selectionMode ? "check" : "list-checks");
       select.addEventListener("click", () => this.selectionMode ? this.finishSelection() : this.startSelection());
+      select.dataset.folderNodesFocusKey = "header:selection";
     }
     if (managedNode) {
       const create = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("createChild") } });
       setIcon(create, "folder-plus");
       create.addEventListener("click", () => this.actions.createChild(folder));
+      create.dataset.folderNodesFocusKey = "header:create";
       const more = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("moreActions", { name: folder.name }) } });
       setIcon(more, "ellipsis");
       more.addEventListener("click", () => this.actions.nodeMenu(more, folder));
-    } else if (!this.service.isIgnoredPath(folderPath)) {
+      more.dataset.folderNodesFocusKey = "header:menu";
+    } else if (currentIdentity === "incomplete") {
       const create = actions.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("createMissingNodeNote") } });
       setIcon(create, "file-plus");
       create.addEventListener("click", () => this.actions.createMissingNote(folder));
+      create.dataset.folderNodesFocusKey = "header:complete";
     }
   }
 
@@ -515,6 +531,9 @@ export class FolderNodeContentsView extends ItemView {
     });
     const finish = actions.createEl("button", { text: t("finishSelection") });
     finish.addEventListener("click", () => this.finishSelection());
+    for (const [key, button] of [["insert", insert], ["links", links], ["copy", copy], ["clear", clear], ["finish", finish]] as const) {
+      button.dataset.folderNodesFocusKey = `selection:${key}`;
+    }
   }
 
   private startSelection(): void {
@@ -646,6 +665,8 @@ export class FolderNodeContentsView extends ItemView {
     handle.addEventListener("dragstart", (event) => {
       this.clearAllDrag();
       this.draggedNodePath = path;
+      const source = this.service.getFolder(path);
+      if (source !== null) this.placementSession.start(source);
       this.draggedSource = shell;
       shell.addClass("folder-nodes-is-dragging");
       event.dataTransfer?.setData("application/x-folder-nodes-order", path);
@@ -663,11 +684,13 @@ export class FolderNodeContentsView extends ItemView {
       const placement = this.nodeDropPlacement(element, event);
       const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
       const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(sourcePath, intent);
-      if (preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis)) {
+      if (preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis) && this.placementSession.preview(preview.intent)) {
+        placementFeedback(this.contentEl, null);
         if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
         return;
       }
       this.clearDropTarget();
+      placementFeedback(this.contentEl, preview.kind === "blocked" ? formatError(new Error(preview.reason)) : preview.kind === "ready" ? t("errorHiddenGap") : null);
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "none";
     });
     element.addEventListener("dragleave", (event) => this.onDragLeave(event, element));
@@ -681,9 +704,11 @@ export class FolderNodeContentsView extends ItemView {
       const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(sourcePath, intent);
       const source = this.service.getFolder(sourcePath);
       const renderable = preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis);
+      const accepted = preview.kind === "ready" ? this.placementSession.commit(preview.intent) : null;
       this.clearNodeDrag();
-      if (source !== null && preview.kind === "ready" && renderable) this.finishDrop(this.service.placeNode(source, preview.intent));
+      if (source !== null && preview.kind === "ready" && renderable && accepted !== null) this.finishDrop(this.service.placeNode(accepted.source, accepted.intent));
       else if (preview.kind === "blocked") this.actions.reportError(new Error(preview.reason));
+      else if (preview.kind === "ready") this.actions.reportError(new Error(t(renderable ? "errorStalePlacement" : "errorHiddenGap")));
     });
   }
 
@@ -697,6 +722,7 @@ export class FolderNodeContentsView extends ItemView {
 
   private markNodePlacement(hit: HTMLElement, intent: PlacementIntent, axis: SiblingDropAxis): boolean {
     if (intent.kind !== "insert") return false;
+    if (!isGapVisible(intent.gap, (path) => this.service.isNodeVisible(path))) return false;
     const grid = hit.parentElement;
     if (grid === null) return false;
     const marker = insertionMarker(intent.gap);
@@ -809,6 +835,8 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private clearNodeDrag(): void {
+    this.placementSession.clear();
+    placementFeedback(this.contentEl, null);
     this.clearDropTarget();
     this.draggedSource?.removeClass("folder-nodes-is-dragging");
     this.draggedSource = null;
@@ -836,6 +864,7 @@ export class FolderNodeContentsView extends ItemView {
     const details = container.createEl("details", { cls: "folder-nodes-section" });
     details.open = this.sectionOpen[key];
     const summary = details.createEl("summary");
+    summary.dataset.folderNodesFocusKey = `section:${key}`;
     summary.createSpan({ cls: "folder-nodes-section-label", text: detail === null ? label : `${label} · ${detail}` });
     summary.createSpan({ cls: "folder-nodes-section-count", text: String(count), attr: { "aria-label": `${label}: ${count}` } });
     details.addEventListener("toggle", () => { this.sectionOpen[key] = details.open; });
@@ -847,6 +876,7 @@ export class FolderNodeContentsView extends ItemView {
     if (total <= limit) return;
     const count = Math.min(200, total - limit);
     const more = container.createEl("button", { cls: "folder-nodes-more", text: t("showMore", { count }) });
+    more.dataset.folderNodesFocusKey = `more:${section}`;
     more.addEventListener("click", () => {
       this.visibleLimits[section] += 200;
       this.render();

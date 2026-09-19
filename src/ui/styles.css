@@ -295,6 +295,19 @@ body {
 .folder-nodes-visual-preview-item .folder-nodes-visual { width: 28px; height: 28px; }
 .folder-nodes-visual-preview > .setting-item-description { flex-basis: 100%; }
 .folder-nodes-canonical-note { display: none !important; }
+.folder-nodes-placement-feedback {
+  position: fixed;
+  inset-inline-end: 16px;
+  inset-block-end: 16px;
+  z-index: var(--layer-notice);
+  max-inline-size: min(360px, 80vw);
+  padding: var(--size-4-3);
+  border-radius: var(--radius-m);
+  background: var(--background-modifier-message);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-s);
+  pointer-events: none;
+}
 
 .folder-nodes-leaf-indicator {
   position: relative;

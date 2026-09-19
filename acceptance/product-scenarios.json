@@ -129,6 +129,31 @@
         "Expansion and collapse preserve the selected node screen position and all graph content remains reachable by scrolling.",
         "Handles and titles remain legible in all four theme and mode combinations."
       ]
+    },
+    {
+      "id": "explicit-placement-and-refresh",
+      "title": "Explicit ordering, unmanaged visibility, and stable refresh",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Open Placement and verify _Unmanaged/_Unmanaged.md remains visible in the native Explorer.",
+        "Move Placement/Move into Placement/Natural using desktop drag or the Move action. Confirm natural ordering is unchanged.",
+        "Open Placement/Manual and use Child order to switch between Name and Manual; use the platform reorder action to change a child position.",
+        "On desktop compare the equivalent A-after and B-before gaps with hidden nodes revealed, and verify hidden-gap feedback while they are hidden. On Android verify disabled reorder actions in Name mode and enabled actions in Manual mode.",
+        "Open Contents and keep a section disclosure focused while its node icon metadata changes; verify focus retention, then edit only a note body and check that the node list stays stable."
+      ],
+      "expected": [
+        "Unmanaged same-named Markdown remains visible; ordinary reparenting does not enable manual ordering.",
+        "Sorting is explicitly controlled on the parent and the resulting child order persists.",
+        "Desktop gaps match their visible destination and reject hidden ambiguities; Android uses the same explicit ordering rules through menus.",
+        "Contents remains usable after refresh and unrelated body edits do not reset its node list."
+      ]
     }
   ]
 }

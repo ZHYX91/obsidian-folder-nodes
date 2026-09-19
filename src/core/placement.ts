@@ -48,6 +48,10 @@ export interface InsertionMarker {
   edge: "before" | "after";
 }
 
+export function isGapVisible(gap: InsertionGap, isVisible: (path: string) => boolean): boolean {
+  return [gap.previousSiblingPath, gap.nextSiblingPath].every((path) => path === null || isVisible(path));
+}
+
 export function insertionMarker(gap: InsertionGap): InsertionMarker | null {
   if (gap.nextSiblingPath !== null) return { path: gap.nextSiblingPath, edge: "before" };
   if (gap.previousSiblingPath !== null) return { path: gap.previousSiblingPath, edge: "after" };
