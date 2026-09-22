@@ -19,6 +19,7 @@ import {
   projectNodeGraph3D,
   rotateNodeGraphCamera,
   zoomNodeGraphCamera,
+  zoomNodeGraphCameraAt,
   type NodeGraphCamera,
   type NodeGraphPoint3D,
 } from "../core/node-graph-3d";
@@ -74,6 +75,7 @@ interface NodeGraphCanvasCallbacks {
   readonly onOpen: (path: string, newLeaf: boolean) => void;
   readonly onSelect: (path: string | null) => void;
   readonly onToggle?: (path: string, branch: boolean) => void;
+  readonly onZoomChange?: (zoom: number) => void;
   readonly overviewEdgeLimit?: number;
   readonly relationSummary: (structure: number, links: number) => string;
   readonly toggleLabel?: (label: string, childCount: number, expanded: boolean) => string;
@@ -277,7 +279,60 @@ export class NodeGraphCanvasRenderer {
       this.camera3D = constrained ? { ...fitted, zoom: MIN_READABLE_3D_ZOOM } : fitted;
       if (constrained && targetPath !== null) this.centerOn(targetPath);
     }
+    this.notifyZoomChange();
     this.scheduleDraw();
+  }
+
+  public zoomBy(factor: number): void {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    const deltaY = -Math.log(factor) / 0.0015;
+    if (this.dimension === "2d") {
+      this.camera2D = zoomNodeGraphCanvasCamera(
+        this.camera2D,
+        deltaY,
+        this.width / 2,
+        this.height / 2,
+        MIN_READABLE_2D_ZOOM,
+      );
+    } else {
+      this.camera3D = zoomNodeGraphCameraAt(
+        this.camera3D,
+        deltaY,
+        this.width / 2,
+        this.height / 2,
+        this.width,
+        this.height,
+      );
+    }
+    this.notifyZoomChange();
+    this.scheduleDraw();
+  }
+
+  public resetZoom(): void {
+    if (this.dimension === "2d") {
+      this.camera2D = zoomNodeGraphCanvasCamera(
+        this.camera2D,
+        -Math.log(1 / this.camera2D.zoom) / 0.0015,
+        this.width / 2,
+        this.height / 2,
+        MIN_READABLE_2D_ZOOM,
+      );
+    } else {
+      this.camera3D = zoomNodeGraphCameraAt(
+        this.camera3D,
+        -Math.log(1 / this.camera3D.zoom) / 0.0015,
+        this.width / 2,
+        this.height / 2,
+        this.width,
+        this.height,
+      );
+    }
+    this.notifyZoomChange();
+    this.scheduleDraw();
+  }
+
+  public currentZoom(): number {
+    return this.dimension === "2d" ? this.camera2D.zoom : this.camera3D.zoom;
   }
 
   public resize(fit = false): void {
@@ -337,6 +392,7 @@ export class NodeGraphCanvasRenderer {
     if (state.dimension !== this.dimension) return;
     this.camera2D = { ...state.camera2D, zoom: Math.max(MIN_READABLE_2D_ZOOM, state.camera2D.zoom) };
     this.camera3D = { ...state.camera3D };
+    this.notifyZoomChange();
     this.scheduleDraw();
   }
 
@@ -417,6 +473,21 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      this.zoomBy(1.2);
+      return;
+    }
+    if (event.key === "-") {
+      event.preventDefault();
+      this.zoomBy(1 / 1.2);
+      return;
+    }
+    if (event.key === "0") {
+      event.preventDefault();
+      this.fit();
+      return;
+    }
     if (event.key === "Escape" && this.focusPath !== null) {
       event.preventDefault();
       event.stopPropagation();
@@ -502,12 +573,17 @@ export class NodeGraphCanvasRenderer {
         } else {
           this.camera3D = panNodeGraphCamera(this.camera3D, deltaX, deltaY);
           if (before.distance > 0 && after.distance > 0) {
-            this.camera3D = zoomNodeGraphCamera(
+            this.camera3D = zoomNodeGraphCameraAt(
               this.camera3D,
               -Math.log(after.distance / before.distance) / 0.0015,
+              anchorX,
+              anchorY,
+              this.width,
+              this.height,
             );
           }
         }
+        this.notifyZoomChange();
         this.scheduleDraw();
       }
       return;
@@ -586,15 +662,33 @@ export class NodeGraphCanvasRenderer {
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
     if (this.dimension === "2d") {
-      this.camera2D = zoomNodeGraphCanvasCamera(
-        this.camera2D,
+      if (event.ctrlKey || event.metaKey) {
+        this.camera2D = zoomNodeGraphCanvasCamera(
+          this.camera2D,
+          event.deltaY,
+          event.offsetX,
+          event.offsetY,
+          MIN_READABLE_2D_ZOOM,
+        );
+        this.notifyZoomChange();
+      } else {
+        const horizontal = event.shiftKey && event.deltaX === 0;
+        this.camera2D = panNodeGraphCanvasCamera(
+          this.camera2D,
+          -(horizontal ? event.deltaY : event.deltaX),
+          horizontal ? 0 : -event.deltaY,
+        );
+      }
+    } else {
+      this.camera3D = zoomNodeGraphCameraAt(
+        this.camera3D,
         event.deltaY,
         event.offsetX,
         event.offsetY,
-        MIN_READABLE_2D_ZOOM,
+        this.width,
+        this.height,
       );
-    } else {
-      this.camera3D = zoomNodeGraphCamera(this.camera3D, event.deltaY);
+      this.notifyZoomChange();
     }
     this.scheduleDraw();
   };
@@ -637,6 +731,10 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlay.removeEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.removeEventListener("click", this.handleOverlayToggle);
     this.focusOverlayToggle.removeEventListener("keydown", this.handleOverlayToggleKeyDown);
+  }
+
+  private notifyZoomChange(): void {
+    this.callbacks.onZoomChange?.(this.currentZoom());
   }
 
   private scheduleDraw(): void {
