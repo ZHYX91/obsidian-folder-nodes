@@ -27,6 +27,7 @@ export class ExplorerAdapter extends Component {
   private readonly originalOrders = new Map<HTMLElement, Element[]>();
   private decorateTimer: number | null = null;
   private explorerMutationTimer: number | null = null;
+  private noteTitleDecorateTimer: number | null = null;
   private readonly pendingExplorerScopes = new Set<HTMLElement>();
   private draggedPath: string | null = null;
   private selectedFolderPath: string | null = null;
@@ -61,11 +62,13 @@ export class ExplorerAdapter extends Component {
 
   public refresh(): void {
     this.cancelExplorerMutationDecorate();
+    this.cancelNoteTitleDecorate();
     this.syncSurfaces();
     this.decorate();
   }
 
   public refreshActiveState(): void {
+    this.cancelNoteTitleDecorate();
     this.syncSurfaces();
     for (const { root } of this.surfaces.values()) this.decorateRoot(root);
     this.decorateNoteTitles();
@@ -84,6 +87,7 @@ export class ExplorerAdapter extends Component {
     if (this.decorateTimer !== null) window.clearTimeout(this.decorateTimer);
     this.decorateTimer = null;
     this.cancelExplorerMutationDecorate();
+    this.cancelNoteTitleDecorate();
     this.clearDrop();
     this.restoreOrders();
     for (const surface of this.surfaces.values()) {
@@ -145,10 +149,10 @@ export class ExplorerAdapter extends Component {
       active.add(root);
       if (this.noteTitleSurfaces.has(root)) continue;
       const Observer = root.ownerDocument.defaultView?.MutationObserver ?? MutationObserver;
-      const observer = new Observer(() => this.scheduleDecorate());
+      const observer = new Observer(() => this.scheduleNoteTitleDecorate());
       observer.observe(root, { childList: true, subtree: true });
       const ResizeObserverConstructor = root.ownerDocument.defaultView?.ResizeObserver;
-      const resizeObserver = ResizeObserverConstructor === undefined ? null : new ResizeObserverConstructor(() => this.scheduleDecorate());
+      const resizeObserver = ResizeObserverConstructor === undefined ? null : new ResizeObserverConstructor(() => this.scheduleNoteTitleDecorate());
       resizeObserver?.observe(root);
       this.noteTitleSurfaces.set(root, { observer, resizeObserver, root });
     }
@@ -163,6 +167,7 @@ export class ExplorerAdapter extends Component {
 
   private scheduleDecorate(): void {
     this.cancelExplorerMutationDecorate();
+    this.cancelNoteTitleDecorate();
     if (this.decorateTimer !== null) return;
     this.decorateTimer = window.setTimeout(() => {
       this.decorateTimer = null;
@@ -207,6 +212,20 @@ export class ExplorerAdapter extends Component {
     if (this.explorerMutationTimer !== null) window.clearTimeout(this.explorerMutationTimer);
     this.explorerMutationTimer = null;
     this.pendingExplorerScopes.clear();
+  }
+
+  private scheduleNoteTitleDecorate(): void {
+    if (this.decorateTimer !== null || this.noteTitleDecorateTimer !== null) return;
+    this.noteTitleDecorateTimer = window.setTimeout(() => {
+      this.noteTitleDecorateTimer = null;
+      this.syncNoteTitleSurfaces();
+      this.decorateNoteTitles();
+    }, 32);
+  }
+
+  private cancelNoteTitleDecorate(): void {
+    if (this.noteTitleDecorateTimer !== null) window.clearTimeout(this.noteTitleDecorateTimer);
+    this.noteTitleDecorateTimer = null;
   }
 
   private decorate(): void {
