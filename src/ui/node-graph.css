@@ -175,11 +175,22 @@
   border-radius: 7px;
 }
 
-.folder-nodes-node-graph-viewport-controls > .clickable-icon {
+.folder-nodes-node-graph-viewport-controls > .clickable-icon,
+.folder-nodes-node-graph-viewport-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   min-width: 28px;
   padding: 5px;
+  color: var(--text-muted);
+  border-radius: 5px;
+}
+
+.folder-nodes-node-graph-viewport-help:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: -2px;
 }
 
 .folder-nodes-node-graph-zoom-level {
