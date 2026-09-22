@@ -163,7 +163,8 @@
   font-style: italic;
 }
 
-.folder-nodes-node-graph-switch {
+.folder-nodes-node-graph-switch,
+.folder-nodes-node-graph-viewport-controls {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -172,6 +173,32 @@
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 7px;
+}
+
+.folder-nodes-node-graph-viewport-controls > .clickable-icon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 5px;
+}
+
+.folder-nodes-node-graph-zoom-level {
+  min-width: 46px;
+  height: 28px;
+  padding: 0 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.folder-nodes-node-graph-zoom-level:hover,
+.folder-nodes-node-graph-viewport-controls > .clickable-icon:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }
 
 .folder-nodes-node-graph-switch-button {
