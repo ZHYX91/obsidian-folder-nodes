@@ -517,8 +517,9 @@ describe("Node Graph progressive view", () => {
     expect(surface.scrollTop).toBe(110);
 
     const zoomWheel = new WheelEvent("wheel", {
-      bubbles: true, cancelable: true, clientX: 400, clientY: 300, ctrlKey: true, deltaY: -120,
+      bubbles: true, cancelable: true, clientX: 400, clientY: 300, deltaY: -120,
     });
+    Object.defineProperty(zoomWheel, "ctrlKey", { configurable: true, value: true });
     surface.dispatchEvent(zoomWheel);
     expect(zoomWheel.defaultPrevented).toBe(true);
     expect(new DOMMatrix(canvas.style.transform).a).toBeGreaterThan(1);
