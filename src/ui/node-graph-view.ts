@@ -1332,9 +1332,18 @@ export class FolderNodeGraphView extends ItemView {
         const after = touchGesture(this.pointers.values());
         if (before !== null && after !== null) {
           this.camera = panNodeGraphCamera(this.camera, after.centerX - before.centerX, after.centerY - before.centerY);
-          if (before.distance > 0 && after.distance > 0) {
+          if (before.distance > 0 && after.distance > 0 && this.threeDViewport !== null) {
             const factor = after.distance / before.distance;
-            this.camera = zoomNodeGraphCamera(this.camera, -Math.log(factor) / 0.0015);
+            const bounds = surface.getBoundingClientRect();
+            this.camera = zoomNodeGraphCameraAt(
+              this.camera,
+              -Math.log(factor) / 0.0015,
+              after.centerX - bounds.left,
+              after.centerY - bounds.top,
+              this.threeDViewport.width,
+              this.threeDViewport.height,
+            );
+            this.updateZoomIndicator(this.camera.zoom);
           }
           this.update3DProjection();
         }
@@ -1373,7 +1382,17 @@ export class FolderNodeGraphView extends ItemView {
     surface.addEventListener("pointercancel", finish);
     surface.addEventListener("wheel", (event) => {
       event.preventDefault();
-      this.camera = zoomNodeGraphCamera(this.camera, event.deltaY);
+      if (this.threeDViewport === null) return;
+      const bounds = surface.getBoundingClientRect();
+      this.camera = zoomNodeGraphCameraAt(
+        this.camera,
+        event.deltaY,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+      );
+      this.updateZoomIndicator(this.camera.zoom);
       this.update3DProjection();
     }, { passive: false });
   }
@@ -1535,6 +1554,159 @@ export class FolderNodeGraphView extends ItemView {
       this.threeDViewport.height / 2 - point.y,
     );
     this.update3DProjection();
+  }
+
+  private bindViewportControlButtons(controls: {
+    readonly currentZoom: () => number;
+    readonly fit: () => void;
+    readonly reset: () => void;
+    readonly zoomBy: (factor: number) => void;
+  }): void {
+    const zoomOut = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-out']");
+    const zoomReset = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
+    const zoomIn = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']");
+    const fit = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
+    zoomOut?.addEventListener("click", () => controls.zoomBy(1 / NODE_GRAPH_ZOOM_STEP));
+    zoomReset?.addEventListener("click", () => controls.reset());
+    zoomIn?.addEventListener("click", () => controls.zoomBy(NODE_GRAPH_ZOOM_STEP));
+    fit?.addEventListener("click", () => controls.fit());
+    this.updateZoomIndicator(controls.currentZoom());
+  }
+
+  private bindViewportKeyboard(surface: HTMLElement, controls: {
+    readonly fit: () => void;
+    readonly zoomBy: (factor: number) => void;
+  }): void {
+    surface.addEventListener("keydown", (event) => {
+      if (event.repeat) return;
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        controls.zoomBy(NODE_GRAPH_ZOOM_STEP);
+        return;
+      }
+      if (event.key === "-") {
+        event.preventDefault();
+        controls.zoomBy(1 / NODE_GRAPH_ZOOM_STEP);
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        controls.fit();
+      }
+    });
+  }
+
+  private updateZoomIndicator(zoom: number): void {
+    const button = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
+    if (button === null) return;
+    const percent = Math.max(1, Math.round(zoom * 100));
+    button.setText(`${percent}%`);
+    button.setAttribute("aria-label", zoomLevelLabel(zoom));
+  }
+
+  private bindDom2DViewport(
+    surface: HTMLElement,
+    stage: HTMLElement,
+    canvas: HTMLElement,
+    width: number,
+    height: number,
+  ): void {
+    const zoomBy = (factor: number, anchorX = surface.clientWidth / 2, anchorY = surface.clientHeight / 2): void => {
+      this.zoomDom2D(surface, stage, canvas, width, height, factor, anchorX, anchorY);
+    };
+    surface.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const bounds = surface.getBoundingClientRect();
+      zoomBy(
+        Math.exp(-event.deltaY * 0.0015),
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+      );
+    }, { passive: false });
+    const controls = {
+      currentZoom: () => domScale(canvas),
+      fit: () => {
+        this.fit2D(surface, stage, canvas, width, height);
+        this.updateZoomIndicator(domScale(canvas));
+      },
+      reset: () => zoomBy(1 / domScale(canvas)),
+      zoomBy,
+    };
+    this.bindViewportControlButtons(controls);
+    this.bindViewportKeyboard(surface, controls);
+  }
+
+  private zoomDom2D(
+    surface: HTMLElement,
+    stage: HTMLElement,
+    canvas: HTMLElement,
+    width: number,
+    height: number,
+    factor: number,
+    anchorX: number,
+    anchorY: number,
+  ): void {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    const previousScale = domScale(canvas);
+    const nextScale = clamp(previousScale * factor, NODE_GRAPH_DOM_MIN_2D_SCALE, NODE_GRAPH_MAX_DOM_2D_SCALE);
+    if (Math.abs(nextScale - previousScale) < 0.000_001) return;
+    const previousLeft = pixelValue(canvas.style.left);
+    const previousTop = pixelValue(canvas.style.top);
+    const worldX = (surface.scrollLeft + anchorX - previousLeft) / previousScale;
+    const worldY = (surface.scrollTop + anchorY - previousTop) / previousScale;
+    const inset = 24;
+    const scaledWidth = width * nextScale;
+    const scaledHeight = height * nextScale;
+    const stageWidth = Math.max(surface.clientWidth, scaledWidth + inset * 2);
+    const stageHeight = Math.max(surface.clientHeight, scaledHeight + inset * 2);
+    const offsetX = (stageWidth - scaledWidth) / 2;
+    const offsetY = (stageHeight - scaledHeight) / 2;
+    stage.style.width = `${stageWidth}px`;
+    stage.style.height = `${stageHeight}px`;
+    canvas.style.left = `${offsetX}px`;
+    canvas.style.top = `${offsetY}px`;
+    canvas.style.transform = `scale(${nextScale})`;
+    surface.scrollLeft = Math.max(0, worldX * nextScale + offsetX - anchorX);
+    surface.scrollTop = Math.max(0, worldY * nextScale + offsetY - anchorY);
+    this.updateZoomIndicator(nextScale);
+  }
+
+  private bind3DViewportControls(): void {
+    const zoomBy = (factor: number): void => {
+      if (this.threeDViewport === null || !Number.isFinite(factor) || factor <= 0) return;
+      this.camera = zoomNodeGraphCameraAt(
+        this.camera,
+        -Math.log(factor) / 0.0015,
+        this.threeDViewport.width / 2,
+        this.threeDViewport.height / 2,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+      );
+      this.updateZoomIndicator(this.camera.zoom);
+      this.update3DProjection();
+    };
+    const fit = (): void => {
+      if (this.threeDViewport === null) return;
+      this.camera = fitNodeGraphCamera(
+        this.threeDPoints,
+        this.camera,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+        48,
+        this.denseThreeD ? NODE_GRAPH_DENSE_3D_FIT_SCALE : NODE_GRAPH_DOM_MIN_SCALE,
+      );
+      this.updateZoomIndicator(this.camera.zoom);
+      this.update3DProjection();
+    };
+    const controls = {
+      currentZoom: () => this.camera.zoom,
+      fit,
+      reset: () => zoomBy(1 / this.camera.zoom),
+      zoomBy,
+    };
+    this.bindViewportControlButtons(controls);
+    if (this.threeDSurface !== null) this.bindViewportKeyboard(this.threeDSurface, controls);
   }
 
   private fit2D(surface: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
