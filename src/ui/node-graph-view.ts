@@ -867,18 +867,38 @@ export class FolderNodeGraphView extends ItemView {
     this.camera = { ...(state.canvas?.camera3D ?? state.view3D) };
     if (this.canvasRenderer !== null) {
       const current = this.canvasRenderer.captureViewportState();
+      const domScaleValue = new DOMMatrix(state.dom2D?.canvasTransform || undefined).a;
       this.canvasRenderer.restoreViewportState(state.canvas ?? {
         ...current,
         camera3D: state.view3D,
-        camera2D: { ...current.camera2D, zoom: new DOMMatrix(state.dom2D?.canvasTransform || undefined).a },
+        camera2D: state.dom2D === null ? current.camera2D : {
+          zoom: Math.max(NODE_GRAPH_DOM_MIN_2D_SCALE, domScaleValue),
+          panX: pixelValue(state.dom2D.canvasLeft) - state.dom2D.scrollLeft,
+          panY: pixelValue(state.dom2D.canvasTop) - state.dom2D.scrollTop,
+        },
       });
       return;
     }
     if (state.canvas !== null && this.dimension === "2d") {
-      const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
-      if (canvas !== null) {
-        canvas.style.transform = `scale(${Math.max(NODE_GRAPH_DOM_MIN_2D_SCALE, state.canvas.camera2D.zoom)})`;
-        this.updateZoomIndicator(domScale(canvas));
+      const surface = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+      const stage = surface?.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+      const canvas = stage?.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+      if (surface !== null && stage != null && canvas != null) {
+        const width = this.displayGraphData?.layout.width ?? pixelValue(canvas.style.width);
+        const height = this.displayGraphData?.layout.height ?? pixelValue(canvas.style.height);
+        const scale = clamp(state.canvas.camera2D.zoom, NODE_GRAPH_DOM_MIN_2D_SCALE, NODE_GRAPH_MAX_DOM_2D_SCALE);
+        const stageWidth = Math.max(surface.clientWidth, width * scale + 48);
+        const stageHeight = Math.max(surface.clientHeight, height * scale + 48);
+        const offsetX = (stageWidth - width * scale) / 2;
+        const offsetY = (stageHeight - height * scale) / 2;
+        stage.style.width = `${stageWidth}px`;
+        stage.style.height = `${stageHeight}px`;
+        canvas.style.left = `${offsetX}px`;
+        canvas.style.top = `${offsetY}px`;
+        canvas.style.transform = `scale(${scale})`;
+        surface.scrollLeft = Math.max(0, offsetX - state.canvas.camera2D.panX);
+        surface.scrollTop = Math.max(0, offsetY - state.canvas.camera2D.panY);
+        this.updateZoomIndicator(scale);
       }
       return;
     }
