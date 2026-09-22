@@ -797,6 +797,7 @@ describe("large Node Graph canvas renderer", () => {
 
     const zoomWheel = new WheelEvent("wheel", { bubbles: true, cancelable: true, ctrlKey: true, deltaY: 100_000 });
     Object.defineProperties(zoomWheel, {
+      ctrlKey: { configurable: true, value: true },
       offsetX: { configurable: true, value: 100 },
       offsetY: { configurable: true, value: 100 },
     });
