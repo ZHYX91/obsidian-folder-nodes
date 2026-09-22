@@ -26,6 +26,8 @@ export class ExplorerAdapter extends Component {
   private readonly noteTitleSurfaces = new Map<HTMLElement, NoteTitleSurface>();
   private readonly originalOrders = new Map<HTMLElement, Element[]>();
   private decorateTimer: number | null = null;
+  private explorerMutationTimer: number | null = null;
+  private readonly pendingExplorerScopes = new Set<HTMLElement>();
   private draggedPath: string | null = null;
   private selectedFolderPath: string | null = null;
   private dropTarget: HTMLElement | null = null;
@@ -58,6 +60,7 @@ export class ExplorerAdapter extends Component {
   }
 
   public refresh(): void {
+    this.cancelExplorerMutationDecorate();
     this.syncSurfaces();
     this.decorate();
   }
@@ -74,6 +77,7 @@ export class ExplorerAdapter extends Component {
   public stop(): void {
     if (this.decorateTimer !== null) window.clearTimeout(this.decorateTimer);
     this.decorateTimer = null;
+    this.cancelExplorerMutationDecorate();
     this.clearDrop();
     this.restoreOrders();
     for (const surface of this.surfaces.values()) {
@@ -103,7 +107,7 @@ export class ExplorerAdapter extends Component {
       const Observer = ownerWindow?.MutationObserver ?? MutationObserver;
       const Abort = ownerWindow?.AbortController ?? AbortController;
       const abort = new Abort();
-      const observer = new Observer(() => this.scheduleDecorate());
+      const observer = new Observer((records) => this.scheduleExplorerMutationDecorate(root, records));
       observer.observe(root, { childList: true, subtree: true });
       root.addEventListener("click", (event) => this.onClick(event), { capture: true, signal: abort.signal });
       root.addEventListener("keydown", (event) => this.onKeyDown(event), { capture: true, signal: abort.signal });
@@ -152,12 +156,51 @@ export class ExplorerAdapter extends Component {
   }
 
   private scheduleDecorate(): void {
+    this.cancelExplorerMutationDecorate();
     if (this.decorateTimer !== null) return;
     this.decorateTimer = window.setTimeout(() => {
       this.decorateTimer = null;
       this.syncSurfaces();
       this.decorate();
     }, 32);
+  }
+
+  private scheduleExplorerMutationDecorate(root: HTMLElement, records: readonly MutationRecord[]): void {
+    if (this.decorateTimer !== null) return;
+    for (const record of records) {
+      const target = asElement(record.target);
+      const scope = target?.closest<HTMLElement>(".nav-folder, .nav-files-container") ?? null;
+      if (scope === null || !root.contains(scope)) {
+        this.scheduleDecorate();
+        return;
+      }
+      this.pendingExplorerScopes.add(scope);
+    }
+    if (this.pendingExplorerScopes.size === 0 || this.explorerMutationTimer !== null) return;
+    this.explorerMutationTimer = window.setTimeout(() => {
+      this.explorerMutationTimer = null;
+      this.syncSurfaces();
+      const pending = [...this.pendingExplorerScopes];
+      this.pendingExplorerScopes.clear();
+      const scopes = pending.filter((scope) =>
+        scope.isConnected && !pending.some((candidate) => candidate !== scope && candidate.contains(scope)));
+      for (const scope of scopes) {
+        const surfaceRoot = [...this.surfaces.keys()].find((candidate) => candidate === scope || candidate.contains(scope));
+        if (surfaceRoot === undefined) continue;
+        if (scope.matches(".nav-files-container")) {
+          this.decorateRoot(surfaceRoot);
+          this.decorateCreateActions(surfaceRoot);
+        }
+        this.decorateEntries(scope);
+        this.syncNodeOrder(scope);
+      }
+    }, 32);
+  }
+
+  private cancelExplorerMutationDecorate(): void {
+    if (this.explorerMutationTimer !== null) window.clearTimeout(this.explorerMutationTimer);
+    this.explorerMutationTimer = null;
+    this.pendingExplorerScopes.clear();
   }
 
   private decorate(): void {
@@ -387,7 +430,11 @@ export class ExplorerAdapter extends Component {
   }
 
   private syncNodeOrder(root: HTMLElement): void {
-    for (const container of root.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children")) {
+    const containers = [
+      ...(root.matches(".nav-files-container, .nav-folder-children") ? [root] : []),
+      ...root.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children"),
+    ];
+    for (const container of containers) {
       const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
       if (parentPath === undefined) continue;
       const before = Array.from(container.children);
@@ -494,6 +541,13 @@ export class ExplorerAdapter extends Component {
       this.runAction(this.service.openFolderNode("", event.ctrlKey || event.metaKey));
       return;
     }
+    if (isFolderCollapseControl(target)) {
+      if (target.closest(".folder-nodes-leaf-indicator") !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
     const title = target.closest<HTMLElement>(".nav-folder-title[data-path]");
     const path = title?.dataset.path;
     if (path !== undefined) {
@@ -507,7 +561,6 @@ export class ExplorerAdapter extends Component {
         this.scheduleDecorate();
       }
     }
-    if (isFolderCollapseControl(target)) return;
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getCanonicalFile(path) === null) return;
     event.preventDefault();
     event.stopPropagation();
