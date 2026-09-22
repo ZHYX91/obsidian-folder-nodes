@@ -1632,6 +1632,34 @@ export class FolderNodeGraphView extends ItemView {
         event.clientY - bounds.top,
       );
     }, { passive: false });
+    let pan: { pointerId: number; scrollLeft: number; scrollTop: number; x: number; y: number } | null = null;
+    surface.addClass("is-mouse-pannable");
+    surface.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "touch" || (event.button !== 0 && event.button !== 1)) return;
+      const target = event.target as Element | null;
+      if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
+      pan = {
+        pointerId: event.pointerId,
+        scrollLeft: surface.scrollLeft,
+        scrollTop: surface.scrollTop,
+        x: event.clientX,
+        y: event.clientY,
+      };
+      surface.setPointerCapture?.(event.pointerId);
+      surface.addClass("is-dragging");
+    });
+    surface.addEventListener("pointermove", (event) => {
+      if (pan === null || event.pointerId !== pan.pointerId) return;
+      surface.scrollLeft = pan.scrollLeft - (event.clientX - pan.x);
+      surface.scrollTop = pan.scrollTop - (event.clientY - pan.y);
+    });
+    const finishPan = (event: PointerEvent): void => {
+      if (pan === null || event.pointerId !== pan.pointerId) return;
+      pan = null;
+      surface.removeClass("is-dragging");
+    };
+    surface.addEventListener("pointerup", finishPan);
+    surface.addEventListener("pointercancel", finishPan);
     const controls = {
       currentZoom: () => domScale(canvas),
       fit: () => {
