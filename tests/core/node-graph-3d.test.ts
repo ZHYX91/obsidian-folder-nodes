@@ -8,6 +8,7 @@ import {
   projectNodeGraph3D,
   rotateNodeGraphCamera,
   zoomNodeGraphCamera,
+  zoomNodeGraphCameraAt,
 } from "../../src/core/node-graph-3d";
 import { nodeGraphCanvasGeometry } from "../../src/core/node-graph-canvas";
 import { buildNodeGraphModel } from "../../src/core/node-graph-model";
@@ -89,6 +90,20 @@ describe("Node Graph 3D layout", () => {
     expect(Math.max(...projection.map(({ x }) => x))).toBeLessThan(800);
     expect(Math.min(...projection.map(({ y }) => y))).toBeGreaterThan(0);
     expect(Math.max(...projection.map(({ y }) => y))).toBeLessThan(600);
+  });
+
+  it("zooms 3D around the pointer without moving the anchored projected point", () => {
+    const points = layoutNodeGraph3D(model);
+    const width = 800;
+    const height = 600;
+    const camera = { ...defaultNodeGraphCamera(), panX: 35, panY: -20 };
+    const target = projectNodeGraph3D(points, camera, width, height).find(({ id }) => id === "A");
+    if (target === undefined) throw new Error("Missing 3D anchor target");
+    const zoomed = zoomNodeGraphCameraAt(camera, -320, target.x, target.y, width, height);
+    const after = projectNodeGraph3D(points, zoomed, width, height).find(({ id }) => id === "A");
+    expect(after?.x).toBeCloseTo(target.x, 6);
+    expect(after?.y).toBeCloseTo(target.y, 6);
+    expect(zoomed.zoom).toBeGreaterThan(camera.zoom);
   });
 
   it("compresses very deep structural levels into a bounded monotonic Z range", () => {
