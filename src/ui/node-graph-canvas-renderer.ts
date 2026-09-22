@@ -18,7 +18,6 @@ import {
   panNodeGraphCamera,
   projectNodeGraph3D,
   rotateNodeGraphCamera,
-  zoomNodeGraphCamera,
   zoomNodeGraphCameraAt,
   type NodeGraphCamera,
   type NodeGraphPoint3D,
