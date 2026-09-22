@@ -1043,6 +1043,7 @@ export default class FolderNodesPlugin extends Plugin {
       normalizeVaultPath(path) === normalizeVaultPath(this.service.rootNotePath()) ||
       isCanonicalNodeNote(path) || this.service.getFolder(path) !== null);
     if (explorerAffected) this.explorer.refresh();
+    else if (batch.reasons.has("active-leaf")) this.explorer.refreshActiveState();
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeContentsView) leaf.view.refresh(batch.full ? undefined : batch.paths);
     }
