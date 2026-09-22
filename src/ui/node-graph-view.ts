@@ -1757,8 +1757,26 @@ function relationSummary(structure: number, links: number): string {
   return t("nodeGraphRelationSummary", { structure, links });
 }
 
+function domScale(canvas: HTMLElement): number {
+  const scale = new DOMMatrix(canvas.style.transform || undefined).a;
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+function pixelValue(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function zoomLevelLabel(zoom: number): string {
+  return t("nodeGraphZoomLevel", { percent: Math.max(1, Math.round(zoom * 100)) });
+}
+
 function label(
-  key: "altBranchHint" | "boundaryNode" | "clearSearch" | "collapseChildren" | "collapseToFirst" | "dimension" | "disabledGraph" | "expandChildren" | "expandRange" | "expandRangeTooltip" | "findNode" | "fitGraph" | "globalScope" | "globalScopeTooltip" | "largeGraph" | "localScope" | "localScopeTooltip" | "nodeGraph" | "noLinks" | "scope" | "scopePrefix" | "selectNodeFirst" | "showLinks" | "showLinksTooltip" | "subtreeScope" | "subtreeScopeTooltip",
+  key: "altBranchHint" | "boundaryNode" | "clearSearch" | "collapseChildren" | "collapseToFirst" | "dimension" | "disabledGraph" | "expandChildren" | "expandRange" | "expandRangeTooltip" | "findNode" | "fitGraph" | "globalScope" | "globalScopeTooltip" | "largeGraph" | "localScope" | "localScopeTooltip" | "nodeGraph" | "noLinks" | "scope" | "scopePrefix" | "selectNodeFirst" | "showLinks" | "showLinksTooltip" | "subtreeScope" | "subtreeScopeTooltip" | "viewportHelp" | "zoomIn" | "zoomOut" | "zoomReset",
 ): string {
   const translationKey = ({
     altBranchHint: "nodeGraphToggleBranch",
@@ -1787,6 +1805,10 @@ function label(
     showLinksTooltip: "nodeGraphShowLinksTooltip",
     subtreeScope: "nodeGraphSubtreeScope",
     subtreeScopeTooltip: "nodeGraphSubtreeScopeTooltip",
+    viewportHelp: "nodeGraphViewportHelp",
+    zoomIn: "nodeGraphZoomIn",
+    zoomOut: "nodeGraphZoomOut",
+    zoomReset: "nodeGraphResetZoom",
   } as const)[key];
   return t(translationKey);
 }
