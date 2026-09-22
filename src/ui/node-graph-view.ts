@@ -876,7 +876,14 @@ export class FolderNodeGraphView extends ItemView {
     }
     if (state.canvas !== null && this.dimension === "2d") {
       const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
-      if (canvas !== null) canvas.style.transform = `scale(${state.canvas.camera2D.zoom})`;
+      if (canvas !== null) {
+        canvas.style.transform = `scale(${Math.max(NODE_GRAPH_DOM_MIN_2D_SCALE, state.canvas.camera2D.zoom)})`;
+        this.updateZoomIndicator(domScale(canvas));
+      }
+      return;
+    }
+    if (this.dimension === "3d") {
+      this.updateZoomIndicator(this.camera.zoom);
       return;
     }
     if (state.dom2D === null || this.dimension !== "2d") return;
@@ -891,6 +898,7 @@ export class FolderNodeGraphView extends ItemView {
     canvas.style.transform = state.dom2D.canvasTransform;
     surface.scrollLeft = state.dom2D.scrollLeft;
     surface.scrollTop = state.dom2D.scrollTop;
+    this.updateZoomIndicator(domScale(canvas));
   }
 
   private focusSearchInput(): void {
