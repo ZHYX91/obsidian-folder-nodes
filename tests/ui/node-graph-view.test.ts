@@ -537,6 +537,31 @@ describe("Node Graph progressive view", () => {
     expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-viewport-controls")).not.toBeNull();
   });
 
+  it("shares viewport buttons and keyboard zoom with Canvas graphs", async () => {
+    const settings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: 1 };
+    const fixture = await graphViewFixture(true, settings);
+    const renderer = (fixture.view as unknown as {
+      canvasRenderer: { currentZoom: () => number } | null;
+    }).canvasRenderer;
+    if (renderer === null) throw new Error("Missing Canvas graph renderer");
+    const zoomLevel = fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
+    const zoomIn = fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']");
+    const canvas = fixture.view.contentEl.querySelector<HTMLCanvasElement>(".folder-nodes-node-graph-render-canvas");
+    if (zoomLevel === null || zoomIn === null || canvas === null) throw new Error("Missing Canvas viewport controls");
+
+    const before = renderer.currentZoom();
+    zoomIn.click();
+    expect(renderer.currentZoom()).toBeGreaterThan(before);
+    expect(zoomLevel.textContent).not.toBe(`${Math.round(before * 100)}%`);
+
+    zoomLevel.click();
+    expect(renderer.currentZoom()).toBeCloseTo(1);
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "-" }));
+    expect(renderer.currentZoom()).toBeLessThan(1);
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "0" }));
+    expect(Number.parseInt(zoomLevel.textContent ?? "0", 10)).toBeGreaterThan(0);
+  });
+
   it("keeps the default DOM threshold boundary readable instead of shrinking cards to dots", async () => {
     const records = new Map<string, NodeGraphIndexRecord>();
     records.set("", record("", "Threshold Vault", null, "Threshold Vault.md"));
