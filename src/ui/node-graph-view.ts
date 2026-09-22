@@ -24,7 +24,7 @@ import {
   panNodeGraphCamera,
   projectNodeGraph3D,
   rotateNodeGraphCamera,
-  zoomNodeGraphCamera,
+  zoomNodeGraphCameraAt,
   type NodeGraphCamera,
   type NodeGraphPoint3D,
   type NodeGraphProjectedPoint,
@@ -146,6 +146,8 @@ const NODE_GRAPH_DENSE_3D_THRESHOLD = 24;
 const NODE_GRAPH_DENSE_3D_FIT_SCALE = 0.16;
 const NODE_GRAPH_MOUSE_PRESS_SLOP = 4;
 const NODE_GRAPH_TOUCH_PRESS_SLOP = 8;
+const NODE_GRAPH_ZOOM_STEP = 1.2;
+const NODE_GRAPH_MAX_DOM_2D_SCALE = 4;
 
 export class FolderNodeGraphView extends ItemView {
   private cardHandleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH;
@@ -411,15 +413,14 @@ export class FolderNodeGraphView extends ItemView {
     this.displayGraphData = data;
     this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
     this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
-    const toolbar = this.renderToolbar();
-    const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
+    this.renderToolbar();
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
     const visibleEdgeCount = edgesForShowLinks(data.model, this.showLinks).length;
     if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
-      this.renderCanvas(surface, data, fit);
+      this.renderCanvas(surface, data);
     }
-    else if (this.dimension === "2d") this.render2D(surface, data, fit);
-    else this.render3D(surface, data, fit);
+    else if (this.dimension === "2d") this.render2D(surface, data);
+    else this.render3D(surface, data);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
     this.highlightSearch(this.searchQuery);
     this.applyNeighborhood();
@@ -530,12 +531,40 @@ export class FolderNodeGraphView extends ItemView {
         this.render();
       });
     }
-    const fit = primary.createEl("button", {
+    const viewport = primary.createDiv({
+      cls: "folder-nodes-node-graph-viewport-controls",
+      attr: { "aria-label": label("viewportHelp") },
+    });
+    const zoomOut = viewport.createEl("button", {
       cls: "clickable-icon",
-      attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit" },
+      attr: { "aria-label": label("zoomOut"), "data-node-graph-action": "zoom-out", type: "button" },
+    });
+    setIcon(zoomOut, "minus");
+    setTooltip(zoomOut, label("zoomOut"));
+    const zoomReset = viewport.createEl("button", {
+      cls: "folder-nodes-node-graph-zoom-level",
+      text: "100%",
+      attr: { "aria-label": zoomLevelLabel(1), "data-node-graph-action": "zoom-reset", type: "button" },
+    });
+    setTooltip(zoomReset, label("zoomReset"));
+    const zoomIn = viewport.createEl("button", {
+      cls: "clickable-icon",
+      attr: { "aria-label": label("zoomIn"), "data-node-graph-action": "zoom-in", type: "button" },
+    });
+    setIcon(zoomIn, "plus");
+    setTooltip(zoomIn, label("zoomIn"));
+    const fit = viewport.createEl("button", {
+      cls: "clickable-icon",
+      attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit", type: "button" },
     });
     setIcon(fit, "maximize-2");
     setTooltip(fit, label("fitGraph"));
+    const help = viewport.createEl("button", {
+      cls: "clickable-icon",
+      attr: { "aria-label": label("viewportHelp"), type: "button" },
+    });
+    setIcon(help, "circle-help");
+    setTooltip(help, label("viewportHelp"));
     return toolbar;
   }
 
@@ -1003,7 +1032,7 @@ export class FolderNodeGraphView extends ItemView {
     return t(this.graphScope.mode === "subtree" ? "nodeGraphSubtreeStatus" : "nodeGraphLocalStatus", { name: rootLabel });
   }
 
-  private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private render2D(surface: HTMLElement, data: GraphData): void {
     const layout = data.layout;
     const stage = surface.createDiv({ cls: "folder-nodes-node-graph-stage" });
     stage.style.width = `${layout.width}px`;
@@ -1029,10 +1058,10 @@ export class FolderNodeGraphView extends ItemView {
       node.style.height = `${layout.nodeHeight}px`;
     }
     this.bindDomFocusClear(surface);
-    fit?.addEventListener("click", () => this.fit2D(surface, stage, canvas, layout.width, layout.height));
+    this.bindDom2DViewport(surface, stage, canvas, layout.width, layout.height);
   }
 
-  private render3D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private render3D(surface: HTMLElement, data: GraphData): void {
     const width = Math.max(1, surface.clientWidth || this.contentEl.clientWidth || 800);
     const height = Math.max(1, surface.clientHeight || this.contentEl.clientHeight - 44 || 600);
     this.threeDViewport = { width, height };
@@ -1060,21 +1089,10 @@ export class FolderNodeGraphView extends ItemView {
     }
     this.bind3DInteraction(surface);
     this.bindDomFocusClear(surface);
-    fit?.addEventListener("click", () => {
-      if (this.threeDViewport === null) return;
-      this.camera = fitNodeGraphCamera(
-        this.threeDPoints,
-        this.camera,
-        this.threeDViewport.width,
-        this.threeDViewport.height,
-        48,
-        this.denseThreeD ? NODE_GRAPH_DENSE_3D_FIT_SCALE : NODE_GRAPH_DOM_MIN_SCALE,
-      );
-      this.update3DProjection();
-    });
+    this.bind3DViewportControls();
   }
 
-  private renderCanvas(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private renderCanvas(surface: HTMLElement, data: GraphData): void {
     this.contentEl.addClass("is-canvas-graph");
     this.canvasRenderer = new NodeGraphCanvasRenderer(
       surface,
@@ -1099,6 +1117,7 @@ export class FolderNodeGraphView extends ItemView {
           this.updateScopeControls();
         },
         onToggle: (path, branch) => this.toggleExpansion(path, branch),
+        onZoomChange: (zoom) => this.updateZoomIndicator(zoom),
         onContextMenu: (path, event) => this.openNodeMenu(event, path),
         overviewEdgeLimit: this.settings().overviewEdgeLimit,
         relationSummary,
@@ -1108,7 +1127,12 @@ export class FolderNodeGraphView extends ItemView {
         ),
       },
     );
-    fit?.addEventListener("click", () => this.canvasRenderer?.fit());
+    this.bindViewportControlButtons({
+      currentZoom: () => this.canvasRenderer?.currentZoom() ?? 1,
+      fit: () => this.canvasRenderer?.fit(),
+      reset: () => this.canvasRenderer?.resetZoom(),
+      zoomBy: (factor) => this.canvasRenderer?.zoomBy(factor),
+    });
   }
 
   private edgeLayer(canvas: HTMLElement, width: number, height: number): SVGSVGElement {
