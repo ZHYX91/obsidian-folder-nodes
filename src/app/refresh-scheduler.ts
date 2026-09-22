@@ -24,7 +24,7 @@ export class RefreshScheduler {
   public request(path?: string, reason: RefreshReason = path === undefined ? "full" : "path"): void {
     this.reasons.add(reason);
     if (path === undefined) {
-      this.full = true;
+      if (reason !== "active-leaf") this.full = true;
     } else {
       this.paths.add(path);
       const reasons = this.pathReasons.get(path) ?? new Set<RefreshReason>();
@@ -38,7 +38,7 @@ export class RefreshScheduler {
   public flush(): void {
     if (this.timer !== null) this.cancelSchedule(this.timer);
     this.timer = null;
-    if (!this.full && this.paths.size === 0) return;
+    if (!this.full && this.paths.size === 0 && this.reasons.size === 0) return;
     const batch = {
       full: this.full,
       pathReasons: new Map([...this.pathReasons].map(([path, reasons]) => [path, new Set(reasons)])),
