@@ -559,9 +559,9 @@ export class FolderNodeGraphView extends ItemView {
     });
     setIcon(fit, "maximize-2");
     setTooltip(fit, label("fitGraph"));
-    const help = viewport.createEl("button", {
-      cls: "clickable-icon",
-      attr: { "aria-label": label("viewportHelp"), type: "button" },
+    const help = viewport.createSpan({
+      cls: "folder-nodes-node-graph-viewport-help",
+      attr: { "aria-label": label("viewportHelp"), role: "img", tabindex: "0" },
     });
     setIcon(help, "circle-help");
     setTooltip(help, label("viewportHelp"));
