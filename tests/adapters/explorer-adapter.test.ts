@@ -185,7 +185,7 @@ describe("ExplorerAdapter lifecycle", () => {
       const title = row.createDiv({ cls: "nav-folder-title", attr: { "data-path": path } });
       title.createSpan({ cls: "tree-item-icon collapse-icon" });
       title.createSpan({ cls: "nav-folder-title-content", text: path });
-      return { row, children: row.createDiv({ cls: "nav-folder-children" }) };
+      return { row, title, children: row.createDiv({ cls: "nav-folder-children" }) };
     };
     const aRow = makeFolderRow("A");
     makeFolderRow("B");
@@ -204,6 +204,7 @@ describe("ExplorerAdapter lifecycle", () => {
     const notes = new Map<string, TFile>([[a.path, aNote], [b.path, bNote]]);
     const canonicalFiles = new Set<TFile>([aNote, bNote]);
     const folderIdentity = vi.fn((path: string) => folders.has(path) ? "node" : "ordinary");
+    const openFolderNode = vi.fn(async () => undefined);
     const app = {
       vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: () => null },
       workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
@@ -216,7 +217,7 @@ describe("ExplorerAdapter lifecycle", () => {
       folderIdentity, fileIdentity: () => "ordinary", isCanonicalFile: (file: TFile) => canonicalFiles.has(file),
       isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false,
       hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
-      notePathForFolder: (path: string) => notes.get(path)?.path ?? `${path}/${path}.md`, openFolderNode: async () => undefined,
+      notePathForFolder: (path: string) => notes.get(path)?.path ?? `${path}/${path}.md`, openFolderNode,
       previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => a, rootNotePath: () => "Vault.md",
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
@@ -230,6 +231,11 @@ describe("ExplorerAdapter lifecycle", () => {
     adapter.start();
     await new Promise((resolve) => window.setTimeout(resolve, 160));
     folderIdentity.mockClear();
+
+    aRow.title.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    expect(openFolderNode).toHaveBeenCalledWith(a.path, false);
+    expect(folderIdentity).not.toHaveBeenCalled();
 
     const child = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "Child", parent: a, path: "A/Child" });
     const childNote = canonical(child);
