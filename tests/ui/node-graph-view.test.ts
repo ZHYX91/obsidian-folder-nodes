@@ -502,6 +502,20 @@ describe("Node Graph progressive view", () => {
     expect(plainWheel.defaultPrevented).toBe(false);
     expect(canvas.style.transform).toBe("");
 
+    surface.scrollLeft = 40;
+    surface.scrollTop = 50;
+    surface.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, button: 0, clientX: 200, clientY: 200, pointerId: 1, pointerType: "mouse",
+    }));
+    surface.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 150, clientY: 140, pointerId: 1, pointerType: "mouse",
+    }));
+    surface.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true, clientX: 150, clientY: 140, pointerId: 1, pointerType: "mouse",
+    }));
+    expect(surface.scrollLeft).toBe(90);
+    expect(surface.scrollTop).toBe(110);
+
     const zoomWheel = new WheelEvent("wheel", {
       bubbles: true, cancelable: true, clientX: 400, clientY: 300, ctrlKey: true, deltaY: -120,
     });
