@@ -780,16 +780,27 @@ describe("large Node Graph canvas renderer", () => {
     }));
     expect(onSelect).not.toHaveBeenCalled();
 
-    const wheel = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100_000 });
-    Object.defineProperties(wheel, {
+    const readable = renderer as unknown as {
+      camera2D: { readonly panY: number; readonly zoom: number };
+      presentationForPoint: (candidate: typeof point) => { readonly label: boolean };
+    };
+    const zoomBeforeScroll = readable.camera2D.zoom;
+    const panBeforeScroll = readable.camera2D.panY;
+    const scrollWheel = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 120 });
+    Object.defineProperties(scrollWheel, {
       offsetX: { configurable: true, value: 100 },
       offsetY: { configurable: true, value: 100 },
     });
-    canvas?.dispatchEvent(wheel);
-    const readable = renderer as unknown as {
-      camera2D: { readonly zoom: number };
-      presentationForPoint: (candidate: typeof point) => { readonly label: boolean };
-    };
+    canvas?.dispatchEvent(scrollWheel);
+    expect(readable.camera2D.zoom).toBe(zoomBeforeScroll);
+    expect(readable.camera2D.panY).toBe(panBeforeScroll - 120);
+
+    const zoomWheel = new WheelEvent("wheel", { bubbles: true, cancelable: true, ctrlKey: true, deltaY: 100_000 });
+    Object.defineProperties(zoomWheel, {
+      offsetX: { configurable: true, value: 100 },
+      offsetY: { configurable: true, value: 100 },
+    });
+    canvas?.dispatchEvent(zoomWheel);
     expect(readable.camera2D.zoom).toBe(0.38);
     expect(readable.presentationForPoint({ ...point, scale: readable.camera2D.zoom }).label).toBe(true);
 
