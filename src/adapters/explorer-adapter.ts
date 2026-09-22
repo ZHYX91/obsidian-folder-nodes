@@ -65,6 +65,12 @@ export class ExplorerAdapter extends Component {
     this.decorate();
   }
 
+  public refreshActiveState(): void {
+    this.syncSurfaces();
+    for (const { root } of this.surfaces.values()) this.decorateRoot(root);
+    this.decorateNoteTitles();
+  }
+
   public async reveal(entry: TAbstractFile): Promise<boolean> {
     const leaf = this.app.workspace.getLeavesOfType("file-explorer")[0];
     const view = leaf?.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void } | undefined;
@@ -541,15 +547,18 @@ export class ExplorerAdapter extends Component {
       this.runAction(this.service.openFolderNode("", event.ctrlKey || event.metaKey));
       return;
     }
+    const title = target.closest<HTMLElement>(".nav-folder-title[data-path]");
+    const path = title?.dataset.path;
     if (isFolderCollapseControl(target)) {
       if (target.closest(".folder-nodes-leaf-indicator") !== null) {
         event.preventDefault();
         event.stopPropagation();
+      } else if (path !== undefined) {
+        this.selectedFolderPath = path;
+        for (const { root } of this.surfaces.values()) this.decorateCreateActions(root);
       }
       return;
     }
-    const title = target.closest<HTMLElement>(".nav-folder-title[data-path]");
-    const path = title?.dataset.path;
     if (path !== undefined) {
       this.selectedFolderPath = path;
       this.scheduleDecorate();
