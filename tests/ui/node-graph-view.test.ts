@@ -483,6 +483,46 @@ describe("Node Graph progressive view", () => {
     expectVisible(fixture.view, ["", "Work", "Personal"]);
   });
 
+  it("uses native 2D wheel browsing and pointer-anchored Ctrl/Cmd wheel zoom with shared controls", async () => {
+    const fixture = await graphViewFixture();
+    const surface = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+    const canvas = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+    if (surface === null || canvas === null) throw new Error("Missing DOM graph viewport");
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 600 },
+      clientWidth: { configurable: true, value: 800 },
+    });
+    surface.getBoundingClientRect = () => ({
+      bottom: 600, height: 600, left: 0, right: 800, top: 0, width: 800, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+
+    const plainWheel = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 120 });
+    surface.dispatchEvent(plainWheel);
+    expect(plainWheel.defaultPrevented).toBe(false);
+    expect(canvas.style.transform).toBe("");
+
+    const zoomWheel = new WheelEvent("wheel", {
+      bubbles: true, cancelable: true, clientX: 400, clientY: 300, ctrlKey: true, deltaY: -120,
+    });
+    surface.dispatchEvent(zoomWheel);
+    expect(zoomWheel.defaultPrevented).toBe(true);
+    expect(new DOMMatrix(canvas.style.transform).a).toBeGreaterThan(1);
+    const zoomLevel = fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
+    expect(zoomLevel?.textContent).not.toBe("100%");
+
+    zoomLevel?.click();
+    expect(new DOMMatrix(canvas.style.transform).a).toBeCloseTo(1);
+    expect(zoomLevel?.textContent).toBe("100%");
+
+    fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']")?.click();
+    expect(new DOMMatrix(canvas.style.transform).a).toBeCloseTo(1.2);
+    nodeBody(fixture.view, "Work").dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "-" }));
+    expect(new DOMMatrix(canvas.style.transform).a).toBeCloseTo(1);
+
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-viewport-controls")).not.toBeNull();
+  });
+
   it("keeps the default DOM threshold boundary readable instead of shrinking cards to dots", async () => {
     const records = new Map<string, NodeGraphIndexRecord>();
     records.set("", record("", "Threshold Vault", null, "Threshold Vault.md"));
