@@ -454,6 +454,10 @@ export class ExplorerAdapter extends Component {
     return this.app.workspace.getActiveFile()?.parent?.path ?? "";
   }
 
+  private refreshCreateActions(): void {
+    for (const { root } of this.surfaces.values()) this.decorateCreateActions(root);
+  }
+
   private syncNodeOrder(root: HTMLElement): void {
     const containers = [
       ...(root.matches(".nav-files-container, .nav-folder-children") ? [root] : []),
@@ -560,7 +564,7 @@ export class ExplorerAdapter extends Component {
     }
     if (target.closest(".folder-nodes-explorer-root") !== null) {
       this.selectedFolderPath = "";
-      this.scheduleDecorate();
+      this.refreshCreateActions();
       event.preventDefault();
       event.stopPropagation();
       this.runAction(this.service.openFolderNode("", event.ctrlKey || event.metaKey));
@@ -574,19 +578,19 @@ export class ExplorerAdapter extends Component {
         event.stopPropagation();
       } else if (path !== undefined) {
         this.selectedFolderPath = path;
-        for (const { root } of this.surfaces.values()) this.decorateCreateActions(root);
+        this.refreshCreateActions();
       }
       return;
     }
     if (path !== undefined) {
       this.selectedFolderPath = path;
-      this.scheduleDecorate();
+      this.refreshCreateActions();
     } else {
       const filePath = target.closest<HTMLElement>(".nav-file-title[data-path]")?.dataset.path;
       const file = filePath === undefined ? null : this.app.vault.getAbstractFileByPath(filePath);
       if (file instanceof TFile) {
         this.selectedFolderPath = file.parent?.path ?? "";
-        this.scheduleDecorate();
+        this.refreshCreateActions();
       }
     }
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getCanonicalFile(path) === null) return;
