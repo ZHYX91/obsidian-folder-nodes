@@ -1658,6 +1658,7 @@ export class FolderNodeGraphView extends ItemView {
       if (event.pointerType === "touch" || (event.button !== 0 && event.button !== 1)) return;
       const target = event.target as Element | null;
       if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
+      event.preventDefault();
       pan = {
         pointerId: event.pointerId,
         scrollLeft: surface.scrollLeft,
@@ -1680,6 +1681,7 @@ export class FolderNodeGraphView extends ItemView {
     };
     surface.addEventListener("pointerup", finishPan);
     surface.addEventListener("pointercancel", finishPan);
+    surface.addEventListener("lostpointercapture", finishPan);
     const controls = {
       currentZoom: () => domScale(canvas),
       fit: () => {
