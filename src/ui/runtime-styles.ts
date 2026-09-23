@@ -42,13 +42,18 @@ export class RuntimeStyles {
     return true;
   }
 
-  public removeAll(): void {
-    for (const [document, sheet] of this.sheets) {
-      document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-        (candidate) => candidate !== sheet,
-      );
+  public reconcile(documents: Iterable<Document>): void {
+    const live = new Set(documents);
+    for (const document of live) this.install(document);
+    for (const [document, sheet] of [...this.sheets]) {
+      if (live.has(document)) continue;
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((candidate) => candidate !== sheet);
+      this.sheets.delete(document);
     }
-    this.sheets.clear();
+  }
+
+  public removeAll(): void {
+    this.reconcile([]);
   }
 
   private source(): string {
