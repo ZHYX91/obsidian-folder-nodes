@@ -39,7 +39,7 @@ describe("RefreshScheduler", () => {
     scheduler.request(undefined, "active-leaf");
     callbacks[0]?.();
     expect(run).toHaveBeenCalledWith({
-      full: true,
+      full: false,
       pathReasons: new Map(),
       paths: new Set(),
       reasons: new Set(["active-leaf"]),

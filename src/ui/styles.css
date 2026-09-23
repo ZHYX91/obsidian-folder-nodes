@@ -311,7 +311,8 @@ body {
 
 .folder-nodes-leaf-indicator {
   position: relative;
-  pointer-events: none;
+  cursor: default;
+  pointer-events: auto;
 }
 .folder-nodes-leaf-indicator > svg { visibility: hidden; }
 .folder-nodes-leaf-indicator::after {

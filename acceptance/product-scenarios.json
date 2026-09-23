@@ -154,6 +154,28 @@
         "Desktop gaps match their visible destination and reject hidden ambiguities; Android uses the same explicit ordering rules through menus.",
         "Contents remains usable after refresh and unrelated body edits do not reset its node list."
       ]
+    },
+    {
+      "id": "explorer-disclosure-and-active-target",
+      "title": "Passive Explorer disclosures and active-note creation destination",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In File Explorer tap or click the passive dot of a complete leaf with no visible contents; then activate its title separately.",
+        "Expand and collapse Geometry repeatedly while an unrelated branch is visible. Add a direct file to the leaf and repeat disclosure activation.",
+        "Reload with no Explorer folder selected, open Geometry/Emoji/Emoji.md, then switch to Geometry/Glyph/Glyph.md through an already-open note tab and use the Explorer New node button."
+      ],
+      "expected": [
+        "The passive dot neither opens a note nor expands the row. The title opens its Node Note once.",
+        "Normal disclosures remain native, visible contents restore the arrow, and unrelated rows and scroll position remain stable.",
+        "The creation dialog names Geometry/Glyph as the destination after the active-note switch; cancel the dialog after verifying its destination."
+      ]
     }
   ]
 }
