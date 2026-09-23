@@ -72,7 +72,9 @@ const doubles = vi.hoisted(() => {
   class FakeContentsView {
     public readonly contentEl = document.createElement("div");
     public readonly extensions = new Map<string, () => void>();
+    public folderPath = "";
     public constructor() { this.contentEl.createDiv({ cls: "folder-nodes-header-actions" }); }
+    public currentFolderPath(): string { return this.folderPath; }
     public setRenderExtension(key: string, extension: () => void): void {
       this.extensions.set(key, extension);
       extension();
@@ -152,6 +154,22 @@ describe("Node Graph plugin integration", () => {
     expect(linksOnly.records).toBe(first.records);
     expect(linksOnly.links.get("A")).toEqual(new Set([""]));
     expect(linksOnly.revision).toBe(first.revision + 1);
+  });
+
+  it("opens the graph for the node shown by Contents instead of the active editor", async () => {
+    const fixture = pluginFixture();
+    fixture.addNode("B");
+    const contents = new doubles.FakeContentsView();
+    contents.folderPath = "B";
+    const graph = new doubles.FakeGraphView({});
+    fixture.leaves.set(CONTENTS_VIEW_TYPE, [{ view: contents }]);
+    fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view: graph }]);
+    const plugin = fixture.createPlugin();
+
+    await plugin.onload();
+    contents.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-entry-button")?.click();
+
+    await vi.waitFor(() => expect(graph.focusCalls).toEqual(["B"]));
   });
 
   it("exits immediately when unload wins while the base plugin is still starting", async () => {
