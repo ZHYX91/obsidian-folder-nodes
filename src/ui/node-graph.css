@@ -163,7 +163,8 @@
   font-style: italic;
 }
 
-.folder-nodes-node-graph-switch {
+.folder-nodes-node-graph-switch,
+.folder-nodes-node-graph-viewport-controls {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -172,6 +173,43 @@
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 7px;
+}
+
+.folder-nodes-node-graph-viewport-controls > .clickable-icon,
+.folder-nodes-node-graph-viewport-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 5px;
+  color: var(--text-muted);
+  border-radius: 5px;
+}
+
+.folder-nodes-node-graph-viewport-help:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: -2px;
+}
+
+.folder-nodes-node-graph-zoom-level {
+  min-width: 46px;
+  height: 28px;
+  padding: 0 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.folder-nodes-node-graph-zoom-level:hover,
+.folder-nodes-node-graph-viewport-controls > .clickable-icon:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }
 
 .folder-nodes-node-graph-switch-button {
@@ -233,6 +271,10 @@
   background: var(--background-primary);
 }
 
+.folder-nodes-node-graph-scroll.is-mouse-pannable {
+  cursor: grab;
+}
+
 .folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll,
 .folder-nodes-node-graph-scroll.folder-nodes-node-graph-canvas-surface {
   overflow: hidden;
@@ -241,6 +283,7 @@
   user-select: none;
 }
 
+.folder-nodes-node-graph-scroll.is-mouse-pannable.is-dragging,
 .folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll.is-dragging,
 .folder-nodes-node-graph-scroll.folder-nodes-node-graph-canvas-surface.is-dragging {
   cursor: grabbing;
@@ -722,6 +765,8 @@
   .folder-nodes-node-graph-range-button,
   .folder-nodes-node-graph-scope-button,
   .folder-nodes-node-graph-switch-button,
+  .folder-nodes-node-graph-zoom-level,
+  .folder-nodes-node-graph-viewport-help,
   .folder-nodes-node-graph-toolbar .clickable-icon {
     min-width: 44px;
     min-height: 44px;

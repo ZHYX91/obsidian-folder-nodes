@@ -74,9 +74,9 @@
       "steps": [
         "Inspect a complete visual leaf in File Explorer, then add a visible direct file",
         "Open Node Contents for a deep node, toggle one non-empty section, and navigate away and back",
-        "Focus a deep graph node, then collapse its parent directly, as a whole Alt branch, and with Collapse to level 1",
+        "Focus a deep graph node and collapse its parent directly and with Collapse to level 1; on desktop also use Alt to collapse the whole branch, and on Android use the equivalent branch action from the node menu.",
         "Select a parent, view its subtree, then select a child without changing scope; explicitly view the child subtree and return to global",
-        "Use the icon, expansion handle, keyboard, context menu and File Explorer reveal; inspect matching handle backgrounds and stable expansion anchors"
+        "Use the icon, expansion handle, context menu and File Explorer reveal; on desktop also exercise keyboard navigation. Inspect matching handle backgrounds and stable expansion anchors."
       ],
       "expected": [
         "The hidden canonical note yields a passive dot, and visible content restores the native disclosure arrow",
@@ -175,6 +175,75 @@
         "The passive dot neither opens a note nor expands the row. The title opens its Node Note once.",
         "Normal disclosures remain native, visible contents restore the arrow, and unrelated rows and scroll position remain stable.",
         "The creation dialog names Geometry/Glyph as the destination after the active-note switch; cancel the dialog after verifying its destination."
+      ]
+    },
+    {
+      "id": "viewport-controls-basic",
+      "title": "Viewport toolbar, scope and focus remain independent",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Open the Geometry subtree in DOM 2D. Select an off-center node and use zoom in, zoom out, percentage reset, Fit, and Center selected.",
+        "Switch to 3D and repeat the toolbar operations; inspect the interaction help in a narrow pane.",
+        "On Android scroll DOM 2D with one finger and verify that the zoom, percentage and help controls have touch targets at least 44 by 44 CSS pixels."
+      ],
+      "expected": [
+        "The percentage updates immediately and reset returns to 100%; zoom preserves the viewport-center anchor.",
+        "Fit contains the graph where permitted by readable node sizes; Center selected keeps the selected card visible without changing the subtree scope.",
+        "Toolbar actions do not open a node or change selection, and the toolbar remains usable in a narrow mobile pane."
+      ]
+    },
+    {
+      "id": "viewport-desktop-renderer-boundary",
+      "title": "Desktop anchors across DOM and Canvas boundaries",
+      "surfaces": [
+        "desktop"
+      ],
+      "requiredCapabilities": {
+        "desktop": []
+      },
+      "steps": [
+        "In a fresh disposable Vault, run the acceptance provider command Create 501-node viewport fixture, scope the graph to Viewport, and retain the default large-graph threshold of 500.",
+        "In DOM 2D, test ordinary wheel scrolling, Ctrl/Cmd+wheel zoom at an off-center card near the upper-left scroll boundary, and blank-space mouse dragging. Test +, -, 0 and F with graph focus, then confirm they do not hijack the search input.",
+        "Select Wide and expand it to cross from 3 visible nodes to 501; pan, zoom above 400% and below 65%, then collapse it to return to DOM. Repeat near both zoom limits and all viewport edges.",
+        "Repeat expansion, collapse, off-center pointer zoom, Fit and Center selected in 3D with both renderers."
+      ],
+      "expected": [
+        "Unmodified wheel scrolls while Ctrl/Cmd+wheel zooms around its pointer; blank dragging pans without opening nodes.",
+        "Selection, scope, supported zoom and the expansion-card screen anchor survive both renderer transitions without a visible jump.",
+        "Zoom limits do not move the anchored point, all graph content remains reachable, and search typing retains normal text behavior.",
+        "3D pointer zoom preserves its projected anchor and both renderers expose the same toolbar actions."
+      ]
+    },
+    {
+      "id": "viewport-android-multitouch",
+      "title": "Android native pinch and two-finger pan across graph renderers",
+      "surfaces": [
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "android-emulator": [
+          "touch.drag",
+          "touch.pinch"
+        ]
+      },
+      "steps": [
+        "Confirm the input host receives two simultaneous native touch pointers with distinct identities and releases both after cancellation or completion.",
+        "Generate the 501-node Viewport fixture in a fresh disposable Vault and expand Wide to enter Canvas 2D. Pinch at an off-center midpoint, translate both fingers together, then combine scaling and translation.",
+        "Repeat in DOM 3D with Wide collapsed and Canvas 3D with Wide expanded. Exercise zoom limits, toolbar reset, Fit, Center selected, and expansion across the 500-node renderer boundary.",
+        "After each two-finger gesture, lift both fingers and tap or long-press a card normally. In DOM 2D use native one-finger scrolling and toolbar zoom."
+      ],
+      "expected": [
+        "Pinch preserves the world point under its moving midpoint and same-distance two-finger movement pans without rotating the 3D camera.",
+        "Two-finger gestures do not accidentally select, open or invoke a context menu for a node.",
+        "Supported zoom and selected-card position remain stable across renderer changes; percentage and controls stay synchronized.",
+        "No pointer remains captured after release or cancellation, and ordinary interaction resumes."
       ]
     }
   ]

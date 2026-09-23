@@ -1,0 +1,9 @@
+{
+  "id": "folder-nodes-acceptance-provider",
+  "name": "Folder Nodes Acceptance Provider",
+  "version": "1.0.0",
+  "minAppVersion": "1.12.7",
+  "description": "Explicitly generates a deterministic graph in a disposable acceptance Vault.",
+  "author": "ZhengYX",
+  "isDesktopOnly": false
+}

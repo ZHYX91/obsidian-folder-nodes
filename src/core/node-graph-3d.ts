@@ -186,6 +186,25 @@ export function zoomNodeGraphCamera(camera: NodeGraphCamera, deltaY: number): No
   return { ...camera, zoom: clamp(camera.zoom * factor, MIN_CAMERA_ZOOM, 4) };
 }
 
+export function zoomNodeGraphCameraAt(
+  camera: NodeGraphCamera,
+  deltaY: number,
+  anchorX: number,
+  anchorY: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): NodeGraphCamera {
+  const zoomed = zoomNodeGraphCamera(camera, deltaY);
+  const ratio = zoomed.zoom / camera.zoom;
+  const centerX = Math.max(1, viewportWidth) / 2;
+  const centerY = Math.max(1, viewportHeight) / 2;
+  return {
+    ...zoomed,
+    panX: anchorX - centerX - (anchorX - centerX - camera.panX) * ratio,
+    panY: anchorY - centerY - (anchorY - centerY - camera.panY) * ratio,
+  };
+}
+
 function projectedBounds(points: readonly NodeGraphProjectedPoint[], minimumNodeScale = 0): {
   readonly centerX: number;
   readonly centerY: number;

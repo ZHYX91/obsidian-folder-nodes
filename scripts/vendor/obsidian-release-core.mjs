@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 
-export const RELEASE_CORE_VERSION = "3.0.2";
+export const RELEASE_CORE_VERSION = "3.1.0";
 export const RELEASE_CORE_PACKAGE_NAME = "@zhyx/obsidian-release-core";
 export const RELEASE_CORE_VENDOR_LOCK_SCHEMA_VERSION = 2;
 export const CANDIDATE_BUNDLE_SCHEMA_VERSION = 3;
@@ -29,7 +29,7 @@ const pluginIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
 const sha256Pattern = /^[0-9a-f]{64}$/u;
 const gitObjectPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
-const hostCapabilities = Object.freeze(["touch.drag", "touch.longPress", "touch.doubleTap"]);
+const hostCapabilities = Object.freeze(["touch.drag", "touch.longPress", "touch.doubleTap", "touch.pinch"]);
 const zipDosDate = 0x0021;
 const zipDosTime = 0;
 const zipUtf8Flag = 0x0800;
@@ -2411,7 +2411,7 @@ function validatePortableProductEvidence(record) {
     new Set(record.scenario.requiredCapabilities).size ===
       record.scenario.requiredCapabilities.length &&
     record.scenario.requiredCapabilities.every((capability, index) =>
-      (capability === "touch.drag" || capability === "touch.longPress" || capability === "touch.doubleTap") &&
+      hostCapabilities.includes(capability) &&
       (index === 0 || record.scenario.requiredCapabilities[index - 1]
         .localeCompare(capability, "en") < 0)),
   "Portable product evidence scenario capabilities are invalid");
@@ -2444,11 +2444,13 @@ function validatePortableAndroidHost(host) {
   assertExactKeys(host.inputDriver, driverKeys, driverKeys,
     "Portable Android emulator input driver");
   assertCondition(host.inputDriver.id === "android-emulator-grpc-v1" &&
-    ["1.1.0", "1.2.0"].includes(host.inputDriver.version) &&
+    ["1.1.0", "1.2.0", "1.3.0"].includes(host.inputDriver.version) &&
     JSON.stringify(host.inputDriver.endpoint) ===
       JSON.stringify({ host: "127.0.0.1", port: "ephemeral" }) &&
     JSON.stringify(host.inputDriver.capabilities) ===
-      JSON.stringify(host.inputDriver.version === "1.1.0" ? ["touch.longPress", "touch.drag"] : ["touch.longPress", "touch.drag", "touch.doubleTap"]) &&
+      JSON.stringify(host.inputDriver.version === "1.1.0" ? ["touch.longPress", "touch.drag"] :
+        host.inputDriver.version === "1.2.0" ? ["touch.longPress", "touch.drag", "touch.doubleTap"] :
+          ["touch.longPress", "touch.drag", "touch.doubleTap", "touch.pinch"]) &&
     JSON.stringify(host.inputDriver.rpcAllowlist) === JSON.stringify([
       "/android.emulation.control.EmulatorController/getStatus",
       "/android.emulation.control.EmulatorController/getScreenshot",
@@ -2470,8 +2472,9 @@ function validatePortableInputTraceSummary(trace, evidence) {
     "residualTouches",
   ];
   assertExactKeys(trace, keys, keys, "Portable Android input trace summary");
-  assertCondition(trace.schemaVersion === 2 &&
-    trace.kind === "obsidian-plugin-workspace/android-input-trace-summary-v2",
+  const traceVersion = evidence.host.inputDriver.version === "1.3.0" ? 3 : 2;
+  assertCondition(trace.schemaVersion === traceVersion &&
+    trace.kind === `obsidian-plugin-workspace/android-input-trace-summary-v${traceVersion}`,
   "Portable Android input trace summary schema/kind is unsupported");
   assertCondition(typeof trace.path === "string" && trace.path.startsWith("input-traces/") &&
     !trace.path.includes("\\") && !trace.path.split("/").some((segment) =>
@@ -2523,11 +2526,12 @@ function validatePortableInputTraceSummary(trace, evidence) {
   assertCondition(Number.isSafeInteger(trace.actionCount) && trace.actionCount > 0,
     "Portable passed Android input trace must contain actions");
   const actionKeys = trace.driver.version === "1.1.0" ? ["tap", "longPress", "drag", "failed"] :
-    ["tap", "doubleTap", "longPress", "drag", "failed"];
+    trace.driver.version === "1.2.0" ? ["tap", "doubleTap", "longPress", "drag", "failed"] :
+      ["tap", "doubleTap", "longPress", "drag", "pinch", "failed"];
   assertExactKeys(trace.actions, actionKeys, actionKeys, "Portable Android input trace actions");
   assertCondition(Object.values(trace.actions).every((count) =>
     Number.isSafeInteger(count) && count >= 0) &&
-    trace.actions.tap + (trace.actions.doubleTap ?? 0) + trace.actions.longPress + trace.actions.drag === trace.actionCount &&
+    trace.actions.tap + (trace.actions.doubleTap ?? 0) + trace.actions.longPress + trace.actions.drag + (trace.actions.pinch ?? 0) === trace.actionCount &&
     trace.actions.failed === 0 && trace.residualTouches === 0,
   "Portable passed Android input trace action counts are invalid");
   for (const capability of evidence.scenario.requiredCapabilities) {

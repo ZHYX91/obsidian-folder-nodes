@@ -24,12 +24,13 @@ import {
   panNodeGraphCamera,
   projectNodeGraph3D,
   rotateNodeGraphCamera,
-  zoomNodeGraphCamera,
+  zoomNodeGraphCameraAt,
   type NodeGraphCamera,
   type NodeGraphPoint3D,
   type NodeGraphProjectedPoint,
 } from "../core/node-graph-3d";
-import { shouldUseNodeGraphCanvas } from "../core/node-graph-canvas";
+import { shouldUseNodeGraphCanvas, zoomNodeGraphCanvasCamera, type NodeGraphCanvasCamera } from "../core/node-graph-canvas";
+import { nodeGraphDomViewport } from "../core/node-graph-dom-viewport";
 import {
   nodeGraphBoxFromCenter,
   nodeGraphBoxFromTopLeft,
@@ -146,6 +147,8 @@ const NODE_GRAPH_DENSE_3D_THRESHOLD = 24;
 const NODE_GRAPH_DENSE_3D_FIT_SCALE = 0.16;
 const NODE_GRAPH_MOUSE_PRESS_SLOP = 4;
 const NODE_GRAPH_TOUCH_PRESS_SLOP = 8;
+const NODE_GRAPH_ZOOM_STEP = 1.2;
+const NODE_GRAPH_MIN_INTERACTIVE_2D_SCALE = 0.38;
 
 export class FolderNodeGraphView extends ItemView {
   private cardHandleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH;
@@ -411,15 +414,14 @@ export class FolderNodeGraphView extends ItemView {
     this.displayGraphData = data;
     this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
     this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
-    const toolbar = this.renderToolbar();
-    const fit = toolbar.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
+    this.renderToolbar();
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
     const visibleEdgeCount = edgesForShowLinks(data.model, this.showLinks).length;
     if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
-      this.renderCanvas(surface, data, fit);
+      this.renderCanvas(surface, data);
     }
-    else if (this.dimension === "2d") this.render2D(surface, data, fit);
-    else this.render3D(surface, data, fit);
+    else if (this.dimension === "2d") this.render2D(surface, data);
+    else this.render3D(surface, data);
     if (this.canvasRenderer === null) this.applyFocus(this.dimension === "2d");
     this.highlightSearch(this.searchQuery);
     this.applyNeighborhood();
@@ -530,12 +532,40 @@ export class FolderNodeGraphView extends ItemView {
         this.render();
       });
     }
-    const fit = primary.createEl("button", {
+    const viewport = primary.createDiv({
+      cls: "folder-nodes-node-graph-viewport-controls",
+      attr: { "aria-label": label("viewportHelp") },
+    });
+    const zoomOut = viewport.createEl("button", {
       cls: "clickable-icon",
-      attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit" },
+      attr: { "aria-label": label("zoomOut"), "data-node-graph-action": "zoom-out", type: "button" },
+    });
+    setIcon(zoomOut, "minus");
+    setTooltip(zoomOut, label("zoomOut"));
+    const zoomReset = viewport.createEl("button", {
+      cls: "folder-nodes-node-graph-zoom-level",
+      text: "100%",
+      attr: { "aria-label": zoomLevelLabel(1), "data-node-graph-action": "zoom-reset", type: "button" },
+    });
+    setTooltip(zoomReset, label("zoomReset"));
+    const zoomIn = viewport.createEl("button", {
+      cls: "clickable-icon",
+      attr: { "aria-label": label("zoomIn"), "data-node-graph-action": "zoom-in", type: "button" },
+    });
+    setIcon(zoomIn, "plus");
+    setTooltip(zoomIn, label("zoomIn"));
+    const fit = viewport.createEl("button", {
+      cls: "clickable-icon",
+      attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit", type: "button" },
     });
     setIcon(fit, "maximize-2");
     setTooltip(fit, label("fitGraph"));
+    const help = viewport.createSpan({
+      cls: "folder-nodes-node-graph-viewport-help",
+      attr: { "aria-label": label("viewportHelp"), role: "img", tabindex: "0" },
+    });
+    setIcon(help, "circle-help");
+    setTooltip(help, label("viewportHelp"));
     return toolbar;
   }
 
@@ -684,13 +714,14 @@ export class FolderNodeGraphView extends ItemView {
     }
     const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
     if (canvas === null) return;
-    canvas.style.left = `${(Number.parseFloat(canvas.style.left) || 0) + dx}px`;
-    canvas.style.top = `${(Number.parseFloat(canvas.style.top) || 0) + dy}px`;
     const stage = canvas.parentElement;
-    if (stage !== null) {
-      const scale = new DOMMatrix(canvas.style.transform || undefined).a;
-      stage.style.width = `${Math.max(Number.parseFloat(stage.style.width) || 0, (this.displayGraphData?.layout.width ?? 0) * scale + (Number.parseFloat(canvas.style.left) || 0))}px`;
-      stage.style.height = `${Math.max(Number.parseFloat(stage.style.height) || 0, (this.displayGraphData?.layout.height ?? 0) * scale + (Number.parseFloat(canvas.style.top) || 0))}px`;
+    const surface = stage?.parentElement;
+    if (stage !== null && surface != null && (dx !== 0 || dy !== 0)) {
+      const camera = domCamera(surface, canvas);
+      this.applyDom2DCamera(surface, stage, canvas,
+        this.displayGraphData?.layout.width ?? pixelValue(canvas.style.width),
+        this.displayGraphData?.layout.height ?? pixelValue(canvas.style.height),
+        { ...camera, panX: camera.panX + dx, panY: camera.panY + dy });
     }
   }
 
@@ -838,16 +869,31 @@ export class FolderNodeGraphView extends ItemView {
     this.camera = { ...(state.canvas?.camera3D ?? state.view3D) };
     if (this.canvasRenderer !== null) {
       const current = this.canvasRenderer.captureViewportState();
+      const domScaleValue = new DOMMatrix(state.dom2D?.canvasTransform || undefined).a;
       this.canvasRenderer.restoreViewportState(state.canvas ?? {
         ...current,
         camera3D: state.view3D,
-        camera2D: { ...current.camera2D, zoom: new DOMMatrix(state.dom2D?.canvasTransform || undefined).a },
+        camera2D: state.dom2D === null ? current.camera2D : {
+          zoom: Math.max(NODE_GRAPH_MIN_INTERACTIVE_2D_SCALE, domScaleValue),
+          panX: pixelValue(state.dom2D.canvasLeft) - state.dom2D.scrollLeft,
+          panY: pixelValue(state.dom2D.canvasTop) - state.dom2D.scrollTop,
+        },
       });
       return;
     }
     if (state.canvas !== null && this.dimension === "2d") {
-      const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
-      if (canvas !== null) canvas.style.transform = `scale(${state.canvas.camera2D.zoom})`;
+      const surface = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll");
+      const stage = surface?.querySelector<HTMLElement>(".folder-nodes-node-graph-stage");
+      const canvas = stage?.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+      if (surface !== null && stage != null && canvas != null) {
+        const width = this.displayGraphData?.layout.width ?? pixelValue(canvas.style.width);
+        const height = this.displayGraphData?.layout.height ?? pixelValue(canvas.style.height);
+        this.applyDom2DCamera(surface, stage, canvas, width, height, state.canvas.camera2D);
+      }
+      return;
+    }
+    if (this.dimension === "3d") {
+      this.updateZoomIndicator(this.camera.zoom);
       return;
     }
     if (state.dom2D === null || this.dimension !== "2d") return;
@@ -862,6 +908,7 @@ export class FolderNodeGraphView extends ItemView {
     canvas.style.transform = state.dom2D.canvasTransform;
     surface.scrollLeft = state.dom2D.scrollLeft;
     surface.scrollTop = state.dom2D.scrollTop;
+    this.updateZoomIndicator(domScale(canvas));
   }
 
   private focusSearchInput(): void {
@@ -1003,7 +1050,7 @@ export class FolderNodeGraphView extends ItemView {
     return t(this.graphScope.mode === "subtree" ? "nodeGraphSubtreeStatus" : "nodeGraphLocalStatus", { name: rootLabel });
   }
 
-  private render2D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private render2D(surface: HTMLElement, data: GraphData): void {
     const layout = data.layout;
     const stage = surface.createDiv({ cls: "folder-nodes-node-graph-stage" });
     stage.style.width = `${layout.width}px`;
@@ -1029,10 +1076,10 @@ export class FolderNodeGraphView extends ItemView {
       node.style.height = `${layout.nodeHeight}px`;
     }
     this.bindDomFocusClear(surface);
-    fit?.addEventListener("click", () => this.fit2D(surface, stage, canvas, layout.width, layout.height));
+    this.bindDom2DViewport(surface, stage, canvas, layout.width, layout.height);
   }
 
-  private render3D(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private render3D(surface: HTMLElement, data: GraphData): void {
     const width = Math.max(1, surface.clientWidth || this.contentEl.clientWidth || 800);
     const height = Math.max(1, surface.clientHeight || this.contentEl.clientHeight - 44 || 600);
     this.threeDViewport = { width, height };
@@ -1060,21 +1107,10 @@ export class FolderNodeGraphView extends ItemView {
     }
     this.bind3DInteraction(surface);
     this.bindDomFocusClear(surface);
-    fit?.addEventListener("click", () => {
-      if (this.threeDViewport === null) return;
-      this.camera = fitNodeGraphCamera(
-        this.threeDPoints,
-        this.camera,
-        this.threeDViewport.width,
-        this.threeDViewport.height,
-        48,
-        this.denseThreeD ? NODE_GRAPH_DENSE_3D_FIT_SCALE : NODE_GRAPH_DOM_MIN_SCALE,
-      );
-      this.update3DProjection();
-    });
+    this.bind3DViewportControls();
   }
 
-  private renderCanvas(surface: HTMLElement, data: GraphData, fit: HTMLButtonElement | null): void {
+  private renderCanvas(surface: HTMLElement, data: GraphData): void {
     this.contentEl.addClass("is-canvas-graph");
     this.canvasRenderer = new NodeGraphCanvasRenderer(
       surface,
@@ -1099,6 +1135,7 @@ export class FolderNodeGraphView extends ItemView {
           this.updateScopeControls();
         },
         onToggle: (path, branch) => this.toggleExpansion(path, branch),
+        onZoomChange: (zoom) => this.updateZoomIndicator(zoom),
         onContextMenu: (path, event) => this.openNodeMenu(event, path),
         overviewEdgeLimit: this.settings().overviewEdgeLimit,
         relationSummary,
@@ -1108,7 +1145,12 @@ export class FolderNodeGraphView extends ItemView {
         ),
       },
     );
-    fit?.addEventListener("click", () => this.canvasRenderer?.fit());
+    this.bindViewportControlButtons({
+      currentZoom: () => this.canvasRenderer?.currentZoom() ?? 1,
+      fit: () => this.canvasRenderer?.fit(),
+      reset: () => this.canvasRenderer?.resetZoom(),
+      zoomBy: (factor) => this.canvasRenderer?.zoomBy(factor),
+    });
   }
 
   private edgeLayer(canvas: HTMLElement, width: number, height: number): SVGSVGElement {
@@ -1308,9 +1350,18 @@ export class FolderNodeGraphView extends ItemView {
         const after = touchGesture(this.pointers.values());
         if (before !== null && after !== null) {
           this.camera = panNodeGraphCamera(this.camera, after.centerX - before.centerX, after.centerY - before.centerY);
-          if (before.distance > 0 && after.distance > 0) {
+          if (before.distance > 0 && after.distance > 0 && this.threeDViewport !== null) {
             const factor = after.distance / before.distance;
-            this.camera = zoomNodeGraphCamera(this.camera, -Math.log(factor) / 0.0015);
+            const bounds = surface.getBoundingClientRect();
+            this.camera = zoomNodeGraphCameraAt(
+              this.camera,
+              -Math.log(factor) / 0.0015,
+              after.centerX - bounds.left,
+              after.centerY - bounds.top,
+              this.threeDViewport.width,
+              this.threeDViewport.height,
+            );
+            this.updateZoomIndicator(this.camera.zoom);
           }
           this.update3DProjection();
         }
@@ -1349,7 +1400,17 @@ export class FolderNodeGraphView extends ItemView {
     surface.addEventListener("pointercancel", finish);
     surface.addEventListener("wheel", (event) => {
       event.preventDefault();
-      this.camera = zoomNodeGraphCamera(this.camera, event.deltaY);
+      if (this.threeDViewport === null) return;
+      const bounds = surface.getBoundingClientRect();
+      this.camera = zoomNodeGraphCameraAt(
+        this.camera,
+        event.deltaY,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+      );
+      this.updateZoomIndicator(this.camera.zoom);
       this.update3DProjection();
     }, { passive: false });
   }
@@ -1513,6 +1574,187 @@ export class FolderNodeGraphView extends ItemView {
     this.update3DProjection();
   }
 
+  private bindViewportControlButtons(controls: {
+    readonly currentZoom: () => number;
+    readonly fit: () => void;
+    readonly reset: () => void;
+    readonly zoomBy: (factor: number) => void;
+  }): void {
+    const zoomOut = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-out']");
+    const zoomReset = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
+    const zoomIn = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']");
+    const fit = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
+    zoomOut?.addEventListener("click", () => controls.zoomBy(1 / NODE_GRAPH_ZOOM_STEP));
+    zoomReset?.addEventListener("click", () => controls.reset());
+    zoomIn?.addEventListener("click", () => controls.zoomBy(NODE_GRAPH_ZOOM_STEP));
+    fit?.addEventListener("click", () => controls.fit());
+    this.updateZoomIndicator(controls.currentZoom());
+  }
+
+  private bindViewportKeyboard(surface: HTMLElement, controls: {
+    readonly fit: () => void;
+    readonly zoomBy: (factor: number) => void;
+  }): void {
+    surface.addEventListener("keydown", (event) => {
+      if (event.repeat) return;
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        controls.zoomBy(NODE_GRAPH_ZOOM_STEP);
+        return;
+      }
+      if (event.key === "-") {
+        event.preventDefault();
+        controls.zoomBy(1 / NODE_GRAPH_ZOOM_STEP);
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        controls.fit();
+      }
+    });
+  }
+
+  private updateZoomIndicator(zoom: number): void {
+    const button = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
+    if (button === null) return;
+    const percent = Math.max(1, Math.round(zoom * 100));
+    button.setText(`${percent}%`);
+    button.setAttribute("aria-label", zoomLevelLabel(zoom));
+  }
+
+  private bindDom2DViewport(
+    surface: HTMLElement,
+    stage: HTMLElement,
+    canvas: HTMLElement,
+    width: number,
+    height: number,
+  ): void {
+    const zoomBy = (factor: number, anchorX = surface.clientWidth / 2, anchorY = surface.clientHeight / 2): void => {
+      this.zoomDom2D(surface, stage, canvas, width, height, factor, anchorX, anchorY);
+    };
+    surface.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const bounds = surface.getBoundingClientRect();
+      zoomBy(
+        Math.exp(-event.deltaY * 0.0015),
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+      );
+    }, { passive: false });
+    let pan: { pointerId: number; camera: NodeGraphCanvasCamera; x: number; y: number } | null = null;
+    surface.addClass("is-mouse-pannable");
+    surface.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "touch" || (event.button !== 0 && event.button !== 1)) return;
+      const target = event.target as Element | null;
+      if (target?.closest(".folder-nodes-node-graph-node") !== null) return;
+      event.preventDefault();
+      pan = {
+        pointerId: event.pointerId,
+        camera: domCamera(surface, canvas),
+        x: event.clientX,
+        y: event.clientY,
+      };
+      surface.setPointerCapture?.(event.pointerId);
+      surface.addClass("is-dragging");
+    });
+    surface.addEventListener("pointermove", (event) => {
+      if (pan === null || event.pointerId !== pan.pointerId) return;
+      this.applyDom2DCamera(surface, stage, canvas, width, height, {
+        ...pan.camera,
+        panX: pan.camera.panX + event.clientX - pan.x,
+        panY: pan.camera.panY + event.clientY - pan.y,
+      });
+    });
+    const finishPan = (event: PointerEvent): void => {
+      if (pan === null || event.pointerId !== pan.pointerId) return;
+      pan = null;
+      surface.removeClass("is-dragging");
+    };
+    surface.addEventListener("pointerup", finishPan);
+    surface.addEventListener("pointercancel", finishPan);
+    surface.addEventListener("lostpointercapture", finishPan);
+    const controls = {
+      currentZoom: () => domScale(canvas),
+      fit: () => {
+        this.fit2D(surface, stage, canvas, width, height);
+        this.updateZoomIndicator(domScale(canvas));
+      },
+      reset: () => zoomBy(1 / domScale(canvas)),
+      zoomBy,
+    };
+    this.bindViewportControlButtons(controls);
+    this.bindViewportKeyboard(surface, controls);
+  }
+
+  private zoomDom2D(
+    surface: HTMLElement,
+    stage: HTMLElement,
+    canvas: HTMLElement,
+    width: number,
+    height: number,
+    factor: number,
+    anchorX: number,
+    anchorY: number,
+  ): void {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    const camera = zoomNodeGraphCanvasCamera(domCamera(surface, canvas), -Math.log(factor) / 0.0015,
+      anchorX, anchorY, NODE_GRAPH_MIN_INTERACTIVE_2D_SCALE);
+    this.applyDom2DCamera(surface, stage, canvas, width, height, camera);
+  }
+
+  private applyDom2DCamera(
+    surface: HTMLElement, stage: HTMLElement, canvas: HTMLElement,
+    width: number, height: number, camera: NodeGraphCanvasCamera,
+  ): void {
+    const viewport = nodeGraphDomViewport(camera, { width, height }, { width: surface.clientWidth, height: surface.clientHeight });
+    stage.style.width = `${viewport.width}px`;
+    stage.style.height = `${viewport.height}px`;
+    canvas.style.left = `${viewport.left}px`;
+    canvas.style.top = `${viewport.top}px`;
+    canvas.style.transform = `scale(${camera.zoom})`;
+    surface.scrollLeft = viewport.scrollLeft;
+    surface.scrollTop = viewport.scrollTop;
+    this.updateZoomIndicator(camera.zoom);
+  }
+
+  private bind3DViewportControls(): void {
+    const zoomBy = (factor: number): void => {
+      if (this.threeDViewport === null || !Number.isFinite(factor) || factor <= 0) return;
+      this.camera = zoomNodeGraphCameraAt(
+        this.camera,
+        -Math.log(factor) / 0.0015,
+        this.threeDViewport.width / 2,
+        this.threeDViewport.height / 2,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+      );
+      this.updateZoomIndicator(this.camera.zoom);
+      this.update3DProjection();
+    };
+    const fit = (): void => {
+      if (this.threeDViewport === null) return;
+      this.camera = fitNodeGraphCamera(
+        this.threeDPoints,
+        this.camera,
+        this.threeDViewport.width,
+        this.threeDViewport.height,
+        48,
+        this.denseThreeD ? NODE_GRAPH_DENSE_3D_FIT_SCALE : NODE_GRAPH_DOM_MIN_SCALE,
+      );
+      this.updateZoomIndicator(this.camera.zoom);
+      this.update3DProjection();
+    };
+    const controls = {
+      currentZoom: () => this.camera.zoom,
+      fit,
+      reset: () => zoomBy(1 / this.camera.zoom),
+      zoomBy,
+    };
+    this.bindViewportControlButtons(controls);
+    if (this.threeDSurface !== null) this.bindViewportKeyboard(this.threeDSurface, controls);
+  }
+
   private fit2D(surface: HTMLElement, stage: HTMLElement, canvas: HTMLElement, width: number, height: number): void {
     const fit = fitNodeGraphViewport(
       width,
@@ -1561,8 +1803,30 @@ function relationSummary(structure: number, links: number): string {
   return t("nodeGraphRelationSummary", { structure, links });
 }
 
+function domScale(canvas: HTMLElement): number {
+  const scale = new DOMMatrix(canvas.style.transform || undefined).a;
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+function pixelValue(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function domCamera(surface: HTMLElement, canvas: HTMLElement): NodeGraphCanvasCamera {
+  return {
+    zoom: domScale(canvas),
+    panX: pixelValue(canvas.style.left) - surface.scrollLeft,
+    panY: pixelValue(canvas.style.top) - surface.scrollTop,
+  };
+}
+
+function zoomLevelLabel(zoom: number): string {
+  return t("nodeGraphZoomLevel", { percent: Math.max(1, Math.round(zoom * 100)) });
+}
+
 function label(
-  key: "altBranchHint" | "boundaryNode" | "clearSearch" | "collapseChildren" | "collapseToFirst" | "dimension" | "disabledGraph" | "expandChildren" | "expandRange" | "expandRangeTooltip" | "findNode" | "fitGraph" | "globalScope" | "globalScopeTooltip" | "largeGraph" | "localScope" | "localScopeTooltip" | "nodeGraph" | "noLinks" | "scope" | "scopePrefix" | "selectNodeFirst" | "showLinks" | "showLinksTooltip" | "subtreeScope" | "subtreeScopeTooltip",
+  key: "altBranchHint" | "boundaryNode" | "clearSearch" | "collapseChildren" | "collapseToFirst" | "dimension" | "disabledGraph" | "expandChildren" | "expandRange" | "expandRangeTooltip" | "findNode" | "fitGraph" | "globalScope" | "globalScopeTooltip" | "largeGraph" | "localScope" | "localScopeTooltip" | "nodeGraph" | "noLinks" | "scope" | "scopePrefix" | "selectNodeFirst" | "showLinks" | "showLinksTooltip" | "subtreeScope" | "subtreeScopeTooltip" | "viewportHelp" | "zoomIn" | "zoomOut" | "zoomReset",
 ): string {
   const translationKey = ({
     altBranchHint: "nodeGraphToggleBranch",
@@ -1591,6 +1855,10 @@ function label(
     showLinksTooltip: "nodeGraphShowLinksTooltip",
     subtreeScope: "nodeGraphSubtreeScope",
     subtreeScopeTooltip: "nodeGraphSubtreeScopeTooltip",
+    viewportHelp: "nodeGraphViewportHelp",
+    zoomIn: "nodeGraphZoomIn",
+    zoomOut: "nodeGraphZoomOut",
+    zoomReset: "nodeGraphResetZoom",
   } as const)[key];
   return t(translationKey);
 }
