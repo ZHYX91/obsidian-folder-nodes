@@ -189,13 +189,13 @@
         "android-emulator": []
       },
       "steps": [
-        "Open the Geometry subtree in DOM 2D. Select an off-center node and use zoom in, zoom out, percentage reset, Fit, and Center selected.",
+        "Open the Geometry subtree in DOM 2D. Select an off-center node and use zoom in, zoom out, percentage reset and Fit.",
         "Switch to 3D and repeat the toolbar operations; inspect the interaction help in a narrow pane.",
         "On Android scroll DOM 2D with one finger and verify that the zoom, percentage and help controls have touch targets at least 44 by 44 CSS pixels."
       ],
       "expected": [
         "The percentage updates immediately and reset returns to 100%; zoom preserves the viewport-center anchor.",
-        "Fit contains the graph where permitted by readable node sizes; Center selected keeps the selected card visible without changing the subtree scope.",
+        "Fit contains the graph where permitted by readable node sizes without changing the subtree scope or selection.",
         "Toolbar actions do not open a node or change selection, and the toolbar remains usable in a narrow mobile pane."
       ]
     },
@@ -210,9 +210,9 @@
       },
       "steps": [
         "In a fresh disposable Vault, run the acceptance provider command Create 501-node viewport fixture, scope the graph to Viewport, and retain the default large-graph threshold of 500.",
-        "In DOM 2D, test ordinary wheel scrolling, Ctrl/Cmd+wheel zoom at an off-center card near the upper-left scroll boundary, and blank-space mouse dragging. Test +, -, 0 and F with graph focus, then confirm they do not hijack the search input.",
+        "In DOM 2D, test ordinary wheel scrolling, Ctrl/Cmd+wheel zoom at an off-center card near the upper-left scroll boundary, and blank-space mouse dragging. Test + and - for zoom and 0 for Fit with graph focus, then confirm they do not hijack the search input.",
         "Select Wide and expand it to cross from 3 visible nodes to 501; pan, zoom above 400% and below 65%, then collapse it to return to DOM. Repeat near both zoom limits and all viewport edges.",
-        "Repeat expansion, collapse, off-center pointer zoom, Fit and Center selected in 3D with both renderers."
+        "Repeat expansion, collapse, off-center pointer zoom, percentage reset and Fit in 3D with both renderers."
       ],
       "expected": [
         "Unmodified wheel scrolls while Ctrl/Cmd+wheel zooms around its pointer; blank dragging pans without opening nodes.",
@@ -236,7 +236,7 @@
       "steps": [
         "Confirm the input host receives two simultaneous native touch pointers with distinct identities and releases both after cancellation or completion.",
         "Generate the 501-node Viewport fixture in a fresh disposable Vault and expand Wide to enter Canvas 2D. Pinch at an off-center midpoint, translate both fingers together, then combine scaling and translation.",
-        "Repeat in DOM 3D with Wide collapsed and Canvas 3D with Wide expanded. Exercise zoom limits, toolbar reset, Fit, Center selected, and expansion across the 500-node renderer boundary.",
+        "Repeat in DOM 3D with Wide collapsed and Canvas 3D with Wide expanded. Exercise zoom limits, toolbar reset, Fit and expansion across the 500-node renderer boundary.",
         "After each two-finger gesture, lift both fingers and tap or long-press a card normally. In DOM 2D use native one-finger scrolling and toolbar zoom."
       ],
       "expected": [

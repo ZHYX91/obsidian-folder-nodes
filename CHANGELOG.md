@@ -2,7 +2,7 @@
 
 ## 0.10.0
 
-- Added consistent Node Graph zoom, percentage reset, Fit, Center selected, interaction help, and keyboard controls across DOM and Canvas rendering.
+- Added consistent Node Graph zoom, percentage reset, Fit, interaction help, and keyboard controls across DOM and Canvas rendering.
 - Kept 2D wheel scrolling separate from Ctrl/Cmd+wheel zoom and added blank-space mouse panning in DOM 2D.
 - Preserved small-graph pointer anchors, pan, and the supported zoom range across large-graph renderer changes; made 3D pinch follow its moving midpoint.
 - Enlarged mobile zoom-percentage and help targets and added repeatable desktop and Android viewport acceptance scenarios.
