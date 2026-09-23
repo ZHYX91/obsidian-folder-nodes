@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0
+
+- Added consistent Node Graph zoom, percentage reset, Fit, Center selected, interaction help, and keyboard controls across DOM and Canvas rendering.
+- Kept 2D wheel scrolling separate from Ctrl/Cmd+wheel zoom and added blank-space mouse panning in DOM 2D.
+- Preserved small-graph pointer anchors, pan, and the supported zoom range across large-graph renderer changes; made 3D pinch follow its moving midpoint.
+- Enlarged mobile zoom-percentage and help targets and added repeatable desktop and Android viewport acceptance scenarios.
+- Smoothed File Explorer disclosure updates without rebuilding the tree and refreshed New node destinations when the active note changes.
+- Bound failed node-creation rollback to the exact created note so a replaced or edited occupant is preserved.
+
 ## 0.9.4
 
 - Separated structural node moves from manual sibling ordering so reparenting never changes a natural parent's sort mode implicitly.
