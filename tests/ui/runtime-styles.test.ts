@@ -86,6 +86,19 @@ describe("RuntimeStyles", () => {
     expect(first.adoptedStyleSheets.at(-1)?.cssRules).toHaveLength(2);
   });
 
+  it("reconciles live workspace documents and releases closed ones", () => {
+    const first = testDocument();
+    const second = testDocument();
+    const styles = new RuntimeStyles(CSS);
+    styles.install(first);
+    styles.install(second);
+
+    styles.reconcile([second]);
+
+    expect(first.adoptedStyleSheets).toHaveLength(0);
+    expect(second.adoptedStyleSheets).toHaveLength(1);
+  });
+
   it("rejects unsafe dynamic property names and values", () => {
     const styles = new RuntimeStyles(CSS);
     expect(() => styles.setBodyProperty("--theme-font", "serif")).toThrow("Invalid Folder Nodes style property");
