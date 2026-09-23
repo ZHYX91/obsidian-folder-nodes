@@ -853,9 +853,10 @@ export class NodeService {
     const createdFolder = await this.app.vault.createFolder(folderPath);
     undos.push(() => this.trashCreatedFolder(createdFolder, folderPath));
     this.expectEvent("create", notePath);
-    const note = await this.app.vault.create(notePath, createNodeDocument(options.alias?.trim() || null, options.body ?? ""));
-    const initialContent = await this.app.vault.read(note);
+    const initialContent = createNodeDocument(options.alias?.trim() || null, options.body ?? "");
+    const note = await this.app.vault.create(notePath, initialContent);
     undos.push(() => this.trashCreatedFile(note, notePath, initialContent));
+    this.assertEntryIdentity(note, notePath, TFile);
     await this.appendRankIfManual(normalizedParent, note, undos);
     return note;
   }

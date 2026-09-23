@@ -167,6 +167,21 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Mixed/mixed.md")).toBe(false);
   });
 
+  it("does not reread a newly created Node Note before rollback registration", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const originalRead = fake.app.vault.read;
+    fake.app.vault.read = async (file) => {
+      if (file.path === "A/A.md") throw new Error("unexpected create-time read");
+      return originalRead(file);
+    };
+
+    const created = await service(fake).createNode("", "A", { body: "body" });
+
+    expect(created.path).toBe("A/A.md");
+    expect(fake.contents.get("A/A.md")).toBe("body");
+  });
+
   it("rolls back a newly created folder when note creation fails", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");

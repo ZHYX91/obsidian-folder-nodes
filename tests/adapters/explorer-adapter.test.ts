@@ -135,6 +135,7 @@ describe("ExplorerAdapter lifecycle", () => {
       basename: "Leaf", extension: "md", name: "Leaf.md", parent: folder, path: "Leaf/Leaf.md",
     });
     folder.children.push(canonical);
+    const openFolderNode = vi.fn(async () => undefined);
     const app = {
       vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => path === folder.path ? folder : null },
       workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
@@ -143,7 +144,7 @@ describe("ExplorerAdapter lifecycle", () => {
       children: () => [], getFolder: () => folder, getFile: () => null, getCanonicalFile: () => canonical, nodeNoteCandidates: () => [canonical], nodeNoteRole: (file: TFile) => file === canonical ? "unique" : "none", folderIdentity: () => "node", fileIdentity: () => "ordinary",
       isCanonicalFile: (file: TFile) => file === canonical, isIgnoredPath: () => false, isIgnoredRootPath: () => false,
       isLeafNoteExempt: () => false, hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false, notePathForFolder: () => canonical.path,
-      openFolderNode: async () => undefined, previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => folder, rootNotePath: () => "Vault.md",
+      openFolderNode, previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => folder, rootNotePath: () => "Vault.md",
     } as unknown as NodeService;
     const adapter = new ExplorerAdapter(
       app, service,
@@ -156,6 +157,10 @@ describe("ExplorerAdapter lifecycle", () => {
     adapter.start();
     expect(disclosure.classList.contains("folder-nodes-leaf-indicator")).toBe(true);
     expect(disclosure.getAttribute("aria-hidden")).toBe("true");
+    const passiveClick = new MouseEvent("click", { bubbles: true, cancelable: true });
+    expect(disclosure.dispatchEvent(passiveClick)).toBe(false);
+    expect(passiveClick.defaultPrevented).toBe(true);
+    expect(openFolderNode).not.toHaveBeenCalled();
 
     folder.children.push(Object.assign(new TFile(), {
       basename: "attachment", extension: "pdf", name: "attachment.pdf", parent: folder, path: "Leaf/attachment.pdf",
@@ -163,6 +168,92 @@ describe("ExplorerAdapter lifecycle", () => {
     adapter.refresh();
     expect(disclosure.classList.contains("folder-nodes-leaf-indicator")).toBe(false);
     expect(disclosure.hasAttribute("aria-hidden")).toBe(false);
+    const disclosureClick = new MouseEvent("click", { bubbles: true, cancelable: true });
+    expect(disclosure.dispatchEvent(disclosureClick)).toBe(true);
+    expect(disclosureClick.defaultPrevented).toBe(false);
+    expect(openFolderNode).not.toHaveBeenCalled();
+
+    adapter.stop();
+    root.remove();
+  });
+
+  it("limits Explorer mutation decoration to the changed folder branch", async () => {
+    const root = document.createElement("div");
+    const files = root.createDiv({ cls: "nav-files-container" });
+    const makeFolderRow = (path: string) => {
+      const row = files.createDiv({ cls: "nav-folder" });
+      const title = row.createDiv({ cls: "nav-folder-title", attr: { "data-path": path } });
+      title.createSpan({ cls: "tree-item-icon collapse-icon" });
+      title.createSpan({ cls: "nav-folder-title-content", text: path });
+      return { row, title, children: row.createDiv({ cls: "nav-folder-children" }) };
+    };
+    const aRow = makeFolderRow("A");
+    makeFolderRow("B");
+    document.body.append(root);
+
+    const a = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "A", path: "A" });
+    const b = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "B", path: "B" });
+    const canonical = (folder: TFolder): TFile => Object.assign(new TFile(), {
+      basename: folder.name, extension: "md", name: `${folder.name}.md`, parent: folder, path: `${folder.path}/${folder.name}.md`,
+    });
+    const aNote = canonical(a);
+    const bNote = canonical(b);
+    a.children.push(aNote);
+    b.children.push(bNote);
+    const folders = new Map<string, TFolder>([[a.path, a], [b.path, b]]);
+    const notes = new Map<string, TFile>([[a.path, aNote], [b.path, bNote]]);
+    const canonicalFiles = new Set<TFile>([aNote, bNote]);
+    const folderIdentity = vi.fn((path: string) => folders.has(path) ? "node" : "ordinary");
+    const openFolderNode = vi.fn(async () => undefined);
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: () => null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: (path: string) => folders.get(path) ?? null, getFile: () => null,
+      getCanonicalFile: (path: string) => notes.get(path) ?? null,
+      nodeNoteCandidates: (path: string) => notes.has(path) ? [notes.get(path)!] : [],
+      nodeNoteRole: (file: TFile) => canonicalFiles.has(file) ? "unique" : "none",
+      folderIdentity, fileIdentity: () => "ordinary", isCanonicalFile: (file: TFile) => canonicalFiles.has(file),
+      isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false,
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
+      notePathForFolder: (path: string) => notes.get(path)?.path ?? `${path}/${path}.md`, openFolderNode,
+      previewPlacement: () => ({ kind: "blocked", reason: "test" }), placeNode: async () => a, rootNotePath: () => "Vault.md",
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete node", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    await new Promise((resolve) => window.setTimeout(resolve, 160));
+    folderIdentity.mockClear();
+
+    aRow.title.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+    expect(openFolderNode).toHaveBeenCalledWith(a.path, false);
+    expect(folderIdentity).not.toHaveBeenCalled();
+
+    const child = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "Child", parent: a, path: "A/Child" });
+    const childNote = canonical(child);
+    child.children.push(childNote);
+    a.children.push(child);
+    folders.set(child.path, child);
+    notes.set(child.path, childNote);
+    canonicalFiles.add(childNote);
+    const childRow = aRow.children.createDiv({ cls: "nav-folder" });
+    const childTitle = childRow.createDiv({ cls: "nav-folder-title", attr: { "data-path": child.path } });
+    childTitle.createSpan({ cls: "tree-item-icon collapse-icon" });
+    childTitle.createSpan({ cls: "nav-folder-title-content", text: child.name });
+    childRow.createDiv({ cls: "nav-folder-children" });
+
+    await new Promise((resolve) => window.setTimeout(resolve, 160));
+    const decoratedPaths = folderIdentity.mock.calls.map(([path]) => path);
+    expect(decoratedPaths).toContain(child.path);
+    expect(decoratedPaths).not.toContain(b.path);
 
     adapter.stop();
     root.remove();
