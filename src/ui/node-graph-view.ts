@@ -79,6 +79,8 @@ import type { NodeGraphDimension, NodeGraphSettings } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
 import { t } from "./i18n";
+import { observeNodeGraphDomViewport } from "./node-graph-dom-viewport";
+import { renderNodeGraphToolbar } from "./node-graph-toolbar";
 import {
   NodeGraphCanvasRenderer,
   type NodeGraphCanvasRecord,
