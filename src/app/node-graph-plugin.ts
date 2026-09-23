@@ -279,8 +279,8 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     });
     setIcon(button, "git-fork");
     button.addEventListener("click", () => {
-      const active = this.app.workspace.getActiveFile();
-      const folder = active === null ? null : this.service.folderForFile(active);
+      const path = view.currentFolderPath();
+      const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
       const focus = folder !== null && this.graphFolderIsEligible(folder)
         ? normalizeVaultPath(folder.path)
         : null;
