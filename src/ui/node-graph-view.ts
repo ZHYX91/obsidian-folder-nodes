@@ -1,7 +1,6 @@
 import {
   ItemView,
   Menu,
-  SearchComponent,
   setIcon,
   setTooltip,
   WorkspaceLeaf,
@@ -80,6 +79,8 @@ import type { NodeGraphDimension, NodeGraphSettings } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
 import { t } from "./i18n";
+import { observeNodeGraphDomViewport } from "./node-graph-dom-viewport";
+import { renderNodeGraphToolbar } from "./node-graph-toolbar";
 import {
   NodeGraphCanvasRenderer,
   type NodeGraphCanvasRecord,
@@ -183,6 +184,7 @@ export class FolderNodeGraphView extends ItemView {
   private searchQuery = "";
   private searchPreviewPath: string | null = null;
   private pendingPersistedFocusReveal = false;
+  private disconnectDomViewport: (() => void) | null = null;
   private searchResultsCache: {
     readonly generation: number;
     readonly query: string;
@@ -202,7 +204,11 @@ export class FolderNodeGraphView extends ItemView {
   public override getViewType(): string { return NODE_GRAPH_VIEW_TYPE; }
   public override getDisplayText(): string { return label("nodeGraph"); }
   public override getIcon(): string { return "git-fork"; }
-  public override async onOpen(): Promise<void> { this.render(); }
+  public override async onOpen(): Promise<void> {
+    this.disconnectDomViewport?.();
+    this.disconnectDomViewport = observeNodeGraphDomViewport(this.contentEl);
+    this.render();
+  }
   public override getState(): Record<string, unknown> {
     return { dimension: this.dimension, focus: this.focusPath, scope: this.graphScope, showLinks: this.showLinks };
   }
@@ -234,6 +240,8 @@ export class FolderNodeGraphView extends ItemView {
     this.resize3DViewport();
   }
   public override async onClose(): Promise<void> {
+    this.disconnectDomViewport?.();
+    this.disconnectDomViewport = null;
     this.refreshGeneration += 1;
     if (this.refreshTimer !== null) {
       (this.contentEl.ownerDocument.defaultView ?? window).clearTimeout(this.refreshTimer);
@@ -442,162 +450,71 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private renderToolbar(): HTMLElement {
-    const toolbar = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-toolbar" });
-    const primary = toolbar.createDiv({ cls: "folder-nodes-node-graph-toolbar-primary" });
-    const secondary = toolbar.createDiv({ cls: "folder-nodes-node-graph-toolbar-secondary" });
-    primary.createDiv({ cls: "folder-nodes-node-graph-title", text: label("nodeGraph") });
-    const searchHost = primary.createDiv({ cls: "folder-nodes-node-graph-search" });
-    const search = new SearchComponent(searchHost)
-      .setPlaceholder(label("findNode"))
-      .setValue(this.searchQuery)
-      .onChange((value) => this.setSearchQuery(value));
-    search.inputEl.setAttribute("aria-label", label("findNode"));
-    search.inputEl.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        search.setValue("");
-        this.setSearchQuery("");
-        return;
-      }
-      if (event.key !== "Enter") return;
-      const match = this.firstSearchMatch(this.searchQuery);
-      if (match === null) return;
-      event.preventDefault();
-      this.setFocus(match);
-    });
-    setTooltip(search.inputEl, label("findNode"));
-    search.clearButtonEl.setAttribute("aria-label", label("clearSearch"));
-    setTooltip(search.clearButtonEl, label("clearSearch"));
-
-    const linksToggle = primary.createEl("button", {
-      cls: `folder-nodes-node-graph-links-toggle${this.showLinks ? " is-active" : ""}`,
-      attr: {
-        "aria-checked": String(this.showLinks),
-        "aria-label": label("showLinksTooltip"),
-        role: "switch",
-        type: "button",
-      },
-    });
-    linksToggle.createSpan({ text: label("showLinks") });
-    linksToggle.createSpan({ cls: "folder-nodes-node-graph-toggle-track", attr: { "aria-hidden": "true" } });
-    setTooltip(linksToggle, label("showLinksTooltip"));
-    linksToggle.addEventListener("click", () => {
-      this.showLinks = !this.showLinks;
-      this.markWorkspaceStateDirty();
-      this.render();
-    });
-    if (this.showLinks) {
-      const visibleLinks = this.displayGraphData?.model.edges.filter((edge) => edge.link).length ?? 0;
-      const summary = primary.createSpan({
-        cls: `folder-nodes-node-graph-link-summary${visibleLinks === 0 ? " is-empty" : ""}`,
-        attr: { role: "status" },
-      });
-      summary.createSpan({ cls: "folder-nodes-node-graph-link-swatch", attr: { "aria-hidden": "true" } });
-      summary.createSpan({ text: visibleLinks === 0 ? label("noLinks") : linkCountLabel(visibleLinks) });
-    }
-
-    const scope = toolbar.createDiv({
-      cls: "folder-nodes-node-graph-scope",
-      attr: { "aria-label": label("scope"), "data-node-graph-scope": this.graphScope.mode },
-    });
-    secondary.append(scope);
-    scope.createSpan({ cls: "folder-nodes-node-graph-scope-path", text: this.scopeLabel() });
-    this.scopeButton(scope, t("nodeGraphReturnGlobal"), label("globalScopeTooltip"), () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE), this.graphScope.mode === "global");
-    this.scopeButton(scope, t("nodeGraphViewSubtree"), label("subtreeScopeTooltip"), () => {
-      if (this.focusPath !== null) this.setGraphScope({ mode: "subtree", rootPath: this.focusPath });
-    }, this.focusPath === null, "subtree");
-    this.scopeButton(scope, t("nodeGraphViewLocal"), label("localScopeTooltip"), () => {
-      if (this.focusPath !== null) this.setGraphScope({ mode: "local", rootPath: this.focusPath });
-    }, this.focusPath === null, "local");
-    this.updateScopeControls();
-    const range = secondary.createEl("button", {
-      cls: "folder-nodes-node-graph-range-button",
-      attr: { "aria-haspopup": "menu", "aria-label": label("expandRangeTooltip"), type: "button" },
-    });
-    range.createSpan({ text: label("expandRange") });
-    setIcon(range.createSpan({ cls: "folder-nodes-node-graph-range-chevron" }), "chevron-down");
-    setTooltip(range, label("expandRangeTooltip"));
-    range.addEventListener("click", () => this.openExpansionMenu(range));
-
-    const dimension = primary.createDiv({
-      cls: "folder-nodes-node-graph-switch",
-      attr: { "aria-label": label("dimension"), "data-node-graph-switch": "dimension" },
-    });
-    for (const mode of ["2d", "3d"] as const) {
-      this.switchButton(dimension, mode.toUpperCase(), this.dimension === mode, () => {
+    const visibleLinks = this.displayGraphData?.model.edges.filter((edge) => edge.link).length ?? 0;
+    const toolbar = renderNodeGraphToolbar(this.contentEl, {
+      dimension: this.dimension,
+      focusPath: this.focusPath,
+      linkSummary: linkCountLabel(visibleLinks),
+      scopeLabel: this.scopeLabel(),
+      scopeMode: this.graphScope.mode,
+      searchQuery: this.searchQuery,
+      showLinks: this.showLinks,
+      visibleLinks,
+    }, {
+      clearSearch: label("clearSearch"),
+      dimension: label("dimension"),
+      expandRange: label("expandRange"),
+      expandRangeTooltip: label("expandRangeTooltip"),
+      findNode: label("findNode"),
+      fitGraph: label("fitGraph"),
+      globalScope: t("nodeGraphReturnGlobal"),
+      globalScopeTooltip: label("globalScopeTooltip"),
+      localScope: t("nodeGraphViewLocal"),
+      localScopeTooltip: label("localScopeTooltip"),
+      noLinks: label("noLinks"),
+      nodeGraph: label("nodeGraph"),
+      scope: label("scope"),
+      selectNodeFirst: label("selectNodeFirst"),
+      showLinks: label("showLinks"),
+      showLinksTooltip: label("showLinksTooltip"),
+      subtreeScope: t("nodeGraphViewSubtree"),
+      subtreeScopeTooltip: label("subtreeScopeTooltip"),
+      viewportHelp: label("viewportHelp"),
+      zoomIn: label("zoomIn"),
+      zoomLevel: zoomLevelLabel(1),
+      zoomOut: label("zoomOut"),
+      zoomReset: label("zoomReset"),
+    }, {
+      onDimension: (mode) => {
         if (this.dimension === mode) return;
         this.dimension = mode;
         if (mode === "3d") this.camera = defaultNodeGraphCamera();
         this.markWorkspaceStateDirty();
         this.render();
-      });
-    }
-    const viewport = primary.createDiv({
-      cls: "folder-nodes-node-graph-viewport-controls",
-      attr: { "aria-label": label("viewportHelp") },
+      },
+      onExpansionMenu: (anchor) => this.openExpansionMenu(anchor),
+      onLocalScope: () => {
+        if (this.focusPath !== null) this.setGraphScope({ mode: "local", rootPath: this.focusPath });
+      },
+      onReturnGlobal: () => this.setGraphScope(GLOBAL_NODE_GRAPH_SCOPE),
+      onSearchChange: (value) => this.setSearchQuery(value),
+      onSearchEnter: () => {
+        const match = this.firstSearchMatch(this.searchQuery);
+        if (match === null) return false;
+        this.setFocus(match);
+        return true;
+      },
+      onShowLinks: () => {
+        this.showLinks = !this.showLinks;
+        this.markWorkspaceStateDirty();
+        this.render();
+      },
+      onSubtreeScope: () => {
+        if (this.focusPath !== null) this.setGraphScope({ mode: "subtree", rootPath: this.focusPath });
+      },
     });
-    const zoomOut = viewport.createEl("button", {
-      cls: "clickable-icon",
-      attr: { "aria-label": label("zoomOut"), "data-node-graph-action": "zoom-out", type: "button" },
-    });
-    setIcon(zoomOut, "minus");
-    setTooltip(zoomOut, label("zoomOut"));
-    const zoomReset = viewport.createEl("button", {
-      cls: "folder-nodes-node-graph-zoom-level",
-      text: "100%",
-      attr: { "aria-label": zoomLevelLabel(1), "data-node-graph-action": "zoom-reset", type: "button" },
-    });
-    setTooltip(zoomReset, label("zoomReset"));
-    const zoomIn = viewport.createEl("button", {
-      cls: "clickable-icon",
-      attr: { "aria-label": label("zoomIn"), "data-node-graph-action": "zoom-in", type: "button" },
-    });
-    setIcon(zoomIn, "plus");
-    setTooltip(zoomIn, label("zoomIn"));
-    const fit = viewport.createEl("button", {
-      cls: "clickable-icon",
-      attr: { "aria-label": label("fitGraph"), "data-node-graph-action": "fit", type: "button" },
-    });
-    setIcon(fit, "maximize-2");
-    setTooltip(fit, label("fitGraph"));
-    const help = viewport.createSpan({
-      cls: "folder-nodes-node-graph-viewport-help",
-      attr: { "aria-label": label("viewportHelp"), role: "img", tabindex: "0" },
-    });
-    setIcon(help, "circle-help");
-    setTooltip(help, label("viewportHelp"));
+    this.updateScopeControls();
     return toolbar;
-  }
-
-  private switchButton(container: HTMLElement, text: string, active: boolean, onClick: () => void): void {
-    const button = container.createEl("button", {
-      cls: `folder-nodes-node-graph-switch-button${active ? " is-active" : ""}`,
-      text,
-      attr: { "aria-pressed": String(active) },
-    });
-    setTooltip(button, `${text} ${label("dimension")}`);
-    button.addEventListener("click", onClick);
-  }
-
-  private scopeButton(
-    container: HTMLElement,
-    text: string,
-    tooltip: string,
-    onClick: () => void,
-    disabled = false,
-    action: "local" | "subtree" | null = null,
-  ): void {
-    const button = container.createEl("button", {
-      cls: "folder-nodes-node-graph-scope-button",
-      text,
-      attr: { type: "button", ...(action === null ? {} : { "data-node-graph-scope-action": action }) },
-    });
-    button.disabled = disabled;
-    const description = disabled && action !== null ? label("selectNodeFirst") : tooltip;
-    button.setAttribute("aria-label", description);
-    button.title = description;
-    setTooltip(button, description);
-    button.addEventListener("click", onClick);
   }
 
   private updateScopeControls(): void {

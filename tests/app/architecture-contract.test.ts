@@ -77,6 +77,19 @@ describe("runtime architecture contract", () => {
     expect(replaceSelection).toBeGreaterThan(secondValidation);
   });
 
+  it("keeps Node Graph toolbar and DOM viewport lifecycle owned by the view layer", () => {
+    const main = source("main.ts");
+    const graph = source("src/ui/node-graph-view.ts");
+    const toolbar = source("src/ui/node-graph-toolbar.ts");
+    expect(main).toContain('./src/app/node-graph-plugin');
+    expect(main).not.toContain("runtime-geometry-plugin");
+    expect(graph).toContain('observeNodeGraphDomViewport(this.contentEl)');
+    expect(graph).toContain("this.disconnectDomViewport?.()");
+    expect(graph).toContain("renderNodeGraphToolbar(this.contentEl");
+    expect(graph).not.toContain("new SearchComponent");
+    expect(toolbar).toContain("new SearchComponent");
+  });
+
   it("owns one authoritative versioned stylesheet per workspace document", () => {
     const plugin = source("src/app/plugin.ts");
     const settings = source("src/app/settings-tab.ts");
