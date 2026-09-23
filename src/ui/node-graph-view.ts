@@ -29,7 +29,8 @@ import {
   type NodeGraphPoint3D,
   type NodeGraphProjectedPoint,
 } from "../core/node-graph-3d";
-import { shouldUseNodeGraphCanvas } from "../core/node-graph-canvas";
+import { shouldUseNodeGraphCanvas, zoomNodeGraphCanvasCamera, type NodeGraphCanvasCamera } from "../core/node-graph-canvas";
+import { nodeGraphDomViewport } from "../core/node-graph-dom-viewport";
 import {
   nodeGraphBoxFromCenter,
   nodeGraphBoxFromTopLeft,
@@ -147,7 +148,7 @@ const NODE_GRAPH_DENSE_3D_FIT_SCALE = 0.16;
 const NODE_GRAPH_MOUSE_PRESS_SLOP = 4;
 const NODE_GRAPH_TOUCH_PRESS_SLOP = 8;
 const NODE_GRAPH_ZOOM_STEP = 1.2;
-const NODE_GRAPH_MAX_DOM_2D_SCALE = 4;
+const NODE_GRAPH_MIN_INTERACTIVE_2D_SCALE = 0.38;
 
 export class FolderNodeGraphView extends ItemView {
   private cardHandleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH;
@@ -713,13 +714,14 @@ export class FolderNodeGraphView extends ItemView {
     }
     const canvas = this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-stage > .folder-nodes-node-graph-canvas");
     if (canvas === null) return;
-    canvas.style.left = `${(Number.parseFloat(canvas.style.left) || 0) + dx}px`;
-    canvas.style.top = `${(Number.parseFloat(canvas.style.top) || 0) + dy}px`;
     const stage = canvas.parentElement;
-    if (stage !== null) {
-      const scale = new DOMMatrix(canvas.style.transform || undefined).a;
-      stage.style.width = `${Math.max(Number.parseFloat(stage.style.width) || 0, (this.displayGraphData?.layout.width ?? 0) * scale + (Number.parseFloat(canvas.style.left) || 0))}px`;
-      stage.style.height = `${Math.max(Number.parseFloat(stage.style.height) || 0, (this.displayGraphData?.layout.height ?? 0) * scale + (Number.parseFloat(canvas.style.top) || 0))}px`;
+    const surface = stage?.parentElement;
+    if (stage !== null && surface != null && (dx !== 0 || dy !== 0)) {
+      const camera = domCamera(surface, canvas);
+      this.applyDom2DCamera(surface, stage, canvas,
+        this.displayGraphData?.layout.width ?? pixelValue(canvas.style.width),
+        this.displayGraphData?.layout.height ?? pixelValue(canvas.style.height),
+        { ...camera, panX: camera.panX + dx, panY: camera.panY + dy });
     }
   }
 
@@ -872,7 +874,7 @@ export class FolderNodeGraphView extends ItemView {
         ...current,
         camera3D: state.view3D,
         camera2D: state.dom2D === null ? current.camera2D : {
-          zoom: Math.max(NODE_GRAPH_DOM_MIN_2D_SCALE, domScaleValue),
+          zoom: Math.max(NODE_GRAPH_MIN_INTERACTIVE_2D_SCALE, domScaleValue),
           panX: pixelValue(state.dom2D.canvasLeft) - state.dom2D.scrollLeft,
           panY: pixelValue(state.dom2D.canvasTop) - state.dom2D.scrollTop,
         },
@@ -886,19 +888,7 @@ export class FolderNodeGraphView extends ItemView {
       if (surface !== null && stage != null && canvas != null) {
         const width = this.displayGraphData?.layout.width ?? pixelValue(canvas.style.width);
         const height = this.displayGraphData?.layout.height ?? pixelValue(canvas.style.height);
-        const scale = clamp(state.canvas.camera2D.zoom, NODE_GRAPH_DOM_MIN_2D_SCALE, NODE_GRAPH_MAX_DOM_2D_SCALE);
-        const stageWidth = Math.max(surface.clientWidth, width * scale + 48);
-        const stageHeight = Math.max(surface.clientHeight, height * scale + 48);
-        const offsetX = (stageWidth - width * scale) / 2;
-        const offsetY = (stageHeight - height * scale) / 2;
-        stage.style.width = `${stageWidth}px`;
-        stage.style.height = `${stageHeight}px`;
-        canvas.style.left = `${offsetX}px`;
-        canvas.style.top = `${offsetY}px`;
-        canvas.style.transform = `scale(${scale})`;
-        surface.scrollLeft = Math.max(0, offsetX - state.canvas.camera2D.panX);
-        surface.scrollTop = Math.max(0, offsetY - state.canvas.camera2D.panY);
-        this.updateZoomIndicator(scale);
+        this.applyDom2DCamera(surface, stage, canvas, width, height, state.canvas.camera2D);
       }
       return;
     }
@@ -1652,7 +1642,7 @@ export class FolderNodeGraphView extends ItemView {
         event.clientY - bounds.top,
       );
     }, { passive: false });
-    let pan: { pointerId: number; scrollLeft: number; scrollTop: number; x: number; y: number } | null = null;
+    let pan: { pointerId: number; camera: NodeGraphCanvasCamera; x: number; y: number } | null = null;
     surface.addClass("is-mouse-pannable");
     surface.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "touch" || (event.button !== 0 && event.button !== 1)) return;
@@ -1661,8 +1651,7 @@ export class FolderNodeGraphView extends ItemView {
       event.preventDefault();
       pan = {
         pointerId: event.pointerId,
-        scrollLeft: surface.scrollLeft,
-        scrollTop: surface.scrollTop,
+        camera: domCamera(surface, canvas),
         x: event.clientX,
         y: event.clientY,
       };
@@ -1671,8 +1660,11 @@ export class FolderNodeGraphView extends ItemView {
     });
     surface.addEventListener("pointermove", (event) => {
       if (pan === null || event.pointerId !== pan.pointerId) return;
-      surface.scrollLeft = pan.scrollLeft - (event.clientX - pan.x);
-      surface.scrollTop = pan.scrollTop - (event.clientY - pan.y);
+      this.applyDom2DCamera(surface, stage, canvas, width, height, {
+        ...pan.camera,
+        panX: pan.camera.panX + event.clientX - pan.x,
+        panY: pan.camera.panY + event.clientY - pan.y,
+      });
     });
     const finishPan = (event: PointerEvent): void => {
       if (pan === null || event.pointerId !== pan.pointerId) return;
@@ -1706,28 +1698,24 @@ export class FolderNodeGraphView extends ItemView {
     anchorY: number,
   ): void {
     if (!Number.isFinite(factor) || factor <= 0) return;
-    const previousScale = domScale(canvas);
-    const nextScale = clamp(previousScale * factor, NODE_GRAPH_DOM_MIN_2D_SCALE, NODE_GRAPH_MAX_DOM_2D_SCALE);
-    if (Math.abs(nextScale - previousScale) < 0.000_001) return;
-    const previousLeft = pixelValue(canvas.style.left);
-    const previousTop = pixelValue(canvas.style.top);
-    const worldX = (surface.scrollLeft + anchorX - previousLeft) / previousScale;
-    const worldY = (surface.scrollTop + anchorY - previousTop) / previousScale;
-    const inset = 24;
-    const scaledWidth = width * nextScale;
-    const scaledHeight = height * nextScale;
-    const stageWidth = Math.max(surface.clientWidth, scaledWidth + inset * 2);
-    const stageHeight = Math.max(surface.clientHeight, scaledHeight + inset * 2);
-    const offsetX = (stageWidth - scaledWidth) / 2;
-    const offsetY = (stageHeight - scaledHeight) / 2;
-    stage.style.width = `${stageWidth}px`;
-    stage.style.height = `${stageHeight}px`;
-    canvas.style.left = `${offsetX}px`;
-    canvas.style.top = `${offsetY}px`;
-    canvas.style.transform = `scale(${nextScale})`;
-    surface.scrollLeft = Math.max(0, worldX * nextScale + offsetX - anchorX);
-    surface.scrollTop = Math.max(0, worldY * nextScale + offsetY - anchorY);
-    this.updateZoomIndicator(nextScale);
+    const camera = zoomNodeGraphCanvasCamera(domCamera(surface, canvas), -Math.log(factor) / 0.0015,
+      anchorX, anchorY, NODE_GRAPH_MIN_INTERACTIVE_2D_SCALE);
+    this.applyDom2DCamera(surface, stage, canvas, width, height, camera);
+  }
+
+  private applyDom2DCamera(
+    surface: HTMLElement, stage: HTMLElement, canvas: HTMLElement,
+    width: number, height: number, camera: NodeGraphCanvasCamera,
+  ): void {
+    const viewport = nodeGraphDomViewport(camera, { width, height }, { width: surface.clientWidth, height: surface.clientHeight });
+    stage.style.width = `${viewport.width}px`;
+    stage.style.height = `${viewport.height}px`;
+    canvas.style.left = `${viewport.left}px`;
+    canvas.style.top = `${viewport.top}px`;
+    canvas.style.transform = `scale(${camera.zoom})`;
+    surface.scrollLeft = viewport.scrollLeft;
+    surface.scrollTop = viewport.scrollTop;
+    this.updateZoomIndicator(camera.zoom);
   }
 
   private bind3DViewportControls(): void {
@@ -1825,8 +1813,12 @@ function pixelValue(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
+function domCamera(surface: HTMLElement, canvas: HTMLElement): NodeGraphCanvasCamera {
+  return {
+    zoom: domScale(canvas),
+    panX: pixelValue(canvas.style.left) - surface.scrollLeft,
+    panY: pixelValue(canvas.style.top) - surface.scrollTop,
+  };
 }
 
 function zoomLevelLabel(zoom: number): string {

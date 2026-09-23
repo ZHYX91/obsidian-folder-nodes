@@ -765,6 +765,8 @@
   .folder-nodes-node-graph-range-button,
   .folder-nodes-node-graph-scope-button,
   .folder-nodes-node-graph-switch-button,
+  .folder-nodes-node-graph-zoom-level,
+  .folder-nodes-node-graph-viewport-help,
   .folder-nodes-node-graph-toolbar .clickable-icon {
     min-width: 44px;
     min-height: 44px;
