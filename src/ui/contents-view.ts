@@ -1,4 +1,4 @@
-import { type Editor, ItemView, Notice, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
+import { type Editor, ItemView, MarkdownView, Notice, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
 import {
   breadcrumbItems,
@@ -119,6 +119,8 @@ export class FolderNodeContentsView extends ItemView {
   public override getViewType(): string { return CONTENTS_VIEW_TYPE; }
   public override getDisplayText(): string { return t("nodeContents"); }
   public override getIcon(): string { return "layout-grid"; }
+
+  public currentFolderPath(): string { return normalizeVaultPath(this.folderPath); }
 
   public setFolder(path: string): void {
     const normalized = normalizeVaultPath(path);
@@ -577,7 +579,7 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private insertSelected(allAsLinks: boolean): void {
-    const target = this.lastEditor;
+    const target = this.liveEditorTarget();
     if (target === null) {
       new Notice(t("noActiveEditor"));
       return;
@@ -609,6 +611,16 @@ export class FolderNodeContentsView extends ItemView {
       return file instanceof TFile ? [{ kind, link: this.app.fileManager.generateMarkdownLink(file, sourcePath) }] : [];
     });
     return formatContentLinks(items, allAsLinks);
+  }
+
+  private liveEditorTarget(): { editor: Editor; file: TFile } | null {
+    const target = this.lastEditor;
+    if (target === null || this.app.vault.getAbstractFileByPath(target.file.path) !== target.file) return null;
+    let live = false;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view instanceof MarkdownView && leaf.view.file === target.file && leaf.view.editor === target.editor) live = true;
+    });
+    return live ? target : null;
   }
 
   private captureActiveEditor(): void {
