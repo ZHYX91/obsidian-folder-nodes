@@ -65,6 +65,18 @@ describe("runtime architecture contract", () => {
     expect(plugin).toContain("throw new SettingsSchemaIncompatibleError");
   });
 
+  it("revalidates selection creation after the asynchronous node write", () => {
+    const plugin = source("src/app/plugin.ts");
+    const firstValidation = plugin.indexOf("assertSelectionCurrent();");
+    const createNode = plugin.indexOf("await this.service.createNode(parentPath, name, options)", firstValidation);
+    const secondValidation = plugin.indexOf("assertSelectionCurrent();", firstValidation + 1);
+    const replaceSelection = plugin.indexOf("editor.replaceSelection(wikiLink)", secondValidation);
+    expect(firstValidation).toBeGreaterThan(0);
+    expect(createNode).toBeGreaterThan(firstValidation);
+    expect(secondValidation).toBeGreaterThan(createNode);
+    expect(replaceSelection).toBeGreaterThan(secondValidation);
+  });
+
   it("owns one authoritative versioned stylesheet per workspace document", () => {
     const plugin = source("src/app/plugin.ts");
     const settings = source("src/app/settings-tab.ts");
@@ -76,6 +88,7 @@ describe("runtime architecture contract", () => {
     expect(plugin).toContain("new RuntimeStyles(PLUGIN_STYLES)");
     expect(plugin).not.toContain("adapter.read");
     expect(plugin).toContain("runtimeStyles.install(document)");
+    expect(plugin).toContain("runtimeStyles.reconcile(documents)");
     expect(plugin).toContain("runtimeStyles.removeAll()");
     expect(plugin).toContain('this.app.workspace.on("css-change", () => this.ensureWorkspaceStyles())');
     expect(plugin).toContain("this.ensureWorkspaceStyles()");
