@@ -45,7 +45,7 @@ export interface NodeGraphToolbarActions {
   readonly onLocalScope: () => void;
   readonly onReturnGlobal: () => void;
   readonly onSearchChange: (value: string) => void;
-  readonly onSearchEnter: () => void;
+  readonly onSearchEnter: () => boolean;
   readonly onShowLinks: () => void;
   readonly onSubtreeScope: () => void;
 }
@@ -74,9 +74,8 @@ export function renderNodeGraphToolbar(
       actions.onSearchChange("");
       return;
     }
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || !actions.onSearchEnter()) return;
     event.preventDefault();
-    actions.onSearchEnter();
   });
   setTooltip(search.inputEl, labels.findNode);
   search.clearButtonEl.setAttribute("aria-label", labels.clearSearch);
