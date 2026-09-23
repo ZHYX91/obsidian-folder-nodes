@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1
+
+- Open the Node Graph from the folder shown in its Contents view and reveal files in the relevant workspace window.
+- Recheck the source editor after creating a node from a selection, and reject stale Contents editor bindings before inserting links.
+- Release styles for closed pop-out windows and let each Node Graph view own its viewport observer.
+- Extract Node Graph toolbar construction without changing graph controls or saved view state.
+
 ## 0.10.0
 
 - Added consistent Node Graph zoom, percentage reset, Fit, interaction help, and keyboard controls across DOM and Canvas rendering.
