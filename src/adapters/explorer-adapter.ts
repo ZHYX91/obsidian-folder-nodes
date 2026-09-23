@@ -71,6 +71,7 @@ export class ExplorerAdapter extends Component {
     this.cancelNoteTitleDecorate();
     this.syncSurfaces();
     for (const { root } of this.surfaces.values()) this.decorateRoot(root);
+    this.refreshCreateActions();
     this.decorateNoteTitles();
   }
 
