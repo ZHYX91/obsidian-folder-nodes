@@ -76,7 +76,9 @@ export class ExplorerAdapter extends Component {
   }
 
   public async reveal(entry: TAbstractFile): Promise<boolean> {
-    const leaf = this.app.workspace.getLeavesOfType("file-explorer")[0];
+    const leaves = this.app.workspace.getLeavesOfType("file-explorer");
+    const recentDocument = this.app.workspace.getMostRecentLeaf()?.view.containerEl.ownerDocument ?? null;
+    const leaf = leaves.find((candidate) => candidate.view.containerEl.ownerDocument === recentDocument) ?? leaves[0];
     const view = leaf?.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void } | undefined;
     if (leaf === undefined || view?.revealInFolder === undefined) return false;
     await view.revealInFolder(entry);
