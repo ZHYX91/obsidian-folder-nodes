@@ -550,7 +550,7 @@ export default class FolderNodesPlugin extends Plugin {
   private ensureWorkspaceStyles(): void {
     const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
-    for (const document of documents) this.ensureStyles(document);
+    this.runtimeStyles.reconcile(documents);
   }
 
   private updateEmojiFontStyle(): void {
@@ -955,15 +955,22 @@ export default class FolderNodesPlugin extends Plugin {
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
     const wikiLink = buildSelectionWikiLink(notePath.slice(0, -3), selection, tableContext);
     new SelectionCreateModal(this.app, { parentPath, nodeName: name, alias }, async () => {
-      if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
-      if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new Error("Source note changed after preview");
-      const currentFrom = editor.getCursor("from");
-      const currentTo = editor.getCursor("to");
-      if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new Error("Selection changed after preview");
-      if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new Error("Table structure changed after preview");
+      const assertSelectionCurrent = (): void => {
+        if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
+        if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new Error("Source note changed after preview");
+        const currentFrom = editor.getCursor("from");
+        const currentTo = editor.getCursor("to");
+        if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new Error("Selection changed after preview");
+        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new Error("Table structure changed after preview");
+        const liveEditor = this.app.workspace.getLeavesOfType("markdown").some((leaf) =>
+          leaf.view instanceof MarkdownView && leaf.view.file === file && leaf.view.editor === editor);
+        if (!liveEditor) throw new Error("Source editor changed after preview");
+      };
+      assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, name, options);
       try {
+        assertSelectionCurrent();
         editor.replaceSelection(wikiLink);
       } catch (error) {
         if (note.parent !== null) {
