@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 
-export const RELEASE_CORE_VERSION = "3.1.0";
+export const RELEASE_CORE_VERSION = "3.1.1";
 export const RELEASE_CORE_PACKAGE_NAME = "@zhyx/obsidian-release-core";
 export const RELEASE_CORE_VENDOR_LOCK_SCHEMA_VERSION = 2;
 export const CANDIDATE_BUNDLE_SCHEMA_VERSION = 3;
@@ -1732,6 +1732,20 @@ function assertOwnedDraft(record, verifiedBundle) {
   "GitHub Release must be the exact owned draft", "RELEASE_CORE_GITHUB");
 }
 
+function assertVisibleReleaseAssets(record, verifiedBundle) {
+  const expected = new Map(verifiedBundle.publicAssets.map((asset) => [asset.name, asset]));
+  assertCondition(Array.isArray(record.assets), "GitHub Release assets must be an array", "RELEASE_CORE_GITHUB");
+  const names = record.assets.map((asset) => asset?.name);
+  assertCondition(new Set(names).size === names.length && names.every((name) => expected.has(name)),
+    "GitHub Release asset inventory contains unexpected or duplicate files", "RELEASE_CORE_GITHUB");
+  for (const asset of record.assets) {
+    const wanted = expected.get(asset.name);
+    assertCondition(asset.state === "uploaded" && asset.size === wanted.size &&
+      asset.digest === `sha256:${wanted.sha256}`,
+    `GitHub Release asset metadata mismatch: ${asset.name}`, "RELEASE_CORE_GITHUB");
+  }
+}
+
 async function readReleaseById(commandRunner, repository, id, verifiedBundle, options,
   published = false, completeAssets = false) {
   return githubJson(commandRunner, `repos/${repository}/releases/${id}`, {
@@ -1742,19 +1756,9 @@ async function readReleaseById(commandRunner, repository, id, verifiedBundle, op
       "GitHub Release ID or tag identity changed", "RELEASE_CORE_GITHUB");
       if (record.draft === true) assertOwnedDraft(record, verifiedBundle);
       if (completeAssets) {
-        const expected = verifiedBundle.publicAssets.map((asset) => asset.name);
-        assertCondition(Array.isArray(record.assets), "GitHub Release assets must be an array", "RELEASE_CORE_GITHUB");
-        const actual = record.assets.map((asset) => asset?.name);
-        assertCondition(new Set(actual).size === actual.length && actual.every((name) => expected.includes(name)),
-          "GitHub Release asset inventory contains unexpected or duplicate files", "RELEASE_CORE_GITHUB");
         // Inspect every visible asset before waiting for the remaining uploaded names.
-        for (const asset of record.assets) {
-          const wanted = verifiedBundle.publicAssets.find((item) => item.name === asset.name);
-          assertCondition(asset.state === "uploaded" && asset.size === wanted.size &&
-            asset.digest === `sha256:${wanted.sha256}`,
-          `GitHub Release asset metadata mismatch: ${asset.name}`, "RELEASE_CORE_GITHUB");
-        }
-        if (actual.length < expected.length) fail("Uploaded assets are not visible yet", "RELEASE_CORE_GITHUB_PENDING");
+        assertVisibleReleaseAssets(record, verifiedBundle);
+        if (record.assets.length < verifiedBundle.publicAssets.length) fail("Uploaded assets are not visible yet", "RELEASE_CORE_GITHUB_PENDING");
       }
       if (published && (record.draft === true || record.immutable === false || record.published_at === null)) {
         fail("Published Release state is not visible yet", "RELEASE_CORE_GITHUB_PENDING");
@@ -1799,6 +1803,18 @@ async function fetchRelease(commandRunner, repository, tag, options, allow404) {
     }
   }
   fail("GitHub release listing exceeded the lookup limit", "RELEASE_CORE_GITHUB");
+}
+
+async function refreshPublishedRelease(record, commandRunner, repository, verifiedBundle, options) {
+  // A tag/list lookup can expose a published release before its assets. Once an
+  // ID is known, resolve the complete record by ID with the bounded read policy.
+  // Contradictory visible identity or bytes must never be hidden by a reread.
+  assertCondition(record.tag_name === verifiedBundle.candidateBundle.plugin.version &&
+    record.draft === false && record.prerelease === false,
+  "GitHub Release tag identity or stable publication state changed", "RELEASE_CORE_GITHUB");
+  assertVisibleReleaseAssets(record, verifiedBundle);
+  return readReleaseById(commandRunner, repository, releaseId(record), verifiedBundle,
+    options, true, true);
 }
 
 async function verifyHostedRecord({
@@ -1873,8 +1889,11 @@ export async function verifyPublishedRelease({
   const config = validateReleaseConfig(configInput);
   await assertCurrentExactTag(path.resolve(projectRoot), verifiedBundle.candidateBundle,
     commandRunner);
-  const record = releaseRecord ?? await fetchRelease(commandRunner, config.publication.repository,
-    verifiedBundle.candidateBundle.plugin.version, { cwd: projectRoot, env }, false);
+  const options = { cwd: projectRoot, env };
+  const record = releaseRecord ?? await refreshPublishedRelease(
+    await fetchRelease(commandRunner, config.publication.repository,
+      verifiedBundle.candidateBundle.plugin.version, options, false),
+    commandRunner, config.publication.repository, verifiedBundle, options);
   return verifyHostedRecord({
     projectRoot: path.resolve(projectRoot),
     config,
@@ -1894,11 +1913,13 @@ async function inspectExistingGitHubRelease({
 }) {
   const repository = config.publication.repository;
   const tag = verifiedBundle.candidateBundle.plugin.version;
-  const existing = await fetchRelease(commandRunner, repository, tag,
+  let existing = await fetchRelease(commandRunner, repository, tag,
     { cwd: projectRoot, env }, true);
   if (existing === null) {
     return Object.freeze({ status: "missing", repository, tag });
   }
+  if (existing.draft !== true) existing = await refreshPublishedRelease(existing,
+    commandRunner, repository, verifiedBundle, { cwd: projectRoot, env });
   const verified = await verifyHostedRecord({
     projectRoot, config, verifiedBundle, commandRunner, env,
     releaseRecord: existing, draft: existing.draft === true, allowMissingAssets: true,
