@@ -1,4 +1,4 @@
-import { TFile, TFolder } from "obsidian";
+import { MarkdownView, TFile, TFolder, type Editor } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
 import { FolderNodeContentsView } from "../../src/ui/contents-view";
@@ -117,6 +117,29 @@ describe("Node Contents render extension lifecycle", () => {
     expect(view.contentEl.scrollTop).toBe(73);
     await view.onClose();
     view.containerEl.remove();
+  });
+
+  it("keeps a remembered editor only while its exact view and file stay live", () => {
+    const view = createView();
+    const subject = view as unknown as {
+      app: {
+        vault: { getAbstractFileByPath(path: string): unknown };
+        workspace: { iterateAllLeaves(callback: (leaf: { view: MarkdownView }) => void): void };
+      };
+      lastEditor: { editor: Editor; file: TFile } | null;
+      liveEditorTarget(): { editor: Editor; file: TFile } | null;
+    };
+    const file = Object.assign(new TFile(), { path: "Target.md" });
+    const editor = {} as Editor;
+    const markdown = Object.assign(new MarkdownView({} as never), { editor, file });
+    let live = true;
+    subject.lastEditor = { editor, file };
+    subject.app.vault.getAbstractFileByPath = () => file;
+    subject.app.workspace.iterateAllLeaves = (callback) => { if (live) callback({ view: markdown }); };
+
+    expect(subject.liveEditorTarget()).toEqual({ editor, file });
+    live = false;
+    expect(subject.liveEditorTarget()).toBeNull();
   });
 
   it("uses one unified empty state instead of three zero-count disclosure rows", async () => {
