@@ -88,7 +88,7 @@ function firstVisibleSlot(slots: readonly Element[], scrollContainer: HTMLElemen
   const viewport = scrollContainer.getBoundingClientRect();
   for (const slot of slots) {
     const rect = slot.getBoundingClientRect();
-    if (rect.bottom >= viewport.top && rect.top <= viewport.bottom) return slot;
+    if (rect.width > 0 && rect.height > 0 && rect.bottom >= viewport.top && rect.top <= viewport.bottom) return slot;
   }
   return null;
 }
