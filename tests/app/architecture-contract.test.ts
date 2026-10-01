@@ -12,6 +12,17 @@ describe("runtime architecture contract", () => {
     expect(explorer).toContain('getLeavesOfType("file-explorer")');
   });
 
+  it("fails closed before host reveal for property-hidden Explorer targets", () => {
+    const explorer = source("src/adapters/explorer-adapter.ts");
+    const plugin = source("src/app/plugin.ts");
+    expect(explorer).toContain("if (!this.canReveal(entry)) return false;");
+    const guard = plugin.indexOf("if (!this.explorer.canReveal(entry))");
+    const reveal = plugin.indexOf("await this.explorer.reveal(entry)", guard);
+    expect(guard).toBeGreaterThan(0);
+    expect(reveal).toBeGreaterThan(guard);
+    expect(plugin.slice(guard, reveal)).toContain('new Notice(t("hiddenNodeDetail"))');
+  });
+
   it("rebinds Explorer decoration when mobile mounts the sidebar after layout-ready", () => {
     const plugin = source("src/app/plugin.ts");
     expect(plugin).toContain('this.app.workspace.on("layout-change"');
