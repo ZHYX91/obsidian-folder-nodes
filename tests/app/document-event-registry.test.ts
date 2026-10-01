@@ -12,18 +12,24 @@ describe("DocumentEventRegistry", () => {
     const listener = vi.fn();
     const registry = new DocumentEventRegistry(listener);
 
+    const dispatch = (document: Document, type: string): void => {
+      const event = document.createEvent("Event");
+      event.initEvent(type, true, true);
+      document.dispatchEvent(event);
+    };
+
     registry.reconcile([first, second]);
-    first.dispatchEvent(new firstWindow.MouseEvent("click", { bubbles: true }));
-    second.dispatchEvent(new secondWindow.MouseEvent("auxclick", { bubbles: true }));
+    dispatch(first, "click");
+    dispatch(second, "auxclick");
     expect(listener).toHaveBeenCalledTimes(2);
 
     registry.reconcile([second]);
-    first.dispatchEvent(new firstWindow.MouseEvent("click", { bubbles: true }));
-    second.dispatchEvent(new secondWindow.MouseEvent("click", { bubbles: true }));
+    dispatch(first, "click");
+    dispatch(second, "click");
     expect(listener).toHaveBeenCalledTimes(3);
 
     registry.clear();
-    second.dispatchEvent(new secondWindow.MouseEvent("click", { bubbles: true }));
+    dispatch(second, "click");
     expect(listener).toHaveBeenCalledTimes(3);
   });
 });
