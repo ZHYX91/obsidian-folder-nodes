@@ -5,7 +5,7 @@ import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeVisual } from "../core/types";
 import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent } from "../core/placement";
-import { normalizeVaultPath } from "../core/paths";
+import { nativeExplorerOrder, restoreExplorerOrder } from "./explorer-native-order";
 import { renderVisual } from "../presentation/render-visual";
 import { PlacementSession } from "../core/placement-session";
 import { placementFeedback } from "../presentation/placement-feedback";
@@ -475,7 +475,6 @@ export class ExplorerAdapter extends Component {
       ...(root.matches(".nav-files-container, .nav-folder-children") ? [root] : []),
       ...root.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children"),
     ];
-    const activePath = normalizeVaultPath(this.app.workspace.getActiveFile()?.path ?? "");
     for (const container of containers) {
       const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
       if (parentPath === undefined) continue;
@@ -485,13 +484,12 @@ export class ExplorerAdapter extends Component {
         continue;
       }
       const orderedPaths = this.service.children(parentPath).map(({ childPath }) => childPath);
-      const anchorPath = orderedPaths.find((path) => activePath === path || activePath.startsWith(`${path}/`)) ?? null;
       const scrollContainer = container.closest<HTMLElement>(".nav-files-container");
       const before = Array.from(container.children);
       const changed = syncExplorerNodeOrder(
         container,
         orderedPaths,
-        scrollContainer === null ? null : { path: anchorPath, scrollContainer },
+        scrollContainer === null ? null : { path: null, scrollContainer },
       );
       if (changed && !this.originalOrders.has(container)) this.originalOrders.set(container, before);
     }
@@ -760,13 +758,11 @@ export class ExplorerAdapter extends Component {
     if (original === undefined) return;
     this.originalOrders.delete(container);
     if (!container.isConnected) return;
-    const survivors = original.filter((element) => element.parentElement === container);
-    const first = Array.from(container.children).find((element) => survivors.includes(element));
-    if (first === undefined) return;
-    const marker = container.ownerDocument.createComment("folder-nodes-restore-order");
-    container.insertBefore(marker, first);
-    for (const element of survivors) container.insertBefore(element, marker);
-    marker.remove();
+    const root = [...this.surfaces.keys()].find((candidate) => candidate.contains(container));
+    const leaf = this.app.workspace.getLeavesOfType("file-explorer").find((candidate) => candidate.view.containerEl === root);
+    const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
+    const folder = parentPath === "" ? this.app.vault.getRoot() : parentPath === undefined ? null : this.service.getFolder(parentPath);
+    restoreExplorerOrder(container, nativeExplorerOrder(leaf?.view, folder) ?? original);
   }
 
   private restoreOrders(): void {

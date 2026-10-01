@@ -72,9 +72,10 @@ describe("ExplorerAdapter lifecycle", () => {
     const aRow = row("A");
     document.body.append(root);
     let mode: "natural" | "manual" = "natural";
+    let nativeOrder = [bRow, aRow];
     const app = {
       vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: () => null },
-      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root, getSortedFolderItems: () => nativeOrder.map((el) => ({ el })) } }] : [] },
     } as unknown as App;
     const service = {
       children: () => [
@@ -109,6 +110,15 @@ describe("ExplorerAdapter lifecycle", () => {
     mode = "natural";
     adapter.refresh();
     expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual([bRow, aRow]);
+
+    mode = "manual";
+    adapter.refresh();
+    const added = row("C");
+    aRow.querySelector(".nav-folder-title")?.setAttribute("data-path", "Renamed");
+    nativeOrder = [added, aRow, bRow];
+    mode = "natural";
+    adapter.refresh();
+    expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual(nativeOrder);
 
     adapter.stop();
     root.remove();

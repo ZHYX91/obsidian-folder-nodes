@@ -159,6 +159,39 @@ describe("File Explorer node ordering", () => {
     container.remove();
   });
 
+  it("keeps a visible non-active title anchored when the preferred branch is offscreen", () => {
+    const container = document.createElement("div");
+    const rows = [folder("A"), folder("B"), folder("C"), folder("D")];
+    container.append(...rows);
+    container.scrollTop = 20;
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 40, width: 100, height: 40 } as DOMRect);
+    for (const row of rows) {
+      const title = row.querySelector<HTMLElement>(".nav-folder-title")!;
+      title.getBoundingClientRect = () => {
+        const top = Array.from(container.children).indexOf(row) * 20 - container.scrollTop;
+        return { top, bottom: top + 20, width: 100, height: 20 } as DOMRect;
+      };
+      // An expanded branch can overlap the viewport while its title is offscreen.
+      row.getBoundingClientRect = () => ({ top: -20, bottom: 400, width: 100, height: 420 } as DOMRect);
+    }
+    const visibleTitle = rows[1]!.querySelector(".nav-folder-title")!;
+    const before = visibleTitle.getBoundingClientRect().top;
+    syncExplorerNodeOrder(container, ["B", "C", "A", "D"], { path: "A", scrollContainer: container });
+    expect(visibleTitle.getBoundingClientRect().top).toBe(before);
+    expect(container.scrollTop).toBe(0);
+  });
+
+  it("does not scroll when every candidate row is hidden or outside the viewport", () => {
+    const container = document.createElement("div");
+    const rows = [folder("A"), folder("B")];
+    container.append(...rows);
+    container.scrollTop = 80;
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 40, width: 100, height: 40 } as DOMRect);
+    for (const row of rows) row.getBoundingClientRect = () => ({ top: -80, bottom: -60, width: 100, height: 20 } as DOMRect);
+    syncExplorerNodeOrder(container, ["B", "A"], { path: "A", scrollContainer: container });
+    expect(container.scrollTop).toBe(80);
+  });
+
   it("settles after one mutation-observer refresh", async () => {
     const container = document.createElement("div");
     const first = folder("A");

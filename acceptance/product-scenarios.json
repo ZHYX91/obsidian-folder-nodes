@@ -13,6 +13,31 @@
   },
   "scenarios": [
     {
+      "id": "explorer-reveal-stability",
+      "title": "Deep breadcrumb reveal, native ordering handoff and visible viewport anchoring",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Run the acceptance provider Create deep Explorer reveal fixture command. Open Reveal/Node 060/Level Two/Level Three/Leaf/Leaf.md, collapse its Explorer ancestors and scroll away.",
+        "Activate each note breadcrumb ancestor repeatedly with Reveal in Manual mode. Check the first visible frame, about 100 ms and about 500 ms after navigation; on desktop also test a collapsed sidebar and a pop-out window.",
+        "Reveal a different branch through a Folder Nodes menu while the active note remains elsewhere. Scroll away from the active note and expand an unrelated branch, including near the scroll limits.",
+        "Switch Reveal to Name, change the native Explorer sort, switch to Manual, then change native sort again. Create, rename and remove disposable child nodes through the product before switching back to Name.",
+        "Compare breadcrumb navigation with Folder Nodes disabled and enabled in this disposable Vault. Restore the candidate to enabled before finishing."
+      ],
+      "expected": [
+        "The target remains visible after navigation settles, with no second ordering jump or wrong ancestor expansion. Desktop pop-out navigation uses the relevant window.",
+        "Ordinary refresh preserves the visible rows and never pulls the viewport toward an offscreen active note. Explicit reveal exposes the requested branch.",
+        "Name follows the current host sibling sort, including newly created and renamed nodes; Manual applies child ranks without touching unrelated entries.",
+        "The disabled comparison distinguishes host behavior from candidate behavior and does not substitute for enabled-candidate observations."
+      ]
+    },
+    {
       "id": "hidden-node-projection",
       "title": "Hidden node and inherited descendant projection",
       "surfaces": [
