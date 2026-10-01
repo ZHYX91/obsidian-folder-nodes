@@ -167,6 +167,30 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Mixed/mixed.md")).toBe(false);
   });
 
+  it("rolls back only an unchanged newly created node after a later workflow failure", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const nodes = service(fake);
+    const note = await nodes.createNode("", "A", { body: "selected" });
+
+    await nodes.rollbackCreatedNode(note, { body: "selected" });
+    expect(fake.files.has("A")).toBe(false);
+    expect(fake.files.has("A/A.md")).toBe(false);
+
+    const changed = await nodes.createNode("", "B", { body: "selected" });
+    await fake.app.vault.modify(changed, "external edit");
+    await expect(nodes.rollbackCreatedNode(changed, { body: "selected" }))
+      .rejects.toThrow("concurrently modified created file");
+    expect(fake.contents.get("B/B.md")).toBe("external edit");
+
+    const occupied = await nodes.createNode("", "C", { body: "selected" });
+    fake.addFile("C/external.md", "external");
+    await expect(nodes.rollbackCreatedNode(occupied, { body: "selected" }))
+      .rejects.toThrow("changed created folder");
+    expect(fake.requireFile("C/C.md")).toBe(occupied);
+    expect(fake.requireFile("C/external.md")).toBeDefined();
+  });
+
   it("does not reread a newly created Node Note before rollback registration", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
