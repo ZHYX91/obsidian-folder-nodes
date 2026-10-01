@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Treat every folder in an Obsidian Vault as a same-named folder node.",
   "type": "module",
   "main": "dist/main.js",
@@ -58,5 +58,8 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "overrides": {
+    "moment": "2.31.0"
   }
 }

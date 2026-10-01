@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.2
+
+- Materialize File Explorer before revealing a node and check the loaded view's reveal capability.
+- Keep native Explorer sorting in Name mode, restore the current host order after Manual mode, and preserve visible rows while manual ranks move nodes.
+- Refuse plugin reveal actions for property-hidden targets with an explanation; session reveal remains available through the Root eye.
+- Add deep breadcrumb navigation fixtures and ordering handoff regressions, centralize Explorer host contracts, and update vulnerable development dependencies.
+
 ## 0.10.1
 
 - Open the Node Graph from the folder shown in its Contents view and reveal files in the relevant workspace window.
