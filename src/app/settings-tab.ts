@@ -12,7 +12,7 @@ import {
 } from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
-import { setLanguage, t } from "../ui/i18n";
+import { t } from "../ui/i18n";
 import { renderVisual } from "../presentation/render-visual";
 
 type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";
@@ -313,8 +313,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(panel).setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
       .addOptions({ auto: t("auto"), "zh-CN": t("chinese"), en: t("english") }).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value as typeof this.plugin.settings.language;
-        setLanguage(this.plugin.settings.language);
-        await this.plugin.saveSettings();
+        await this.plugin.applyLanguageSetting();
         new Notice(t("reloadLanguage"));
         this.display();
       }));
