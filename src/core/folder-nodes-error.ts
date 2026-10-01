@@ -20,7 +20,7 @@ export class FolderNodesError extends Error {
   public constructor(
     public readonly code: FolderNodesErrorCode,
     public readonly values: Readonly<Record<string, string | number>> = {},
-    message = code,
+    message: string = code,
   ) {
     super(message);
     this.name = "FolderNodesError";
