@@ -37,7 +37,16 @@ export function explorerMarkerPlacement(
   };
 }
 
-export function syncExplorerNodeOrder(container: HTMLElement, orderedPaths: readonly string[]): boolean {
+export interface ExplorerOrderAnchor {
+  path: string | null;
+  scrollContainer: HTMLElement;
+}
+
+export function syncExplorerNodeOrder(
+  container: HTMLElement,
+  orderedPaths: readonly string[],
+  anchor: ExplorerOrderAnchor | null = null,
+): boolean {
   const order = new Map(orderedPaths.map((path, index) => [path, index]));
   const slots = Array.from(container.children).filter((child) => {
     const title = child.matches(".nav-folder-title[data-path]")
@@ -56,13 +65,41 @@ export function syncExplorerNodeOrder(container: HTMLElement, orderedPaths: read
     (order.get(pathFor(left)) ?? Number.MAX_SAFE_INTEGER) - (order.get(pathFor(right)) ?? Number.MAX_SAFE_INTEGER));
   if (slots.every((element, index) => element === desired[index])) return false;
 
+  const preferredSlot = anchor?.path === null || anchor === null ? null : slots.find((slot) => pathFor(slot) === anchor.path) ?? null;
+  const preferred = preferredSlot?.querySelector(".nav-folder-title[data-path]") ?? preferredSlot;
+  const anchorElement = anchor === null ? null
+    : preferred !== null && isVisibleRow(preferred, anchor.scrollContainer) ? preferred : firstVisibleSlot(slots, anchor.scrollContainer);
+  const anchorTop = anchorElement?.getBoundingClientRect().top ?? null;
+
   const markers = slots.map((element) => {
     const marker = container.ownerDocument.createComment("folder-nodes-order-slot");
     container.insertBefore(marker, element);
     return marker;
   });
   markers.forEach((marker, index) => marker.replaceWith(desired[index]!));
+
+  if (anchor !== null && anchorElement !== null && anchorTop !== null && container.contains(anchorElement)) {
+    const delta = anchorElement.getBoundingClientRect().top - anchorTop;
+    if (Number.isFinite(delta) && Math.abs(delta) > 0.5) anchor.scrollContainer.scrollTop += delta;
+  }
   return true;
+}
+
+function firstVisibleSlot(slots: readonly Element[], scrollContainer: HTMLElement): Element | null {
+  // Anchor a visible title, not the bounding box of an expanded subtree.
+  const visibleTitle = Array.from(scrollContainer.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]"))
+    .find((title) => isVisibleRow(title, scrollContainer));
+  if (visibleTitle !== undefined) return visibleTitle;
+  for (const slot of slots) {
+    if (isVisibleRow(slot, scrollContainer)) return slot;
+  }
+  return null;
+}
+
+function isVisibleRow(element: Element, scrollContainer: HTMLElement): boolean {
+  const viewport = scrollContainer.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom;
 }
 
 export interface ExplorerRootRow {

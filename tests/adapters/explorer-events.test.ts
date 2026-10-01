@@ -125,6 +125,73 @@ describe("File Explorer node ordering", () => {
     expect(syncExplorerNodeOrder(container, ["生活/餐饮", "生活/购物", "生活/宠物"])).toBe(false);
   });
 
+
+  it("preserves the revealed branch position while managed siblings move", () => {
+    const container = document.createElement("div");
+    container.className = "nav-files-container";
+    const first = folder("A");
+    const revealed = folder("B");
+    container.append(revealed, first);
+    document.body.append(container);
+    container.scrollTop = 4;
+    container.getBoundingClientRect = () => ({
+      bottom: 40, height: 40, left: 0, right: 100, top: 0, width: 100, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const rectFor = (element: Element): DOMRect => {
+      const top = Array.from(container.children).indexOf(element) * 20 - container.scrollTop;
+      return {
+        bottom: top + 20, height: 20, left: 0, right: 100, top, width: 100, x: 0, y: top, toJSON: () => ({}),
+      };
+    };
+    first.getBoundingClientRect = () => rectFor(first);
+    revealed.getBoundingClientRect = () => rectFor(revealed);
+    const topBefore = revealed.getBoundingClientRect().top;
+
+    expect(syncExplorerNodeOrder(
+      container,
+      ["A", "B"],
+      { path: "B", scrollContainer: container },
+    )).toBe(true);
+
+    expect(Array.from(container.children)).toEqual([first, revealed]);
+    expect(container.scrollTop).toBe(24);
+    expect(revealed.getBoundingClientRect().top).toBe(topBefore);
+    container.remove();
+  });
+
+  it("keeps a visible non-active title anchored when the preferred branch is offscreen", () => {
+    const container = document.createElement("div");
+    const rows = [folder("A"), folder("B"), folder("C"), folder("D")];
+    container.append(...rows);
+    container.scrollTop = 20;
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 40, width: 100, height: 40 } as DOMRect);
+    for (const row of rows) {
+      const title = row.querySelector<HTMLElement>(".nav-folder-title")!;
+      title.getBoundingClientRect = () => {
+        const top = Array.from(container.children).indexOf(row) * 20 - container.scrollTop;
+        return { top, bottom: top + 20, width: 100, height: 20 } as DOMRect;
+      };
+      // An expanded branch can overlap the viewport while its title is offscreen.
+      row.getBoundingClientRect = () => ({ top: -20, bottom: 400, width: 100, height: 420 } as DOMRect);
+    }
+    const visibleTitle = rows[1]!.querySelector(".nav-folder-title")!;
+    const before = visibleTitle.getBoundingClientRect().top;
+    syncExplorerNodeOrder(container, ["B", "C", "A", "D"], { path: "A", scrollContainer: container });
+    expect(visibleTitle.getBoundingClientRect().top).toBe(before);
+    expect(container.scrollTop).toBe(0);
+  });
+
+  it("does not scroll when every candidate row is hidden or outside the viewport", () => {
+    const container = document.createElement("div");
+    const rows = [folder("A"), folder("B")];
+    container.append(...rows);
+    container.scrollTop = 80;
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 40, width: 100, height: 40 } as DOMRect);
+    for (const row of rows) row.getBoundingClientRect = () => ({ top: -80, bottom: -60, width: 100, height: 20 } as DOMRect);
+    syncExplorerNodeOrder(container, ["B", "A"], { path: "A", scrollContainer: container });
+    expect(container.scrollTop).toBe(80);
+  });
+
   it("settles after one mutation-observer refresh", async () => {
     const container = document.createElement("div");
     const first = folder("A");

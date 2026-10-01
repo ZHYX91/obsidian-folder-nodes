@@ -5,6 +5,7 @@ import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeVisual } from "../core/types";
 import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent } from "../core/placement";
+import { nativeExplorerOrder, restoreExplorerOrder } from "./explorer-native-order";
 import { renderVisual } from "../presentation/render-visual";
 import { PlacementSession } from "../core/placement-session";
 import { placementFeedback } from "../presentation/placement-feedback";
@@ -26,7 +27,8 @@ export class ExplorerAdapter extends Component {
   private readonly noteTitleSurfaces = new Map<HTMLElement, NoteTitleSurface>();
   private readonly originalOrders = new Map<HTMLElement, Element[]>();
   private decorateTimer: number | null = null;
-  private explorerMutationTimer: number | null = null;
+  private explorerMutationQueued = false;
+  private explorerMutationGeneration = 0;
   private noteTitleDecorateTimer: number | null = null;
   private readonly pendingExplorerScopes = new Set<HTMLElement>();
   private draggedPath: string | null = null;
@@ -194,9 +196,12 @@ export class ExplorerAdapter extends Component {
       }
       this.pendingExplorerScopes.add(scope);
     }
-    if (this.pendingExplorerScopes.size === 0 || this.explorerMutationTimer !== null) return;
-    this.explorerMutationTimer = window.setTimeout(() => {
-      this.explorerMutationTimer = null;
+    if (this.pendingExplorerScopes.size === 0 || this.explorerMutationQueued) return;
+    const generation = this.explorerMutationGeneration;
+    this.explorerMutationQueued = true;
+    queueMicrotask(() => {
+      if (generation !== this.explorerMutationGeneration) return;
+      this.explorerMutationQueued = false;
       this.syncSurfaces();
       const pending = [...this.pendingExplorerScopes];
       this.pendingExplorerScopes.clear();
@@ -212,12 +217,12 @@ export class ExplorerAdapter extends Component {
         this.decorateEntries(scope);
         this.syncNodeOrder(scope);
       }
-    }, 32);
+    });
   }
 
   private cancelExplorerMutationDecorate(): void {
-    if (this.explorerMutationTimer !== null) window.clearTimeout(this.explorerMutationTimer);
-    this.explorerMutationTimer = null;
+    this.explorerMutationGeneration += 1;
+    this.explorerMutationQueued = false;
     this.pendingExplorerScopes.clear();
   }
 
@@ -473,8 +478,19 @@ export class ExplorerAdapter extends Component {
     for (const container of containers) {
       const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
       if (parentPath === undefined) continue;
+      const sortMode = (this.service as unknown as { sortMode?: (path: string) => "manual" | "natural" }).sortMode?.(parentPath) ?? "natural";
+      if (sortMode !== "manual") {
+        this.restoreOrder(container);
+        continue;
+      }
+      const orderedPaths = this.service.children(parentPath).map(({ childPath }) => childPath);
+      const scrollContainer = container.closest<HTMLElement>(".nav-files-container");
       const before = Array.from(container.children);
-      const changed = syncExplorerNodeOrder(container, this.service.children(parentPath).map(({ childPath }) => childPath));
+      const changed = syncExplorerNodeOrder(
+        container,
+        orderedPaths,
+        scrollContainer === null ? null : { path: null, scrollContainer },
+      );
       if (changed && !this.originalOrders.has(container)) this.originalOrders.set(container, before);
     }
   }
@@ -737,18 +753,20 @@ export class ExplorerAdapter extends Component {
     }
   }
 
+  private restoreOrder(container: HTMLElement): void {
+    const original = this.originalOrders.get(container);
+    if (original === undefined) return;
+    this.originalOrders.delete(container);
+    if (!container.isConnected) return;
+    const root = [...this.surfaces.keys()].find((candidate) => candidate.contains(container));
+    const leaf = this.app.workspace.getLeavesOfType("file-explorer").find((candidate) => candidate.view.containerEl === root);
+    const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
+    const folder = parentPath === "" ? this.app.vault.getRoot() : parentPath === undefined ? null : this.service.getFolder(parentPath);
+    restoreExplorerOrder(container, nativeExplorerOrder(leaf?.view, folder) ?? original);
+  }
+
   private restoreOrders(): void {
-    for (const [container, original] of this.originalOrders) {
-      if (!container.isConnected) continue;
-      const survivors = original.filter((element) => element.parentElement === container);
-      const first = Array.from(container.children).find((element) => survivors.includes(element));
-      if (first === undefined) continue;
-      const marker = container.ownerDocument.createComment("folder-nodes-restore-order");
-      container.insertBefore(marker, first);
-      for (const element of survivors) container.insertBefore(element, marker);
-      marker.remove();
-    }
-    this.originalOrders.clear();
+    for (const container of [...this.originalOrders.keys()]) this.restoreOrder(container);
   }
 
   private cleanupSurface(root: HTMLElement): void {
