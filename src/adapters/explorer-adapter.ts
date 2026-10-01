@@ -26,7 +26,8 @@ export class ExplorerAdapter extends Component {
   private readonly noteTitleSurfaces = new Map<HTMLElement, NoteTitleSurface>();
   private readonly originalOrders = new Map<HTMLElement, Element[]>();
   private decorateTimer: number | null = null;
-  private explorerMutationTimer: number | null = null;
+  private explorerMutationQueued = false;
+  private explorerMutationGeneration = 0;
   private noteTitleDecorateTimer: number | null = null;
   private readonly pendingExplorerScopes = new Set<HTMLElement>();
   private draggedPath: string | null = null;
@@ -190,9 +191,12 @@ export class ExplorerAdapter extends Component {
       }
       this.pendingExplorerScopes.add(scope);
     }
-    if (this.pendingExplorerScopes.size === 0 || this.explorerMutationTimer !== null) return;
-    this.explorerMutationTimer = window.setTimeout(() => {
-      this.explorerMutationTimer = null;
+    if (this.pendingExplorerScopes.size === 0 || this.explorerMutationQueued) return;
+    const generation = this.explorerMutationGeneration;
+    this.explorerMutationQueued = true;
+    queueMicrotask(() => {
+      if (generation !== this.explorerMutationGeneration) return;
+      this.explorerMutationQueued = false;
       this.syncSurfaces();
       const pending = [...this.pendingExplorerScopes];
       this.pendingExplorerScopes.clear();
@@ -208,12 +212,12 @@ export class ExplorerAdapter extends Component {
         this.decorateEntries(scope);
         this.syncNodeOrder(scope);
       }
-    }, 32);
+    });
   }
 
   private cancelExplorerMutationDecorate(): void {
-    if (this.explorerMutationTimer !== null) window.clearTimeout(this.explorerMutationTimer);
-    this.explorerMutationTimer = null;
+    this.explorerMutationGeneration += 1;
+    this.explorerMutationQueued = false;
     this.pendingExplorerScopes.clear();
   }
 
@@ -466,11 +470,21 @@ export class ExplorerAdapter extends Component {
       ...(root.matches(".nav-files-container, .nav-folder-children") ? [root] : []),
       ...root.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children"),
     ];
+    const activePath = normalizeVaultPath(this.app.workspace.getActiveFile()?.path ?? "");
     for (const container of containers) {
       const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
       if (parentPath === undefined) continue;
+      const sortMode = (this.service as unknown as { sortMode?: (path: string) => "manual" | "natural" }).sortMode?.(parentPath) ?? "natural";
+      if (sortMode !== "manual") continue;
+      const orderedPaths = this.service.children(parentPath).map(({ childPath }) => childPath);
+      const anchorPath = orderedPaths.find((path) => activePath === path || activePath.startsWith(`${path}/`)) ?? null;
+      const scrollContainer = container.closest<HTMLElement>(".nav-files-container");
       const before = Array.from(container.children);
-      const changed = syncExplorerNodeOrder(container, this.service.children(parentPath).map(({ childPath }) => childPath));
+      const changed = syncExplorerNodeOrder(
+        container,
+        orderedPaths,
+        scrollContainer === null ? null : { path: anchorPath, scrollContainer },
+      );
       if (changed && !this.originalOrders.has(container)) this.originalOrders.set(container, before);
     }
   }
