@@ -1,6 +1,12 @@
 import { App, Component, MarkdownView, setIcon, TAbstractFile, TFile, TFolder } from "obsidian";
 
 import { alignNoteTitleIcon, ensureExplorerIconPosition, ensureExplorerRootRow, ensureNoteTitleIcon, explorerMarkerPlacement, isFolderCollapseControl, removeNoteTitleIcon, syncExplorerNodeOrder } from "./explorer-events";
+import {
+  EXPLORER_BRANCH_SCOPE_SELECTOR,
+  EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR,
+  EXPLORER_FOLDER_CONTAINERS_SELECTOR,
+  EXPLORER_HOST,
+} from "./explorer-host";
 import type { NodeService } from "./node-service";
 import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeVisual } from "../core/types";
@@ -82,7 +88,7 @@ export class ExplorerAdapter extends Component {
 
   public async reveal(entry: TAbstractFile): Promise<boolean> {
     if (!this.canReveal(entry)) return false;
-    const leaves = this.app.workspace.getLeavesOfType("file-explorer");
+    const leaves = this.app.workspace.getLeavesOfType(EXPLORER_HOST.viewType);
     const recentDocument = this.app.workspace.getMostRecentLeaf()?.view.containerEl.ownerDocument ?? null;
     const leaf = leaves.find((candidate) => candidate.view.containerEl.ownerDocument === recentDocument) ?? leaves[0];
     const view = leaf?.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void } | undefined;
@@ -117,7 +123,7 @@ export class ExplorerAdapter extends Component {
 
   private syncSurfaces(): void {
     const active = new Set<HTMLElement>();
-    for (const leaf of this.app.workspace.getLeavesOfType("file-explorer")) {
+    for (const leaf of this.app.workspace.getLeavesOfType(EXPLORER_HOST.viewType)) {
       const root = (leaf.view as unknown as { containerEl?: HTMLElement }).containerEl;
       if (root === undefined) continue;
       active.add(root);
@@ -189,7 +195,7 @@ export class ExplorerAdapter extends Component {
     if (this.decorateTimer !== null) return;
     for (const record of records) {
       const target = asElement(record.target);
-      const scope = target?.closest<HTMLElement>(".nav-folder, .nav-files-container") ?? null;
+      const scope = target?.closest<HTMLElement>(EXPLORER_BRANCH_SCOPE_SELECTOR) ?? null;
       if (scope === null || !root.contains(scope)) {
         this.scheduleDecorate();
         return;
@@ -207,7 +213,7 @@ export class ExplorerAdapter extends Component {
       for (const scope of scopes) {
         const surfaceRoot = [...this.surfaces.keys()].find((candidate) => candidate === scope || candidate.contains(scope));
         if (surfaceRoot === undefined) continue;
-        if (scope.matches(".nav-files-container")) {
+        if (scope.matches(EXPLORER_HOST.filesContainer)) {
           this.decorateRoot(surfaceRoot);
           this.decorateCreateActions(surfaceRoot);
         }
@@ -248,7 +254,7 @@ export class ExplorerAdapter extends Component {
   }
 
   private decorateEntries(root: HTMLElement): void {
-    for (const element of root.querySelectorAll<HTMLElement>(".nav-file-title[data-path]")) {
+    for (const element of root.querySelectorAll<HTMLElement>(EXPLORER_HOST.fileTitle)) {
       const path = element.dataset.path;
       if (path === undefined) continue;
       const file = this.app.vault.getAbstractFileByPath(path);
@@ -285,7 +291,7 @@ export class ExplorerAdapter extends Component {
       } else repair?.remove();
     }
 
-    for (const element of root.querySelectorAll<HTMLElement>(".nav-folder-title[data-path]")) {
+    for (const element of root.querySelectorAll<HTMLElement>(EXPLORER_HOST.folderTitle)) {
       const path = element.dataset.path;
       const folder = path === undefined ? null : this.service.getFolder(path);
       if (folder === null) continue;
@@ -412,7 +418,7 @@ export class ExplorerAdapter extends Component {
     const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
     const managed = parent !== null && !this.service.isIgnoredPath(parent.path);
     const containers = new Set<HTMLElement>();
-    for (const files of root.querySelectorAll<HTMLElement>(".nav-files-container")) {
+    for (const files of root.querySelectorAll<HTMLElement>(EXPLORER_HOST.filesContainer)) {
       const actions = files.closest<HTMLElement>(".workspace-leaf-content")?.querySelector<HTMLElement>(".nav-header .nav-buttons-container");
       if (actions !== null && actions !== undefined) containers.add(actions);
     }
@@ -469,11 +475,11 @@ export class ExplorerAdapter extends Component {
 
   private syncNodeOrder(root: HTMLElement): void {
     const containers = [
-      ...(root.matches(".nav-files-container, .nav-folder-children") ? [root] : []),
-      ...root.querySelectorAll<HTMLElement>(".nav-files-container, .nav-folder-children"),
+      ...(root.matches(EXPLORER_FOLDER_CONTAINERS_SELECTOR) ? [root] : []),
+      ...root.querySelectorAll<HTMLElement>(EXPLORER_FOLDER_CONTAINERS_SELECTOR),
     ];
     for (const container of containers) {
-      const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
+      const parentPath = container.matches(EXPLORER_HOST.filesContainer) ? "" : container.parentElement?.querySelector<HTMLElement>(EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR)?.dataset.path;
       if (parentPath === undefined) continue;
       const before = Array.from(container.children);
       const changed = syncExplorerNodeOrder(container, this.service.children(parentPath).map(({ childPath }) => childPath));
@@ -496,7 +502,7 @@ export class ExplorerAdapter extends Component {
     const missing = rootCandidates.length === 0;
     const active = rootNote !== null && this.app.workspace.getActiveFile() === rootNote;
     const labels = this.getRootLabels();
-    for (const container of root.querySelectorAll<HTMLElement>(".nav-files-container")) {
+    for (const container of root.querySelectorAll<HTMLElement>(EXPLORER_HOST.filesContainer)) {
       const { row, icon, title, badge, visibility } = ensureExplorerRootRow(container);
       const titleLabel = this.app.vault.getName();
       const accessibleLabel = titleLabel + " · " + labels.root;
@@ -534,7 +540,7 @@ export class ExplorerAdapter extends Component {
     const liveHosts = new Set<HTMLElement>();
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       if (!(leaf.view instanceof MarkdownView) || !this.noteTitleSurfaces.has(leaf.view.containerEl)) continue;
-      const title = leaf.view.containerEl.querySelector<HTMLElement>(".inline-title");
+      const title = leaf.view.containerEl.querySelector<HTMLElement>(EXPLORER_HOST.inlineTitle);
       const host = title?.parentElement ?? null;
       if (title === null || host === null) continue;
       liveHosts.add(host);
@@ -579,7 +585,7 @@ export class ExplorerAdapter extends Component {
       this.runAction(this.service.openFolderNode("", event.ctrlKey || event.metaKey));
       return;
     }
-    const title = target.closest<HTMLElement>(".nav-folder-title[data-path]");
+    const title = target.closest<HTMLElement>(EXPLORER_HOST.folderTitle);
     const path = title?.dataset.path;
     if (isFolderCollapseControl(target)) {
       if (target.closest(".folder-nodes-leaf-indicator") !== null) {
@@ -595,7 +601,7 @@ export class ExplorerAdapter extends Component {
       this.selectedFolderPath = path;
       this.refreshCreateActions();
     } else {
-      const filePath = target.closest<HTMLElement>(".nav-file-title[data-path]")?.dataset.path;
+      const filePath = target.closest<HTMLElement>(EXPLORER_HOST.fileTitle)?.dataset.path;
       const file = filePath === undefined ? null : this.app.vault.getAbstractFileByPath(filePath);
       if (file instanceof TFile) {
         this.selectedFolderPath = file.parent?.path ?? "";
@@ -619,7 +625,7 @@ export class ExplorerAdapter extends Component {
 
   private onDragStart(event: DragEvent): void {
     const target = asElement(event.target);
-    const title = target?.closest<HTMLElement>(".nav-folder-title[data-path]");
+    const title = target?.closest<HTMLElement>(EXPLORER_HOST.folderTitle);
     const path = title?.dataset.path;
     if (path === undefined || this.service.isIgnoredPath(path) || this.service.getFolder(path) === null || this.service.getCanonicalFile(path) === null) return;
     this.draggedPath = path;
@@ -630,26 +636,26 @@ export class ExplorerAdapter extends Component {
 
   private onDragOver(event: DragEvent): void {
     if (this.draggedPath === null) return;
-    const title = asElement(event.target)?.closest<HTMLElement>(".nav-folder-title[data-path]");
+    const title = asElement(event.target)?.closest<HTMLElement>(EXPLORER_HOST.folderTitle);
     if (title?.dataset.path === undefined) return;
     event.preventDefault();
     event.stopPropagation();
     const intent = this.dropIntent(title, this.zone(title, event.clientY));
     const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(this.draggedPath, intent);
     if (preview.kind === "ready" && this.markPlacement(title, preview.intent) && this.placementSession.preview(preview.intent)) {
-      placementFeedback(title.closest<HTMLElement>(".nav-files-container") ?? title, null);
+      placementFeedback(title.closest<HTMLElement>(EXPLORER_HOST.filesContainer) ?? title, null);
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
       return;
     }
     this.clearDrop(false);
-    placementFeedback(title.closest<HTMLElement>(".nav-files-container") ?? title,
+    placementFeedback(title.closest<HTMLElement>(EXPLORER_HOST.filesContainer) ?? title,
       preview.kind === "blocked" ? this.getRootLabels().placementError?.(preview.reason) ?? preview.reason : preview.kind === "ready" ? this.getRootLabels().hiddenGap ?? "Show hidden nodes before choosing an exact position" : null);
     if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "none";
   }
 
   private onDrop(event: DragEvent): void {
     if (this.draggedPath === null) return;
-    const title = asElement(event.target)?.closest<HTMLElement>(".nav-folder-title[data-path]");
+    const title = asElement(event.target)?.closest<HTMLElement>(EXPLORER_HOST.folderTitle);
     if (title?.dataset.path === undefined) return;
     event.preventDefault();
     event.stopPropagation();
@@ -692,7 +698,7 @@ export class ExplorerAdapter extends Component {
       return true;
     }
     if (!isGapVisible(intent.gap, (path) => this.service.isNodeVisible(path))) return false;
-    const container = hit.closest<HTMLElement>(".nav-files-container");
+    const container = hit.closest<HTMLElement>(EXPLORER_HOST.filesContainer);
     const marker = insertionMarker(intent.gap);
     if (container === null || marker === null) return false;
     const target = findFolderTitle(container, marker.path);
@@ -731,7 +737,7 @@ export class ExplorerAdapter extends Component {
       return this.service.isNodeVisible(entry.path);
     });
     for (const indicator of title.querySelectorAll<HTMLElement>(
-      ".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon",
+      EXPLORER_HOST.collapseControl,
     )) {
       indicator.toggleClass("folder-nodes-leaf-indicator", visualLeaf);
       if (visualLeaf) ownAriaHidden(indicator);
@@ -816,7 +822,7 @@ function ownedSpan(document: Document, className: string): HTMLSpanElement {
 }
 
 function findFolderTitle(container: HTMLElement, path: string): HTMLElement | null {
-  for (const title of container.querySelectorAll<HTMLElement>(".nav-folder-title[data-path]")) {
+  for (const title of container.querySelectorAll<HTMLElement>(EXPLORER_HOST.folderTitle)) {
     if (title.dataset.path === path) return title;
   }
   return null;
