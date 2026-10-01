@@ -2,106 +2,109 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
 
-Folder Nodes 使用文件夹与同名 Node Note `A/A.md` 表示一个完整结构节点。受管理的文件夹或 Markdown 缺少对应侧时，会作为“不完整”节点显示，直到用户补全或设为不管理。
+Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件夹和一个同名 Markdown 笔记组成，例如 `A/A.md`。如果只存在其中一边，插件会把它显示为**不完整**，不会悄悄替你创建或移动文件。
 
 ## 截图
 
 ### 节点内容
 
-在同一个侧栏中浏览子节点、视觉媒体、普通文件和明确的不管理边界。
+在一个侧栏里查看子节点、图片和视频、普通文件，以及明确设为“不管理”的边界。
 
-![Folder Nodes 侧栏显示子节点、视觉媒体和不管理的文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![Folder Nodes 侧栏显示子节点、媒体和不管理文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
 [相册图片来源与许可](../assets/PHOTO-CREDITS.md)。
 
 ### 文件列表
 
-在 Obsidian 熟悉的文件列表中浏览 Root 与嵌套 Folder Node。Root 旁的眼睛可在当前会话显示属性隐藏的子树；对齐的胶囊分别标示隐藏、不完整、不管理和冲突。
+直接把 Obsidian 文件列表当作全局节点树使用。Folder Nodes 会增加置顶 Root 行、节点状态、可选图标和手动同级排序，但不会替换 Obsidian 原生文件/文件夹操作。
 
-![Obsidian 文件列表显示 Root 眼睛与对齐的 Folder Nodes 状态胶囊](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian 文件列表显示 Root 眼睛与 Folder Nodes 状态标签](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
 ### 节点图谱
 
-用全局、子树或局部范围浏览节点结构，按需展开分支，并在 2D 与 3D 视图间切换。
+可在全局、子树或局部范围查看层级结构，按需展开分支，并在 2D 和 3D 之间切换。
 
-![Folder Nodes 图谱显示已展开的 Projects 子树](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Folder Nodes 图谱显示展开的 Projects 子树](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ### 图标与外观
 
-设置说明卡介绍图标来源，并直接比较 `icon: A`、`icon: 📓` 与文件名开头相同字符的显示差异。可选标题图标在节点笔记标题前使用单独且对齐的图标位。
+节点图标可使用 Vault 图片、Lucide 图标、文字、Emoji 或颜色回退。设置页会直接预览属性图标与文件名中相同字符的区别。
 
-![Folder Nodes 图标与外观设置显示属性图标和文件名字符对比](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![Folder Nodes 图标与外观设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
 ### 可预测的 Node 创建
 
-在调整命名选项前，先明确看到选中文字和未创建链接如何映射到 Node 路径、笔记正文与 aliases。
+在创建前预览选中文字和未创建链接将如何变成节点名称、路径、正文和 aliases。
 
-![Folder Nodes 选择与命名设置说明可预测的 Node 创建](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Folder Nodes 选区与命名设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 功能特性
 
-- 创建、重命名、移动、合并、排序和安全删除完整 Folder Node。
-- 在“新建节点”旁保留 Obsidian 原生“新建笔记”和“新建文件夹”。原生创建产生不完整的文件夹侧或 Markdown 侧；“新建节点”会以一次串行操作创建完整配对，并在后续创建步骤失败时执行受保护的补偿回滚；文件列表中的文件夹操作作用于整个文件夹，标签页中的移动、删除和合并只作用于 Node Note。重命名任一侧会同步已有的文件夹/Node Note 配对；Node Note 标签页还提供措辞明确的“所在节点”操作。
-- 通过命令面板或编辑器右键菜单从选中文字创建子节点。确认弹窗只显示创建位置、新节点短名称和 alias 策略；插件仍在内部生成准确的 Vault 相对 WikiLink，以事务方式把选区写入新笔记正文并替换来源选区。在单个 Markdown 表格单元格内会把 alias 分隔符写成 `\|`；跨单元格或跨行选区会安全停止且不写入。
-- 在受管理范围内，点击未创建的内部链接即可直接创建完整 Node。`[[a]]` 创建 `a/a.md`；开启 aliases 后，`[[a|b]]` 还会把 `b` 写入 `aliases`。
-- 通过文件列表浏览全局 Node Tree：使用置顶且不可折叠的根节点行，以及旁边的眼睛按钮在当前会话显示或隐藏由属性隐藏的子树；点击普通文件夹名称打开 Node Note；如果隐藏的 canonical note 是唯一子项，则用不可点击的圆点替代无意义的展开箭头，一旦出现可见内容便自动恢复箭头。桌面端会区分“移入”和“排序”：拖入节点只改变层级，不会改变目标父节点的自然排序；只有先将该父节点的“子节点排序”明确切换为手动后，before/after 才用于精确排序。Android 使用 Obsidian 原生移动文件夹和 Folder Nodes 的“移动”“上移”“下移”。
-- 在响应式侧栏中分别按每批 200 项浏览“节点”“静态相册”和紧凑“文件”。breadcrumb 只显示祖先，当前节点只保留一个可点击卡片；常用操作集中在标题区，空分类隐藏，分类展开状态在当前 view 会话内保留。所有条目都有菜单入口；桌面端支持子节点和单文件拖放，Android 使用等价的移动/排序菜单。多选可插入或复制链接。
-- 在同一个渐进展开的节点图谱工作区视图中探索 Folder Node。结构始终是层级骨架；“显示链接”是默认关闭的独立开关，只叠加已解析 canonical-note 链接而不移动节点。图谱支持易读的从左到右 2D（也可从上到下）、分层 3D、全局/子树/局部范围、逐分支展开把手、范围展开、原生搜索、聚焦与适应视图；直接和整支操作先选中对应卡片；范围收起若隐藏当前焦点，则提升到最近可见祖先。
-- 将一个 Obsidian 原生 `icon` Text/List 解析为有序 Vault 图片、Lucide 或单字素候选及可选 `color:` 值，支持本地回退、祖先继承、文件列表名称前/后/隐藏位置，以及位于可编辑标题文字之外的可选笔记标题图标。属性图标统一放入固定且无边框的图标位，通过文字的字重、大小和颜色与文件名自身的开头字符区分；Emoji 使用所选本机彩色字体或系统样式并保留原色。
-- 可将根节点笔记作为主页，通过命令或节点内容视图打开，并可选择在 Vault 启动后打开。
-- 无需初始化即可立即识别完整与不完整节点；“管理”提供预览优先的批量整理、显式旧属性迁移，以及同时检查结构、Folder Nodes 属性和 icon 声明的严格只读健康检查。
-- 文件夹侧和 Markdown 侧缺失时都显示橙色“不完整”，并提供补全与“设为不管理”；真正的配对冲突使用红色“冲突”并失败关闭。
-- 使用两个统一的不管理规则组且不隐藏内容：不管理的 Markdown 文件和不管理的文件夹。两组都支持指定路径与自然语言的名称开头规则；`.`、`_` 是默认规则。当前 Vault 配置目录、`.git`、`.trash` 始终受保护，根目录 `AGENTS.md` 和 `CLAUDE.md` 默认是不管理的 Markdown 路径。
-- 用一个简洁 Node Note 属性保存 Folder Nodes 行为：`folder-nodes` 是 Text List，只包含 `order=manual`、`rank=1024`、`hidden=true` 这类非默认 token。隐藏节点会从文件列表、节点内容和 Folder Nodes 节点图谱中连同完整子树一起移除；Obsidian 搜索、快速切换、反向链接、原生图谱、链接与直接打开均不受影响。对属性隐藏目标执行“在文件列表中显示”会安全失败，Obsidian 原生笔记路径也不会覆盖这一投影。“常规”可以在不删除标记的情况下忽略全部隐藏标记；Root 行眼睛或命令面板可在当前会话临时显示它们。
-- Folder Nodes 自身视图中的自然名称排序不写元数据；手动排序必须在父节点上明确启用，并使用子节点自己的稀疏 rank。文件列表在“名称”模式下保留 Obsidian 原生同级排序，只有父节点明确切换为“手动”后，Folder Nodes 才接管其中受管理节点的位置。普通移入不会切换排序模式；手动排序中才允许精确调整同级位置。
-- 界面语言默认自动跟随 Obsidian，也可手动选择 English 或简体中文。
-- 全部处理保持本地，不写永久节点 ID、`_pkwf`、manifest、path、parent 或完整子节点列表。
+- **以文件夹为节点。** 可以创建、重命名、移动、合并、排序和删除完整 Folder Node，同时保留 Obsidian 原生“新建笔记”和“新建文件夹”。
+- **明确显示不完整状态。** 文件夹缺少同名笔记，或 Markdown 笔记缺少匹配文件夹时，会一直显示为橙色**不完整**，直到你补全或设为“不管理”。
+- **融入文件列表。** 点击完整节点的文件夹名称即可打开 Node Note。Root 旁的眼睛可在当前会话临时显示被 Folder Nodes 隐藏的节点。“名称”模式保留 Obsidian 原生排序；“手动”模式才使用 Folder Nodes 的显式 rank。
+- **节点内容侧栏。** 子节点、静态媒体相册和普通文件分别分页显示。GIF 使用静态缩略图；视频和音频不提供内嵌播放控件。
+- **节点图谱。** 层级结构始终存在；可选的“显示链接”只在结构图上叠加 Node Note 之间的链接，不改变层级布局。
+- **从选中文字创建节点。** 使用“从选中文字创建 Folder Node”后，插件会创建子节点、把选中文字写入新笔记，并用链接替换原选区。单个 Markdown 表格单元格可以安全处理；跨单元格选区会在写入前停止。
+- **从未创建链接直接创建节点。** 在受管理范围内点击 `[[a]]` 会创建 `a/a.md`。开启 aliases 后，`[[a|b]]` 还会把 `b` 写入 `aliases`。
+- **节点图标。** 一个 Obsidian `icon` 文本/列表可以按顺序提供图片、Lucide、文字、Emoji 或 `color:` 候选，并可选择继承祖先图标。
+- **隐藏子树。** 节点可写入 `hidden=true`。它只会从 Folder Nodes 管理的文件列表、节点内容和节点图谱中隐藏；Obsidian 搜索、快速切换、反向链接、原生图谱、链接和直接打开都不受影响。
+- **不管理边界。** 可按精确路径或“名称开头”规则，让某些 Markdown 或整个文件夹子树不参与 Folder Nodes 结构管理，但内容仍正常可见。
+- **先预览再维护。** 批量整理和旧属性迁移都会先显示将要发生的变化。遇到冲突或无法确认安全的输入时，插件会停止操作，不猜测处理。
+- **只在本地工作。** Folder Nodes 不上传 Vault 内容，也不发起网络请求。
 
 ## 使用要求与兼容性
 
-- Obsidian 1.12.7 或更高版本。
-- 支持桌面版与 Android 版 Obsidian。节点图谱保持窄屏、粗指针与触控兼容控件；Android 发布验收使用当前模拟器，Android 真机和 iOS 不在范围内。
-- 完整结构节点仍要求恰好一个同名 Node Note。受管理的文件夹或 Markdown 缺少对应侧时是不完整节点；不管理规则是插件结构操作的明确边界。
+- Obsidian **1.12.7 或更高版本**。
+- 支持桌面版和 Android 版 Obsidian。Android 使用菜单和原生移动文件夹，不使用 HTML5 拖放。
+- Android 真机和 iOS 不属于本项目共享的宿主验收矩阵。
+- 完整节点必须只有一个同名 Node Note；“不管理”规则定义 Folder Nodes 不执行结构操作的边界。
 
 ## 安装
 
 ### 社区插件
 
-打开 **设置 → 第三方插件 → 浏览**，搜索 **Folder Nodes**，安装并启用。如果当前目录中尚未显示，请按下文手动安装。
+打开 **设置 → 第三方插件 → 浏览**，搜索 **Folder Nodes**，安装并启用。如果当前插件目录还没有上架，可使用下面的手动安装方式。
 
 ### 手动安装
 
-下载同一版本的发布文件，将 `main.js`、`manifest.json` 和 `styles.css` 放入 `Vault/.obsidian/plugins/folder-nodes/`。重新加载 Obsidian，然后在第三方插件中启用 Folder Nodes。不要混用不同版本的运行文件。
+下载同一版本的发布文件，将以下三个文件放入 `Vault/.obsidian/plugins/folder-nodes/`：
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+重新加载 Obsidian 并启用 Folder Nodes。不要混用不同版本的运行文件。
 
 ### 升级
 
-已有 `Vault/.obsidian/plugins/folder-nodes/data.json` 时必须保留。只替换 `main.js`、`manifest.json` 和 `styles.css`；只有明确需要重置插件偏好和不管理规则时才删除 `data.json`。
+如果存在 `Vault/.obsidian/plugins/folder-nodes/data.json`，请保留它。正常升级只替换上面的三个运行文件；只有明确想重置插件偏好和“不管理”规则时才删除 `data.json`。
 
 ## 使用
 
-1. 先备份 Vault，再打开 **设置 → Folder Nodes → 常规**。
-2. 在文件列表检查“不完整节点”和“不管理”标签；可逐项补全，也可打开“批量整理不完整节点”查看可选的精确路径批量预览。
-3. 使用文件列表、节点右键菜单或命令面板创建和浏览节点。Root 旁边的眼睛只切换本次会话中的隐藏子树，不编辑 YAML。
-4. 选中编辑器文字，从右键菜单或命令面板选择“从选中文字创建 Folder Node”，确认创建位置、新节点短名称和 alias 策略后创建。
-5. 在受管理范围内点击未创建的 `[[a]]` 或 `[[a|b]]` 链接，直接创建并打开完整 Folder Node。
-6. 打开“节点内容”查看子节点、静态图片/视频相册和紧凑普通文件。右键条目、使用“更多操作”按钮或按 Shift+F10 都可打开同一个菜单。
-7. 从节点内容、命令面板或 Folder Node/Node Note 右键菜单打开“节点图谱”。全局默认显示 Root 与直接子级；子树默认显示选中节点与直接子级；局部额外显示一个父级作为上下文，并且只允许从选中节点继续向下展开。点击右侧把手显示直接子级，Alt+点击展开整支，或通过范围菜单展开 1/2/3 层、全部展开、收回一级。点击标题或图标选择；展开把手和右键菜单也会选中对应卡片。展开操作保持视口位置和把手键盘焦点。双击标题或按 Enter 打开 canonical Node Note。当前范围独立显示根节点；“查看子树”和“查看局部图”针对选中卡片执行，单击其他卡片不会改变范围。右键第一层提供“在文件列表中显示”和整支展开／收起操作。搜索会展开隐藏祖先并居中，清除后恢复搜索前的展开状态。2D 下可拖动空白区域或使用滚轮/触控板平移，按住 Ctrl/Cmd 再滚动则围绕指针缩放；3D 下拖动旋转、Shift+拖动平移，滚轮围绕指针缩放。紧凑的“− / 缩放百分比 / + / 适应视图”在两种渲染器中保持一致；图谱键盘焦点下 `+`、`-`、`0` 分别执行放大、缩小和适应视图。在局部范围中，开启“显示链接”才加入直接已解析链接邻居；全局和子树保持当前结构节点集合，只叠加端点已经可见的链接。
-8. 桌面端把 Folder Node 拖到另一个节点中央时只改变层级；目标父节点明确启用手动“子节点排序”后，才可用边缘插入线精确调整 before/after 同级位置。同一个兄弟间隙始终显示同一条插入线。相册/文件条目仍可拖入节点或面包屑；Android 使用 Obsidian 原生移动文件夹，或 Folder Nodes 的“移动”“上移”“下移”菜单动作。
-9. 要操作当前文件或文件夹时使用 Obsidian 原生菜单；只有明确要处理整个子树时，才在 Node Note 标签页选择“移动/删除/合并所在节点”。
+1. 先备份 Vault，然后查看 **设置 → Folder Nodes → 常规** 和 **管理**。
+2. 在文件列表中检查橙色**不完整**项：需要管理的就补全，不希望 Folder Nodes 管理的就设为**不管理**。
+3. 使用“新建节点”、节点右键菜单或命令面板创建和浏览 Folder Node。
+4. 选中编辑器文字后，用“从选中文字创建 Folder Node”把它变成子节点。
+5. 在受管理范围内点击 `[[a]]` 或 `[[a|b]]` 这类未创建内部链接，可直接创建完整 Folder Node。
+6. 打开“节点内容”查看当前节点的子节点、媒体和文件。右键条目、点击“更多操作”或按 Shift+F10/菜单键都能打开同一组操作。
+7. 打开“节点图谱”查看层级结构。全局范围查看整个 Vault，子树范围固定一个节点，局部范围还会显示它的父级作为上下文。可从节点把手展开分支、搜索节点、切换 2D/3D，并按需开启“显示链接”。
+8. 桌面端把节点拖进另一个节点只会改变父级。只有目标父节点先切换到“手动”子节点排序后，才允许精确 before/after 排序。Android 请使用原生移动文件夹或 Folder Nodes 的“移动 / 上移 / 下移”。
+9. 如果只想操作当前文件或文件夹，使用 Obsidian 原生操作。只有明确要操作整个 Folder Node 时，才使用标签页中标明“所在节点”的操作。
 
 ## 设置
 
-- **常规**：界面语言、是否应用隐藏标记，以及是否把根节点笔记作为主页并在启动后打开。
-- **管理**：“不管理的 Markdown 文件/不管理的文件夹”两个统一规则组、预览优先批量整理、显式属性迁移和只读健康检查。
-- **图标与外观**：图标继承、文件列表中的位置和笔记标题显示；对比卡片直接展示属性图标与文件名开头相同字符的区别。尺寸与对齐跟随 Obsidian，不提供任意大小设置。
-- **选区与命名**：说明两种 Node 创建方式，并把前缀和后缀分组显示。每个启用的时间戳来源都有独立、经过校验的 Obsidian/Moment 格式和实时预览；未启用的组或无关来源不会显示多余控件。
-- **节点图谱**：只保留总开关、默认维度、2D 布局方向和大图阈值。结构始终显示，新建图谱的“显示链接”默认关闭。这里刻意不再提供持久的纳入/排除规则；文件列表、节点内容与节点图谱统一由 `hidden=true` 子树标记控制。
-- 选择 **跟随 Obsidian** 时使用 Obsidian 当前的界面语言；手动选择 English 或简体中文只覆盖插件界面，不改变文件名或 Markdown 属性。
-- 命名来源包括当前文件、当前 Folder Node、最近的当前标题、时间戳和自定义文字。前后缀只影响 basename，并可对同一个创建时刻使用不同格式，例如 `YYYY-MM-DD` 与 `HHmmss`。开启 aliases 后，从选区创建时写入选中文字，从未创建的 `[[a|b]]` 链接创建时写入显示文字 `b`。
+- **常规**：界面语言、隐藏标记行为、可选 Root 主页。
+- **管理**：不管理 Markdown / 文件夹规则、批量整理、属性迁移和只读健康检查。
+- **图标与外观**：图标继承、文件列表位置、笔记标题图标和 Emoji 字体。
+- **选区与命名**：aliases，以及可选的前缀/后缀来源和时间戳格式。
+- **节点图谱**：是否启用、默认维度、2D 方向和大图阈值。
+
+**跟随 Obsidian** 当前会在 Obsidian 使用中文界面时显示简体中文，其他语言则显示 English。手动选择 English 或简体中文可以覆盖这个回退规则，但不会改变文件名或 Markdown 属性。
 
 ## Folder Nodes 属性
 
-`folder-nodes` 是扁平的 Obsidian Text List。默认值不写入；没有 token 时删除整个属性。
+Folder Nodes 只用一个名为 `folder-nodes` 的扁平 Obsidian 文本列表保存结构选项。默认值不写入；没有任何 token 时会删除整个属性。
 
 ```yaml
 folder-nodes:
@@ -110,11 +113,15 @@ folder-nodes:
   - hidden=true
 ```
 
-已经公开的旧字段 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 会继续兼容读取。使用 **管理 → 迁移 Folder Nodes 属性** 先查看精确受影响笔记，先更新所有设备，再明确确认；启动时绝不自动迁移。新旧值等价时可安全规范化；冲突、无效值、重复键、预览后内容变化或有歧义的 YAML 都会失败关闭。迁移保留无关 frontmatter、正文、换行符、BOM 和可识别的未来 `key=value` token。
+- `order=manual`：让该父节点使用手动子节点排序。
+- `rank=N`：保存某个子节点在手动排序中的稀疏位置。
+- `hidden=true`：从 Folder Nodes 的三个投影中隐藏该节点及其受管理后代。
+
+已经公开的旧字段 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 会继续兼容读取。使用 **管理 → 迁移 Folder Nodes 属性** 可以先查看准确受影响的笔记。迁移前请先更新所有设备上的 Folder Nodes；插件启动时不会自动迁移笔记属性。
 
 ## icon 属性
 
-`icon` 与 Obsidian Properties 兼容：使用一个字符串或扁平字符串列表，不使用嵌套 YAML。按顺序采用第一个实际可显示的基础候选；图片缺失时继续下一项。与文字或 Lucide 搭配时，第一个有效 `color:` 项直接为前景着色。Emoji 和图片保留原始像素，不增加圆点、背景或边框；对它们而言，只有所有基础候选都失败时，`color:` 才回退为居中的实心圆形色标。
+`icon` 可以是一个字符串，也可以是扁平字符串列表：
 
 ```yaml
 icon:
@@ -124,27 +131,33 @@ icon:
   - "color:#7c3aed"
 ```
 
-Picker 会载入当前完整列表，支持添加、删除、排序、预设和 File Explorer/Contents 实时预览。未知值或多字素值会显示为无效且不能保存；单个英文字符、中文字符、符号或 Emoji 仍然有效。只有本地列表全部耗尽后才开始继承。
+Folder Nodes 会按顺序尝试基础候选。图片缺失时继续尝试下一项。第一个有效 `color:` 会为文字或 Lucide 图标着色；对于 Emoji 和图片，只有所有基础候选都无法显示时才把颜色作为回退色标。
 
-**图标与外观**会显示“系统默认”以及当前设备检测到的受支持彩色 Emoji 字体：Segoe UI Emoji、Apple Color Emoji、Noto Color Emoji、Twemoji Mozilla 和 OpenMoji。复杂序列预览会在使用前暴露缺字或 Emoji 拆分；同步设置或卸载字体后若所选字体消失，会自动回退到系统字体栈，“重新检测本机字体”可刷新列表。高级 CSS snippet 仍可覆盖 `--folder-nodes-glyph-font` 和 `--folder-nodes-emoji-font`。
+图标选择器会载入当前列表，可添加、删除、排序、使用预设，并实时预览文件列表和节点内容。未知值或多字素值不能通过选择器保存。只有当前节点没有可用本地图标时才开始继承祖先。
 
 ## 限制
 
-- 结构身份是当前规范化 Vault 路径，不是永久 ID。外部删除后再创建不会被猜测为重命名。
-- HTML5 拖放仅在桌面端启用。Android 不创建 draggable handle 或 drop target，改用原生移动文件夹和插件移动/排序动作。
-- 节点视觉支持 Vault 图片和轻量语义图标位，但不抓取远程图片、不做 inline SVG 重着色、不从节点名推断首字母、不接受嵌套 `icon` 对象、不生成 PDF 首页或视频帧、不预览 HEIC/HEIF、不播放 GIF、视频或音频。
-- Contents View 可将单个普通文件移入当前显示的节点或面包屑目录，并可多选文件插入或复制链接，但不提供普通文件独立排序、事务式多文件移动、跨视图内部放置，也不是第二棵完整 Vault 目录树。
-- 合并遇到路径或 frontmatter 冲突会失败关闭，不提供复杂的冲突合并界面。
-- 不支持 `README.md`、`index.md`、`_A.md` 等替代 canonical note 名称或任意属性继承。不管理的文件夹是完整子树边界，不是部分受管节点。
-- 超大图谱会切换到 Canvas 并保留所有可见结构边，只限制可选的链接叠加。2D 保持可读的最小缩放，3D 把远处节点绘制为圆点，只在聚焦或悬停时显示完整卡片；用户继续通过范围和渐进展开控制可见内容，不在图谱上覆盖密集总览提示。
+- 节点身份是当前规范化 Vault 路径，不是永久 ID。
+- 不支持用 `README.md`、`index.md`、`_A.md` 等名称替代同名 Node Note。
+- 合并遇到路径或 frontmatter 冲突时会停止，不提供复杂冲突合并界面。
+- Android 不提供 HTML5 拖拽把手或放置目标。
+- 节点图标不会抓取远程图片、随意重着色 inline SVG、生成 PDF/视频缩略图、预览 HEIC/HEIF，也不提供内嵌视频/音频播放。
+- 节点内容不是第二棵完整 Vault 目录树，也不提供普通文件的事务式多文件移动。
+- 超大图谱会切换到 Canvas 渲染；层级结构保持完整，只限制可选的链接叠加。
 
 ## 隐私与安全
 
-Folder Nodes 只在本地运行，不发起网络请求。健康检查和预览扫描会盘点本地 Vault 路径与属性声明；节点图谱读取本地 Folder Node 结构、Metadata Cache 和共用反向引用索引，不上传笔记内容，也不建立另一套全 Vault 链接扫描。已记录的用户操作可以创建、修改、移动、重命名、合并笔记和文件夹，或将其移入回收站。批量整理和属性迁移始终先预览并在提交前重新核对；结构写入串行执行，路径冲突阻止提交，歧义操作失败关闭。回滚动作始终绑定原始 Vault 对象；对象已改变或同路径已被替换时拒绝恢复，不会操作新的占位对象。完整节点删除使用 Obsidian 的系统回收站路径。只有用户明确执行复制操作后，插件才会把生成的 Markdown 链接写入系统剪贴板；它从不读取剪贴板。偏好与不管理规则保存在插件 `data.json`，结构 token 保存在 Node Note 的 `folder-nodes` 列表；图谱工作区状态只持久化范围、焦点、维度与是否显示链接。分支展开和搜索快照只在当前会话存在，重启后恢复安全的一层默认。节点内容、路径、视觉和诊断都不会上传。
+Folder Nodes 只在本地运行，不发起网络请求。只有在结构检查、迁移预览、链接索引和节点图谱等明确功能需要时，才读取 Vault 路径、元数据和笔记文字。
+
+用户操作可以创建、修改、移动、重命名、合并笔记和文件夹，或将其移入回收站。多步结构操作会串行执行；发现冲突时停止不安全写入；需要维护 Vault 时会先预览，并在提交前再次核对目标。完整节点删除使用 Obsidian 系统回收站。
+
+插件只有在用户明确执行复制操作后才把生成的 Markdown 链接写入系统剪贴板，**从不读取剪贴板**。插件偏好和“不管理”规则保存在 `data.json`，结构 token 保存在 Node Note 中。
+
+安全问题请按仓库的[安全策略](../../SECURITY.md)私下报告。
 
 ## 开发
 
-使用 Node.js 24.19.0 和 npm 11.17.0。
+使用 Node.js **24.19.0** 和 npm **11.17.0**。
 
 ```bash
 npm ci
@@ -152,7 +165,7 @@ npm run check
 npm run release:check
 ```
 
-稳定项目文档：
+项目文档：
 
 - [产品需求](../product-requirements.zh-CN.md)
 - [交互规范](../ux-spec.zh-CN.md)
@@ -160,15 +173,15 @@ npm run release:check
 - [测试策略](../testing-strategy.zh-CN.md)
 - [变更记录](../../CHANGELOG.md)
 - [贡献指南](../../CONTRIBUTING.md)
-- [安全策略](../../SECURITY.md)
 
 ## 支持
 
 - [Q&A](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/q-a)：使用和配置问题。
-- [Ideas](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/ideas)：尚待讨论的功能与工作流想法。
-- [Show and tell](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/show-and-tell)：技巧、工作流和参考实现。
+- [Ideas](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/ideas)：功能和工作流建议。
+- [Show and tell](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/show-and-tell)：技巧和案例。
+- [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose)：可复现 bug 和明确功能需求。
 
-通过 [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose) 提交可复现问题和明确功能需求。请提供 Folder Nodes 版本、Obsidian 版本、操作系统、合成目录结构和准确操作，并在公开提交前删除真实 Vault 路径和笔记内容。安全漏洞请按[安全策略](../../SECURITY.md)私下报告。
+公开提交问题时，请提供 Folder Nodes 版本、Obsidian 版本、操作系统、合成目录结构和准确复现步骤，并删除真实 Vault 路径和笔记内容。
 
 ## 许可证
 
