@@ -342,6 +342,38 @@ describe("NodeService structural safety", () => {
     expect(nodes.scan().leafMarkdown).toEqual(["Loose.md"]);
   });
 
+  it("rejects queued structural writes and rolls back an in-flight create after dispose", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const nodes = service(fake);
+    const originalCreateFolder = fake.app.vault.createFolder;
+    let releaseCreate!: () => void;
+    const createBlocked = new Promise<void>((resolve) => { releaseCreate = resolve; });
+    let markFolderCreated!: () => void;
+    const folderCreated = new Promise<void>((resolve) => { markFolderCreated = resolve; });
+    fake.app.vault.createFolder = async (path: string) => {
+      const folder = await originalCreateFolder(path);
+      if (path === "A") {
+        markFolderCreated();
+        await createBlocked;
+      }
+      return folder;
+    };
+
+    const first = nodes.createNode("", "A");
+    await folderCreated;
+    const queued = nodes.createNode("", "B");
+    nodes.dispose();
+    releaseCreate();
+
+    await expect(first).rejects.toThrow("service unloaded");
+    await expect(queued).rejects.toThrow("service unloaded");
+    expect(fake.files.has("A")).toBe(false);
+    expect(fake.files.has("A/A.md")).toBe(false);
+    expect(fake.files.has("B")).toBe(false);
+    expect(fake.trashed).toContain("A");
+  });
+
   it("rejects a migration disposed before its queued operation can write", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
