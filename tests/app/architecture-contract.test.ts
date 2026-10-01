@@ -43,6 +43,15 @@ describe("runtime architecture contract", () => {
     }
   });
 
+  it("keeps Explorer host ordering native unless manual and settles mutation work without a paint-delay timer", () => {
+    const explorer = source("src/adapters/explorer-adapter.ts");
+    expect(explorer).toContain("queueMicrotask(() => {");
+    expect(explorer).not.toContain("explorerMutationTimer");
+    expect(explorer).toContain('if (sortMode !== "manual")');
+    expect(explorer).toContain("this.restoreOrder(container)");
+    expect(explorer).toContain("syncExplorerNodeOrder(");
+  });
+
   it("rebinds Explorer decoration when mobile mounts the sidebar after layout-ready", () => {
     const plugin = source("src/app/plugin.ts");
     expect(plugin).toContain('this.app.workspace.on("layout-change"');

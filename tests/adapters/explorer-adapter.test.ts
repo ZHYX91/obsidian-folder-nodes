@@ -58,6 +58,72 @@ describe("ExplorerAdapter lifecycle", () => {
     root.remove();
   });
 
+
+  it("leaves natural ordering to Obsidian and owns only explicit manual ordering", () => {
+    const root = document.createElement("div");
+    const files = root.createDiv({ cls: "nav-files-container" });
+    const row = (path: string) => {
+      const wrapper = files.createDiv({ cls: "nav-folder" });
+      wrapper.createDiv({ cls: "nav-folder-title", attr: { "data-path": path } })
+        .createSpan({ cls: "nav-folder-title-content", text: path });
+      return wrapper;
+    };
+    const bRow = row("B");
+    const aRow = row("A");
+    document.body.append(root);
+    let mode: "natural" | "manual" = "natural";
+    let nativeOrder = [bRow, aRow];
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: () => null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root, getSortedFolderItems: () => nativeOrder.map((el) => ({ el })) } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [
+        { basename: "A", childPath: "A", order: 1024 },
+        { basename: "B", childPath: "B", order: 2048 },
+      ],
+      sortMode: () => mode,
+      getFolder: () => null, getFile: () => null, getCanonicalFile: () => null,
+      nodeNoteCandidates: () => [], nodeNoteRole: () => "none", folderIdentity: () => "ordinary",
+      fileIdentity: () => "ordinary", isCanonicalFile: () => false, isIgnoredPath: () => false,
+      isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: () => "Vault.md",
+      openFolderNode: async () => undefined, previewPlacement: () => ({ kind: "blocked", reason: "test" }),
+      placeNode: async () => ({ path: "" }), rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }),
+      isNodeVisible: () => true, revealingHiddenNodes: () => false,
+    } as unknown as NodeService;
+    const adapter = new ExplorerAdapter(
+      app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: "Create node", incompleteNode: "Incomplete", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, () => undefined, () => undefined, () => undefined,
+    );
+
+    adapter.start();
+    expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual([bRow, aRow]);
+
+    mode = "manual";
+    adapter.refresh();
+    expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual([aRow, bRow]);
+
+    mode = "natural";
+    adapter.refresh();
+    expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual([bRow, aRow]);
+
+    mode = "manual";
+    adapter.refresh();
+    const added = row("C");
+    aRow.querySelector(".nav-folder-title")?.setAttribute("data-path", "Renamed");
+    nativeOrder = [added, aRow, bRow];
+    mode = "natural";
+    adapter.refresh();
+    expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual(nativeOrder);
+
+    adapter.stop();
+    root.remove();
+  });
+
   it("hides managed rows, shows a text status during session reveal, and gives unmanaged precedence", () => {
     const root = document.createElement("div");
     root.createDiv({ cls: "nav-files-container" });

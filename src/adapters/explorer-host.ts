@@ -17,3 +17,6 @@ export const EXPLORER_FOLDER_CONTAINERS_SELECTOR =
 
 export const EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR =
   `:scope > ${EXPLORER_HOST.folderTitle}`;
+
+export const EXPLORER_ENTRY_TITLES_SELECTOR =
+  `${EXPLORER_HOST.folderTitle}, ${EXPLORER_HOST.fileTitle}`;
