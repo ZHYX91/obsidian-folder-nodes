@@ -4,10 +4,12 @@ Use these fixtures only in a disposable Vault. `product-scenarios.json` declares
 expected behavior for desktop and Android emulator checks. A pass covers the selected scenarios
 and the exact installed candidate, not every host or input method.
 
-The optional Folder Nodes Acceptance Provider stays idle until its **Create 501-node viewport
-fixture** command is invoked. It creates `Viewport/` only when that folder does not exist and
-never replaces or removes files. If generation is interrupted, start with a fresh disposable
-Vault. The provider is a fixture and is excluded from release assets.
+The optional Folder Nodes Acceptance Provider stays idle until one of its explicit fixture commands
+is invoked. **Create deep Explorer reveal fixture** creates `Reveal/` with 120 reverse-ranked
+siblings and a five-level target path for reveal/order/viewport checks. **Create 501-node viewport
+fixture** creates `Viewport/` for large-graph checks. Each command refuses to replace its target
+folder; if generation is interrupted, start with a fresh disposable Vault. The provider is a fixture
+and is excluded from release assets.
 
 With the graph scoped to the Viewport subtree and the default large-graph threshold of 500,
 expanding Wide changes the visible graph from 3 to 501 nodes. Collapsing it changes back. This

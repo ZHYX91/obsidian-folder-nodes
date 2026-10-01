@@ -9,6 +9,27 @@ const DOCUMENTS = Object.freeze([
   "architecture",
   "testing-strategy",
 ]);
+const SEMANTIC_ANCHORS = Object.freeze({
+  "product-requirements": [
+    ["未知项或多字素项会被诊断", "Unknown or multi-grapheme items are diagnosed"],
+    ["多个颜色以第一个为准", "when several colors are present, the first one wins"],
+    ["只有当前节点的整组声明都无法显示时才继承最近祖先", "Nearest-ancestor inheritance starts only after the current node's complete declaration has no renderable result"],
+    ["文字图标继承 Obsidian 界面字体", "Glyph icons use the Obsidian interface font"],
+  ],
+  architecture: [
+    ["VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属", "VaultOperationCoordinator independently owns structural-write serialization and internal event attribution"],
+    ["Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器", "Presentation contains host-DOM renderers shared by Explorer, settings, and UI"],
+    ["GraphIndex → ViewState → VisibleScene → renderer", "GraphIndex → ViewState → VisibleScene → renderer"],
+  ],
+  "ux-spec": [
+    ["Root 图标、Vault 名称、“根节点”状态和会话可见性眼睛", "The Root icon, Vault name, Root status, and session-visibility eye"],
+    ["包括 popout window", "including pop-out windows"],
+  ],
+  "testing-strategy": [
+    ["Android 真机和 iOS 不在验收范围内", "Android physical devices and iOS are out of scope"],
+  ],
+});
+
 const LEGACY_DOCUMENTS = Object.freeze([
   "docs/product.en.md",
   "docs/product.zh-CN.md",
@@ -72,6 +93,10 @@ export async function checkDocsI18n(projectRoot = process.cwd()) {
     ]);
     if (JSON.stringify(sourceHeadings) !== JSON.stringify(translationHeadings)) {
       throw new Error(`${sourcePath} and ${translationPath} must have matching heading structures`);
+    }
+    for (const [sourceAnchor, translationAnchor] of SEMANTIC_ANCHORS[document] ?? []) {
+      if (!source.includes(sourceAnchor)) throw new Error(`${sourcePath} is missing semantic anchor: ${sourceAnchor}`);
+      if (!translation.includes(translationAnchor)) throw new Error(`${translationPath} is missing semantic anchor for: ${sourceAnchor}`);
     }
   }
   return DOCUMENTS.length * 2;
