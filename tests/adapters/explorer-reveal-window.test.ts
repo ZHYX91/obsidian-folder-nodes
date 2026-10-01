@@ -46,7 +46,77 @@ describe("Explorer reveal window affinity", () => {
 
     expect(await adapter.reveal(file)).toBe(true);
     expect(firstReveal).not.toHaveBeenCalled();
-    expect(secondReveal).toHaveBeenCalledWith(file);
     expect(revealLeaf).toHaveBeenCalledWith(secondLeaf);
+    expect(secondReveal).toHaveBeenCalledWith(file);
+    expect(revealLeaf.mock.invocationCallOrder[0]).toBeLessThan(secondReveal.mock.invocationCallOrder[0]!);
+  });
+
+
+  it("re-reads the Explorer view after revealing a deferred leaf", async () => {
+    const ownerDocument = new Window().document as unknown as Document;
+    const revealInFolder = vi.fn(async () => undefined);
+    const deferredView = { containerEl: ownerDocument.createElement("div") };
+    const loadedView = { containerEl: deferredView.containerEl, revealInFolder };
+    let currentView = deferredView;
+    const leaf = {
+      get view() { return currentView; },
+    };
+    const revealLeaf = vi.fn(async () => { currentView = loadedView; });
+    const app = {
+      workspace: {
+        getLeavesOfType: () => [leaf],
+        getMostRecentLeaf: () => ({ view: { containerEl: ownerDocument.createElement("div") } }),
+        revealLeaf,
+      },
+    } as unknown as App;
+    const adapter = new ExplorerAdapter(
+      app,
+      {} as NodeService,
+      {} as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({
+        createNode: "", incompleteNode: "", missingNodeFolder: "", missingNodeNote: "",
+        node: "", nodeConflict: "", root: "", unmanaged: "",
+      }),
+      () => undefined,
+      () => undefined,
+      () => undefined,
+      () => undefined,
+    );
+    const file = Object.assign(new TFile(), { path: "Deferred.md" });
+
+    expect(await adapter.reveal(file)).toBe(true);
+    expect(revealLeaf).toHaveBeenCalledWith(leaf);
+    expect(revealInFolder).toHaveBeenCalledWith(file);
+  });
+
+  it("returns false after revealing when the materialized view has no reveal capability", async () => {
+    const ownerDocument = new Window().document as unknown as Document;
+    const leaf = { view: { containerEl: ownerDocument.createElement("div") } };
+    const revealLeaf = vi.fn(async () => undefined);
+    const app = {
+      workspace: {
+        getLeavesOfType: () => [leaf],
+        getMostRecentLeaf: () => null,
+        revealLeaf,
+      },
+    } as unknown as App;
+    const adapter = new ExplorerAdapter(
+      app,
+      {} as NodeService,
+      {} as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({
+        createNode: "", incompleteNode: "", missingNodeFolder: "", missingNodeNote: "",
+        node: "", nodeConflict: "", root: "", unmanaged: "",
+      }),
+      () => undefined,
+      () => undefined,
+      () => undefined,
+      () => undefined,
+    );
+
+    expect(await adapter.reveal(Object.assign(new TFile(), { path: "A.md" }))).toBe(false);
+    expect(revealLeaf).toHaveBeenCalledWith(leaf);
   });
 });
