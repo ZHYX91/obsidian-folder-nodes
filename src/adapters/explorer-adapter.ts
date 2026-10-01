@@ -81,10 +81,14 @@ export class ExplorerAdapter extends Component {
     const leaves = this.app.workspace.getLeavesOfType("file-explorer");
     const recentDocument = this.app.workspace.getMostRecentLeaf()?.view.containerEl.ownerDocument ?? null;
     const leaf = leaves.find((candidate) => candidate.view.containerEl.ownerDocument === recentDocument) ?? leaves[0];
-    const view = leaf?.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void } | undefined;
-    if (leaf === undefined || view?.revealInFolder === undefined) return false;
-    await view.revealInFolder(entry);
+    if (leaf === undefined) return false;
+
+    // A hidden Explorer can still be backed by a DeferredView. Reveal the leaf first,
+    // then read leaf.view again so the host has a chance to materialize its real view.
     await this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void };
+    if (typeof view.revealInFolder !== "function") return false;
+    await view.revealInFolder(entry);
     return true;
   }
 
