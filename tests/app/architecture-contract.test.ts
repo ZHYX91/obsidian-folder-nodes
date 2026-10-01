@@ -52,6 +52,7 @@ describe("runtime architecture contract", () => {
     expect(explorer).toContain("syncExplorerNodeOrder(");
   });
 
+
   it("rebinds Explorer decoration when mobile mounts the sidebar after layout-ready", () => {
     const plugin = source("src/app/plugin.ts");
     expect(plugin).toContain('this.app.workspace.on("layout-change"');
