@@ -9,7 +9,7 @@ describe("runtime architecture contract", () => {
     const explorer = source("src/adapters/explorer-adapter.ts");
     expect(explorer).not.toContain("observe(document.body");
     expect(explorer).not.toContain("document.querySelectorAll");
-    expect(explorer).toContain('getLeavesOfType("file-explorer")');
+    expect(explorer).toContain("getLeavesOfType(EXPLORER_HOST.viewType)");
   });
 
   it("fails closed before host reveal for property-hidden Explorer targets", () => {
