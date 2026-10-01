@@ -23,6 +23,26 @@ describe("runtime architecture contract", () => {
     expect(plugin.slice(guard, reveal)).toContain('new Notice(t("hiddenNodeDetail"))');
   });
 
+  it("keeps Obsidian File Explorer host selectors in one adapter contract", () => {
+    const explorer = source("src/adapters/explorer-adapter.ts");
+    const events = source("src/adapters/explorer-events.ts");
+    const host = source("src/adapters/explorer-host.ts");
+    expect(explorer).toContain("EXPLORER_HOST");
+    expect(events).toContain("EXPLORER_HOST");
+    for (const token of [
+      '"file-explorer"',
+      '".nav-files-container"',
+      '".nav-folder-children"',
+      '".nav-folder-title[data-path]"',
+      '".nav-file-title[data-path]"',
+      '".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon"',
+    ]) {
+      expect(explorer).not.toContain(token);
+      expect(events).not.toContain(token);
+      expect(host).toContain(token);
+    }
+  });
+
   it("rebinds Explorer decoration when mobile mounts the sidebar after layout-ready", () => {
     const plugin = source("src/app/plugin.ts");
     expect(plugin).toContain('this.app.workspace.on("layout-change"');
