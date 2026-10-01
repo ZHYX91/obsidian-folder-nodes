@@ -11,21 +11,7 @@ export default defineConfig({
   test: {
     coverage: {
       exclude: ["src/**/*.d.ts"],
-      include: [
-        "src/core/**/*.ts",
-        "src/shared/settings.ts",
-        "src/adapters/node-service.ts",
-        "src/adapters/visual-service.ts",
-        "src/adapters/vault-operation-coordinator.ts",
-        "src/adapters/explorer-events.ts",
-        "src/app/node-graph-index.ts",
-        "src/app/node-graph-plugin.ts",
-        "src/app/refresh-scheduler.ts",
-        "src/ui/contents-interactions.ts",
-        "src/ui/node-graph-canvas-renderer.ts",
-        "src/ui/node-graph-view.ts",
-        "src/ui/submitting-modal.ts",
-      ],
+      include: ["src/**/*.ts"],
       provider: "v8",
       reporter: ["text", "html", "json-summary"],
       thresholds: {
