@@ -164,7 +164,11 @@ Stable project documents:
 
 ## Support
 
-Use [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues) for reproducible bugs and concrete feature requests. Include the Folder Nodes version, Obsidian version, operating system, synthetic folder structure, and exact action. Remove private Vault paths and note content before posting. Report vulnerabilities privately through the [security policy](SECURITY.md).
+- [Q&A](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/q-a): Usage and configuration questions.
+- [Ideas](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/ideas): Early feature and workflow ideas.
+- [Show and tell](https://github.com/ZHYX91/obsidian-folder-nodes/discussions/categories/show-and-tell): Tips, workflows, and reference implementations.
+
+Use [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose) for reproducible bugs and concrete feature requests. Include the Folder Nodes version, Obsidian version, operating system, synthetic folder structure, and exact action. Remove private Vault paths and note content before posting. Report vulnerabilities privately through the [security policy](SECURITY.md).
 
 ## License
 
