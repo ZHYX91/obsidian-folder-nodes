@@ -1,6 +1,8 @@
+import { EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR, EXPLORER_HOST } from "./explorer-host";
+
 export function isFolderCollapseControl(target: EventTarget | null): boolean {
   return isElementTarget(target) && target.closest(
-    ".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon",
+    EXPLORER_HOST.collapseControl,
   ) !== null;
 }
 
@@ -40,16 +42,16 @@ export function explorerMarkerPlacement(
 export function syncExplorerNodeOrder(container: HTMLElement, orderedPaths: readonly string[]): boolean {
   const order = new Map(orderedPaths.map((path, index) => [path, index]));
   const slots = Array.from(container.children).filter((child) => {
-    const title = child.matches(".nav-folder-title[data-path]")
+    const title = child.matches(EXPLORER_HOST.folderTitle)
       ? child
-      : child.querySelector(":scope > .nav-folder-title[data-path]");
+      : child.querySelector(EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR);
     const path = title?.getAttribute("data-path");
     return path !== null && path !== undefined && order.has(path);
   });
   const pathFor = (element: Element): string => {
-    const title = element.matches(".nav-folder-title[data-path]")
+    const title = element.matches(EXPLORER_HOST.folderTitle)
       ? element
-      : element.querySelector(":scope > .nav-folder-title[data-path]");
+      : element.querySelector(EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR);
     return title?.getAttribute("data-path") ?? "";
   };
   const desired = [...slots].sort((left, right) =>
