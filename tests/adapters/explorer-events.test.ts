@@ -125,6 +125,40 @@ describe("File Explorer node ordering", () => {
     expect(syncExplorerNodeOrder(container, ["生活/餐饮", "生活/购物", "生活/宠物"])).toBe(false);
   });
 
+
+  it("preserves the revealed branch position while managed siblings move", () => {
+    const container = document.createElement("div");
+    container.className = "nav-files-container";
+    const first = folder("A");
+    const revealed = folder("B");
+    container.append(revealed, first);
+    document.body.append(container);
+    container.scrollTop = 4;
+    container.getBoundingClientRect = () => ({
+      bottom: 40, height: 40, left: 0, right: 100, top: 0, width: 100, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const rectFor = (element: Element): DOMRect => {
+      const top = Array.from(container.children).indexOf(element) * 20 - container.scrollTop;
+      return {
+        bottom: top + 20, height: 20, left: 0, right: 100, top, width: 100, x: 0, y: top, toJSON: () => ({}),
+      };
+    };
+    first.getBoundingClientRect = () => rectFor(first);
+    revealed.getBoundingClientRect = () => rectFor(revealed);
+    const topBefore = revealed.getBoundingClientRect().top;
+
+    expect(syncExplorerNodeOrder(
+      container,
+      ["A", "B"],
+      { path: "B", scrollContainer: container },
+    )).toBe(true);
+
+    expect(Array.from(container.children)).toEqual([first, revealed]);
+    expect(container.scrollTop).toBe(24);
+    expect(revealed.getBoundingClientRect().top).toBe(topBefore);
+    container.remove();
+  });
+
   it("settles after one mutation-observer refresh", async () => {
     const container = document.createElement("div");
     const first = folder("A");
