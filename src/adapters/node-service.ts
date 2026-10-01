@@ -195,6 +195,31 @@ export class NodeService {
     return this.exclusive(() => this.createNodePathUnlocked(nodePath, options));
   }
 
+  public rollbackCreatedNode(note: TFile, options: { alias?: string; body?: string } = {}): Promise<void> {
+    return this.operations.run(async () => {
+      const folder = note.parent;
+      if (!(folder instanceof TFolder) || normalizeVaultPath(folder.path) === "") {
+        throw new Error("Cannot safely roll back a created node without its original folder");
+      }
+      const notePath = note.path;
+      const folderPath = folder.path;
+      const initialContent = createNodeDocument(options.alias?.trim() || null, options.body ?? "");
+      this.assertEntryIdentity(note, notePath, TFile);
+      if (this.getCanonicalFile(folderPath) !== note || folder.children.length !== 1 || folder.children[0] !== note) {
+        throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
+      }
+      if (await this.app.vault.read(note) !== initialContent) {
+        throw new Error(`Cannot safely roll back concurrently modified created file: ${notePath}`);
+      }
+      this.assertEntryIdentity(note, notePath, TFile);
+      if (folder.children.length !== 1 || folder.children[0] !== note) {
+        throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
+      }
+      await this.trashCreatedFile(note, notePath, initialContent);
+      await this.trashCreatedFolder(folder, folderPath);
+    });
+  }
+
   public createMissingNodeNote(folder: TFolder): Promise<TFile> {
     return this.exclusive(async () => {
       if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
