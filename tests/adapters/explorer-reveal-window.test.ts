@@ -30,7 +30,7 @@ describe("Explorer reveal window affinity", () => {
     } as unknown as App;
     const adapter = new ExplorerAdapter(
       app,
-      {} as NodeService,
+      { isNodeVisible: () => true } as unknown as NodeService,
       {} as VisualService,
       () => structuredClone(DEFAULT_SETTINGS),
       () => ({
@@ -71,7 +71,7 @@ describe("Explorer reveal window affinity", () => {
     } as unknown as App;
     const adapter = new ExplorerAdapter(
       app,
-      {} as NodeService,
+      { isNodeVisible: () => true } as unknown as NodeService,
       {} as VisualService,
       () => structuredClone(DEFAULT_SETTINGS),
       () => ({
@@ -103,7 +103,7 @@ describe("Explorer reveal window affinity", () => {
     } as unknown as App;
     const adapter = new ExplorerAdapter(
       app,
-      {} as NodeService,
+      { isNodeVisible: () => true } as unknown as NodeService,
       {} as VisualService,
       () => structuredClone(DEFAULT_SETTINGS),
       () => ({

@@ -9,7 +9,47 @@ describe("runtime architecture contract", () => {
     const explorer = source("src/adapters/explorer-adapter.ts");
     expect(explorer).not.toContain("observe(document.body");
     expect(explorer).not.toContain("document.querySelectorAll");
-    expect(explorer).toContain('getLeavesOfType("file-explorer")');
+    expect(explorer).toContain("getLeavesOfType(EXPLORER_HOST.viewType)");
+  });
+
+  it("fails closed before host reveal for property-hidden Explorer targets", () => {
+    const explorer = source("src/adapters/explorer-adapter.ts");
+    const plugin = source("src/app/plugin.ts");
+    expect(explorer).toContain("if (!this.canReveal(entry)) return false;");
+    const guard = plugin.indexOf("if (!this.explorer.canReveal(entry))");
+    const reveal = plugin.indexOf("await this.explorer.reveal(entry)", guard);
+    expect(guard).toBeGreaterThan(0);
+    expect(reveal).toBeGreaterThan(guard);
+    expect(plugin.slice(guard, reveal)).toContain('new Notice(t("hiddenNodeDetail"))');
+  });
+
+  it("keeps Obsidian File Explorer host selectors in one adapter contract", () => {
+    const explorer = source("src/adapters/explorer-adapter.ts");
+    const events = source("src/adapters/explorer-events.ts");
+    const host = source("src/adapters/explorer-host.ts");
+    expect(explorer).toContain("EXPLORER_HOST");
+    expect(events).toContain("EXPLORER_HOST");
+    for (const token of [
+      '"file-explorer"',
+      '".nav-files-container"',
+      '".nav-folder-children"',
+      '".nav-folder-title[data-path]"',
+      '".nav-file-title[data-path]"',
+      '".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon"',
+    ]) {
+      expect(explorer).not.toContain(token);
+      expect(events).not.toContain(token);
+      expect(host).toContain(token);
+    }
+  });
+
+  it("keeps Explorer host ordering native unless manual and settles mutation work without a paint-delay timer", () => {
+    const explorer = source("src/adapters/explorer-adapter.ts");
+    expect(explorer).toContain("queueMicrotask(() => {");
+    expect(explorer).not.toContain("explorerMutationTimer");
+    expect(explorer).toContain('if (sortMode !== "manual")');
+    expect(explorer).toContain("this.restoreOrder(container)");
+    expect(explorer).toContain("syncExplorerNodeOrder(");
   });
 
   it("keeps Explorer host ordering native unless manual and settles mutation work without a paint-delay timer", () => {

@@ -870,6 +870,10 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private async revealEntry(entry: TAbstractFile): Promise<void> {
+    if (!this.explorer.canReveal(entry)) {
+      new Notice(t("hiddenNodeDetail"));
+      return;
+    }
     try {
       if (!await this.explorer.reveal(entry)) new Notice(t("revealUnavailable"));
     } catch (error) {

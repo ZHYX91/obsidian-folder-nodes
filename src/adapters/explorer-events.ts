@@ -1,6 +1,8 @@
+import { EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR, EXPLORER_ENTRY_TITLES_SELECTOR, EXPLORER_HOST } from "./explorer-host";
+
 export function isFolderCollapseControl(target: EventTarget | null): boolean {
   return isElementTarget(target) && target.closest(
-    ".nav-folder-collapse-indicator, .tree-item-icon.collapse-icon",
+    EXPLORER_HOST.collapseControl,
   ) !== null;
 }
 
@@ -49,16 +51,16 @@ export function syncExplorerNodeOrder(
 ): boolean {
   const order = new Map(orderedPaths.map((path, index) => [path, index]));
   const slots = Array.from(container.children).filter((child) => {
-    const title = child.matches(".nav-folder-title[data-path]")
+    const title = child.matches(EXPLORER_HOST.folderTitle)
       ? child
-      : child.querySelector(":scope > .nav-folder-title[data-path]");
+      : child.querySelector(EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR);
     const path = title?.getAttribute("data-path");
     return path !== null && path !== undefined && order.has(path);
   });
   const pathFor = (element: Element): string => {
-    const title = element.matches(".nav-folder-title[data-path]")
+    const title = element.matches(EXPLORER_HOST.folderTitle)
       ? element
-      : element.querySelector(":scope > .nav-folder-title[data-path]");
+      : element.querySelector(EXPLORER_DIRECT_FOLDER_TITLE_SELECTOR);
     return title?.getAttribute("data-path") ?? "";
   };
   const desired = [...slots].sort((left, right) =>
@@ -66,7 +68,7 @@ export function syncExplorerNodeOrder(
   if (slots.every((element, index) => element === desired[index])) return false;
 
   const preferredSlot = anchor?.path === null || anchor === null ? null : slots.find((slot) => pathFor(slot) === anchor.path) ?? null;
-  const preferred = preferredSlot?.querySelector(".nav-folder-title[data-path]") ?? preferredSlot;
+  const preferred = preferredSlot?.querySelector(EXPLORER_HOST.folderTitle) ?? preferredSlot;
   const anchorElement = anchor === null ? null
     : preferred !== null && isVisibleRow(preferred, anchor.scrollContainer) ? preferred : firstVisibleSlot(slots, anchor.scrollContainer);
   const anchorTop = anchorElement?.getBoundingClientRect().top ?? null;
@@ -87,7 +89,7 @@ export function syncExplorerNodeOrder(
 
 function firstVisibleSlot(slots: readonly Element[], scrollContainer: HTMLElement): Element | null {
   // Anchor a visible title, not the bounding box of an expanded subtree.
-  const visibleTitle = Array.from(scrollContainer.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]"))
+  const visibleTitle = Array.from(scrollContainer.querySelectorAll(EXPLORER_ENTRY_TITLES_SELECTOR))
     .find((title) => isVisibleRow(title, scrollContainer));
   if (visibleTitle !== undefined) return visibleTitle;
   for (const slot of slots) {
