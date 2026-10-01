@@ -476,7 +476,10 @@ export class ExplorerAdapter extends Component {
       const parentPath = container.matches(".nav-files-container") ? "" : container.parentElement?.querySelector<HTMLElement>(":scope > .nav-folder-title[data-path]")?.dataset.path;
       if (parentPath === undefined) continue;
       const sortMode = (this.service as unknown as { sortMode?: (path: string) => "manual" | "natural" }).sortMode?.(parentPath) ?? "natural";
-      if (sortMode !== "manual") continue;
+      if (sortMode !== "manual") {
+        this.restoreOrder(container);
+        continue;
+      }
       const orderedPaths = this.service.children(parentPath).map(({ childPath }) => childPath);
       const anchorPath = orderedPaths.find((path) => activePath === path || activePath.startsWith(`${path}/`)) ?? null;
       const scrollContainer = container.closest<HTMLElement>(".nav-files-container");
@@ -748,18 +751,22 @@ export class ExplorerAdapter extends Component {
     }
   }
 
+  private restoreOrder(container: HTMLElement): void {
+    const original = this.originalOrders.get(container);
+    if (original === undefined) return;
+    this.originalOrders.delete(container);
+    if (!container.isConnected) return;
+    const survivors = original.filter((element) => element.parentElement === container);
+    const first = Array.from(container.children).find((element) => survivors.includes(element));
+    if (first === undefined) return;
+    const marker = container.ownerDocument.createComment("folder-nodes-restore-order");
+    container.insertBefore(marker, first);
+    for (const element of survivors) container.insertBefore(element, marker);
+    marker.remove();
+  }
+
   private restoreOrders(): void {
-    for (const [container, original] of this.originalOrders) {
-      if (!container.isConnected) continue;
-      const survivors = original.filter((element) => element.parentElement === container);
-      const first = Array.from(container.children).find((element) => survivors.includes(element));
-      if (first === undefined) continue;
-      const marker = container.ownerDocument.createComment("folder-nodes-restore-order");
-      container.insertBefore(marker, first);
-      for (const element of survivors) container.insertBefore(element, marker);
-      marker.remove();
-    }
-    this.originalOrders.clear();
+    for (const container of [...this.originalOrders.keys()]) this.restoreOrder(container);
   }
 
   private cleanupSurface(root: HTMLElement): void {
