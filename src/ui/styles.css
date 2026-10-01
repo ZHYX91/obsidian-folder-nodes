@@ -436,9 +436,9 @@ body {
   flex: 0 0 22px;
   place-items: center;
   width: 22px;
-  height: 22px;
+  height: 1em;
   min-width: 22px;
-  min-height: 22px;
+  min-height: 0;
   margin-inline: 2px 4px;
   color: var(--text-muted);
   line-height: 1;
