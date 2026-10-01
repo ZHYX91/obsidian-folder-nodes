@@ -80,11 +80,12 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     assertSettingsWritable(this.plugin.getSettingsCompatibility());
     const settings = this.plugin.settings;
     let reconcileNodeGraph = false;
+    let languageChanged = false;
     switch (key) {
       case "language":
         if (value !== "auto" && value !== "zh-CN" && value !== "en") throw new Error("Unsupported language");
         settings.language = value;
-        setLanguage(value);
+        languageChanged = true;
         new Notice(t("reloadLanguage"));
         break;
       case "homepageEnabled": settings.homepageEnabled = Boolean(value); this.plugin.refreshVisuals(); break;
@@ -125,7 +126,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       case "suffixTimestampFormat": settings.suffix.timestampFormat = this.timestampFormat(value); break;
       default: throw new Error(`Unsupported Folder Nodes setting: ${key}`);
     }
-    await this.plugin.saveSettings();
+    if (languageChanged) await this.plugin.applyLanguageSetting();
+    else await this.plugin.saveSettings();
     if (reconcileNodeGraph) await this.plugin.reconcileSettingsChange();
     updateDeclarativeSettingTab(this);
   }
