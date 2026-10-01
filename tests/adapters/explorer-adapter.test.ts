@@ -106,6 +106,10 @@ describe("ExplorerAdapter lifecycle", () => {
     adapter.refresh();
     expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual([aRow, bRow]);
 
+    mode = "natural";
+    adapter.refresh();
+    expect(Array.from(files.children).filter((element) => element.matches(".nav-folder"))).toEqual([bRow, aRow]);
+
     adapter.stop();
     root.remove();
   });
