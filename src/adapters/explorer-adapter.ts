@@ -75,7 +75,13 @@ export class ExplorerAdapter extends Component {
     this.decorateNoteTitles();
   }
 
+  public canReveal(entry: TAbstractFile): boolean {
+    const folderPath = entry instanceof TFolder ? entry.path : entry.parent?.path ?? "";
+    return this.service.isNodeVisible(folderPath);
+  }
+
   public async reveal(entry: TAbstractFile): Promise<boolean> {
+    if (!this.canReveal(entry)) return false;
     const leaves = this.app.workspace.getLeavesOfType("file-explorer");
     const recentDocument = this.app.workspace.getMostRecentLeaf()?.view.containerEl.ownerDocument ?? null;
     const leaf = leaves.find((candidate) => candidate.view.containerEl.ownerDocument === recentDocument) ?? leaves[0];
