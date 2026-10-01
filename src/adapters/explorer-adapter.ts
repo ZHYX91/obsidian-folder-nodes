@@ -12,6 +12,8 @@ import type { VisualService } from "./visual-service";
 import type { FolderNodesSettings, NodeVisual } from "../core/types";
 import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent } from "../core/placement";
 import { nativeExplorerOrder, restoreExplorerOrder } from "./explorer-native-order";
+import { installExplorerVirtualOrder, type ExplorerVirtualOrder } from "./explorer-virtual-order";
+import { normalizeVaultPath } from "../core/paths";
 import { renderVisual } from "../presentation/render-visual";
 import { PlacementSession } from "../core/placement-session";
 import { placementFeedback } from "../presentation/placement-feedback";
@@ -20,6 +22,8 @@ interface ExplorerSurface {
   abort: AbortController;
   observer: MutationObserver;
   root: HTMLElement;
+  ordering: ExplorerVirtualOrder | null;
+  view: unknown;
 }
 
 interface NoteTitleSurface {
@@ -98,6 +102,8 @@ export class ExplorerAdapter extends Component {
     // A hidden Explorer can still be backed by a DeferredView. Reveal the leaf first,
     // then read leaf.view again so the host has a chance to materialize its real view.
     await this.app.workspace.revealLeaf(leaf);
+    this.syncSurfaces();
+    this.surfaces.get(leaf.view.containerEl)?.ordering?.refresh();
     const view = leaf.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void };
     if (typeof view.revealInFolder !== "function") return false;
     await view.revealInFolder(entry);
@@ -114,6 +120,7 @@ export class ExplorerAdapter extends Component {
     for (const surface of this.surfaces.values()) {
       surface.observer.disconnect();
       surface.abort.abort();
+      surface.ordering?.dispose();
       this.cleanupSurface(surface.root);
     }
     this.surfaces.clear();
@@ -133,7 +140,15 @@ export class ExplorerAdapter extends Component {
       const root = (leaf.view as unknown as { containerEl?: HTMLElement }).containerEl;
       if (root === undefined) continue;
       active.add(root);
-      if (this.surfaces.has(root)) continue;
+      const existing = this.surfaces.get(root);
+      if (existing !== undefined) {
+        if (existing.view !== leaf.view) {
+          existing.ordering?.dispose();
+          existing.view = leaf.view;
+          existing.ordering = this.installVirtualOrder(leaf.view, root);
+        }
+        continue;
+      }
       const ownerWindow = root.ownerDocument.defaultView;
       const Observer = ownerWindow?.MutationObserver ?? MutationObserver;
       const Abort = ownerWindow?.AbortController ?? AbortController;
@@ -148,17 +163,26 @@ export class ExplorerAdapter extends Component {
         root.addEventListener("drop", (event) => this.onDrop(event), { capture: true, signal: abort.signal });
         root.addEventListener("dragend", () => this.clearDrop(), { capture: true, signal: abort.signal });
       }
-      this.surfaces.set(root, { abort, observer, root });
+      const ordering = this.installVirtualOrder(leaf.view, root);
+      this.surfaces.set(root, { abort, observer, root, ordering, view: leaf.view });
     }
     for (const [root, surface] of this.surfaces) {
       if (active.has(root) && root.isConnected) continue;
       surface.observer.disconnect();
       surface.abort.abort();
+      surface.ordering?.dispose();
       this.cleanupSurface(root);
       for (const container of this.originalOrders.keys()) if (root.contains(container)) this.originalOrders.delete(container);
       this.surfaces.delete(root);
     }
     this.syncNoteTitleSurfaces();
+  }
+
+  private installVirtualOrder(view: unknown, root: HTMLElement): ExplorerVirtualOrder | null {
+    return installExplorerVirtualOrder(view, root, (folder) => {
+      const path = normalizeVaultPath(folder.path);
+      return this.service.sortMode(path) === "manual" ? this.service.children(path).map(({ childPath }) => childPath) : null;
+    });
   }
 
   private syncNoteTitleSurfaces(): void {
@@ -253,7 +277,8 @@ export class ExplorerAdapter extends Component {
   }
 
   private decorate(): void {
-    for (const { root } of this.surfaces.values()) {
+    for (const { root, ordering } of this.surfaces.values()) {
+      ordering?.refresh();
       this.decorateRoot(root);
       this.decorateCreateActions(root);
       this.decorateEntries(root);
@@ -483,6 +508,8 @@ export class ExplorerAdapter extends Component {
   }
 
   private syncNodeOrder(root: HTMLElement): void {
+    if ([...this.surfaces.values()].some((surface) => surface.ordering !== null &&
+      (surface.root === root || surface.root.contains(root)))) return;
     const containers = [
       ...(root.matches(EXPLORER_FOLDER_CONTAINERS_SELECTOR) ? [root] : []),
       ...root.querySelectorAll<HTMLElement>(EXPLORER_FOLDER_CONTAINERS_SELECTOR),

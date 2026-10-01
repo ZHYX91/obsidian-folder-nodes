@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 
@@ -8,6 +8,39 @@ import type { VisualService } from "../../src/adapters/visual-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 
 describe("Explorer reveal window affinity", () => {
+  it("synchronizes materialized virtual children before revealing and restores the sorter on stop", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const folder = Object.assign(new TFolder(), { path: "Parent" });
+    const items = ["Parent/A", "Parent/B"].map((path) => ({ file: { path } }));
+    let virtual = items;
+    const original = (parent: TFolder) => parent === folder ? items : [];
+    const view = {
+      containerEl: root, tree: { infinityScroll: {} }, getSortedFolderItems: original,
+      sort: () => { virtual = view.getSortedFolderItems(folder); },
+      revealInFolder: vi.fn(() => { expect(virtual.map(({ file }) => file.path)).toEqual(["Parent/B", "Parent/A"]); }),
+    };
+    const leaf = { view };
+    const app = { workspace: {
+      getLeavesOfType: (type: string) => type === "file-explorer" ? [leaf] : [],
+      getMostRecentLeaf: () => leaf, revealLeaf: async () => undefined,
+    } } as unknown as App;
+    const adapter = new ExplorerAdapter(app, {
+      isNodeVisible: () => true, sortMode: () => "manual",
+      children: () => [{ childPath: "Parent/B" }, { childPath: "Parent/A" }],
+    } as unknown as NodeService, {} as VisualService, () => structuredClone(DEFAULT_SETTINGS),
+    () => ({ createNode: "", incompleteNode: "", missingNodeFolder: "", missingNodeNote: "",
+      node: "", nodeConflict: "", root: "", unmanaged: "" }),
+    () => undefined, () => undefined, () => undefined, () => undefined);
+    try {
+      expect(await adapter.reveal(Object.assign(new TFile(), { path: "Parent/B/B.md" }))).toBe(true);
+      expect(view.revealInFolder).toHaveBeenCalledOnce();
+      adapter.stop();
+      expect(view.getSortedFolderItems).toBe(original);
+      expect(virtual).toBe(items);
+    } finally { adapter.stop(); root.remove(); }
+  });
+
   it("prefers the File Explorer in the most recent workspace document", async () => {
     const firstDocument = new Window().document as unknown as Document;
     const secondDocument = new Window().document as unknown as Document;
