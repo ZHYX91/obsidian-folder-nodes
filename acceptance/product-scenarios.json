@@ -26,12 +26,14 @@
       "steps": [
         "Confirm the explicit hidden root and its descendant are absent from Folder Nodes projections",
         "Use the eye beside Root to enable session reveal and inspect the explicit Hidden text badge and inherited source treatment",
-        "Disable Apply hidden markers and reload without editing frontmatter"
+        "Disable Apply hidden markers and reload without editing frontmatter",
+        "While the subtree is hidden, use a Node action to Reveal in File Explorer and click the active note breadcrumb for that hidden path; then enable the Root eye and repeat."
       ],
       "expected": [
         "Only Folder Nodes Explorer, Contents, and Graph projections hide the marked subtree",
         "The explicit root has one non-interactive Hidden text badge, no per-node eye, and the descendant shows inherited muted feedback",
-        "Session reveal resets on reload and the hidden=true token remains byte-preserved"
+        "Session reveal resets on reload and the hidden=true token remains byte-preserved",
+        "Folder Nodes never reports its own reveal as successful while the target path is property-hidden. Native breadcrumb expansion does not override the plugin projection; after session reveal is enabled, both paths can expose the target without editing frontmatter."
       ]
     },
     {
