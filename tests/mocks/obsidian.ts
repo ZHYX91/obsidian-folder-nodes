@@ -1,3 +1,5 @@
+import { parse, stringify } from "yaml";
+
 let language = "en";
 
 export function moment(date: Date): { format(pattern: string): string } {
@@ -159,6 +161,10 @@ export function setTooltip(element: HTMLElement, value: string): void {
 export function normalizePath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
 }
+
+export function parseYaml(source: string): unknown { return parse(source) as unknown; }
+
+export function stringifyYaml(value: unknown): string { return stringify(value); }
 
 export function getLanguage(): string {
   return language;

@@ -1,6 +1,8 @@
 import {
   App,
   normalizePath,
+  parseYaml,
+  stringifyYaml,
   TAbstractFile,
   TFile,
   TFolder,
@@ -419,28 +421,45 @@ export class NodeService {
     return this.exclusive(async () => {
       if (this.isIgnoredPath(source.path) || this.isIgnoredPath(target.path)) throw new FolderNodesError("unmanaged_merge", {}, "An unmanaged folder cannot be merged as a Folder Node");
       if (source.path === target.path || isDescendantPath(target.path, source.path)) throw new Error("A node cannot be merged into itself or a descendant");
+      const sourcePath = source.path;
+      const targetPath = target.path;
       const sourceNote = this.requireCanonicalNote(source);
       const targetNote = this.requireCanonicalNote(target);
+      const sourceNotePath = sourceNote.path;
       const targetNotePath = targetNote.path;
-      const movable = source.children.filter((entry) => entry.path !== sourceNote.path);
-      for (const entry of movable) await this.assertAvailable(normalizePath(`${target.path}/${entry.name}`));
+      const initialSourceChildren = [...source.children];
+      const movable = initialSourceChildren.filter((entry) => entry !== sourceNote).map((entry) => ({
+        entry, path: entry.path, name: entry.name, parent: entry.parent,
+      }));
 
-      const sourceProperties = this.app.metadataCache.getFileCache(sourceNote)?.frontmatter ?? {};
-      const targetProperties = this.app.metadataCache.getFileCache(targetNote)?.frontmatter ?? {};
-      for (const [key, value] of Object.entries(sourceProperties)) {
-        if (key === "position" || STRUCTURAL_PROPERTIES.has(key)) continue;
-        if (key in targetProperties && !deepEqual(targetProperties[key], value)) throw new Error(`Merge property conflict: ${key}`);
-      }
+      for (const entry of movable) await this.assertAvailable(normalizePath(`${targetPath}/${entry.name}`));
+      const sourceSnapshot = await this.readClosedMergeNote(sourceNote, sourceNotePath, "source");
+      const targetSnapshot = await this.readClosedMergeNote(targetNote, targetNotePath, "target");
+      const sourceProperties = readMergeFrontmatter(sourceSnapshot, sourceNotePath);
+      const targetWithProperties = mergeFrontmatterProperties(
+        targetSnapshot,
+        sourceProperties,
+        targetNotePath,
+      );
+      const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
 
-      const originalTarget = await this.app.vault.read(targetNote);
-      const ownedTargetStates = new Set([originalTarget]);
+      await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
+      await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
+      this.assertMergeStructure(source, sourcePath, initialSourceChildren);
+      this.assertEntryIdentity(target, targetPath, TFolder);
+
       const undos: Undo[] = [];
+      let latestTarget = targetSnapshot;
       try {
-        for (const entry of movable) {
+        for (const snapshot of movable) {
           this.assertActive();
-          const sourcePath = entry.path;
-          const destination = normalizePath(`${target.path}/${entry.name}`);
-          this.expectEvent("rename", destination, sourcePath, entry instanceof TFolder);
+          const { entry, path: sourceEntryPath, name, parent } = snapshot;
+          this.assertEntryIdentity(entry, sourceEntryPath, entry instanceof TFolder ? TFolder : TFile);
+          if (entry.name !== name || entry.parent !== parent || parent !== source) {
+            throw new Error(`source child changed during merge: ${sourceEntryPath}`);
+          }
+          const destination = normalizePath(`${targetPath}/${name}`);
+          this.expectEvent("rename", destination, sourceEntryPath, entry instanceof TFolder);
           await this.app.fileManager.renameFile(entry, destination);
           undos.push(async () => {
             this.assertEntryIdentity(
@@ -448,37 +467,75 @@ export class NodeService {
               destination,
               entry instanceof TFolder ? TFolder : TFile,
             );
-            this.expectEvent("rename", sourcePath, destination, entry instanceof TFolder);
-            await this.app.fileManager.renameFile(entry, sourcePath);
+            this.expectEvent("rename", sourceEntryPath, destination, entry instanceof TFolder);
+            await this.app.fileManager.renameFile(entry, sourceEntryPath);
           });
         }
-        undos.push(async () => {
-          await this.applyFileChange(targetNote, targetNotePath, (current) => {
-            if (!ownedTargetStates.has(current)) {
-              throw new Error(`Cannot safely roll back concurrently modified file: ${targetNotePath}`);
-            }
-            return originalTarget;
-          });
-        });
-        this.assertActive();
-        this.assertEntryIdentity(targetNote, targetNotePath, TFile);
-        await this.app.fileManager.processFrontMatter(targetNote, (frontmatter: Record<string, unknown>) => {
-          for (const [key, value] of Object.entries(sourceProperties)) {
-            if (key !== "position" && !STRUCTURAL_PROPERTIES.has(key) && !(key in frontmatter)) frontmatter[key] = value;
-          }
-        });
-        this.assertEntryIdentity(targetNote, targetNotePath, TFile);
-        ownedTargetStates.add(await this.app.vault.read(targetNote));
-        const sourceBody = stripFrontmatter(await this.app.vault.read(sourceNote));
+
+        await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
+        await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
+        this.assertMergeStructure(source, sourcePath, [sourceNote]);
+        this.assertEntryIdentity(target, targetPath, TFolder);
+
+        if (targetWithProperties !== latestTarget) {
+          const receipt = await this.applyClosedMergeFileChange(
+            targetNote,
+            targetNotePath,
+            "target",
+            (current) => {
+              if (current !== latestTarget) {
+                throw new Error(`target Node Note changed during merge: ${targetNotePath}`);
+              }
+              return targetWithProperties;
+            },
+          );
+          this.pushExactMergeUndo(undos, targetNote, targetNotePath, receipt);
+          latestTarget = receipt.after;
+          await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
+        }
+
         if (/\S/u.test(sourceBody)) {
-          this.assertActive();
-          this.assertEntryIdentity(targetNote, targetNotePath, TFile);
-          await this.app.vault.append(targetNote, `\n\n## Merged from ${source.name}\n\n${sourceBody}`);
-          ownedTargetStates.add(await this.app.vault.read(targetNote));
+          const expectedBefore = latestTarget;
+          const appended = `${expectedBefore}\n\n## Merged from ${source.name}\n\n${sourceBody}`;
+          const receipt = await this.applyClosedMergeFileChange(
+            targetNote,
+            targetNotePath,
+            "target",
+            (current) => {
+              if (current !== expectedBefore) {
+                throw new Error(`target Node Note changed during merge: ${targetNotePath}`);
+              }
+              return appended;
+            },
+          );
+          this.pushExactMergeUndo(undos, targetNote, targetNotePath, receipt);
+          latestTarget = receipt.after;
+          await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
         }
-        this.assertActive();
-        this.expectEvent("delete", source.path, null, true);
-        await this.app.fileManager.trashFile(source);
+
+        // Observe both notes across the final asynchronous reads, so checking one
+        // cannot silently invalidate the other. Trash dispatch is the commit point.
+        let notesChanged = false;
+        const modification = this.app.vault.on("modify", (file) => {
+          if (file === sourceNote || file === targetNote) notesChanged = true;
+        });
+        try {
+          this.assertEntryIdentity(target, targetPath, TFolder);
+          await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
+          await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
+          this.assertActive();
+          this.assertEntryIdentity(target, targetPath, TFolder);
+          this.assertEntryIdentity(targetNote, targetNotePath, TFile);
+          this.assertMergeNoteClosed(targetNote, targetNotePath, "target");
+          this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+          this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");
+          this.assertMergeStructure(source, sourcePath, [sourceNote]);
+          if (notesChanged) throw new Error("Node Note changed during final merge validation");
+          this.expectEvent("delete", sourcePath, null, true);
+          await this.app.fileManager.trashFile(source);
+        } finally {
+          this.app.vault.offref(modification);
+        }
       } catch (error) {
         await this.rollback(undos, error);
       }
@@ -1136,6 +1193,106 @@ export class NodeService {
     });
   }
 
+  private async readClosedMergeNote(
+    file: TFile,
+    path: string,
+    role: "source" | "target",
+  ): Promise<string> {
+    this.assertEntryIdentity(file, path, TFile);
+    this.assertMergeNoteClosed(file, path, role);
+    const content = await this.app.vault.read(file);
+    this.assertEntryIdentity(file, path, TFile);
+    this.assertMergeNoteClosed(file, path, role);
+    return content;
+  }
+
+  private async assertClosedMergeNoteSnapshot(
+    file: TFile,
+    path: string,
+    role: "source" | "target",
+    expected: string,
+  ): Promise<void> {
+    const current = await this.readClosedMergeNote(file, path, role);
+    if (current !== expected) throw new Error(`${role} Node Note changed during merge: ${path}`);
+  }
+
+  private assertMergeNoteClosed(
+    file: TFile,
+    path: string,
+    role: "source" | "target",
+  ): void {
+    const matching = this.app.workspace.getLeavesOfType("markdown").flatMap((leaf) => {
+      const view = leaf.view as typeof leaf.view & { file?: TFile | null; editor?: Editor };
+      return view.file?.path === path && view.editor !== undefined ? [view.file] : [];
+    });
+    if (matching.some((current) => current !== file)) {
+      throw new Error(`Markdown file identity changed during merge: ${path}`);
+    }
+    if (matching.length > 1) {
+      throw new FolderNodesError("merge_note_open", { path }, `Cannot merge while the ${role} Node Note is open in multiple editors: ${path}`);
+    }
+    if (matching.length === 1) {
+      throw new FolderNodesError("merge_note_open", { path }, `Cannot merge while the ${role} Node Note is open in a Markdown editor: ${path}`);
+    }
+  }
+
+  private assertMergeStructure(
+    source: TFolder,
+    sourcePath: string,
+    expectedChildren: readonly TAbstractFile[],
+  ): void {
+    this.assertEntryIdentity(source, sourcePath, TFolder);
+    if (
+      source.children.length !== expectedChildren.length
+      || expectedChildren.some((entry) => !source.children.includes(entry))
+    ) {
+      throw new Error(`source structure changed during merge: ${sourcePath}`);
+    }
+  }
+
+  private async applyClosedMergeFileChange(
+    file: TFile,
+    path: string,
+    role: "source" | "target",
+    update: (current: string) => string,
+    rollback = false,
+  ): Promise<{ before: string; after: string }> {
+    if (!rollback) this.assertActive();
+    this.assertEntryIdentity(file, path, TFile);
+    this.assertMergeNoteClosed(file, path, role);
+    let before: string | undefined;
+    let after: string | undefined;
+    const published = await this.app.vault.process(file, (current) => {
+      if (!rollback) this.assertActive();
+      this.assertEntryIdentity(file, path, TFile);
+      this.assertMergeNoteClosed(file, path, role);
+      before = current;
+      after = update(current);
+      return after;
+    });
+    if (before === undefined || after === undefined || published !== after) {
+      throw new Error(`Vault did not publish merge update: ${path}`);
+    }
+    return { before, after };
+  }
+
+  private pushExactMergeUndo(
+    undos: Undo[],
+    file: TFile,
+    path: string,
+    receipt: { before: string; after: string },
+  ): void {
+    if (receipt.before === receipt.after) return;
+    undos.push(async () => {
+      await this.applyClosedMergeFileChange(file, path, "target", (current) => {
+        if (current !== receipt.after) {
+          throw new Error(`Cannot safely roll back concurrently modified file: ${path}`);
+        }
+        return receipt.before;
+      }, true);
+    });
+  }
+
   private async readCurrentSource(file: TFile): Promise<string> {
     const target = this.findOpenMarkdownTarget(file, file.path);
     return target?.editor.getValue() ?? this.app.vault.cachedRead(file);
@@ -1347,9 +1504,91 @@ function deepEqual(left: unknown, right: unknown): boolean {
   });
 }
 
-function stripFrontmatter(source: string): string {
-  const normalized = source.replaceAll("\r\n", "\n");
-  if (!normalized.startsWith("---\n")) return normalized;
-  const end = normalized.indexOf("\n---\n", 4);
-  return end < 0 ? normalized : normalized.slice(end + 5);
+interface ParsedMergeFrontmatter {
+  readonly bom: string;
+  readonly closingBoundary: number;
+  readonly eol: string;
+  readonly frontmatter: Record<string, unknown>;
+  readonly hasFrontmatter: boolean;
+  readonly lines: string[];
+}
+
+function readMergeFrontmatter(source: string, path: string): Record<string, unknown> {
+  return parseMergeFrontmatter(source, path).frontmatter;
+}
+
+function mergeFrontmatterProperties(
+  targetSource: string,
+  sourceProperties: Readonly<Record<string, unknown>>,
+  targetPath: string,
+): string {
+  const parsed = parseMergeFrontmatter(targetSource, targetPath);
+  const additions: Array<readonly [string, unknown]> = [];
+  for (const [key, value] of Object.entries(sourceProperties)) {
+    if (key === "position" || STRUCTURAL_PROPERTIES.has(key)) continue;
+    if (Object.prototype.hasOwnProperty.call(parsed.frontmatter, key)) {
+      if (!deepEqual(parsed.frontmatter[key], value)) throw new Error(`Merge property conflict: ${key}`);
+      continue;
+    }
+    additions.push([key, value]);
+  }
+  if (additions.length === 0) return targetSource;
+  const serialized = stringifyYaml(Object.fromEntries(additions)).replaceAll("\r\n", "\n");
+  const rendered = (serialized.endsWith("\n") ? serialized.slice(0, -1) : serialized)
+    .replaceAll("\n", parsed.eol);
+  if (!parsed.hasFrontmatter) {
+    return `${parsed.bom}---${parsed.eol}${rendered}${parsed.eol}---${parsed.eol}${targetSource.slice(parsed.bom.length)}`;
+  }
+  const lines = [...parsed.lines];
+  lines.splice(parsed.closingBoundary, 0, ...rendered.split(parsed.eol));
+  const candidate = `${parsed.bom}${lines.join(parsed.eol)}`;
+  const expected = Object.fromEntries([...Object.entries(parsed.frontmatter), ...additions]);
+  try {
+    if (deepEqual(readMergeFrontmatter(candidate, targetPath), expected)) return candidate;
+  } catch { /* Flow-style mappings cannot accept appended block-style fields. */ }
+  const normalized = stringifyYaml(expected).trimEnd().replaceAll("\r\n", "\n").replaceAll("\n", parsed.eol);
+  const body = parsed.lines.slice(parsed.closingBoundary + 1).join(parsed.eol);
+  const fallback = `${parsed.bom}---${parsed.eol}${normalized}${parsed.eol}---${parsed.eol}${body}`;
+  if (!deepEqual(readMergeFrontmatter(fallback, targetPath), expected)) {
+    throw new Error(`Cannot safely serialize merge properties: ${targetPath}`);
+  }
+  return fallback;
+}
+
+function parseMergeFrontmatter(source: string, path: string): ParsedMergeFrontmatter {
+  const bom = source.startsWith("\uFEFF") ? "\uFEFF" : "";
+  const body = source.slice(bom.length);
+  const eol = body.includes("\r\n") ? "\r\n" : "\n";
+  const lines = body.split(/\r\n|\n/u);
+  if (!/^---\s*$/u.test(lines[0] ?? "")) {
+    return { bom, closingBoundary: -1, eol, frontmatter: {}, hasFrontmatter: false, lines };
+  }
+  const relativeEnd = lines.slice(1).findIndex((line) => /^---\s*$/u.test(line));
+  if (relativeEnd < 0) throw new Error(`Cannot merge malformed frontmatter: ${path}`);
+  const closingBoundary = relativeEnd + 1;
+  const yaml = lines.slice(1, closingBoundary).join("\n");
+  let parsed: unknown;
+  try {
+    parsed = yaml.trim() === "" ? {} : parseYaml(yaml);
+  } catch (error) {
+    throw new Error(`Cannot merge malformed frontmatter: ${path}`, { cause: error });
+  }
+  if (parsed === null || parsed === undefined) parsed = {};
+  if (typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Cannot merge non-object frontmatter: ${path}`);
+  }
+  return {
+    bom,
+    closingBoundary,
+    eol,
+    frontmatter: parsed as Record<string, unknown>,
+    hasFrontmatter: true,
+    lines,
+  };
+}
+
+function stripMergeFrontmatter(source: string, path: string): string {
+  const parsed = parseMergeFrontmatter(source, path);
+  if (!parsed.hasFrontmatter) return source.slice(parsed.bom.length).replaceAll("\r\n", "\n");
+  return parsed.lines.slice(parsed.closingBoundary + 1).join("\n");
 }

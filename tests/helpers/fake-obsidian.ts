@@ -8,10 +8,17 @@ export class FakeObsidian {
   public readonly renames: Array<{ from: string; to: string }> = [];
   public readonly trashed: string[] = [];
   public readonly opened: string[] = [];
+  public readonly modifyListeners = new Set<(file: TFile) => void>();
   public readonly app: App;
 
   public constructor(public readonly vaultName = "Vault") {
     const vault = {
+      on: (event: string, callback: (file: TFile) => void) => {
+        if (event !== "modify") throw new Error(`Unsupported fake Vault event: ${event}`);
+        this.modifyListeners.add(callback);
+        return callback;
+      },
+      offref: (callback: (file: TFile) => void) => { this.modifyListeners.delete(callback); },
       adapter: { exists: async (path: string) => this.files.has(normalize(path)) },
       configDir: ".obsidian",
       getAbstractFileByPath: (path: string) => this.files.get(normalize(path)) ?? null,
@@ -27,6 +34,7 @@ export class FakeObsidian {
       modify: async (file: TFile, source: string) => {
         this.contents.set(file.path, source);
         this.frontmatters.set(file.path, parseFrontmatter(source));
+        for (const callback of this.modifyListeners) callback(file);
       },
       process: async (file: TFile, update: (source: string) => string) => {
         const next = update(this.contents.get(file.path) ?? "");

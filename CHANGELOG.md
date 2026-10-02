@@ -2,6 +2,8 @@
 
 ## 0.10.2
 
+- Stop forward merge writes after unload before final trash dispatch, reject open node-note editors with recovery instructions, preserve concurrent edits through exact rollback receipts, and revalidate both notes and frozen child paths before deletion. Preserve BOM and valid YAML semantics when combining note content.
+
 - Stop queued structural writes after unload, preserve compensating rollback, and bind selection-creation rollback to original objects, paths, and owned content, including automatic manual ranks.
 - Remove owned Explorer status elements and release event listeners when workspace documents close.
 - Refresh open views when changing language, clarify automatic language fallback, and localize common structural errors.

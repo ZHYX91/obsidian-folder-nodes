@@ -149,6 +149,7 @@ const zh = {
   errorCompleteParentRequired: "只有完整的父节点才能切换子节点排序。", errorNodePathRequired: "请输入节点路径。",
   errorTargetFolderUnknown: "找不到目标文件夹：{path}", errorTargetNotComplete: "目标不是完整的 Folder Node：{path}", errorSourceNodeChanged: "节点结构已变化，请重新执行操作。",
   errorUnmanagedMerge: "设为不管理的文件夹不能作为 Folder Node 合并。",
+  errorMergeNoteOpen: "请先保存并关闭来源与目标节点笔记的所有标签页，再从文件列表重试合并：{path}",
   errorSelectionSourceChanged: "预览后来源笔记已变化，创建已停止。", errorSelectionTableChanged: "预览后表格结构已变化，创建已停止。", errorSelectionEditorChanged: "预览后来源编辑器已变化，创建已停止。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "预览后选区已改变，创建已停止。",
@@ -304,6 +305,7 @@ const en: typeof zh = {
   errorCompleteParentRequired: "A complete parent node is required to change child ordering.", errorNodePathRequired: "Enter a node path.",
   errorTargetFolderUnknown: "Target folder not found: {path}", errorTargetNotComplete: "The target is not a complete Folder Node: {path}", errorSourceNodeChanged: "The node structure changed. Try the action again.",
   errorUnmanagedMerge: "An unmanaged folder cannot be merged as a Folder Node.",
+  errorMergeNoteOpen: "Save and close all tabs for the source and target node notes, then retry merging from the file explorer: {path}",
   errorSelectionSourceChanged: "The source note changed after preview; creation stopped.", errorSelectionTableChanged: "The table structure changed after preview; creation stopped.", errorSelectionEditorChanged: "The source editor changed after preview; creation stopped.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed after preview; creation stopped.",
@@ -345,6 +347,7 @@ export function formatError(error: unknown): string {
       case "target_not_complete": return t("errorTargetNotComplete", error.values);
       case "source_node_changed": return t("errorSourceNodeChanged");
       case "unmanaged_merge": return t("errorUnmanagedMerge");
+      case "merge_note_open": return t("errorMergeNoteOpen", error.values);
       case "selection_changed": return t("errorSelectionChanged");
       case "selection_source_changed": return t("errorSelectionSourceChanged");
       case "selection_table_changed": return t("errorSelectionTableChanged");
