@@ -46,6 +46,12 @@ interface OpenMarkdownTarget {
 export class NodeService {
   private readonly operations = new VaultOperationCoordinator();
   private readonly lifecycle = new AbortController();
+  private readonly createdNodes = new WeakMap<TFile, {
+    folder: TFolder;
+    folderPath: string;
+    notePath: string;
+    content: string;
+  }>();
 
   public constructor(
     private readonly app: App,
@@ -195,28 +201,27 @@ export class NodeService {
     return this.exclusive(() => this.createNodePathUnlocked(nodePath, options));
   }
 
-  public rollbackCreatedNode(note: TFile, options: { alias?: string; body?: string } = {}): Promise<void> {
+  public rollbackCreatedNode(note: TFile): Promise<void> {
     return this.operations.run(async () => {
-      const folder = note.parent;
-      if (!(folder instanceof TFolder) || normalizeVaultPath(folder.path) === "") {
-        throw new Error("Cannot safely roll back a created node without its original folder");
-      }
-      const notePath = note.path;
-      const folderPath = folder.path;
-      const initialContent = createNodeDocument(options.alias?.trim() || null, options.body ?? "");
-      this.assertEntryIdentity(note, notePath, TFile);
-      if (this.getCanonicalFile(folderPath) !== note || folder.children.length !== 1 || folder.children[0] !== note) {
-        throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
-      }
-      if (await this.app.vault.read(note) !== initialContent) {
+      const receipt = this.createdNodes.get(note);
+      if (receipt === undefined) throw new Error("Cannot safely roll back a node without its creation receipt");
+      const { folder, folderPath, notePath, content } = receipt;
+      const assertOwned = (): void => {
+        this.assertEntryIdentity(folder, folderPath, TFolder);
+        this.assertEntryIdentity(note, notePath, TFile);
+        if (note.parent !== folder || this.getCanonicalFile(folderPath) !== note
+          || folder.children.length !== 1 || folder.children[0] !== note) {
+          throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
+        }
+      };
+      assertOwned();
+      if (await this.readCurrentSource(note) !== content) {
         throw new Error(`Cannot safely roll back concurrently modified created file: ${notePath}`);
       }
-      this.assertEntryIdentity(note, notePath, TFile);
-      if (folder.children.length !== 1 || folder.children[0] !== note) {
-        throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
-      }
-      await this.trashCreatedFile(note, notePath, initialContent);
+      assertOwned();
+      await this.trashCreatedFile(note, notePath, content);
       await this.trashCreatedFolder(folder, folderPath);
+      this.createdNodes.delete(note);
     });
   }
 
@@ -901,7 +906,13 @@ export class NodeService {
     undos.push(() => this.trashCreatedFile(note, notePath, initialContent));
     this.assertEntryIdentity(note, notePath, TFile);
     this.assertActive();
-    await this.appendRankIfManual(normalizedParent, note, undos);
+    const rank = await this.appendRankIfManual(normalizedParent, note, undos);
+    this.createdNodes.set(note, {
+      folder: createdFolder,
+      folderPath,
+      notePath,
+      content: rank === null ? initialContent : patchFolderNodesFrontmatter(initialContent, { rank }),
+    });
     return note;
   }
 
@@ -995,13 +1006,14 @@ export class NodeService {
     return note === null ? null : this.propertiesForNote(note).rank;
   }
 
-  private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<void> {
-    if (this.sortMode(parentPath) !== "manual") return;
+  private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<number | null> {
+    if (this.sortMode(parentPath) !== "manual") return null;
     const movedPath = normalizeVaultPath(note.parent?.path ?? "");
     const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== movedPath);
     const moved: ChildOrderRecord = { basename: note.parent?.name ?? note.basename, childPath: movedPath, order: this.readRank(note) };
     const plan = planInsert(siblings, moved, siblings.length);
     await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos);
+    return plan.patches.find(({ childPath }) => childPath === movedPath)?.nextOrder ?? null;
   }
 
   private async migrateUnlocked(

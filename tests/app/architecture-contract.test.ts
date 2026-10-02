@@ -116,7 +116,7 @@ describe("runtime architecture contract", () => {
     expect(createNode).toBeGreaterThan(firstValidation);
     expect(secondValidation).toBeGreaterThan(createNode);
     expect(replaceSelection).toBeGreaterThan(secondValidation);
-    expect(plugin).toContain("this.service.rollbackCreatedNode(note, options)");
+    expect(plugin).toContain("this.service.rollbackCreatedNode(note)");
     expect(plugin).not.toContain("this.service.deleteNode(note.parent)");
   });
 
