@@ -179,10 +179,19 @@ export class ExplorerAdapter extends Component {
   }
 
   private installVirtualOrder(view: unknown, root: HTMLElement): ExplorerVirtualOrder | null {
-    return installExplorerVirtualOrder(view, root, (folder) => {
-      const path = normalizeVaultPath(folder.path);
-      return this.service.sortMode(path) === "manual" ? this.service.children(path).map(({ childPath }) => childPath) : null;
-    });
+    return installExplorerVirtualOrder(
+      view,
+      root,
+      (folder) => {
+        const path = normalizeVaultPath(folder.path);
+        return this.service.sortMode(path) === "manual" ? this.service.children(path).map(({ childPath }) => childPath) : null;
+      },
+      (entry) => {
+        if (!this.canReveal(entry)) return null;
+        if (entry instanceof TFile && this.service.isCanonicalFile(entry)) return normalizeVaultPath(entry.parent?.path ?? "");
+        return normalizeVaultPath(entry.path);
+      },
+    );
   }
 
   private syncNoteTitleSurfaces(): void {
@@ -252,6 +261,7 @@ export class ExplorerAdapter extends Component {
         }
         this.decorateEntries(scope);
         this.syncNodeOrder(scope);
+        this.surfaces.get(surfaceRoot)?.ordering?.settleReveal();
       }
     });
   }

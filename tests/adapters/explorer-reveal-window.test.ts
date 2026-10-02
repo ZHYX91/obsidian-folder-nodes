@@ -15,10 +15,11 @@ describe("Explorer reveal window affinity", () => {
     const items = ["Parent/A", "Parent/B"].map((path) => ({ file: { path } }));
     let virtual = items;
     const original = (parent: TFolder) => parent === folder ? items : [];
+    const nativeReveal = vi.fn(() => { expect(virtual.map(({ file }) => file.path)).toEqual(["Parent/B", "Parent/A"]); });
     const view = {
       containerEl: root, tree: { infinityScroll: {} }, getSortedFolderItems: original,
       sort: () => { virtual = view.getSortedFolderItems(folder); },
-      revealInFolder: vi.fn(() => { expect(virtual.map(({ file }) => file.path)).toEqual(["Parent/B", "Parent/A"]); }),
+      revealInFolder: nativeReveal,
     };
     const leaf = { view };
     const app = { workspace: {
@@ -34,9 +35,10 @@ describe("Explorer reveal window affinity", () => {
     () => undefined, () => undefined, () => undefined, () => undefined);
     try {
       expect(await adapter.reveal(Object.assign(new TFile(), { path: "Parent/B/B.md" }))).toBe(true);
-      expect(view.revealInFolder).toHaveBeenCalledOnce();
+      expect(nativeReveal).toHaveBeenCalledOnce();
       adapter.stop();
       expect(view.getSortedFolderItems).toBe(original);
+      expect(view.revealInFolder).toBe(nativeReveal);
       expect(virtual).toBe(items);
     } finally { adapter.stop(); root.remove(); }
   });
