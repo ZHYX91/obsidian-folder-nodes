@@ -10,6 +10,7 @@ import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
 import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
+import { FolderNodesError } from "../core/folder-nodes-error";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
@@ -39,6 +40,7 @@ import { VisualPickerModal } from "../ui/visual-picker-modal";
 import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
+import { DocumentEventRegistry } from "./document-event-registry";
 import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
@@ -57,7 +59,7 @@ export default class FolderNodesPlugin extends Plugin {
   private reconcileNoticeTimer: number | null = null;
   private reconcileErrorCount = 0;
   private reconcileErrorMessages = new Set<string>();
-  private readonly unresolvedLinkDocuments = new Set<Document>();
+  private readonly unresolvedLinkDocuments = new DocumentEventRegistry((event) => this.interceptUnresolvedLink(event));
   private readonly metadataFingerprints = new Map<string, string>();
   private unloaded = false;
   private initialized = false;
@@ -219,6 +221,12 @@ export default class FolderNodesPlugin extends Plugin {
   public applyEmojiFontSetting(): void {
     this.updateEmojiFontStyle();
     this.refreshVisuals();
+  }
+
+  public async applyLanguageSetting(): Promise<void> {
+    setLanguage(this.settings.language);
+    this.refreshVisuals();
+    await this.saveSettings();
   }
 
   public previewSelectionName(selection: string): string {
@@ -540,16 +548,13 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private registerUnresolvedLinkDocument(document: Document): void {
-    if (this.unresolvedLinkDocuments.has(document)) return;
     this.unresolvedLinkDocuments.add(document);
-    const handle = (event: MouseEvent) => this.interceptUnresolvedLink(event);
-    this.registerDomEvent(document, "click", handle, { capture: true });
-    this.registerDomEvent(document, "auxclick", handle, { capture: true });
   }
 
   private ensureWorkspaceStyles(): void {
     const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
+    this.unresolvedLinkDocuments.reconcile(documents);
     this.runtimeStyles.reconcile(documents);
   }
 
@@ -960,15 +965,15 @@ export default class FolderNodesPlugin extends Plugin {
     const wikiLink = buildSelectionWikiLink(notePath.slice(0, -3), selection, tableContext);
     new SelectionCreateModal(this.app, { parentPath, nodeName: name, alias }, async () => {
       const assertSelectionCurrent = (): void => {
-        if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
-        if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new Error("Source note changed after preview");
+        if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
+        if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
         const currentFrom = editor.getCursor("from");
         const currentTo = editor.getCursor("to");
-        if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new Error("Selection changed after preview");
-        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new Error("Table structure changed after preview");
+        if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
+        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
         const liveEditor = this.app.workspace.getLeavesOfType("markdown").some((leaf) =>
           leaf.view instanceof MarkdownView && leaf.view.file === file && leaf.view.editor === editor);
-        if (!liveEditor) throw new Error("Source editor changed after preview");
+        if (!liveEditor) throw new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview");
       };
       assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };
@@ -978,7 +983,7 @@ export default class FolderNodesPlugin extends Plugin {
         editor.replaceSelection(wikiLink);
       } catch (error) {
         if (note.parent !== null) {
-          try { await this.service.deleteNode(note.parent); }
+          try { await this.service.rollbackCreatedNode(note); }
           catch (rollbackError) {
             throw new AggregateError([error, rollbackError], "Selection replacement failed and the new node could not be rolled back", { cause: error });
           }

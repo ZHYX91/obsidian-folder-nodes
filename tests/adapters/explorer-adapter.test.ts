@@ -164,6 +164,9 @@ describe("ExplorerAdapter lifecycle", () => {
     expect(hiddenBadge?.textContent).toBe("Hidden");
     expect(hiddenBadge?.querySelector("svg")).toBeNull();
     expect(hiddenBadge?.getAttribute("title")).toBe("This node and its subtree are hidden");
+    adapter.stop();
+    expect(title.querySelector(".folder-nodes-hidden-status")).toBeNull();
+    adapter.start();
     explicit = false;
     adapter.refresh();
     expect(title.querySelector(".folder-nodes-hidden-status")).toBeNull();

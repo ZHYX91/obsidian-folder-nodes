@@ -1,4 +1,5 @@
 import { getLanguage } from "obsidian";
+import { FolderNodesError } from "../core/folder-nodes-error";
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
@@ -38,14 +39,14 @@ const zh = {
   nodeGraphDimension: "图谱维度", nodeGraphFitGraph: "适应视图",
   nodeGraphZoomIn: "放大", nodeGraphZoomOut: "缩小", nodeGraphResetZoom: "恢复 100% 缩放",
   nodeGraphZoomLevel: "当前缩放 {percent}%；点击恢复 100%", nodeGraphViewportHelp: "2D：拖动或滚轮平移，Ctrl/Cmd + 滚轮缩放。3D：拖动旋转，Shift + 拖动平移，滚轮缩放。+ / − 缩放，0 适应视图。",
-  nodeGraphShowLinksTooltip: "在结构图上叠加 canonical Node Note 之间的链接。",
+  nodeGraphShowLinksTooltip: "在结构图上显示节点笔记之间的链接。",
   nodeGraphLargeGraphAria: "大型节点图谱；2D 拖动或滚轮平移，Ctrl/Cmd + 滚轮缩放；3D 拖动旋转、滚轮缩放；回车打开所选节点",
   nodeGraphRelationSummary: "结构 {structure} · 链接 {links}",
-  nodeGraphPerformance: "大型图谱性能", nodeGraphPerformanceDesc: "过滤会在模型和布局之前执行；超过阈值时改用固定 DOM 数量的 Canvas 渲染。",
+  nodeGraphPerformance: "大型图谱性能", nodeGraphPerformanceDesc: "节点较多时自动切换为 Canvas 渲染，以减少界面元素并保持响应。",
   nodeGraphCanvasThreshold: "Canvas 节点/边阈值", nodeGraphCanvasThresholdDesc: "当前范围的节点数或可见边数超过此值时使用 Canvas。范围：50–10000。",
   nodeGraphEdgeLimit: "链接概览边数", nodeGraphEdgeLimitDesc: "大型图谱最多绘制的代表性链接边；结构骨架始终完整，聚焦后补全该节点的全部链接。",
   nodeGraphFindNode: "查找节点",
-  maintenance: "结构维护", health: "检查 Folder Nodes 健康状态",
+  maintenance: "结构维护", health: "Folder Nodes 健康检查",
   batchOrganize: "批量整理不完整节点", previewOrganizePlan: "预览整理方案",
   scanningStructure: "正在扫描结构", scanningStructureDesc: "正在分批盘点受管理范围；扫描期间可以继续使用 Obsidian。",
   scanningProperties: "正在扫描 Folder Nodes 属性", scanningPropertiesDesc: "正在只读检查新旧属性、冲突和无效值；扫描期间可以继续使用 Obsidian。",
@@ -53,8 +54,8 @@ const zh = {
   batchOrganizeDesc: "扫描 Vault 受管理范围内的不完整节点。标记为“不管理”或匹配“不管理”规则的内容会被跳过；确认前不会修改任何文件。",
   propertyMigration: "迁移 Folder Nodes 属性", propertyMigrationDesc: "预览并将公开旧字段转换为单一 folder-nodes 列表。不会在启动时自动迁移；冲突或无效值会阻止写入。",
   previewPropertyMigration: "预览属性迁移", propertyMigrationPreviewNotice: "请先更新所有设备上的 Folder Nodes。下列变更仅在确认后写入，并会在写入前重新检查。",
-  propertiesScanned: "已扫描 Markdown", canonicalPropertyNotes: "使用 folder-nodes", legacyPropertyNotes: "使用旧字段", redundantLegacyNotes: "新旧字段等价",
-  propertyChanges: "可迁移的属性", propertyConflicts: "阻塞属性冲突", nonCanonicalProperties: "非规范节点笔记中的属性", invalidIcons: "无效 icon 声明",
+  propertiesScanned: "已扫描 Markdown 笔记", canonicalPropertyNotes: "使用 folder-nodes", legacyPropertyNotes: "使用旧字段", redundantLegacyNotes: "新旧字段等价",
+  propertyChanges: "可迁移的属性", propertyConflicts: "阻塞属性冲突", nonCanonicalProperties: "非规范节点笔记中的属性", invalidIcons: "无效的 icon 属性",
   noPropertyChanges: "没有需要迁移或报告的 Folder Nodes 属性。", applyPropertyMigration: "应用属性迁移", propertyMigrationComplete: "Folder Nodes 属性迁移已完成并验证。", showingFirstItems: "仅显示前 {count} 项。",
   structureMaintenance: "结构维护", structureMaintenanceDesc: "批量整理会先显示准确路径；健康检查始终只读。",
   maintenanceDesc: "先预览将创建、移动、跳过和阻止的具体路径；确认前不会修改 Vault。",
@@ -70,7 +71,7 @@ const zh = {
   childOrderNatural: "子节点排序：按名称（切换为手动）", childOrderManual: "子节点排序：手动（恢复按名称）",
   rename: "重命名节点", delete: "删除节点", move: "移动节点", merge: "合并节点",
   renameCurrentNode: "重命名当前节点", moveContainingNode: "移动所在节点", mergeContainingNode: "合并所在节点", deleteContainingNode: "删除所在节点",
-  language: "界面语言", languageDesc: "选择“跟随 Obsidian”可使用 Obsidian 的界面语言。", auto: "跟随 Obsidian",
+  language: "界面语言", languageDesc: "跟随 Obsidian 时，中文界面使用简体中文，其他语言使用 English；也可以手动指定。", auto: "跟随 Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "图标继承",
   iconInheritanceDesc: "当前节点没有有效 icon 时，使用最近祖先节点的图标。",
   emojiFont: "Emoji 字体", systemDefault: "系统默认",
@@ -125,7 +126,7 @@ const zh = {
   selectionPreview: "从选中文字创建 Folder Node", creationLocation: "创建位置", newNode: "新节点",
   selectionCrossesTableCells: "选区跨越了 Markdown 表格的单元格或行；为避免破坏表格，本次未创建节点。",
   aliasValue: "Alias", aliasNone: "不添加", reloadLanguage: "命令名称将在插件下次加载时使用新语言。",
-  leafMarkdown: "叶子 Markdown", missingNotes: "缺失节点笔记", conflicts: "阻塞冲突",
+  leafMarkdown: "尚未组成节点的 Markdown", missingNotes: "缺失节点笔记", conflicts: "阻塞冲突",
   leafExemptions: "不管理的 Markdown 文件", leafExemptionsDesc: "匹配的 Markdown 只显示为文件，不作为节点，也不要求创建同名文件夹。默认包含路径 AGENTS.md、CLAUDE.md，以及名称以 . 或 _ 开头的规则。",
   folderExemptions: "不管理的文件夹", folderExemptionsDesc: "匹配的文件夹及其完整子树不作为节点管理，也不参与批量整理。默认名称开头规则为 .、_；Vault 配置目录、.git、.trash 始终受系统保护。",
   leafExemptionItemDesc: "此 Markdown 文件不作为节点管理", folderExemptionItemDesc: "此文件夹的完整子树不由 Folder Nodes 管理",
@@ -143,10 +144,16 @@ const zh = {
   healthSummary: "Folder Nodes 健康状态", root: "根节点", node: "Folder Node", visualInherited: "继承自 {name}",
   sampleSelection: "选中文字",
   errorPathExists: "目标已存在：{path}", errorInvalidMove: "节点不能移动或合并到自身或后代节点。",
+  errorRootCannotHide: "根节点不能隐藏。", errorRootCannotRename: "根节点不能重命名。", errorRootCannotDelete: "根节点不能删除。", errorRootCannotMove: "根节点不能移动。",
+  errorFolderUnmanaged: "此文件夹当前设为不管理：{path}", errorMultipleCanonicalNotes: "此文件夹中存在多个同名节点笔记：{path}",
+  errorCompleteParentRequired: "只有完整的父节点才能切换子节点排序。", errorNodePathRequired: "请输入节点路径。",
+  errorTargetFolderUnknown: "找不到目标文件夹：{path}", errorTargetNotComplete: "目标不是完整的 Folder Node：{path}", errorSourceNodeChanged: "节点结构已变化，请重新执行操作。",
+  errorUnmanagedMerge: "设为不管理的文件夹不能作为 Folder Node 合并。",
+  errorSelectionSourceChanged: "预览后来源笔记已变化，创建已停止。", errorSelectionTableChanged: "预览后表格结构已变化，创建已停止。", errorSelectionEditorChanged: "预览后来源编辑器已变化，创建已停止。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "预览后选区已改变，创建已停止。",
   errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
-  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "操作安全停止：{message}",
+  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "为避免误操作，已停止此次操作：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
 };
 
@@ -219,7 +226,7 @@ const en: typeof zh = {
   childOrderNatural: "Child order: Name (switch to manual)", childOrderManual: "Child order: Manual (restore name order)",
   rename: "Rename node", delete: "Delete node", move: "Move node", merge: "Merge node",
   renameCurrentNode: "Rename current node", moveContainingNode: "Move containing node", mergeContainingNode: "Merge containing node", deleteContainingNode: "Delete containing node",
-  language: "Interface language", languageDesc: "Choose Follow Obsidian to use Obsidian's interface language.", auto: "Follow Obsidian",
+  language: "Interface language", languageDesc: "Follow Obsidian uses Simplified Chinese for Chinese interface languages and English otherwise. You can also choose a language explicitly.", auto: "Follow Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "Icon inheritance",
   iconInheritanceDesc: "Use the nearest ancestor icon when the current node has no valid icon.",
   emojiFont: "Emoji font", systemDefault: "System default",
@@ -292,6 +299,12 @@ const en: typeof zh = {
   healthSummary: "Folder Nodes health", root: "Root", node: "Folder Node", visualInherited: "Inherited from {name}",
   sampleSelection: "Selected text",
   errorPathExists: "Target already exists: {path}", errorInvalidMove: "A node cannot be moved or merged into itself or a descendant.",
+  errorRootCannotHide: "The Root node cannot be hidden.", errorRootCannotRename: "The Root node cannot be renamed.", errorRootCannotDelete: "The Root node cannot be deleted.", errorRootCannotMove: "The Root node cannot be moved.",
+  errorFolderUnmanaged: "This folder is unmanaged: {path}", errorMultipleCanonicalNotes: "Multiple same-named Node Notes exist in this folder: {path}",
+  errorCompleteParentRequired: "A complete parent node is required to change child ordering.", errorNodePathRequired: "Enter a node path.",
+  errorTargetFolderUnknown: "Target folder not found: {path}", errorTargetNotComplete: "The target is not a complete Folder Node: {path}", errorSourceNodeChanged: "The node structure changed. Try the action again.",
+  errorUnmanagedMerge: "An unmanaged folder cannot be merged as a Folder Node.",
+  errorSelectionSourceChanged: "The source note changed after preview; creation stopped.", errorSelectionTableChanged: "The table structure changed after preview; creation stopped.", errorSelectionEditorChanged: "The source editor changed after preview; creation stopped.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed after preview; creation stopped.",
   errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
@@ -318,6 +331,26 @@ export function t(key: TranslationKey, values: Record<string, string | number> =
 }
 
 export function formatError(error: unknown): string {
+  if (error instanceof FolderNodesError) {
+    switch (error.code) {
+      case "root_cannot_hide": return t("errorRootCannotHide");
+      case "root_cannot_rename": return t("errorRootCannotRename");
+      case "root_cannot_delete": return t("errorRootCannotDelete");
+      case "root_cannot_move": return t("errorRootCannotMove");
+      case "folder_unmanaged": return t("errorFolderUnmanaged", error.values);
+      case "multiple_canonical_notes": return t("errorMultipleCanonicalNotes", error.values);
+      case "complete_parent_required": return t("errorCompleteParentRequired");
+      case "node_path_required": return t("errorNodePathRequired");
+      case "target_folder_unknown": return t("errorTargetFolderUnknown", error.values);
+      case "target_not_complete": return t("errorTargetNotComplete", error.values);
+      case "source_node_changed": return t("errorSourceNodeChanged");
+      case "unmanaged_merge": return t("errorUnmanagedMerge");
+      case "selection_changed": return t("errorSelectionChanged");
+      case "selection_source_changed": return t("errorSelectionSourceChanged");
+      case "selection_table_changed": return t("errorSelectionTableChanged");
+      case "selection_editor_changed": return t("errorSelectionEditorChanged");
+    }
+  }
   const message = error instanceof Error ? error.message : String(error);
   const pathExists = /^Path already exists:\s*(.+)$/u.exec(message)?.[1];
   if (pathExists !== undefined) return t("errorPathExists", { path: pathExists });

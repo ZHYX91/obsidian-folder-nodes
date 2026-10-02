@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { assertSemanticAnchors, assertTechnicalParity } from "./markdown-contract.mjs";
+
 const DOCUMENTS = Object.freeze([
   "product-requirements",
   "ux-spec",
@@ -94,10 +96,10 @@ export async function checkDocsI18n(projectRoot = process.cwd()) {
     if (JSON.stringify(sourceHeadings) !== JSON.stringify(translationHeadings)) {
       throw new Error(`${sourcePath} and ${translationPath} must have matching heading structures`);
     }
-    for (const [sourceAnchor, translationAnchor] of SEMANTIC_ANCHORS[document] ?? []) {
-      if (!source.includes(sourceAnchor)) throw new Error(`${sourcePath} is missing semantic anchor: ${sourceAnchor}`);
-      if (!translation.includes(translationAnchor)) throw new Error(`${translationPath} is missing semantic anchor for: ${sourceAnchor}`);
-    }
+    const anchors = SEMANTIC_ANCHORS[document] ?? [];
+    assertSemanticAnchors(source, anchors.map(([anchor]) => anchor), sourcePath);
+    assertSemanticAnchors(translation, anchors.map(([, anchor]) => anchor), translationPath);
+    assertTechnicalParity(source.replace(/^---[\s\S]*?---/u, ""), translation.replace(/^---[\s\S]*?---/u, ""), document);
   }
   return DOCUMENTS.length * 2;
 }

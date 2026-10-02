@@ -1,6 +1,8 @@
 import { MarkdownView, TFile, TFolder, type Editor } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
+import { setLanguage, t } from "../../src/ui/i18n";
+
 import { FolderNodeContentsView } from "../../src/ui/contents-view";
 
 function createView(): FolderNodeContentsView {
@@ -57,6 +59,25 @@ function createView(): FolderNodeContentsView {
 }
 
 describe("Node Contents render extension lifecycle", () => {
+  it("refreshes existing Contents labels when the language changes", async () => {
+    const view = createView();
+    try {
+      setLanguage("en");
+      await view.onOpen();
+      const english = view.contentEl.textContent;
+      setLanguage("zh-CN");
+      view.refresh();
+      expect(view.contentEl.textContent).not.toBe(english);
+      expect(view.getDisplayText()).toBe(t("nodeContents"));
+      setLanguage("en");
+      view.refresh();
+      expect(view.contentEl.textContent).toBe(english);
+    } finally {
+      setLanguage("auto");
+      await view.onClose();
+    }
+  });
+
   it("filters hidden nodes and restores status during session reveal", async () => {
     const root = Object.assign(new TFolder(), { children: [], name: "", path: "" });
     const visible = Object.assign(new TFolder(), { children: [], name: "Visible", parent: root, path: "Visible" });

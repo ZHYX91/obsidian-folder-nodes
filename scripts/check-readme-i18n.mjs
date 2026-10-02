@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { assertSemanticAnchors } from "./markdown-contract.mjs";
+
 const REQUIRED_ENGLISH = [
   "Screenshots",
   "Features",
@@ -56,10 +58,8 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
     }
   }
   if (!english.includes("docs/i18n/README.zh-CN.md")) throw new Error("README.md must link its Chinese translation");
-  for (const [englishAnchor, chineseAnchor] of SEMANTIC_ANCHORS) {
-    if (!english.includes(englishAnchor)) throw new Error(`README.md is missing semantic anchor: ${englishAnchor}`);
-    if (!chinese.includes(chineseAnchor)) throw new Error(`Chinese README is missing semantic anchor for: ${englishAnchor}`);
-  }
+  assertSemanticAnchors(english, SEMANTIC_ANCHORS.map(([anchor]) => anchor), "README.md");
+  assertSemanticAnchors(chinese, SEMANTIC_ANCHORS.map(([, anchor]) => anchor), "Chinese README");
   return 2;
 }
 

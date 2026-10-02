@@ -20,7 +20,7 @@ Selected editor text exposes Create Folder Node from selection in both the conte
 
 The Selection & naming page begins with a compact explanation card showing `[[a]]` → `a/a.md` and `[[a|b]]` → `a/a.md`, followed by the shared aliases switch. In managed scope, normal or modified clicks on an unresolved internal Markdown link create and open the complete Node in the corresponding pane. When aliases are enabled, only the explicit display text `b` becomes an alias; the target `a` remains the Node name and the new body is blank. Existing links are never mutated merely by clicking them. Unmanaged or unsupported targets keep native Obsidian behavior, while a structural conflict produces a notice and no partial Node.
 
-Prefix and Suffix each have a heading. A disabled group hides source, separator, custom text, and timestamp controls; custom text and timestamp format appear only for their matching source. Each timestamp source stores its own validated Obsidian/Moment pattern with a live preview and inline invalid state. One captured `Date` is formatted twice. Schema-2 shared percent-token formats migrate into both groups, and no second runtime formatter remains.
+Prefix and Suffix each have a heading. A disabled group hides source, separator, custom text, and timestamp controls; custom text and timestamp format appear only for their matching source. Each timestamp source stores its own validated Obsidian/Moment pattern with a live preview and inline invalid state. One captured `Date` is formatted twice. Schema-2 shared `%` formats migrate into both groups, and no second runtime formatter remains.
 
 ## Explorer Node Tree
 
