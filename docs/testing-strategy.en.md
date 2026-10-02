@@ -14,6 +14,8 @@ Node Graph tests import the real production entry and exercise registration, ena
 
 Regressions additionally inject a concurrent closed-file edit, an unsaved open editor, a same-path TFile replacement, and a same-path folder replacement during rollback. Settings-save tests delay and fail earlier persistence calls to prove snapshot isolation, ordering, and recovery of the queued latest state.
 
+The selected-file aggregate thresholds are distinct from whole-source inventory. Independent file thresholds additionally protect `node-service.ts`, `explorer-events.ts`, and `settings.ts`; their values are declared in `vitest.config.mts`. The document event registry is included in the numeric gate. Inventory alone does not impose a threshold on `plugin.ts`, `settings-tab.ts`, or `contents-view.ts`.
+
 ## Performance
 
 Automation locks canonical `folder-nodes` token parsing/writing/deletion, published legacy reads, equivalent dual values, fail-closed conflicts/invalid/duplicate YAML, source-preserving explicit migration, stale-preview rejection, descendant inheritance, Root/incomplete/unmanaged write rejection, unmanaged and master-switch precedence, merge non-copying, Explorer/Contents/Graph projections, Root-eye session reveal, and graph metadata invalidation. Isolated-Vault acceptance also covers both languages, no hover dependency on mobile, a Hidden text badge on an explicit hidden root, muted inherited-source feedback, master-off preserving YAML, reload resetting the session switch, and no effect on Obsidian Search, Quick Switcher, backlinks, native Graph, or direct access.

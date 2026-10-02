@@ -13,6 +13,8 @@ translation_status: source
 
 回归测试还会注入 closed file 同期编辑、未保存的 open editor、同路径 TFile replacement，以及 rollback 期间的同路径 folder replacement。设置保存测试通过延迟和拒绝较早的持久化调用，证明快照隔离、顺序和 queued latest state 的恢复。
 
+选定文件的整体阈值与全量源码 inventory 是两种不同的检查。`node-service.ts`、`explorer-events.ts` 和 `settings.ts` 另有独立文件阈值，具体数值声明在 `vitest.config.mts`。文档事件注册表纳入数值门禁。单独的 inventory 不会对 `plugin.ts`、`settings-tab.ts` 或 `contents-view.ts` 施加阈值。
+
 ## 性能
 
 自动化测试必须锁定 `folder-nodes` 规范 token 的解析/写入/删除、公开旧字段读取、等价双写、冲突/无效/重复 YAML 失败关闭、源码保真显式迁移、过期预览拒绝、后代继承、Root/不完整/不管理写入拒绝、不管理与总开关优先级、合并不复制、Explorer/Contents/Graph 投影、Root 眼睛会话显示状态和图谱元数据增量失效。隔离 Vault 验收还要覆盖中英文设置、移动端无 hover、显式隐藏根使用“隐藏”文字徽标、继承后代弱化和来源提示、关闭总开关不改 YAML、会话重载复位，以及 Obsidian 搜索、快速切换、反向链接、原生图谱和直接打开不受影响。

@@ -23,6 +23,7 @@ export default defineConfig({
         "src/adapters/explorer-host.ts",
         "src/adapters/explorer-native-order.ts",
         "src/adapters/explorer-virtual-order.ts",
+        "src/app/document-event-registry.ts",
         "src/app/layout-ready.ts",
         "src/app/metadata-refresh.ts",
         "src/app/node-graph-index.ts",
@@ -44,7 +45,10 @@ export default defineConfig({
         branches: 70,
         functions: 75,
         lines: 80,
-        statements: 80
+        statements: 80,
+        "src/adapters/node-service.ts": { branches: 70, functions: 75, lines: 80, statements: 80 },
+        "src/adapters/explorer-events.ts": { branches: 70, functions: 90, lines: 90, statements: 90 },
+        "src/shared/settings.ts": { branches: 90, functions: 100, lines: 100, statements: 100 },
       }
     },
     environment: "happy-dom",
