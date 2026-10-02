@@ -23,7 +23,9 @@ Core 只处理路径、命名、不管理边界规则、批量整理计划、反
 
 ## Node 操作
 
-NodeService 把 create、rename、move、place、merge、repair 和 trash 作为串行结构事务；所有 rename/move 都经过 Obsidian FileManager 以保留链接。Move/placement 拒绝自身和 descendant，相对放置在同一事务内重新计算 parent/index。每项多步操作预检查磁盘与缓存中的目标路径，并维护逆序 rollback；rollback 无法安全完成时返回包含原始错误与恢复错误的聚合失败，而不伪报成功。Merge 预检查目标路径与 frontmatter 冲突；目标属性优先，非冲突来源属性合入目标，正文追加后移动资源并把来源送入系统回收站。允许仅移动或删除 Node Note，并保持所属文件夹不动。外部 rename 调和会双向同步已有 Node Note/文件夹配对，但绝不凭空创建缺失 Note。Root 不允许作为完整节点 rename/move/delete。新 Node Note 默认为空白；Folder Nodes 不执行内容模板。
+NodeService 把 create、rename、move、place、merge、repair 和 trash 作为串行结构事务；所有 rename/move 都经过 Obsidian FileManager 以保留链接。Move/placement 拒绝自身和 descendant，相对放置在同一事务内重新计算 parent/index。每项多步操作预检查磁盘与缓存中的目标路径，并维护逆序 rollback；rollback 无法安全完成时返回包含原始错误与恢复错误的聚合失败，而不伪报成功。Merge 预检查目标路径与 frontmatter 冲突；目标属性优先，非冲突来源属性合入目标，先移动资源，再追加来源正文，最后把来源送入系统回收站。允许仅移动或删除 Node Note，并保持所属文件夹不动。外部 rename 调和会双向同步已有 Node Note/文件夹配对，但绝不凭空创建缺失 Note。Root 不允许作为完整节点 rename/move/delete。新 Node Note 默认为空白；Folder Nodes 不执行内容模板。
+
+合并在预检查前固定子项路径与父目录。最终校验在异步读取两篇笔记期间监听 Vault 修改事件，再同步检查两篇笔记的对象身份、编辑器状态和来源剩余结构；检测到变化时，在调用回收站操作前终止。最终系统回收站操作的调用是提交边界，之后卸载不会取消已交给宿主的操作。临时修改监听器在成功或失败时都会释放。
 
 结构元数据 patch 在恰好一个匹配 Markdown view 时使用当前未保存编辑器，否则通过 `Vault.process` 提交；两条路径都固定原始 TFile 与 path，在 commit 前重新核对，并拒绝同期替换或内容变化。Rollback closure 保留原始对象引用，并在 mutation 前验证仍是插件拥有的内容。设置持久化使用 schema 3，并把兼容的无版本、schema 1 和 schema 2 数据统一规范化为规范 schema 3 快照。schema 2 的共享旧 `%` 时间格式会转换为独立的 Moment 前缀/后缀格式，已弃用的图谱规则数组会丢弃并报告；显式 schema 无效或更高时只读打开，未知字段绝不回写。其本地串行队列捕获不可变快照，保留最近失败的快照供“重试保存”，并在卸载时追加一份最终兼容快照，保证旧写入不能最后完成。
 

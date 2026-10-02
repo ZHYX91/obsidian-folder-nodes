@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { parseYaml } from "obsidian";
 
 import { NodeService } from "../../src/adapters/node-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
@@ -804,6 +805,105 @@ describe("NodeService structural safety", () => {
     expect(fake.trashed).toEqual([]);
   });
 
+  it.each(["edit", "replace", "open"])("preserves source when target changes during final source read: %s", async (change) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    const sourceNote = fake.addFile("Source/Source.md", "source body");
+    const target = fake.addFolder("Target");
+    const targetNote = fake.addFile("Target/Target.md", "target body");
+    const read = fake.app.vault.read.bind(fake.app.vault);
+    let reads = 0;
+    fake.app.vault.read = async (file) => {
+      const content = await read(file);
+      if (file === sourceNote && ++reads === 4) {
+        if (change === "edit") await fake.app.vault.modify(targetNote, "external target edit");
+        if (change === "replace") {
+          fake.remove(targetNote.path);
+          fake.addFile(targetNote.path, "external replacement");
+        }
+        if (change === "open") {
+          const editor = markdownEditorLeaf(targetNote, "unsaved target edit");
+          fake.app.workspace.getLeavesOfType = vi.fn(() => [editor.leaf] as never);
+        }
+      }
+      return content;
+    };
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow();
+    expect(fake.files.get(sourceNote.path)).toBe(sourceNote);
+    expect(fake.trashed).toEqual([]);
+    if (change === "edit") expect(fake.contents.get(targetNote.path)).toBe("external target edit");
+    if (change === "replace") expect(fake.contents.get(targetNote.path)).toBe("external replacement");
+    expect(fake.modifyListeners.size).toBe(0);
+  });
+
+  it.each(["Source/renamed.bin", "Elsewhere/b.bin"])("does not seize a pending child moved to %s", async (externalPath) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "source");
+    fake.addFile("Source/a.bin", "a");
+    const pending = fake.addFile("Source/b.bin", "b");
+    fake.addFolder("Elsewhere");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    const rename = fake.app.fileManager.renameFile.bind(fake.app.fileManager);
+    fake.app.fileManager.renameFile = async (file, path) => {
+      await rename(file, path);
+      if (path === "Target/a.bin") await fake.rename(pending, externalPath);
+    };
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow();
+    expect(fake.files.get(externalPath)).toBe(pending);
+    expect(fake.files.has("Source/a.bin")).toBe(true);
+    expect(fake.trashed).toEqual([]);
+  });
+
+  it("removes a source file BOM before appending plain Markdown", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "\uFEFF# Heading\r\nbody");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    await service(fake).mergeNode(source, target);
+    expect(fake.contents.get("Target/Target.md")).toBe("target\n\n## Merged from Source\n\n# Heading\nbody");
+    expect(fake.modifyListeners.size).toBe(0);
+  });
+
+  it.each(["{title: Target}", "title: Target\nnested:\n  values:\n    - one\n    - two"])("keeps merged YAML valid for %s", async (yaml) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "\uFEFF---\r\ncategory: source\r\n---\r\n# Heading");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", `---\n${yaml}\n---\ntarget`);
+    await service(fake).mergeNode(source, target);
+    const result = fake.contents.get("Target/Target.md") ?? "";
+    expect(parseYaml(result.split("---")[1] ?? "")).toEqual({
+      ...(parseYaml(yaml) as Record<string, unknown>), category: "source",
+    });
+    expect(result).toContain("## Merged from Source\n\n# Heading");
+  });
+
+  it("treats a dispatched source trash as committed even if unload follows", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "source");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    const nodes = service(fake);
+    const trash = fake.app.fileManager.trashFile.bind(fake.app.fileManager);
+    fake.app.fileManager.trashFile = async (file) => {
+      nodes.dispose();
+      await trash(file);
+    };
+    await nodes.mergeNode(source, target);
+    expect(fake.files.has("Source")).toBe(false);
+    expect(fake.contents.get("Target/Target.md")).toContain("Merged from Source\n\nsource");
+    expect(fake.modifyListeners.size).toBe(0);
+  });
+
   it("reports a non-Markdown file occupying a migration target folder path", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -1098,7 +1198,8 @@ describe("NodeService structural safety", () => {
     );
     await service(fake).mergeNode(source, target);
     expect(fake.requireFile("Target/asset.bin")).toBeDefined();
-    expect(fake.contents.get("Target/Target.md")).toContain("sourceOnly: \"copied\"");
+    expect(parseYaml((fake.contents.get("Target/Target.md") ?? "").split("---")[1] ?? ""))
+      .toMatchObject({ sourceOnly: "copied" });
     expect(fake.contents.get("Target/Target.md")).toContain("Merged from Source");
     expect(fake.files.has("Source")).toBe(false);
   });

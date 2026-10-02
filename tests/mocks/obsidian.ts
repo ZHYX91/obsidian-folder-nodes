@@ -1,3 +1,5 @@
+import { parse, stringify } from "yaml";
+
 let language = "en";
 
 export function moment(date: Date): { format(pattern: string): string } {
@@ -160,62 +162,9 @@ export function normalizePath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
 }
 
-export function parseYaml(source: string): unknown {
-  const result: Record<string, unknown> = {};
-  const lines = source.split(/\r\n|\n/u);
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    if (line.trim() === "" || /^\s*#/u.test(line)) continue;
-    if (/^\s/u.test(line)) throw new Error(`Unsupported test YAML indentation: ${line}`);
-    const separator = line.indexOf(":");
-    if (separator < 0) throw new Error(`Unsupported test YAML line: ${line}`);
-    const key = parseYamlKey(line.slice(0, separator).trim());
-    const raw = line.slice(separator + 1).trim();
-    if (raw !== "") {
-      result[key] = parseYamlValue(raw);
-      continue;
-    }
-    const values: unknown[] = [];
-    while (/^\s+-\s+/u.test(lines[index + 1] ?? "")) {
-      index += 1;
-      values.push(parseYamlValue((lines[index] ?? "").replace(/^\s+-\s+/u, "")));
-    }
-    result[key] = values;
-  }
-  return result;
-}
+export function parseYaml(source: string): unknown { return parse(source) as unknown; }
 
-export function stringifyYaml(value: unknown): string {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Test stringifyYaml expects an object");
-  return Object.entries(value as Record<string, unknown>)
-    .map(([key, entry]) => `${renderYamlKey(key)}: ${renderYamlValue(entry)}`)
-    .join("\n") + "\n";
-}
-
-function parseYamlKey(raw: string): string {
-  if (raw.startsWith('"') || raw.startsWith("'")) return String(parseYamlValue(raw));
-  return raw;
-}
-
-function parseYamlValue(raw: string): unknown {
-  if (raw.startsWith("'") && raw.endsWith("'")) return raw.slice(1, -1).replaceAll("''", "'");
-  try { return JSON.parse(raw) as unknown; } catch { /* plain YAML scalar */ }
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  if (raw === "null" || raw === "~") return null;
-  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/u.test(raw)) return Number(raw);
-  return raw;
-}
-
-function renderYamlKey(value: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_-]*$/u.test(value) ? value : JSON.stringify(value);
-}
-
-function renderYamlValue(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value);
-  if (typeof value === "number" || typeof value === "boolean" || value === null) return String(value);
-  return JSON.stringify(value);
-}
+export function stringifyYaml(value: unknown): string { return stringify(value); }
 
 export function getLanguage(): string {
   return language;

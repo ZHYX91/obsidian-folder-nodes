@@ -428,7 +428,9 @@ export class NodeService {
       const sourceNotePath = sourceNote.path;
       const targetNotePath = targetNote.path;
       const initialSourceChildren = [...source.children];
-      const movable = initialSourceChildren.filter((entry) => entry !== sourceNote);
+      const movable = initialSourceChildren.filter((entry) => entry !== sourceNote).map((entry) => ({
+        entry, path: entry.path, name: entry.name, parent: entry.parent,
+      }));
 
       for (const entry of movable) await this.assertAvailable(normalizePath(`${targetPath}/${entry.name}`));
       const sourceSnapshot = await this.readClosedMergeNote(sourceNote, sourceNotePath, "source");
@@ -449,10 +451,14 @@ export class NodeService {
       const undos: Undo[] = [];
       let latestTarget = targetSnapshot;
       try {
-        for (const entry of movable) {
+        for (const snapshot of movable) {
           this.assertActive();
-          const sourceEntryPath = entry.path;
-          const destination = normalizePath(`${targetPath}/${entry.name}`);
+          const { entry, path: sourceEntryPath, name, parent } = snapshot;
+          this.assertEntryIdentity(entry, sourceEntryPath, entry instanceof TFolder ? TFolder : TFile);
+          if (entry.name !== name || entry.parent !== parent || parent !== source) {
+            throw new Error(`source child changed during merge: ${sourceEntryPath}`);
+          }
+          const destination = normalizePath(`${targetPath}/${name}`);
           this.expectEvent("rename", destination, sourceEntryPath, entry instanceof TFolder);
           await this.app.fileManager.renameFile(entry, destination);
           undos.push(async () => {
@@ -507,17 +513,29 @@ export class NodeService {
           await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
         }
 
-        this.assertEntryIdentity(target, targetPath, TFolder);
-        await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
-        await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
-        this.assertActive();
-        this.assertEntryIdentity(target, targetPath, TFolder);
-        this.assertEntryIdentity(source, sourcePath, TFolder);
-        this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
-        this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");
-        this.assertMergeStructure(source, sourcePath, [sourceNote]);
-        this.expectEvent("delete", sourcePath, null, true);
-        await this.app.fileManager.trashFile(source);
+        // Observe both notes across the final asynchronous reads, so checking one
+        // cannot silently invalidate the other. Trash dispatch is the commit point.
+        let notesChanged = false;
+        const modification = this.app.vault.on("modify", (file) => {
+          if (file === sourceNote || file === targetNote) notesChanged = true;
+        });
+        try {
+          this.assertEntryIdentity(target, targetPath, TFolder);
+          await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
+          await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
+          this.assertActive();
+          this.assertEntryIdentity(target, targetPath, TFolder);
+          this.assertEntryIdentity(targetNote, targetNotePath, TFile);
+          this.assertMergeNoteClosed(targetNote, targetNotePath, "target");
+          this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+          this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");
+          this.assertMergeStructure(source, sourcePath, [sourceNote]);
+          if (notesChanged) throw new Error("Node Note changed during final merge validation");
+          this.expectEvent("delete", sourcePath, null, true);
+          await this.app.fileManager.trashFile(source);
+        } finally {
+          this.app.vault.offref(modification);
+        }
       } catch (error) {
         await this.rollback(undos, error);
       }
@@ -1523,7 +1541,18 @@ function mergeFrontmatterProperties(
   }
   const lines = [...parsed.lines];
   lines.splice(parsed.closingBoundary, 0, ...rendered.split(parsed.eol));
-  return `${parsed.bom}${lines.join(parsed.eol)}`;
+  const candidate = `${parsed.bom}${lines.join(parsed.eol)}`;
+  const expected = Object.fromEntries([...Object.entries(parsed.frontmatter), ...additions]);
+  try {
+    if (deepEqual(readMergeFrontmatter(candidate, targetPath), expected)) return candidate;
+  } catch { /* Flow-style mappings cannot accept appended block-style fields. */ }
+  const normalized = stringifyYaml(expected).trimEnd().replaceAll("\r\n", "\n").replaceAll("\n", parsed.eol);
+  const body = parsed.lines.slice(parsed.closingBoundary + 1).join(parsed.eol);
+  const fallback = `${parsed.bom}---${parsed.eol}${normalized}${parsed.eol}---${parsed.eol}${body}`;
+  if (!deepEqual(readMergeFrontmatter(fallback, targetPath), expected)) {
+    throw new Error(`Cannot safely serialize merge properties: ${targetPath}`);
+  }
+  return fallback;
 }
 
 function parseMergeFrontmatter(source: string, path: string): ParsedMergeFrontmatter {
@@ -1560,6 +1589,6 @@ function parseMergeFrontmatter(source: string, path: string): ParsedMergeFrontma
 
 function stripMergeFrontmatter(source: string, path: string): string {
   const parsed = parseMergeFrontmatter(source, path);
-  if (!parsed.hasFrontmatter) return source.replaceAll("\r\n", "\n");
+  if (!parsed.hasFrontmatter) return source.slice(parsed.bom.length).replaceAll("\r\n", "\n");
   return parsed.lines.slice(parsed.closingBoundary + 1).join("\n");
 }
