@@ -430,6 +430,7 @@ export class NodeService {
       const initialSourceChildren = [...source.children];
       const movable = initialSourceChildren.filter((entry) => entry !== sourceNote);
 
+      for (const entry of movable) await this.assertAvailable(normalizePath(`${targetPath}/${entry.name}`));
       const sourceSnapshot = await this.readClosedMergeNote(sourceNote, sourceNotePath, "source");
       const targetSnapshot = await this.readClosedMergeNote(targetNote, targetNotePath, "target");
       const sourceProperties = readMergeFrontmatter(sourceSnapshot, sourceNotePath);
@@ -440,7 +441,6 @@ export class NodeService {
       );
       const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
 
-      for (const entry of movable) await this.assertAvailable(normalizePath(`${targetPath}/${entry.name}`));
       await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
       await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
       this.assertMergeStructure(source, sourcePath, initialSourceChildren);

@@ -716,7 +716,7 @@ describe("NodeService structural safety", () => {
       return published;
     };
 
-    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("source Node Note identity changed");
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("identity changed during operation");
 
     expect(fake.contents.get("Source/Source.md")).toBe("replacement source body");
     expect(fake.contents.get("Target/Target.md")).toBe("target body");
