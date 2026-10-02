@@ -68,6 +68,8 @@ Open **Settings → Community plugins → Browse**, search for **Folder Nodes**,
 
 ### Manual installation
 
+Download the versioned `folder-nodes-<version>.zip` from the release and extract its `folder-nodes` directory into `Vault/.obsidian/plugins/`. You can also install the three loose files below.
+
 Download one matching release and place these three files in `Vault/.obsidian/plugins/folder-nodes/`:
 
 - `main.js`

@@ -818,7 +818,7 @@ export class ExplorerAdapter extends Component {
       indicator.removeClass("folder-nodes-leaf-indicator");
       restoreAriaHidden(indicator);
     }
-    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge, .folder-nodes-explorer-repair")) element.remove();
+    for (const element of root.querySelectorAll<HTMLElement>(".folder-nodes-explorer-root, .folder-nodes-create-node, .folder-nodes-explorer-icon, .folder-nodes-explorer-status-icon, .folder-nodes-explorer-problem-badge, .folder-nodes-hidden-status, .folder-nodes-explorer-repair")) element.remove();
   }
 
   private cleanupNoteTitleSurface(root: HTMLElement): void {

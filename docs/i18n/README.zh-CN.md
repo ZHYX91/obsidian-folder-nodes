@@ -68,6 +68,8 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 
 ### 手动安装
 
+从发布页下载 `folder-nodes-<version>.zip`，把其中的 `folder-nodes` 目录解压到 `Vault/.obsidian/plugins/`。也可以使用下面的三个独立文件安装。
+
 下载同一版本的发布文件，将以下三个文件放入 `Vault/.obsidian/plugins/folder-nodes/`：
 
 - `main.js`

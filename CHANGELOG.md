@@ -2,6 +2,12 @@
 
 ## 0.10.2
 
+- Stop queued structural writes after unload, preserve compensating rollback, and bind selection-creation rollback to original objects, paths, and owned content, including automatic manual ranks.
+- Remove owned Explorer status elements and release event listeners when workspace documents close.
+- Refresh open views when changing language, clarify automatic language fallback, and localize common structural errors.
+- Extend runtime coverage gates and whole-source inventory, add independent critical-file thresholds, and strengthen bilingual technical-document checks.
+- Simplify bilingual setup and feature documentation and explain the manual-installation archive.
+
 - Materialize File Explorer before revealing a node and check the loaded view's reveal capability.
 - Keep native Explorer sorting in Name mode, restore the current host order after Manual mode, and keep manual ranks consistent with virtual-list positions so breadcrumb reveals stay visible.
 - Keep Explorer icon decoration within the native text row height so late decoration does not shift reveal targets.
