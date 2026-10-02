@@ -507,11 +507,11 @@ export class NodeService {
           await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
         }
 
-        await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
-        this.assertMergeStructure(source, sourcePath, [sourceNote]);
         this.assertEntryIdentity(target, targetPath, TFolder);
         await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
+        await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
         this.assertActive();
+        this.assertEntryIdentity(target, targetPath, TFolder);
         this.assertEntryIdentity(source, sourcePath, TFolder);
         this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
         this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");

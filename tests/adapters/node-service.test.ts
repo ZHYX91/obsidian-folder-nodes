@@ -670,6 +670,32 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Source")).toBe(true);
   });
 
+  it("rechecks source content after the final target validation before trash", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    const sourceNote = fake.addFile("Source/Source.md", "source body");
+    fake.addFile("Source/asset.bin", "asset");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target body");
+    const originalRead = fake.app.vault.read.bind(fake.app.vault);
+    let targetReads = 0;
+    fake.app.vault.read = async (file) => {
+      const content = await originalRead(file);
+      if (file.path === "Target/Target.md" && ++targetReads === 5) {
+        fake.contents.set(sourceNote.path, "source body\nlate source edit");
+      }
+      return content;
+    };
+
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("source Node Note changed");
+
+    expect(fake.contents.get("Source/Source.md")).toContain("late source edit");
+    expect(fake.contents.get("Target/Target.md")).toBe("target body");
+    expect(fake.requireFile("Source/asset.bin")).toBeDefined();
+    expect(fake.files.has("Source")).toBe(true);
+  });
+
   it("preserves a same-path source Note replacement before trash", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
