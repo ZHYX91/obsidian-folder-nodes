@@ -978,7 +978,7 @@ export default class FolderNodesPlugin extends Plugin {
         editor.replaceSelection(wikiLink);
       } catch (error) {
         if (note.parent !== null) {
-          try { await this.service.deleteNode(note.parent); }
+          try { await this.service.rollbackCreatedNode(note); }
           catch (rollbackError) {
             throw new AggregateError([error, rollbackError], "Selection replacement failed and the new node could not be rolled back", { cause: error });
           }
