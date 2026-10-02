@@ -39,6 +39,7 @@ import { VisualPickerModal } from "../ui/visual-picker-modal";
 import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
+import { DocumentEventRegistry } from "./document-event-registry";
 import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
@@ -57,7 +58,7 @@ export default class FolderNodesPlugin extends Plugin {
   private reconcileNoticeTimer: number | null = null;
   private reconcileErrorCount = 0;
   private reconcileErrorMessages = new Set<string>();
-  private readonly unresolvedLinkDocuments = new Set<Document>();
+  private readonly unresolvedLinkDocuments = new DocumentEventRegistry((event) => this.interceptUnresolvedLink(event));
   private readonly metadataFingerprints = new Map<string, string>();
   private unloaded = false;
   private initialized = false;
@@ -540,16 +541,13 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private registerUnresolvedLinkDocument(document: Document): void {
-    if (this.unresolvedLinkDocuments.has(document)) return;
     this.unresolvedLinkDocuments.add(document);
-    const handle = (event: MouseEvent) => this.interceptUnresolvedLink(event);
-    this.registerDomEvent(document, "click", handle, { capture: true });
-    this.registerDomEvent(document, "auxclick", handle, { capture: true });
   }
 
   private ensureWorkspaceStyles(): void {
     const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
+    this.unresolvedLinkDocuments.reconcile(documents);
     this.runtimeStyles.reconcile(documents);
   }
 
