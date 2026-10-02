@@ -226,7 +226,7 @@ const en: typeof zh = {
   childOrderNatural: "Child order: Name (switch to manual)", childOrderManual: "Child order: Manual (restore name order)",
   rename: "Rename node", delete: "Delete node", move: "Move node", merge: "Merge node",
   renameCurrentNode: "Rename current node", moveContainingNode: "Move containing node", mergeContainingNode: "Merge containing node", deleteContainingNode: "Delete containing node",
-  language: "Interface language", languageDesc: "Choose Follow Obsidian to use Obsidian's interface language.", auto: "Follow Obsidian",
+  language: "Interface language", languageDesc: "Follow Obsidian uses Simplified Chinese for Chinese interface languages and English otherwise. You can also choose a language explicitly.", auto: "Follow Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "Icon inheritance",
   iconInheritanceDesc: "Use the nearest ancestor icon when the current node has no valid icon.",
   emojiFont: "Emoji font", systemDefault: "System default",
