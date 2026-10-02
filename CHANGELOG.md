@@ -13,6 +13,7 @@
 - Materialize File Explorer before revealing a node and check the loaded view's reveal capability.
 - Keep native Explorer sorting in Name mode, restore the current host order after Manual mode, and keep manual ranks consistent with virtual-list positions so breadcrumb reveals stay visible.
 - Keep Explorer icon decoration within the native text row height so late decoration does not shift reveal targets.
+- Keep explicit native/breadcrumb Explorer reveal targets inside the actual viewport when plugin-owned Root or hidden-row geometry diverges from the host virtual model, without making ordinary refresh chase an offscreen active note.
 - Refuse plugin reveal actions for property-hidden targets with an explanation; session reveal remains available through the Root eye.
 - Add deep breadcrumb navigation fixtures and ordering handoff regressions, centralize Explorer host contracts, and update vulnerable development dependencies.
 

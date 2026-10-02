@@ -34,7 +34,130 @@ function setup() {
     virtual: () => virtual, native: () => native, setNative: (items: typeof native) => { native = items; } };
 }
 
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+
 describe("Explorer virtual item ordering", () => {
+  function revealFixture(native: (entry: TFolder) => Promise<void> | void, allowed = () => true) {
+    const fixture = setup();
+    fixture.scroll.getBoundingClientRect = () => ({ top: 80, bottom: 180, width: 200, height: 100 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 100 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    const host = Object.assign(fixture.host, { revealInFolder: native });
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => null,
+      (entry) => allowed() ? entry.path : null)!;
+    const target = Object.assign(new TFolder(), { path: fixture.b.file.path });
+    return { ...fixture, host, bridge, target };
+  }
+
+  it("retains the postcondition until its native async reveal finishes", async () => {
+    const completion = deferred();
+    const fixture = revealFixture(() => completion.promise);
+    const result = fixture.host.revealInFolder(fixture.target);
+    fixture.bridge.refresh();
+    fixture.bridge.settleReveal();
+    fixture.scroll.scrollTop = 60;
+    completion.resolve();
+    await result;
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["resolve", "reject"] as const)("does not let an older reveal %s consume a newer request", async (outcome) => {
+    const old = deferred();
+    const current = deferred();
+    let calls = 0;
+    const fixture = revealFixture(() => ++calls === 1 ? old.promise : current.promise);
+    const oldResult = Promise.resolve(fixture.host.revealInFolder(fixture.target)).catch(() => undefined);
+    const currentResult = fixture.host.revealInFolder(fixture.target);
+    if (outcome === "resolve") old.resolve();
+    else old.reject(new Error("old reveal failed"));
+    await oldResult;
+    fixture.scroll.scrollTop = 60;
+    current.resolve();
+    await currentResult;
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["wheel", "pointerdown", "touchstart", "keydown"])("cancels delayed materialization on user %s takeover", async (eventType) => {
+    const fixture = revealFixture(() => undefined);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    fixture.scroll.dispatchEvent(new Event(eventType, { bubbles: true }));
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("rechecks hidden projection before delayed correction and forgets it permanently", async () => {
+    let allowed = true;
+    const fixture = revealFixture(() => undefined, () => allowed);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    allowed = false;
+    fixture.bridge.settleReveal();
+    allowed = true;
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("expires an unmaterialized request after its next rendering opportunity", async () => {
+    const fixture = revealFixture(() => undefined);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("does not revive a native async request after user takeover or disposal", async () => {
+    for (const cancel of ["input", "dispose"]) {
+      const completion = deferred();
+      const fixture = revealFixture(() => completion.promise);
+      const result = fixture.host.revealInFolder(fixture.target);
+      if (cancel === "input") fixture.scroll.dispatchEvent(new Event("wheel", { bubbles: true }));
+      else fixture.bridge.dispose();
+      fixture.scroll.scrollTop = 60;
+      completion.resolve();
+      await result;
+      expect(fixture.scroll.scrollTop).toBe(60);
+      fixture.bridge.dispose();
+      fixture.root.remove();
+    }
+  });
+
+  it("does not let refresh adopt an external scroll while a row is missing", async () => {
+    const fixture = revealFixture(() => undefined);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.refresh();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
   it("makes virtual reveal positions agree with manual DOM order and leaves ordinary slots intact", () => {
     const fixture = setup();
     const { root, scroll, host, b, ordinary, a, folder } = fixture;
@@ -82,21 +205,181 @@ describe("Explorer virtual item ordering", () => {
     fixture.root.remove();
   });
 
-  it("does not overwrite a later host wrapper and becomes inert after disposal", () => {
+
+  it.each([
+    ["Name", null],
+    ["Manual", ["Parent/B", "Parent/A"]],
+  ] as const)("keeps an explicit %s reveal target visible when plugin geometry makes host scrolling overshoot", async (_mode, paths) => {
     const fixture = setup();
-    const bridge = installExplorerVirtualOrder(fixture.host, fixture.root, () => [fixture.b.file.path, fixture.a.file.path])!;
+    const viewport = { top: 80, bottom: 180, width: 200, height: 100 } as DOMRect;
+    fixture.scroll.getBoundingClientRect = () => viewport;
+    fixture.ordinary.selfEl.classList.add("folder-nodes-canonical-note");
+    fixture.ordinary.selfEl.getBoundingClientRect = () =>
+      ({ top: 0, bottom: 0, width: 0, height: 0 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 100 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    const pluginRoot = fixture.scroll.ownerDocument.createElement("div");
+    pluginRoot.className = "folder-nodes-explorer-root";
+    fixture.scroll.prepend(pluginRoot);
+
+    const target = Object.assign(new TFolder(), { path: fixture.b.file.path });
+    const nativeReveal = vi.fn((_entry: TFolder) => {
+      // The host virtual model does not include Folder Nodes' 48px Root row and
+      // may still count rows that plugin CSS removes from actual layout.
+      fixture.scroll.scrollTop = 60;
+    });
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    host.revealInFolder = nativeReveal;
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => paths)!;
+    bridge.refresh();
+
+    await host.revealInFolder(target);
+
+    expect(nativeReveal).toHaveBeenCalledWith(target);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
+    expect(fixture.scroll.scrollTop).toBe(20);
+
+    bridge.dispose();
+    expect(host.revealInFolder).toBe(nativeReveal);
+    fixture.root.remove();
+  });
+
+  it("minimally corrects a deep explicit reveal clipped below the Explorer viewport", async () => {
+    const fixture = setup();
+    const deepPath = "Parent/Level Two/Level Three/Leaf";
+    fixture.b.file.path = deepPath;
+    fixture.b.selfEl.dataset.path = deepPath;
+    const viewport = { top: 80, bottom: 180, width: 200, height: 100 } as DOMRect;
+    fixture.scroll.getBoundingClientRect = () => viewport;
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 220 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 25, width: 120, height: 25 } as DOMRect;
+    };
+    const target = Object.assign(new TFolder(), { path: deepPath });
+    const nativeReveal = vi.fn(() => { fixture.scroll.scrollTop = 50; });
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    host.revealInFolder = nativeReveal;
+    const bridge = installExplorerVirtualOrder(host, fixture.root,
+      () => [deepPath, fixture.a.file.path])!;
+
+    await host.revealInFolder(target);
+
+    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(viewport.bottom);
+    expect(fixture.scroll.scrollTop).toBe(65);
+    bridge.dispose();
+    fixture.root.remove();
+  });
+
+
+  it("keeps the plugin Root row visible when an explicit root reveal is over-scrolled", async () => {
+    const fixture = setup();
+    const viewport = { top: 80, bottom: 180, width: 200, height: 100 } as DOMRect;
+    fixture.scroll.getBoundingClientRect = () => viewport;
+    const pluginRoot = fixture.scroll.ownerDocument.createElement("div");
+    pluginRoot.className = "folder-nodes-explorer-root";
+    pluginRoot.getBoundingClientRect = () => {
+      const top = 100 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 36, width: 160, height: 36 } as DOMRect;
+    };
+    fixture.scroll.prepend(pluginRoot);
+    const rootFolder = Object.assign(new TFolder(), { path: "" });
+    const nativeReveal = vi.fn(() => { fixture.scroll.scrollTop = 60; });
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    host.revealInFolder = nativeReveal;
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => null)!;
+
+    await host.revealInFolder(rootFolder);
+
+    expect(pluginRoot.getBoundingClientRect().top).toBe(viewport.top);
+    expect(fixture.scroll.scrollTop).toBe(20);
+    bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("settles a reveal after its virtual row materializes instead of using a timing delay", async () => {
+    const fixture = setup();
+    const viewport = { top: 80, bottom: 180, width: 200, height: 100 } as DOMRect;
+    fixture.scroll.getBoundingClientRect = () => viewport;
+    fixture.b.el.remove();
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 100 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    const target = Object.assign(new TFolder(), { path: fixture.b.file.path });
+    const nativeReveal = vi.fn(() => { fixture.scroll.scrollTop = 60; });
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    host.revealInFolder = nativeReveal;
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => null)!;
+
+    await host.revealInFolder(target);
+    expect(fixture.scroll.scrollTop).toBe(60);
+
+    fixture.scroll.append(fixture.b.el);
+    bridge.settleReveal();
+
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
+    expect(fixture.scroll.scrollTop).toBe(20);
+    bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("does not force a plugin-hidden native reveal target into view", async () => {
+    const fixture = setup();
+    fixture.scroll.scrollTop = 10;
+    const hidden = Object.assign(new TFolder(), { path: fixture.b.file.path });
+    const nativeReveal = vi.fn(() => { fixture.scroll.scrollTop = 60; });
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    host.revealInFolder = nativeReveal;
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => null, () => null)!;
+
+    await host.revealInFolder(hidden);
+
+    expect(fixture.scroll.scrollTop).toBe(60);
+    bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("does not overwrite later host wrappers and becomes inert after disposal", () => {
+    const fixture = setup();
+    const nativeReveal = vi.fn((_entry: TFolder) => undefined);
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    host.revealInFolder = nativeReveal;
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => [fixture.b.file.path, fixture.a.file.path])!;
     const installed = fixture.host.getSortedFolderItems;
+    const installedReveal = host.revealInFolder;
     const later = () => installed(fixture.folder);
+    const laterReveal = vi.fn((entry: TFolder) => installedReveal(entry));
     fixture.host.getSortedFolderItems = later;
+    host.revealInFolder = laterReveal;
     bridge.dispose();
     expect(fixture.host.getSortedFolderItems).toBe(later);
+    expect(host.revealInFolder).toBe(laterReveal);
     expect(later()).toEqual(fixture.native());
     fixture.root.remove();
   });
 
   it("guards unavailable host capabilities and falls back to the host result on projection errors", () => {
     const fixture = setup();
-    expect(installExplorerVirtualOrder({}, fixture.root, () => [])).toBeNull();
+    const nativeReveal = vi.fn((_entry: TFolder) => undefined);
+    const unsupported = { revealInFolder: nativeReveal };
+    expect(installExplorerVirtualOrder(unsupported, fixture.root, () => [])).toBeNull();
+    expect(unsupported.revealInFolder).toBe(nativeReveal);
     const bridge = installExplorerVirtualOrder(fixture.host, fixture.root, () => { throw new Error("projection unavailable"); })!;
     expect(fixture.host.getSortedFolderItems(fixture.folder)).toEqual(fixture.native());
     bridge.dispose();
