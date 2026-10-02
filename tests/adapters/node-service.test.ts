@@ -167,6 +167,57 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Mixed/mixed.md")).toBe(false);
   });
 
+  it("rolls back only an unchanged newly created node after a later workflow failure", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const nodes = service(fake);
+    const note = await nodes.createNode("", "A", { body: "selected" });
+
+    await nodes.rollbackCreatedNode(note);
+    expect(fake.files.has("A")).toBe(false);
+    expect(fake.files.has("A/A.md")).toBe(false);
+
+    const changed = await nodes.createNode("", "B", { body: "selected" });
+    await fake.app.vault.modify(changed, "external edit");
+    await expect(nodes.rollbackCreatedNode(changed))
+      .rejects.toThrow("concurrently modified created file");
+    expect(fake.contents.get("B/B.md")).toBe("external edit");
+
+    const occupied = await nodes.createNode("", "C", { body: "selected" });
+    fake.addFile("C/external.md", "external");
+    await expect(nodes.rollbackCreatedNode(occupied))
+      .rejects.toThrow("changed created folder");
+    expect(fake.requireFile("C/C.md")).toBe(occupied);
+    expect(fake.requireFile("C/external.md")).toBeDefined();
+  });
+
+  it("rolls back its own manual rank without treating it as an external edit", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+    const nodes = service(fake);
+    const note = await nodes.createNode("", "A", { body: "selected" });
+    expect(fake.contents.get(note.path)).toContain("rank=1024");
+    await nodes.rollbackCreatedNode(note);
+    expect(fake.files.has("A")).toBe(false);
+  });
+
+  it("preserves externally moved creations and replacement objects at the original path", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFolder("Elsewhere");
+    const nodes = service(fake);
+    const note = await nodes.createNode("", "A", { body: "selected" });
+    await fake.rename(note.parent!, "Elsewhere/A");
+    await expect(nodes.rollbackCreatedNode(note)).rejects.toThrow();
+    expect(fake.requireFile("Elsewhere/A/A.md")).toBe(note);
+    fake.addFolder("A");
+    const replacement = fake.addFile("A/A.md", "replacement");
+    await expect(nodes.rollbackCreatedNode(note)).rejects.toThrow();
+    await expect(nodes.rollbackCreatedNode(replacement)).rejects.toThrow("creation receipt");
+    expect(fake.contents.get("A/A.md")).toBe("replacement");
+    expect(fake.trashed).toEqual([]);
+  });
+
   it("does not reread a newly created Node Note before rollback registration", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -340,6 +391,77 @@ describe("NodeService structural safety", () => {
     expect(fake.requireFile("Loose.md")).toBeDefined();
     expect(nodes.scan().missingNodeNotes).toEqual(["FolderOnly"]);
     expect(nodes.scan().leafMarkdown).toEqual(["Loose.md"]);
+  });
+
+  it("rejects queued structural writes and rolls back an in-flight create after dispose", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const nodes = service(fake);
+    const originalCreateFolder = fake.app.vault.createFolder;
+    let releaseCreate!: () => void;
+    const createBlocked = new Promise<void>((resolve) => { releaseCreate = resolve; });
+    let markFolderCreated!: () => void;
+    const folderCreated = new Promise<void>((resolve) => { markFolderCreated = resolve; });
+    fake.app.vault.createFolder = async (path: string) => {
+      const folder = await originalCreateFolder(path);
+      if (path === "A") {
+        markFolderCreated();
+        await createBlocked;
+      }
+      return folder;
+    };
+
+    const first = nodes.createNode("", "A");
+    await folderCreated;
+    const queued = nodes.createNode("", "B");
+    nodes.dispose();
+    releaseCreate();
+
+    await expect(first).rejects.toThrow("service unloaded");
+    await expect(queued).rejects.toThrow("service unloaded");
+    expect(fake.files.has("A")).toBe(false);
+    expect(fake.files.has("A/A.md")).toBe(false);
+    expect(fake.files.has("B")).toBe(false);
+    expect(fake.trashed).toContain("A");
+  });
+
+  it("rejects queued rename, move, merge and delete after disposal", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "keep source");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "keep target");
+    const nodes = service(fake);
+    const pending = [
+      nodes.renameNode(source, "Renamed"),
+      nodes.moveNode(source, "Target"),
+      nodes.mergeNode(source, target),
+      nodes.deleteNode(source),
+    ];
+    nodes.dispose();
+    const results = await Promise.allSettled(pending);
+    expect(results.every((result) => result.status === "rejected")).toBe(true);
+    expect(fake.contents.get("Source/Source.md")).toBe("keep source");
+    expect(fake.contents.get("Target/Target.md")).toBe("keep target");
+    expect(fake.renames).toEqual([]);
+    expect(fake.trashed).toEqual([]);
+  });
+
+  it("undoes an in-flight folder rename when disposal prevents the matching note rename", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const folder = fake.addFolder("A");
+    fake.addFile("A/A.md", "keep");
+    const nodes = service(fake);
+    const rename = fake.app.fileManager.renameFile;
+    fake.app.fileManager.renameFile = async (entry, path) => {
+      await rename(entry, path);
+      if (path === "B") nodes.dispose();
+    };
+    await expect(nodes.renameNode(folder, "B")).rejects.toThrow("service unloaded");
+    expect(fake.contents.get("A/A.md")).toBe("keep");
+    expect(fake.files.has("B")).toBe(false);
   });
 
   it("rejects a migration disposed before its queued operation can write", async () => {

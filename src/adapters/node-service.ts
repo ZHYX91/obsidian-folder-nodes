@@ -46,6 +46,12 @@ interface OpenMarkdownTarget {
 export class NodeService {
   private readonly operations = new VaultOperationCoordinator();
   private readonly lifecycle = new AbortController();
+  private readonly createdNodes = new WeakMap<TFile, {
+    folder: TFolder;
+    folderPath: string;
+    notePath: string;
+    content: string;
+  }>();
 
   public constructor(
     private readonly app: App,
@@ -195,6 +201,30 @@ export class NodeService {
     return this.exclusive(() => this.createNodePathUnlocked(nodePath, options));
   }
 
+  public rollbackCreatedNode(note: TFile): Promise<void> {
+    return this.operations.run(async () => {
+      const receipt = this.createdNodes.get(note);
+      if (receipt === undefined) throw new Error("Cannot safely roll back a node without its creation receipt");
+      const { folder, folderPath, notePath, content } = receipt;
+      const assertOwned = (): void => {
+        this.assertEntryIdentity(folder, folderPath, TFolder);
+        this.assertEntryIdentity(note, notePath, TFile);
+        if (note.parent !== folder || this.getCanonicalFile(folderPath) !== note
+          || folder.children.length !== 1 || folder.children[0] !== note) {
+          throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
+        }
+      };
+      assertOwned();
+      if (await this.readCurrentSource(note) !== content) {
+        throw new Error(`Cannot safely roll back concurrently modified created file: ${notePath}`);
+      }
+      assertOwned();
+      await this.trashCreatedFile(note, notePath, content);
+      await this.trashCreatedFolder(folder, folderPath);
+      this.createdNodes.delete(note);
+    });
+  }
+
   public createMissingNodeNote(folder: TFolder): Promise<TFile> {
     return this.exclusive(async () => {
       if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
@@ -202,6 +232,7 @@ export class NodeService {
       const existing = this.getCanonicalFile(folder.path);
       if (existing !== null) return existing;
       await this.assertAvailable(notePath);
+      this.assertActive();
       this.expectEvent("create", notePath);
       return this.app.vault.create(notePath, "");
     });
@@ -223,6 +254,7 @@ export class NodeService {
       if (candidate !== undefined) return this.convertLeafNoteUnlocked(candidate);
       const notePath = this.notePathForFolder(folder.path);
       await this.assertAvailable(notePath);
+      this.assertActive();
       this.expectEvent("create", notePath);
       return this.app.vault.create(notePath, "");
     });
@@ -236,6 +268,7 @@ export class NodeService {
       if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
       const notePath = this.notePathForFolder(folder.path);
       if (await this.pathExists(notePath)) throw new Error(`Node Note already exists: ${notePath}`);
+      this.assertActive();
       this.expectEvent("rename", notePath, file.path);
       await this.app.fileManager.renameFile(file, notePath);
       this.assertEntryIdentity(file, notePath, TFile);
@@ -263,6 +296,7 @@ export class NodeService {
 
       const undos: Undo[] = [];
       try {
+        this.assertActive();
         this.expectEvent("rename", nextPath, sourcePath, true);
         await this.app.fileManager.renameFile(folder, nextPath);
         undos.push(async () => {
@@ -277,6 +311,7 @@ export class NodeService {
         const oldNoteAtNewLocation = note;
         this.assertEntryIdentity(oldNoteAtNewLocation, `${nextPath}/${oldName}.md`, TFile);
         const oldNotePathAtNewLocation = oldNoteAtNewLocation.path;
+        this.assertActive();
         this.expectEvent("rename", nextNotePath, oldNoteAtNewLocation.path);
         await this.app.fileManager.renameFile(oldNoteAtNewLocation, nextNotePath);
         undos.push(async () => {
@@ -337,6 +372,7 @@ export class NodeService {
     return this.exclusive(async () => {
       if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
       if (normalizeVaultPath(folder.path) === "") throw new Error("The Root Node cannot be deleted");
+      this.assertActive();
       this.expectEvent("delete", folder.path, null, true);
       await this.app.fileManager.trashFile(folder);
     });
@@ -351,6 +387,7 @@ export class NodeService {
       const nextPath = normalizePath(normalizedTarget === "" ? file.name : `${normalizedTarget}/${file.name}`);
       if (nextPath === file.path) return;
       await this.assertAvailable(nextPath, file);
+      this.assertActive();
       this.expectEvent("rename", nextPath, file.path);
       await this.app.fileManager.renameFile(file, nextPath);
     });
@@ -363,6 +400,7 @@ export class NodeService {
       const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
       if (nextPath === file.path) return;
       await this.assertAvailable(nextPath, file);
+      this.assertActive();
       this.expectEvent("rename", nextPath, file.path);
       await this.app.fileManager.renameFile(file, nextPath);
     });
@@ -370,6 +408,7 @@ export class NodeService {
 
   public deleteFile(file: TFile): Promise<void> {
     return this.exclusive(async () => {
+      this.assertActive();
       this.expectEvent("delete", file.path);
       await this.app.fileManager.trashFile(file);
     });
@@ -397,6 +436,7 @@ export class NodeService {
       const undos: Undo[] = [];
       try {
         for (const entry of movable) {
+          this.assertActive();
           const sourcePath = entry.path;
           const destination = normalizePath(`${target.path}/${entry.name}`);
           this.expectEvent("rename", destination, sourcePath, entry instanceof TFolder);
@@ -419,6 +459,7 @@ export class NodeService {
             return originalTarget;
           });
         });
+        this.assertActive();
         this.assertEntryIdentity(targetNote, targetNotePath, TFile);
         await this.app.fileManager.processFrontMatter(targetNote, (frontmatter: Record<string, unknown>) => {
           for (const [key, value] of Object.entries(sourceProperties)) {
@@ -429,10 +470,12 @@ export class NodeService {
         ownedTargetStates.add(await this.app.vault.read(targetNote));
         const sourceBody = stripFrontmatter(await this.app.vault.read(sourceNote));
         if (/\S/u.test(sourceBody)) {
+          this.assertActive();
           this.assertEntryIdentity(targetNote, targetNotePath, TFile);
           await this.app.vault.append(targetNote, `\n\n## Merged from ${source.name}\n\n${sourceBody}`);
           ownedTargetStates.add(await this.app.vault.read(targetNote));
         }
+        this.assertActive();
         this.expectEvent("delete", source.path, null, true);
         await this.app.fileManager.trashFile(source);
       } catch (error) {
@@ -781,12 +824,14 @@ export class NodeService {
     const undos: Undo[] = [];
     try {
       if (this.sortMode(parentPath) === "manual") {
+        this.assertActive();
         const note = this.requireCanonicalNote(folder);
         const moved: ChildOrderRecord = { basename: folder.name, childPath: sourcePath, order: this.readRank(note) };
         const plan = planInsert(siblings, moved, targetIndex ?? siblings.length);
         await this.applyOrderPatches(plan.patches, folder, undos);
       }
       if (oldParentPath === parentPath) return folder;
+      this.assertActive();
       this.expectEvent("rename", nextPath, sourcePath, true);
       await this.app.fileManager.renameFile(folder, nextPath);
       undos.push(async () => {
@@ -817,6 +862,7 @@ export class NodeService {
     let result: TFile | null = null;
     try {
       for (const [index, part] of parts.entries()) {
+        this.assertActive();
         const folderPath = normalizePath(parentPath === "" ? part : `${parentPath}/${part}`);
         if (this.isIgnoredPath(folderPath)) throw new Error(`Folder is unmanaged: ${folderPath}`);
         const existing = this.app.vault.getAbstractFileByPath(folderPath);
@@ -849,15 +895,24 @@ export class NodeService {
     const notePath = `${folderPath}/${name}.md`;
     await this.assertAvailable(folderPath);
     await this.assertAvailable(notePath);
+    this.assertActive();
     this.expectEvent("create", folderPath);
     const createdFolder = await this.app.vault.createFolder(folderPath);
     undos.push(() => this.trashCreatedFolder(createdFolder, folderPath));
+    this.assertActive();
     this.expectEvent("create", notePath);
     const initialContent = createNodeDocument(options.alias?.trim() || null, options.body ?? "");
     const note = await this.app.vault.create(notePath, initialContent);
     undos.push(() => this.trashCreatedFile(note, notePath, initialContent));
     this.assertEntryIdentity(note, notePath, TFile);
-    await this.appendRankIfManual(normalizedParent, note, undos);
+    this.assertActive();
+    const rank = await this.appendRankIfManual(normalizedParent, note, undos);
+    this.createdNodes.set(note, {
+      folder: createdFolder,
+      folderPath,
+      notePath,
+      content: rank === null ? initialContent : patchFolderNodesFrontmatter(initialContent, { rank }),
+    });
     return note;
   }
 
@@ -881,10 +936,12 @@ export class NodeService {
     const undos: Undo[] = [];
     try {
       if (target === null) {
+        this.assertActive();
         this.expectEvent("create", folderPath);
         const createdFolder = await this.app.vault.createFolder(folderPath);
         undos.push(() => this.trashCreatedFolder(createdFolder, folderPath));
       }
+      this.assertActive();
       this.expectEvent("rename", notePath, originalPath);
       await this.app.fileManager.renameFile(file, notePath);
       undos.push(async () => {
@@ -899,6 +956,7 @@ export class NodeService {
   }
 
   private async renameNodeUnlockedFromRenamedNote(folder: TFolder, renamedNote: TFile): Promise<void> {
+    this.assertActive();
     const name = sanitizeNodeName(renamedNote.basename);
     const sourcePath = folder.path;
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
@@ -926,6 +984,7 @@ export class NodeService {
   ): Promise<void> {
     const movedPath = movedFolder === null ? null : normalizeVaultPath(movedFolder.path);
     for (const patch of patches) {
+      this.assertActive();
       const note = movedPath !== null && patch.childPath === movedPath
         ? this.requireCanonicalNote(movedFolder!)
         : this.getCanonicalFile(patch.childPath);
@@ -947,13 +1006,14 @@ export class NodeService {
     return note === null ? null : this.propertiesForNote(note).rank;
   }
 
-  private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<void> {
-    if (this.sortMode(parentPath) !== "manual") return;
+  private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<number | null> {
+    if (this.sortMode(parentPath) !== "manual") return null;
     const movedPath = normalizeVaultPath(note.parent?.path ?? "");
     const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== movedPath);
     const moved: ChildOrderRecord = { basename: note.parent?.name ?? note.basename, childPath: movedPath, order: this.readRank(note) };
     const plan = planInsert(siblings, moved, siblings.length);
     await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos);
+    return plan.patches.find(({ childPath }) => childPath === movedPath)?.nextOrder ?? null;
   }
 
   private async migrateUnlocked(
@@ -1055,6 +1115,7 @@ export class NodeService {
   }
 
   private async patchFolderNodesTransactional(file: TFile | null, patch: FolderNodesFrontmatterPatch, undos: Undo[]): Promise<void> {
+    this.assertActive();
     if (file === null) throw new Error(`Cannot update missing Node Note: ${FOLDER_NODES_PROPERTY}`);
     const path = file.path;
     const result = await this.applyFileChange(
@@ -1206,8 +1267,16 @@ export class NodeService {
     throw cause;
   }
 
+  private assertActive(): void {
+    throwIfAborted(this.lifecycle.signal);
+  }
+
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
-    return this.operations.run(operation);
+    const signal = this.lifecycle.signal;
+    return this.operations.run(async () => {
+      throwIfAborted(signal);
+      return operation();
+    });
   }
 }
 
