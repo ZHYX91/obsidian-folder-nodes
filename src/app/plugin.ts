@@ -10,6 +10,7 @@ import { VisualService } from "../adapters/visual-service";
 import { buildNodeName } from "../core/naming";
 import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
+import { FolderNodesError } from "../core/folder-nodes-error";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
@@ -220,6 +221,12 @@ export default class FolderNodesPlugin extends Plugin {
   public applyEmojiFontSetting(): void {
     this.updateEmojiFontStyle();
     this.refreshVisuals();
+  }
+
+  public async applyLanguageSetting(): Promise<void> {
+    setLanguage(this.settings.language);
+    this.refreshVisuals();
+    await this.saveSettings();
   }
 
   public previewSelectionName(selection: string): string {
@@ -958,15 +965,15 @@ export default class FolderNodesPlugin extends Plugin {
     const wikiLink = buildSelectionWikiLink(notePath.slice(0, -3), selection, tableContext);
     new SelectionCreateModal(this.app, { parentPath, nodeName: name, alias }, async () => {
       const assertSelectionCurrent = (): void => {
-        if (editor.getSelection() !== selection) throw new Error("Selection changed after preview");
-        if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new Error("Source note changed after preview");
+        if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
+        if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
         const currentFrom = editor.getCursor("from");
         const currentTo = editor.getCursor("to");
-        if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new Error("Selection changed after preview");
-        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new Error("Table structure changed after preview");
+        if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
+        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
         const liveEditor = this.app.workspace.getLeavesOfType("markdown").some((leaf) =>
           leaf.view instanceof MarkdownView && leaf.view.file === file && leaf.view.editor === editor);
-        if (!liveEditor) throw new Error("Source editor changed after preview");
+        if (!liveEditor) throw new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview");
       };
       assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };

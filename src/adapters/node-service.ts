@@ -10,6 +10,7 @@ import {
 
 import { VaultOperationCoordinator, type VaultEventKind } from "./vault-operation-coordinator";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exemptions";
+import { FolderNodesError } from "../core/folder-nodes-error";
 import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type FolderIdentity } from "../core/identity";
 import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
 import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
@@ -172,8 +173,8 @@ export class NodeService {
   public setNodeHidden(folder: TFolder, hidden: boolean): Promise<void> {
     return this.exclusive(async () => {
       const path = normalizeVaultPath(folder.path);
-      if (path === "") throw new Error("The Root Node cannot be hidden");
-      if (this.isIgnoredPath(path)) throw new Error(`Folder is unmanaged: ${path}`);
+      if (path === "") throw new FolderNodesError("root_cannot_hide", {}, "The Root Node cannot be hidden");
+      if (this.isIgnoredPath(path)) throw new FolderNodesError("folder_unmanaged", { path }, `Folder is unmanaged: ${path}`);
       const note = this.requireCanonicalNote(folder);
       const undos: Undo[] = [];
       try {
@@ -227,7 +228,7 @@ export class NodeService {
 
   public createMissingNodeNote(folder: TFolder): Promise<TFile> {
     return this.exclusive(async () => {
-      if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
+      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
       const notePath = this.notePathForFolder(folder.path);
       const existing = this.getCanonicalFile(folder.path);
       if (existing !== null) return existing;
@@ -240,7 +241,7 @@ export class NodeService {
 
   public completeFolder(folder: TFolder): Promise<TFile> {
     return this.exclusive(async () => {
-      if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
+      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
       const existing = this.getCanonicalFile(folder.path);
       if (existing !== null) return existing;
       const parent = folder.parent;
@@ -265,7 +266,7 @@ export class NodeService {
   public useAsNodeNote(folder: TFolder, file: TFile): Promise<TFile> {
     return this.exclusive(async () => {
       if (file.parent !== folder) throw new Error("The note is not inside the selected folder");
-      if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
+      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
       const notePath = this.notePathForFolder(folder.path);
       if (await this.pathExists(notePath)) throw new Error(`Node Note already exists: ${notePath}`);
       this.assertActive();
@@ -278,11 +279,11 @@ export class NodeService {
 
   public renameNode(folder: TFolder, rawName: string): Promise<TFolder> {
     return this.exclusive(async () => {
-      if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
+      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
       const sourcePath = normalizeVaultPath(folder.path);
-      if (sourcePath === "") throw new Error("The Root Node cannot be renamed");
+      if (sourcePath === "") throw new FolderNodesError("root_cannot_rename", {}, "The Root Node cannot be renamed");
       const noteCandidates = this.canonicalFiles(sourcePath);
-      if (noteCandidates.length > 1) throw new Error(`Multiple canonical Node Notes: ${sourcePath}`);
+      if (noteCandidates.length > 1) throw new FolderNodesError("multiple_canonical_notes", { path: sourcePath }, `Multiple canonical Node Notes: ${sourcePath}`);
       const note = noteCandidates[0] ?? null;
       const name = sanitizeNodeName(rawName);
       const oldName = folder.name;
@@ -352,7 +353,7 @@ export class NodeService {
       parentPath = normalizeVaultPath(parentPath);
       if (this.sortMode(parentPath) === mode) return;
       const parentNote = this.getCanonicalFile(parentPath);
-      if (parentNote === null) throw new Error("A complete parent Node is required to change child ordering");
+      if (parentNote === null) throw new FolderNodesError("complete_parent_required", {}, "A complete parent Node is required to change child ordering");
       const undos: Undo[] = [];
       try {
         if (mode === "natural") {
@@ -370,8 +371,8 @@ export class NodeService {
 
   public deleteNode(folder: TFolder): Promise<void> {
     return this.exclusive(async () => {
-      if (this.isIgnoredPath(folder.path)) throw new Error(`Folder is unmanaged: ${folder.path}`);
-      if (normalizeVaultPath(folder.path) === "") throw new Error("The Root Node cannot be deleted");
+      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
+      if (normalizeVaultPath(folder.path) === "") throw new FolderNodesError("root_cannot_delete", {}, "The Root Node cannot be deleted");
       this.assertActive();
       this.expectEvent("delete", folder.path, null, true);
       await this.app.fileManager.trashFile(folder);
@@ -416,7 +417,7 @@ export class NodeService {
 
   public mergeNode(source: TFolder, target: TFolder): Promise<void> {
     return this.exclusive(async () => {
-      if (this.isIgnoredPath(source.path) || this.isIgnoredPath(target.path)) throw new Error("An unmanaged folder cannot be merged as a Folder Node");
+      if (this.isIgnoredPath(source.path) || this.isIgnoredPath(target.path)) throw new FolderNodesError("unmanaged_merge", {}, "An unmanaged folder cannot be merged as a Folder Node");
       if (source.path === target.path || isDescendantPath(target.path, source.path)) throw new Error("A node cannot be merged into itself or a descendant");
       const sourceNote = this.requireCanonicalNote(source);
       const targetNote = this.requireCanonicalNote(target);
@@ -770,17 +771,17 @@ export class NodeService {
     siblings: ChildOrderRecord[];
   } | null {
     const sourcePath = normalizeVaultPath(folder.path);
-    if (sourcePath === "") throw new Error("The Root Node cannot be moved");
-    if (this.getFolder(sourcePath) !== folder) throw new Error("The source node changed; retry the drag");
-    if (this.isIgnoredPath(sourcePath)) throw new Error("An unmanaged folder cannot be placed as a Folder Node");
+    if (sourcePath === "") throw new FolderNodesError("root_cannot_move", {}, "The Root Node cannot be moved");
+    if (this.getFolder(sourcePath) !== folder) throw new FolderNodesError("source_node_changed", {}, "The source node changed; retry the drag");
+    if (this.isIgnoredPath(sourcePath)) throw new FolderNodesError("folder_unmanaged", { path: sourcePath }, "An unmanaged folder cannot be placed as a Folder Node");
     this.requireCanonicalNote(folder);
 
     const parentPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
-    if (this.isIgnoredPath(parentPath)) throw new Error("An unmanaged folder cannot contain a placed Folder Node");
+    if (this.isIgnoredPath(parentPath)) throw new FolderNodesError("folder_unmanaged", { path: parentPath }, "An unmanaged folder cannot contain a placed Folder Node");
     if (parentPath === sourcePath || isDescendantPath(parentPath, sourcePath)) throw new Error("A node cannot be moved into itself or a descendant");
     const targetParent = parentPath === "" ? this.app.vault.getRoot() : this.getFolder(parentPath);
-    if (targetParent === null) throw new Error(`Unknown target folder: ${parentPath}`);
-    if (parentPath !== "" && this.getCanonicalFile(parentPath) === null) throw new Error(`Target is not a complete Folder Node: ${parentPath}`);
+    if (targetParent === null) throw new FolderNodesError("target_folder_unknown", { path: parentPath }, `Unknown target folder: ${parentPath}`);
+    if (parentPath !== "" && this.getCanonicalFile(parentPath) === null) throw new FolderNodesError("target_not_complete", { path: parentPath }, `Target is not a complete Folder Node: ${parentPath}`);
 
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
     if (intent.kind === "move-into" && oldParentPath === parentPath) return null;
@@ -856,7 +857,7 @@ export class NodeService {
   private async createNodePathUnlocked(nodePath: string, options: { alias?: string; body?: string }): Promise<TFile> {
     const normalized = normalizeVaultPath(nodePath);
     const parts = normalized.split("/").filter((part) => part !== "");
-    if (parts.length === 0) throw new Error("A Node path is required");
+    if (parts.length === 0) throw new FolderNodesError("node_path_required", {}, "A Node path is required");
     const undos: Undo[] = [];
     let parentPath = "";
     let result: TFile | null = null;
@@ -864,7 +865,7 @@ export class NodeService {
       for (const [index, part] of parts.entries()) {
         this.assertActive();
         const folderPath = normalizePath(parentPath === "" ? part : `${parentPath}/${part}`);
-        if (this.isIgnoredPath(folderPath)) throw new Error(`Folder is unmanaged: ${folderPath}`);
+        if (this.isIgnoredPath(folderPath)) throw new FolderNodesError("folder_unmanaged", { path: folderPath }, `Folder is unmanaged: ${folderPath}`);
         const existing = this.app.vault.getAbstractFileByPath(folderPath);
         const isTarget = index === parts.length - 1;
         if (existing !== null) {
@@ -888,7 +889,7 @@ export class NodeService {
     undos: Undo[],
   ): Promise<TFile> {
     const normalizedParent = normalizeVaultPath(parentPath);
-    if (this.isIgnoredPath(normalizedParent)) throw new Error(`Folder is unmanaged: ${normalizedParent}`);
+    if (this.isIgnoredPath(normalizedParent)) throw new FolderNodesError("folder_unmanaged", { path: normalizedParent }, `Folder is unmanaged: ${normalizedParent}`);
     if (normalizedParent !== "" && this.getFolder(normalizedParent) === null) throw new Error(`Unknown parent folder: ${normalizedParent}`);
     const name = sanitizeNodeName(rawName);
     const folderPath = normalizePath(normalizedParent === "" ? name : `${normalizedParent}/${name}`);

@@ -12,7 +12,7 @@ import {
 } from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
-import { setLanguage, t } from "../ui/i18n";
+import { t } from "../ui/i18n";
 import { renderVisual } from "../presentation/render-visual";
 
 type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";
@@ -80,11 +80,12 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     assertSettingsWritable(this.plugin.getSettingsCompatibility());
     const settings = this.plugin.settings;
     let reconcileNodeGraph = false;
+    let languageChanged = false;
     switch (key) {
       case "language":
         if (value !== "auto" && value !== "zh-CN" && value !== "en") throw new Error("Unsupported language");
         settings.language = value;
-        setLanguage(value);
+        languageChanged = true;
         new Notice(t("reloadLanguage"));
         break;
       case "homepageEnabled": settings.homepageEnabled = Boolean(value); this.plugin.refreshVisuals(); break;
@@ -125,7 +126,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       case "suffixTimestampFormat": settings.suffix.timestampFormat = this.timestampFormat(value); break;
       default: throw new Error(`Unsupported Folder Nodes setting: ${key}`);
     }
-    await this.plugin.saveSettings();
+    if (languageChanged) await this.plugin.applyLanguageSetting();
+    else await this.plugin.saveSettings();
     if (reconcileNodeGraph) await this.plugin.reconcileSettingsChange();
     updateDeclarativeSettingTab(this);
   }
@@ -313,8 +315,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(panel).setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
       .addOptions({ auto: t("auto"), "zh-CN": t("chinese"), en: t("english") }).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value as typeof this.plugin.settings.language;
-        setLanguage(this.plugin.settings.language);
-        await this.plugin.saveSettings();
+        await this.plugin.applyLanguageSetting();
         new Notice(t("reloadLanguage"));
         this.display();
       }));

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { setMockLanguage } from "../mocks/obsidian";
-import { resolvedLanguage, setLanguage, t } from "../../src/ui/i18n";
+import { FolderNodesError } from "../../src/core/folder-nodes-error";
+import { formatError, resolvedLanguage, setLanguage, t } from "../../src/ui/i18n";
 
 afterEach(() => {
   setLanguage("auto");
@@ -12,6 +13,9 @@ describe("interface language", () => {
     setMockLanguage("zh-cn");
     expect(resolvedLanguage()).toBe("zh-CN");
     expect(t("auto")).toBe("跟随 Obsidian");
+
+    setMockLanguage("zh-tw");
+    expect(resolvedLanguage()).toBe("zh-CN");
 
     setMockLanguage("en");
     expect(resolvedLanguage()).toBe("en");
@@ -26,6 +30,16 @@ describe("interface language", () => {
     setMockLanguage("en");
     setLanguage("zh-CN");
     expect(resolvedLanguage()).toBe("zh-CN");
+  });
+
+  it("localizes stable structural errors without exposing internal English messages", () => {
+    setLanguage("zh-CN");
+    expect(formatError(new FolderNodesError("root_cannot_hide", {}, "The Root Node cannot be hidden")))
+      .toBe("根节点不能隐藏。");
+    expect(formatError(new FolderNodesError("folder_unmanaged", { path: "Private" }, "Folder is unmanaged: Private")))
+      .toBe("此文件夹当前设为不管理：Private");
+    expect(formatError(new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview")))
+      .toBe("预览后来源编辑器已变化，创建已停止。");
   });
 
   it("uses icon terminology consistently in both languages", () => {
