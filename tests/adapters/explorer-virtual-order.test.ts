@@ -34,7 +34,130 @@ function setup() {
     virtual: () => virtual, native: () => native, setNative: (items: typeof native) => { native = items; } };
 }
 
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+
 describe("Explorer virtual item ordering", () => {
+  function revealFixture(native: (entry: TFolder) => Promise<void> | void, allowed = () => true) {
+    const fixture = setup();
+    fixture.scroll.getBoundingClientRect = () => ({ top: 80, bottom: 180, width: 200, height: 100 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 100 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    const host = Object.assign(fixture.host, { revealInFolder: native });
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => null,
+      (entry) => allowed() ? entry.path : null)!;
+    const target = Object.assign(new TFolder(), { path: fixture.b.file.path });
+    return { ...fixture, host, bridge, target };
+  }
+
+  it("retains the postcondition until its native async reveal finishes", async () => {
+    const completion = deferred();
+    const fixture = revealFixture(() => completion.promise);
+    const result = fixture.host.revealInFolder(fixture.target);
+    fixture.bridge.refresh();
+    fixture.bridge.settleReveal();
+    fixture.scroll.scrollTop = 60;
+    completion.resolve();
+    await result;
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["resolve", "reject"] as const)("does not let an older reveal %s consume a newer request", async (outcome) => {
+    const old = deferred();
+    const current = deferred();
+    let calls = 0;
+    const fixture = revealFixture(() => ++calls === 1 ? old.promise : current.promise);
+    const oldResult = Promise.resolve(fixture.host.revealInFolder(fixture.target)).catch(() => undefined);
+    const currentResult = fixture.host.revealInFolder(fixture.target);
+    if (outcome === "resolve") old.resolve();
+    else old.reject(new Error("old reveal failed"));
+    await oldResult;
+    fixture.scroll.scrollTop = 60;
+    current.resolve();
+    await currentResult;
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["wheel", "pointerdown", "touchstart", "keydown"])("cancels delayed materialization on user %s takeover", async (eventType) => {
+    const fixture = revealFixture(() => undefined);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    fixture.scroll.dispatchEvent(new Event(eventType, { bubbles: true }));
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("rechecks hidden projection before delayed correction and forgets it permanently", async () => {
+    let allowed = true;
+    const fixture = revealFixture(() => undefined, () => allowed);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    allowed = false;
+    fixture.bridge.settleReveal();
+    allowed = true;
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("expires an unmaterialized request after its next rendering opportunity", async () => {
+    const fixture = revealFixture(() => undefined);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.settleReveal();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("does not revive a native async request after user takeover or disposal", async () => {
+    for (const cancel of ["input", "dispose"]) {
+      const completion = deferred();
+      const fixture = revealFixture(() => completion.promise);
+      const result = fixture.host.revealInFolder(fixture.target);
+      if (cancel === "input") fixture.scroll.dispatchEvent(new Event("wheel", { bubbles: true }));
+      else fixture.bridge.dispose();
+      fixture.scroll.scrollTop = 60;
+      completion.resolve();
+      await result;
+      expect(fixture.scroll.scrollTop).toBe(60);
+      fixture.bridge.dispose();
+      fixture.root.remove();
+    }
+  });
+
+  it("does not let refresh adopt an external scroll while a row is missing", async () => {
+    const fixture = revealFixture(() => undefined);
+    fixture.b.el.remove();
+    await fixture.host.revealInFolder(fixture.target);
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    fixture.bridge.refresh();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
   it("makes virtual reveal positions agree with manual DOM order and leaves ordinary slots intact", () => {
     const fixture = setup();
     const { root, scroll, host, b, ordinary, a, folder } = fixture;
