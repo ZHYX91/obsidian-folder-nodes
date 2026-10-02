@@ -1211,10 +1211,10 @@ export class NodeService {
       throw new Error(`Markdown file identity changed during merge: ${path}`);
     }
     if (matching.length > 1) {
-      throw new Error(`Cannot merge while the ${role} Node Note is open in multiple editors: ${path}`);
+      throw new FolderNodesError("merge_note_open", { path }, `Cannot merge while the ${role} Node Note is open in multiple editors: ${path}`);
     }
     if (matching.length === 1) {
-      throw new Error(`Cannot merge while the ${role} Node Note is open in a Markdown editor: ${path}`);
+      throw new FolderNodesError("merge_note_open", { path }, `Cannot merge while the ${role} Node Note is open in a Markdown editor: ${path}`);
     }
   }
 
@@ -1237,12 +1237,15 @@ export class NodeService {
     path: string,
     role: "source" | "target",
     update: (current: string) => string,
+    rollback = false,
   ): Promise<{ before: string; after: string }> {
+    if (!rollback) this.assertActive();
     this.assertEntryIdentity(file, path, TFile);
     this.assertMergeNoteClosed(file, path, role);
     let before: string | undefined;
     let after: string | undefined;
     const published = await this.app.vault.process(file, (current) => {
+      if (!rollback) this.assertActive();
       this.assertEntryIdentity(file, path, TFile);
       this.assertMergeNoteClosed(file, path, role);
       before = current;
@@ -1268,7 +1271,7 @@ export class NodeService {
           throw new Error(`Cannot safely roll back concurrently modified file: ${path}`);
         }
         return receipt.before;
-      });
+      }, true);
     });
   }
 

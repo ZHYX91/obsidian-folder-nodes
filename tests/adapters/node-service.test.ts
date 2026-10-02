@@ -777,6 +777,33 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Source")).toBe(true);
   });
 
+  it.each([1, 2])("stops merge write %i after disposal while preserving rollback", async (stopAt) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "---\ncategory: source\n---\nsource body");
+    fake.addFile("Source/asset.bin", "asset");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target body");
+    const nodes = service(fake);
+    const process = fake.app.vault.process.bind(fake.app.vault);
+    const published: string[] = [];
+    let calls = 0;
+    fake.app.vault.process = async (file, update) => {
+      if (++calls === stopAt) nodes.dispose();
+      const result = await process(file, update);
+      published.push(result);
+      return result;
+    };
+
+    await expect(nodes.mergeNode(source, target)).rejects.toThrow("service unloaded");
+    expect(published).toHaveLength(stopAt === 1 ? 0 : 2);
+    expect(published.some((content) => content.includes("Merged from"))).toBe(false);
+    expect(fake.contents.get("Target/Target.md")).toBe("target body");
+    expect(fake.requireFile("Source/asset.bin")).toBeDefined();
+    expect(fake.trashed).toEqual([]);
+  });
+
   it("reports a non-Markdown file occupying a migration target folder path", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");

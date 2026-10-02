@@ -2,6 +2,7 @@ export type FolderNodesErrorCode =
   | "complete_parent_required"
   | "folder_unmanaged"
   | "multiple_canonical_notes"
+  | "merge_note_open"
   | "node_path_required"
   | "root_cannot_delete"
   | "root_cannot_hide"
