@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("../../src/app/plugin.ts", import.meta.url), "utf8");
+const source = readFileSync("src/app/plugin.ts", "utf8");
 
 describe("plugin localization lifecycle", () => {
   it("refreshes command and ribbon labels after an interface-language change", () => {
