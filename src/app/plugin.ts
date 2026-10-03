@@ -415,7 +415,7 @@ export default class FolderNodesPlugin extends Plugin {
       });
   }
 
-  private registerCommand(command: Parameters<FolderNodesPlugin["addCommand"]>[0]): void {
+  private registerCommand(command: Command): void {
     this.localizedCommands.push(this.addCommand(command));
   }
 
