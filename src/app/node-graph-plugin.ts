@@ -29,7 +29,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       });
       return view;
     });
-    this.addCommand({
+    this.registerCommand({
       id: "open-node-graph",
       name: label("openGraph"),
       checkCallback: (checking) => {
@@ -38,12 +38,12 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
         return true;
       },
     });
-    this.addCommand({
+    this.registerCommand({
       id: "open-node-graph-subtree",
       name: label("openSubtreeGraph"),
       checkCallback: (checking) => this.checkOpenCurrentNodeGraph("subtree", checking),
     });
-    this.addCommand({
+    this.registerCommand({
       id: "open-node-graph-local",
       name: label("openLocalGraph"),
       checkCallback: (checking) => this.checkOpenCurrentNodeGraph("local", checking),
@@ -101,6 +101,15 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       }
       this.decorateContentsViews();
     });
+  }
+
+  protected override localizedCommandNames(): Record<string, string> {
+    return {
+      ...super.localizedCommandNames(),
+      "open-node-graph": label("openGraph"),
+      "open-node-graph-subtree": label("openSubtreeGraph"),
+      "open-node-graph-local": label("openLocalGraph"),
+    };
   }
 
   public override onunload(): void {
@@ -270,6 +279,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       return;
     }
     if (existing !== null) {
+      existing.setAttribute("aria-label", label("openGraph"));
       if (existing.parentElement !== actions) actions.prepend(existing);
       return;
     }
