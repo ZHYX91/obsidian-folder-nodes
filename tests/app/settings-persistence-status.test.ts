@@ -26,8 +26,8 @@ describe("settings persistence status", () => {
 
     const warning = container.querySelector<HTMLElement>(".folder-nodes-settings-warning");
     expect(warning?.getAttribute("role")).toBe("alert");
-    expect(warning?.textContent).toContain(`unsupported schema ${CURRENT_SETTINGS_SCHEMA_VERSION + 1}`);
-    expect(warning?.textContent).toContain(`supports schema ${CURRENT_SETTINGS_SCHEMA_VERSION}`);
+    expect(warning?.textContent).toContain(`data version ${CURRENT_SETTINGS_SCHEMA_VERSION + 1}`);
+    expect(warning?.textContent).toContain(`supports through ${CURRENT_SETTINGS_SCHEMA_VERSION}`);
     expect(warning?.textContent).toContain("was not rewritten");
     expect(panel.getAttribute("aria-disabled")).toBe("true");
     expect(button.disabled).toBe(true);
