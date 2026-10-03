@@ -255,13 +255,13 @@ export default class FolderNodesPlugin extends Plugin {
 
   public async reconcileSettingsChange(): Promise<void> {
     if (!this.settings.hiddenNodesEnabled) this.showHiddenNodesThisSession = false;
+    this.refreshLocalizedChrome();
     this.refreshVisuals();
   }
 
   public async toggleHiddenNodesThisSession(): Promise<void> {
     if (!this.settings.hiddenNodesEnabled) return;
     this.showHiddenNodesThisSession = !this.showHiddenNodesThisSession;
-    this.refreshLocalizedChrome();
     await this.reconcileSettingsChange();
   }
 
@@ -415,7 +415,7 @@ export default class FolderNodesPlugin extends Plugin {
       });
   }
 
-  private registerCommand(command: Command): void {
+  protected registerCommand(command: Command): void {
     this.localizedCommands.push(this.addCommand(command));
   }
 
@@ -423,7 +423,21 @@ export default class FolderNodesPlugin extends Plugin {
     const ribbonLabel = t("contents");
     this.ribbonElement?.setAttribute("aria-label", ribbonLabel);
     this.ribbonElement?.setAttribute("title", ribbonLabel);
-    const names: Record<string, string> = {
+    const names = this.localizedCommandNames();
+    const idPrefix = `${this.manifest.id}:`;
+    const namePrefix = `${this.manifest.name}: `;
+    for (const command of this.localizedCommands) {
+      const localId = command.id.startsWith(idPrefix) ? command.id.slice(idPrefix.length) : command.id;
+      const localizedName = names[localId];
+      if (localizedName === undefined) continue;
+      command.name = command.name.startsWith(namePrefix)
+        ? `${namePrefix}${localizedName}`
+        : localizedName;
+    }
+  }
+
+  protected localizedCommandNames(): Record<string, string> {
+    return {
       "review-vault-changes": t("batchOrganize"),
       "migrate-properties": t("propertyMigration"),
       health: t("health"),
@@ -440,16 +454,6 @@ export default class FolderNodesPlugin extends Plugin {
       "move-node-up": t("moveUp"),
       "move-node-down": t("moveDown"),
     };
-    const idPrefix = `${this.manifest.id}:`;
-    const namePrefix = `${this.manifest.name}: `;
-    for (const command of this.localizedCommands) {
-      const localId = command.id.startsWith(idPrefix) ? command.id.slice(idPrefix.length) : command.id;
-      const localizedName = names[localId];
-      if (localizedName === undefined) continue;
-      command.name = command.name.startsWith(namePrefix)
-        ? `${namePrefix}${localizedName}`
-        : localizedName;
-    }
   }
 
   private registerCommands(): void {

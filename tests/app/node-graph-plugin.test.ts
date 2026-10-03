@@ -43,6 +43,8 @@ const doubles = vi.hoisted(() => {
     public async reconcileSettingsChange(): Promise<void> { this.baseReconcileCalls += 1; }
     public registerView(type: string, factory: (leaf: unknown) => unknown): void { this.viewFactories.set(type, factory); }
     public addCommand(command: Record<string, unknown>): void { this.commands.push(command); }
+    protected registerCommand(command: Record<string, unknown>): void { this.addCommand(command); }
+    protected localizedCommandNames(): Record<string, string> { return {}; }
     public registerEvent(event: unknown): void { this.registeredEvents.push(event); }
     public register(cleanup: () => void): void { this.cleanups.push(cleanup); }
     public async saveSettings(): Promise<void> {}
@@ -81,7 +83,7 @@ const doubles = vi.hoisted(() => {
     }
   }
 
-  return { FakeBasePlugin, FakeContentsView, FakeGraphView };
+  return { FakeBasePlugin, FakeContentsView, FakeGraphView, language: "en" };
 });
 
 vi.mock("../../src/app/plugin", () => ({ default: doubles.FakeBasePlugin }));
@@ -96,7 +98,7 @@ vi.mock("../../src/ui/contents-view", () => ({
 vi.mock("../../src/app/layout-ready", () => ({
   onLayoutReadyOnce: (_host: unknown, callback: () => void) => callback(),
 }));
-vi.mock("../../src/ui/i18n", () => ({ resolvedLanguage: () => "en" }));
+vi.mock("../../src/ui/i18n", () => ({ resolvedLanguage: () => doubles.language }));
 
 import FolderNodesWithNodeGraphPlugin from "../../src/app/node-graph-plugin";
 
@@ -109,7 +111,25 @@ type FakeGraphViewInstance = InstanceType<typeof doubles.FakeGraphView>;
 describe("Node Graph plugin integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    doubles.language = "en";
     (Notice as unknown as { messages: string[] }).messages.length = 0;
+  });
+
+  it("refreshes the existing graph entry label without duplicating its button", async () => {
+    const fixture = pluginFixture();
+    const contents = new doubles.FakeContentsView();
+    fixture.leaves.set(CONTENTS_VIEW_TYPE, [{ view: contents }]);
+    const plugin = fixture.createPlugin();
+    await plugin.onload();
+    const button = contents.contentEl.querySelector(".folder-nodes-node-graph-entry-button");
+    expect(button?.getAttribute("aria-label")).toBe("Open Node Graph");
+    doubles.language = "zh-CN";
+    await plugin.reconcileSettingsChange();
+    expect(button?.getAttribute("aria-label")).toBe("打开节点图谱");
+    doubles.language = "en";
+    await plugin.reconcileSettingsChange();
+    expect(button?.getAttribute("aria-label")).toBe("Open Node Graph");
+    expect(contents.contentEl.querySelectorAll(".folder-nodes-node-graph-entry-button")).toHaveLength(1);
   });
 
   it("registers the real extension entry and passes one shared index through view options", async () => {
