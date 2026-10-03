@@ -1,4 +1,4 @@
-import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, TAbstractFile, TFile, TFolder } from "obsidian";
+import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, TAbstractFile, TFile, TFolder, type Command } from "obsidian";
 
 import BASE_STYLES from "../ui/styles.css";
 import NODE_GRAPH_STYLES from "../ui/node-graph.css";
@@ -67,6 +67,8 @@ export default class FolderNodesPlugin extends Plugin {
   private lifecycleGeneration = 0;
   private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
   private settingsTab: FolderNodesSettingTab | null = null;
+  private readonly localizedCommands: Command[] = [];
+  private ribbonElement: HTMLElement | null = null;
   private settingsSaveWasPending = false;
   private showHiddenNodesThisSession = false;
   private readonly settingsSaver = new SettingsSaveCoordinator<PersistedFolderNodesSettings>(
@@ -151,7 +153,7 @@ export default class FolderNodesPlugin extends Plugin {
     }, Platform.isDesktopApp));
     this.settingsTab = new FolderNodesSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
-    this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
+    this.ribbonElement = this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
     this.registerCommands();
     this.registerEvents();
     onLayoutReadyOnce(this.app.workspace, () => {
@@ -177,6 +179,8 @@ export default class FolderNodesPlugin extends Plugin {
     this.initialized = false;
     this.settingsLoaded = false;
     this.settingsTab = null;
+    this.localizedCommands.length = 0;
+    this.ribbonElement = null;
     this.reconciliationReady = false;
     this.service?.dispose();
     this.refreshScheduler?.cancel();
@@ -225,6 +229,7 @@ export default class FolderNodesPlugin extends Plugin {
 
   public async applyLanguageSetting(): Promise<void> {
     setLanguage(this.settings.language);
+    this.refreshLocalizedChrome();
     this.refreshVisuals();
     await this.saveSettings();
   }
@@ -256,6 +261,7 @@ export default class FolderNodesPlugin extends Plugin {
   public async toggleHiddenNodesThisSession(): Promise<void> {
     if (!this.settings.hiddenNodesEnabled) return;
     this.showHiddenNodesThisSession = !this.showHiddenNodesThisSession;
+    this.refreshLocalizedChrome();
     await this.reconcileSettingsChange();
   }
 
@@ -409,13 +415,50 @@ export default class FolderNodesPlugin extends Plugin {
       });
   }
 
+  private registerCommand(command: Parameters<FolderNodesPlugin["addCommand"]>[0]): void {
+    this.localizedCommands.push(this.addCommand(command));
+  }
+
+  private refreshLocalizedChrome(): void {
+    const ribbonLabel = t("contents");
+    this.ribbonElement?.setAttribute("aria-label", ribbonLabel);
+    this.ribbonElement?.setAttribute("title", ribbonLabel);
+    const names: Record<string, string> = {
+      "review-vault-changes": t("batchOrganize"),
+      "migrate-properties": t("propertyMigration"),
+      health: t("health"),
+      "open-homepage": t("openHomepage"),
+      "create-child-node": t("createChild"),
+      "create-from-selection": t("createSelection"),
+      "open-contents": t("contents"),
+      "toggle-hidden-nodes": t(this.showHiddenNodesThisSession
+        ? "hideHiddenNodesThisSession"
+        : "showHiddenNodesThisSession"),
+      "rename-node": t("renameCurrentNode"),
+      "move-node": t("moveContainingNode"),
+      "merge-node": t("mergeContainingNode"),
+      "move-node-up": t("moveUp"),
+      "move-node-down": t("moveDown"),
+    };
+    const idPrefix = `${this.manifest.id}:`;
+    const namePrefix = `${this.manifest.name}: `;
+    for (const command of this.localizedCommands) {
+      const localId = command.id.startsWith(idPrefix) ? command.id.slice(idPrefix.length) : command.id;
+      const localizedName = names[localId];
+      if (localizedName === undefined) continue;
+      command.name = command.name.startsWith(namePrefix)
+        ? `${namePrefix}${localizedName}`
+        : localizedName;
+    }
+  }
+
   private registerCommands(): void {
-    this.addCommand({ id: "review-vault-changes", name: t("batchOrganize"), callback: () => this.openBatchOrganize() });
-    this.addCommand({ id: "migrate-properties", name: t("propertyMigration"), callback: () => this.openPropertyMigration() });
-    this.addCommand({ id: "health", name: t("health"), callback: () => this.showHealth() });
-    this.addCommand({ id: "open-homepage", name: t("openHomepage"), callback: () => this.runAction(this.openHomepage()) });
-    this.addCommand({ id: "create-child-node", name: t("createChild"), callback: () => this.promptCreateChild() });
-    this.addCommand({
+    this.registerCommand({ id: "review-vault-changes", name: t("batchOrganize"), callback: () => this.openBatchOrganize() });
+    this.registerCommand({ id: "migrate-properties", name: t("propertyMigration"), callback: () => this.openPropertyMigration() });
+    this.registerCommand({ id: "health", name: t("health"), callback: () => this.showHealth() });
+    this.registerCommand({ id: "open-homepage", name: t("openHomepage"), callback: () => this.runAction(this.openHomepage()) });
+    this.registerCommand({ id: "create-child-node", name: t("createChild"), callback: () => this.promptCreateChild() });
+    this.registerCommand({
       id: "create-from-selection",
       name: t("createSelection"),
       editorCheckCallback: (checking, editor, view) => {
@@ -424,8 +467,8 @@ export default class FolderNodesPlugin extends Plugin {
         return true;
       },
     });
-    this.addCommand({ id: "open-contents", name: t("contents"), callback: () => this.runAction(this.openContents()) });
-    this.addCommand({
+    this.registerCommand({ id: "open-contents", name: t("contents"), callback: () => this.runAction(this.openContents()) });
+    this.registerCommand({
       id: "toggle-hidden-nodes",
       name: t("showHiddenNodesThisSession"),
       checkCallback: (checking) => {
@@ -434,11 +477,11 @@ export default class FolderNodesPlugin extends Plugin {
         return true;
       },
     });
-    this.addCommand({ id: "rename-node", name: t("renameCurrentNode"), callback: () => this.promptRenameCurrent() });
-    this.addCommand({ id: "move-node", name: t("moveContainingNode"), callback: () => this.promptMoveCurrent() });
-    this.addCommand({ id: "merge-node", name: t("mergeContainingNode"), callback: () => this.promptMergeCurrent() });
-    this.addCommand({ id: "move-node-up", name: t("moveUp"), callback: () => this.runAction(this.reorderCurrent(-1)) });
-    this.addCommand({ id: "move-node-down", name: t("moveDown"), callback: () => this.runAction(this.reorderCurrent(1)) });
+    this.registerCommand({ id: "rename-node", name: t("renameCurrentNode"), callback: () => this.promptRenameCurrent() });
+    this.registerCommand({ id: "move-node", name: t("moveContainingNode"), callback: () => this.promptMoveCurrent() });
+    this.registerCommand({ id: "merge-node", name: t("mergeContainingNode"), callback: () => this.promptMergeCurrent() });
+    this.registerCommand({ id: "move-node-up", name: t("moveUp"), callback: () => this.runAction(this.reorderCurrent(-1)) });
+    this.registerCommand({ id: "move-node-down", name: t("moveDown"), callback: () => this.runAction(this.reorderCurrent(1)) });
   }
 
   private registerEvents(): void {
