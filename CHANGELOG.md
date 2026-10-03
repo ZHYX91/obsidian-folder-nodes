@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.3
+
+- Refresh command names and graph-button accessibility labels when changing interface language.
+- Keep the session hidden-node command label synchronized after settings changes.
+- Clarify bilingual migration and recovery guidance.
+
 ## 0.10.2
 
 - Stop forward merge writes after unload before final trash dispatch, reject open node-note editors with recovery instructions, preserve concurrent edits through exact rollback receipts, and revalidate both notes and frozen child paths before deletion. Preserve BOM and valid YAML semantics when combining note content.
