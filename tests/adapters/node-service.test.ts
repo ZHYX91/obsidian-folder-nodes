@@ -10,6 +10,12 @@ function service(fake: FakeObsidian): NodeService {
   return new NodeService(fake.app, () => settings);
 }
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 function markdownEditorLeaf(file: ReturnType<FakeObsidian["requireFile"]>, initial: string) {
   let value = initial;
   const editor = {
@@ -164,6 +170,89 @@ describe("NodeService structural safety", () => {
     expect(fake.renames).toEqual([{ from: "A", to: "B" }]);
   });
 
+  it("revalidates mutable sources after asynchronous destination preflights", async () => {
+    {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const folder = fake.addFolder("A");
+      fake.addFile("A/A.md");
+      const nodes = service(fake);
+      const entered = deferred();
+      const release = deferred();
+      fake.app.vault.adapter.exists = async (path: string) => {
+        if (path === "B") {
+          entered.resolve();
+          await release.promise;
+        }
+        return fake.files.has(path);
+      };
+
+      const pending = nodes.renameNode(folder, "B");
+      await entered.promise;
+      await fake.rename(folder, "External");
+      release.resolve();
+
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(folder.path).toBe("External");
+      expect(fake.files.has("B")).toBe(false);
+    }
+
+    {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder("Parent");
+      fake.addFile("Parent/Parent.md");
+      fake.addFolder("Elsewhere");
+      const child = fake.addFolder("Child");
+      fake.addFile("Child/Child.md");
+      const nodes = service(fake);
+      const entered = deferred();
+      const release = deferred();
+      fake.app.vault.adapter.exists = async (path: string) => {
+        if (path === "Parent/Child") {
+          entered.resolve();
+          await release.promise;
+        }
+        return fake.files.has(path);
+      };
+
+      const pending = nodes.moveNode(child, "Parent");
+      await entered.promise;
+      await fake.rename(child, "Elsewhere/Child");
+      release.resolve();
+
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(child.path).toBe("Elsewhere/Child");
+      expect(fake.files.has("Parent/Child")).toBe(false);
+    }
+
+    {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder("Elsewhere");
+      const file = fake.addFile("Document.pdf", "body");
+      const nodes = service(fake);
+      const entered = deferred();
+      const release = deferred();
+      fake.app.vault.adapter.exists = async (path: string) => {
+        if (path === "Renamed.pdf") {
+          entered.resolve();
+          await release.promise;
+        }
+        return fake.files.has(path);
+      };
+
+      const pending = nodes.renameFile(file, "Renamed.pdf");
+      await entered.promise;
+      await fake.rename(file, "Elsewhere/Document.pdf");
+      release.resolve();
+
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(file.path).toBe("Elsewhere/Document.pdf");
+      expect(fake.files.has("Renamed.pdf")).toBe(false);
+    }
+  });
+
   it("supports case-only node and file renames on a case-insensitive adapter", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -218,6 +307,27 @@ describe("NodeService structural safety", () => {
     expect(fake.contents.get(note.path)).toContain("rank=1024");
     await nodes.rollbackCreatedNode(note);
     expect(fake.files.has("A")).toBe(false);
+  });
+
+  it("restores sibling ranks materialized by a compensated manual-order creation", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+    fake.addFolder("A");
+    fake.addFile("A/A.md", "A body");
+    fake.addFolder("B");
+    fake.addFile("B/B.md", "B body");
+    const nodes = service(fake);
+
+    const created = await nodes.createNode("", "C", { body: "selected" });
+    expect(fake.contents.get("A/A.md")).toContain("rank=1024");
+    expect(fake.contents.get("B/B.md")).toContain("rank=2048");
+    expect(fake.contents.get(created.path)).toContain("rank=3072");
+
+    await nodes.rollbackCreatedNode(created);
+
+    expect(fake.contents.get("A/A.md")).toBe("A body");
+    expect(fake.contents.get("B/B.md")).toBe("B body");
+    expect(fake.files.has("C")).toBe(false);
   });
 
   it("preserves externally moved creations and replacement objects at the original path", async () => {
@@ -311,6 +421,18 @@ describe("NodeService structural safety", () => {
     await service(fake).reconcileDeleted("Vault.md");
 
     expect(fake.files.has("Vault.md")).toBe(false);
+  });
+
+  it("leaves the Vault root in place when the Root Node Note is natively renamed", async () => {
+    const fake = new FakeObsidian();
+    const note = fake.addFile("Vault.md", "root body");
+    await fake.rename(note, "Home.md");
+
+    await service(fake).reconcileRenamed(fake.requireFile("Home.md"), "Vault.md");
+
+    expect(fake.app.vault.getRoot().path).toBe("");
+    expect(fake.requireFile("Home.md")).toBe(note);
+    expect(fake.renames).toEqual([{ from: "Vault.md", to: "Home.md" }]);
   });
 
   it("leaves the source folder incomplete and the moved Node Note noncanonical", async () => {
@@ -983,6 +1105,28 @@ describe("NodeService structural safety", () => {
     expect((await nodes.useAsNodeNote(folder, candidate)).path).toBe("Adopt/Adopt.md");
   });
 
+  it("refuses menu reordering across a hidden adjacent sibling", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+    const a = fake.addFolder("A");
+    fake.addFile("A/A.md", "---\nfolder-nodes:\n  - rank=1024\n---\n", { "folder-nodes": ["rank=1024"] });
+    fake.addFolder("Hidden");
+    fake.addFile("Hidden/Hidden.md", "---\nfolder-nodes:\n  - rank=2048\n  - hidden=true\n---\n", {
+      "folder-nodes": ["rank=2048", "hidden=true"],
+    });
+    fake.addFolder("B");
+    fake.addFile("B/B.md", "---\nfolder-nodes:\n  - rank=3072\n---\n", { "folder-nodes": ["rank=3072"] });
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    settings.hiddenNodesEnabled = true;
+    const nodes = new NodeService(fake.app, () => settings);
+
+    expect(nodes.canReorder(a, 1)).toBe(false);
+    await nodes.reorder(a, 1);
+
+    expect(nodes.children("").map(({ childPath }) => childPath)).toEqual(["A", "Hidden", "B"]);
+    expect(fake.frontmatters.get("A/A.md")?.["folder-nodes"]).toEqual(["rank=1024"]);
+  });
+
   it("moves and reorders nodes with transactional structural metadata", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -1186,8 +1330,8 @@ describe("NodeService structural safety", () => {
     const source = fake.addFolder("Source");
     fake.addFile(
       "Source/Source.md",
-      "---\nnested: {\"b\":2,\"a\":1}\nsourceOnly: copied\n---\nsource body",
-      { nested: { b: 2, a: 1 }, sourceOnly: "copied" },
+      "---\nnested: {\"b\":2,\"a\":1}\nsourceOnly: copied\nposition: manager\n---\nsource body",
+      { nested: { b: 2, a: 1 }, sourceOnly: "copied", position: "manager" },
     );
     fake.addFile("Source/asset.bin", "asset");
     const target = fake.addFolder("Target");
@@ -1199,7 +1343,7 @@ describe("NodeService structural safety", () => {
     await service(fake).mergeNode(source, target);
     expect(fake.requireFile("Target/asset.bin")).toBeDefined();
     expect(parseYaml((fake.contents.get("Target/Target.md") ?? "").split("---")[1] ?? ""))
-      .toMatchObject({ sourceOnly: "copied" });
+      .toMatchObject({ position: "manager", sourceOnly: "copied" });
     expect(fake.contents.get("Target/Target.md")).toContain("Merged from Source");
     expect(fake.files.has("Source")).toBe(false);
   });
@@ -1261,6 +1405,33 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Archive/Archive.md")).toBe(false);
     expect(fake.files.has("Archive/Child/Child.md")).toBe(false);
     expect(fake.requireFile("Archive/loose.md")).toBeDefined();
+  });
+
+  it("assigns target-relative ranks to child nodes moved by merge into a manual parent", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+    fake.addFolder("Source/First");
+    fake.addFile("Source/First/First.md", "---\nfolder-nodes:\n  - rank=1024\n---\n", { "folder-nodes": ["rank=1024"] });
+    fake.addFolder("Source/Second");
+    fake.addFile("Source/Second/Second.md", "---\nfolder-nodes:\n  - rank=2048\n---\n", { "folder-nodes": ["rank=2048"] });
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+    fake.addFolder("Target/Existing");
+    fake.addFile("Target/Existing/Existing.md", "---\nfolder-nodes:\n  - rank=1024\n---\n", { "folder-nodes": ["rank=1024"] });
+
+    const nodes = service(fake);
+    await nodes.mergeNode(source, target);
+
+    expect(nodes.children("Target").map(({ childPath }) => childPath)).toEqual([
+      "Target/Existing",
+      "Target/First",
+      "Target/Second",
+    ]);
+    expect(fake.frontmatters.get("Target/Existing/Existing.md")?.["folder-nodes"]).toEqual(["rank=1024"]);
+    expect(fake.frontmatters.get("Target/First/First.md")?.["folder-nodes"]).toEqual(["rank=3072"]);
+    expect(fake.frontmatters.get("Target/Second/Second.md")?.["folder-nodes"]).toEqual(["rank=4096"]);
   });
 
   it("assigns a fresh target-parent rank after a native cross-parent node move", async () => {
