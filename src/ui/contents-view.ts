@@ -165,6 +165,13 @@ export class FolderNodeContentsView extends ItemView {
     }
     const folderPath = normalizeVaultPath(folder.path);
     const currentIgnored = this.service.isIgnoredPath(folderPath);
+    if (!currentIgnored && !this.service.isNodeVisible(folderPath)) {
+      container.createEl("p", { cls: "setting-item-description", text: t("hiddenNodeDetail") });
+      this.runRenderExtensions();
+      this.renderedFolderPath = requestedPath;
+      this.restoreRenderState(container, renderState);
+      return;
+    }
     const childFolders = folder.children.filter((entry): entry is TFolder => entry instanceof TFolder);
     const childOrder = new Map(this.service.children(folderPath).map(({ childPath }, index) => [childPath, index]));
     const managedFolders = (currentIgnored ? [] : childFolders.filter((entry) =>
@@ -174,7 +181,8 @@ export class FolderNodeContentsView extends ItemView {
       const identity = this.service.folderIdentity(entry.path);
       return { kind: identity === "conflict" ? "conflict" : identity === "node" ? "healthy" : "incomplete", entry };
     });
-    const directFiles = folder.children.filter((entry): entry is TFile => entry instanceof TFile && !this.service.isCanonicalFile(entry));
+    const directFiles = folder.children.filter((entry): entry is TFile =>
+      entry instanceof TFile && this.service.fileIdentity(entry) !== "node-note");
     const pendingNotes = currentIgnored ? [] : directFiles.filter((entry) => {
       if (entry.extension.toLocaleLowerCase() !== "md" || this.service.isLeafNoteExempt(entry.path)) return false;
       const targetPath = folderPath === "" ? entry.basename : `${folderPath}/${entry.basename}`;

@@ -126,7 +126,12 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       .filter(([, reasons]) => reasons.has("metadata"))
       .map(([path]) => this.nodeGraphMetadataFolderPath(path))
       .filter((path): path is string => path !== null));
-    if (structuralPaths.size === 0 && metadataFolderPaths.size === 0 && !batch.reasons.has("full")) return;
+    const referencePaths = new Set([...batch.pathReasons]
+      .filter(([, reasons]) => reasons.has("reference"))
+      .map(([path]) => path)
+      .filter((path) => this.nodeGraphPathAffectsIndex(path)));
+    if (structuralPaths.size === 0 && metadataFolderPaths.size === 0
+      && referencePaths.size === 0 && !batch.reasons.has("full")) return;
     if (!this.settings.nodeGraph.enabled) {
       for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) leaf.detach();
       this.decorateContentsViews();
@@ -136,6 +141,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     if (metadataFolderPaths.size > 0 && this.nodeGraphIndex.invalidateRecordMetadata(metadataFolderPaths)) {
       this.nodeGraphIndex.invalidateLinks();
     }
+    if (referencePaths.size > 0) this.nodeGraphIndex.invalidateLinks();
     if (batch.reasons.has("full")) this.nodeGraphIndex.invalidateVisuals();
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeGraphView) leaf.view.refresh();

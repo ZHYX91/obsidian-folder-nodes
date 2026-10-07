@@ -34,6 +34,7 @@ export function scanMigration(inventory: VaultInventory, exemptions: MigrationEx
   const missingNodeNotes: string[] = [];
   const conflicts: MigrationConflict[] = [];
   const completedByLeafMoves = new Set<string>();
+  const plannedLeafTargets = new Map<string, string[]>();
   const canonicalByFolder = new Map<string, string[]>();
   const canonicalNotes = new Set<string>();
 
@@ -73,9 +74,28 @@ export function scanMigration(inventory: VaultInventory, exemptions: MigrationEx
     } else if ((canonicalByFolder.get(vaultPathKey(targetFolder))?.length ?? 0) > 0) {
       conflicts.push({ path: note, reason: `Target node already exists: ${targetFile}` });
     } else {
-      leafMarkdown.push(note);
-      if (existingFolder !== undefined) completedByLeafMoves.add(existingFolder);
+      const targetKey = vaultPathKey(targetFile);
+      const planned = plannedLeafTargets.get(targetKey) ?? [];
+      if (planned.length === 1) {
+        const first = planned[0]!;
+        const index = leafMarkdown.indexOf(first);
+        if (index >= 0) leafMarkdown.splice(index, 1);
+        conflicts.push({ path: first, reason: `Multiple leaf notes resolve to the same target: ${targetFile}` });
+      }
+      if (planned.length > 0) {
+        conflicts.push({ path: note, reason: `Multiple leaf notes resolve to the same target: ${targetFile}` });
+      } else {
+        leafMarkdown.push(note);
+      }
+      planned.push(note);
+      plannedLeafTargets.set(targetKey, planned);
     }
+  }
+  for (const note of leafMarkdown) {
+    const parent = dirname(note);
+    const name = sanitizeNodeName(basename(note).slice(0, -3));
+    const existingFolder = folderByKey.get(vaultPathKey(parent === "" ? name : `${parent}/${name}`));
+    if (existingFolder !== undefined) completedByLeafMoves.add(existingFolder);
   }
   return {
     conflicts: conflicts.sort((a, b) => a.path.localeCompare(b.path)),
@@ -145,6 +165,7 @@ export async function scanMigrationAsync(
   const missingNodeNotes: string[] = [];
   const conflicts: MigrationConflict[] = [];
   const completedByLeafMoves = new Set<string>();
+  const plannedLeafTargets = new Map<string, string[]>();
   for (const folder of folders) {
     const canonical = canonicalByFolder.get(vaultPathKey(folder)) ?? [];
     if (canonical.length === 0) missingNodeNotes.push(folder);
@@ -169,10 +190,29 @@ export async function scanMigrationAsync(
     else if (existingFolder !== undefined && existingFolder !== targetFolder) conflicts.push({ path: note, reason: `Target folder differs only by case: ${existingFolder}` });
     else if ((canonicalByFolder.get(vaultPathKey(targetFolder))?.length ?? 0) > 0) conflicts.push({ path: note, reason: `Target node already exists: ${targetFile}` });
     else {
-      leafMarkdown.push(note);
-      if (existingFolder !== undefined) completedByLeafMoves.add(existingFolder);
+      const targetKey = vaultPathKey(targetFile);
+      const planned = plannedLeafTargets.get(targetKey) ?? [];
+      if (planned.length === 1) {
+        const first = planned[0]!;
+        const index = leafMarkdown.indexOf(first);
+        if (index >= 0) leafMarkdown.splice(index, 1);
+        conflicts.push({ path: first, reason: `Multiple leaf notes resolve to the same target: ${targetFile}` });
+      }
+      if (planned.length > 0) {
+        conflicts.push({ path: note, reason: `Multiple leaf notes resolve to the same target: ${targetFile}` });
+      } else {
+        leafMarkdown.push(note);
+      }
+      planned.push(note);
+      plannedLeafTargets.set(targetKey, planned);
     }
     await checkpoint();
+  }
+  for (const note of leafMarkdown) {
+    const parent = dirname(note);
+    const name = sanitizeNodeName(basename(note).slice(0, -3));
+    const existingFolder = folderByKey.get(vaultPathKey(parent === "" ? name : `${parent}/${name}`));
+    if (existingFolder !== undefined) completedByLeafMoves.add(existingFolder);
   }
   throwIfScanAborted(signal);
   onProgress?.(Math.max(1, total), Math.max(1, total));
