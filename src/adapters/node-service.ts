@@ -419,6 +419,7 @@ export class NodeService {
       if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
       this.assertEntryIdentity(file, sourcePath, TFile);
+      if (normalizedTarget !== "") this.assertEntryIdentity(target, normalizedTarget, TFolder);
       this.assertActive();
       this.expectEvent("rename", nextPath, sourcePath);
       await this.app.fileManager.renameFile(file, nextPath);
@@ -919,10 +920,17 @@ export class NodeService {
     if (resolved === null) return folder;
     const { parentPath, siblings, targetIndex } = resolved;
     const sourcePath = normalizeVaultPath(folder.path);
+    const sourceNote = this.requireCanonicalNote(folder);
+    const sourceNotePath = sourceNote.path;
+    const targetParent = parentPath === "" ? null : this.getFolder(parentPath);
+    if (parentPath !== "" && targetParent === null) throw new Error(`Unknown target folder: ${parentPath}`);
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
     const nextPath = normalizePath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
     if (oldParentPath !== parentPath) await this.assertAvailable(nextPath);
     this.assertEntryIdentity(folder, sourcePath, TFolder);
+    this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+    if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
+    if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
 
     const undos: Undo[] = [];
     try {
@@ -934,6 +942,9 @@ export class NodeService {
         await this.applyOrderPatches(plan.patches, folder, undos);
       }
       this.assertEntryIdentity(folder, sourcePath, TFolder);
+      this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+      if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
+      if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
       if (oldParentPath === parentPath) return folder;
       this.assertActive();
       this.expectEvent("rename", nextPath, sourcePath, true);
