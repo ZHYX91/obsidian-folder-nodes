@@ -343,49 +343,73 @@ describe("Explorer virtual item ordering", () => {
     fixture.root.remove();
   });
 
-  it("keeps a void reveal visible through delayed host scroll and decoration refresh", async () => {
+  it("suppresses host active-file auto-reveal only during plugin-owned refresh after reveal ownership expires", async () => {
     const fixture = setup();
     const viewport = { top: 80, bottom: 180, width: 200, height: 100 } as DOMRect;
     fixture.scroll.getBoundingClientRect = () => viewport;
-    let decorated = false;
     fixture.b.selfEl.getBoundingClientRect = () => {
-      const top = (decorated ? 220 : 100) - fixture.scroll.scrollTop;
+      const top = 500 - fixture.scroll.scrollTop;
       return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
     };
     const target = Object.assign(new TFolder(), { path: fixture.b.file.path });
-    const active = Object.assign(new TFolder(), { path: fixture.a.file.path });
-    const nativeReveal = vi.fn((entry: TFolder) => {
-      window.requestAnimationFrame(() => {
-        fixture.scroll.scrollTop = entry.path === target.path ? 60 : 0;
-      });
+    const activeDom = fixture.a;
+    const nativeReveal = vi.fn(() => {
+      window.requestAnimationFrame(() => { fixture.scroll.scrollTop = 460; });
+    });
+    const scrollIntoView = vi.fn((item: typeof activeDom, alignment: number) => {
+      expect(item).toBe(activeDom);
+      expect(alignment).toBe(4);
+      fixture.scroll.scrollTop = 0;
     });
     const host = fixture.host as typeof fixture.host & {
+      activeDom: typeof activeDom;
+      autoRevealFile: boolean;
+      fileBeingRenamed: boolean;
+      revealActiveFile: () => void;
       revealInFolder: (entry: TFolder) => void | Promise<void>;
+      tree: { infinityScroll: { scrollIntoView: typeof scrollIntoView } };
     };
-    const nativeSort = host.sort.bind(host);
+    host.activeDom = activeDom;
+    host.autoRevealFile = true;
+    host.fileBeingRenamed = false;
+    host.tree.infinityScroll = { scrollIntoView };
     host.revealInFolder = nativeReveal;
+    const nativeActiveReveal = vi.fn(() => {
+      host.tree.infinityScroll.scrollIntoView(host.activeDom, 4);
+    });
+    host.revealActiveFile = nativeActiveReveal;
+    const nativeSort = host.sort.bind(host);
     host.sort = () => {
       nativeSort();
-      host.revealInFolder(active);
+      if (host.autoRevealFile && !host.fileBeingRenamed) host.revealActiveFile();
     };
     const bridge = installExplorerVirtualOrder(host, fixture.root, () => null)!;
 
     expect(host.revealInFolder(target)).toBeUndefined();
     await nextFrame();
-
-    expect(nativeReveal).toHaveBeenCalledTimes(1);
-    expect(fixture.scroll.scrollTop).toBe(20);
-    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
-
-    decorated = true;
-    bridge.refresh();
-
-    expect(nativeReveal).toHaveBeenCalledTimes(1);
-    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(viewport.bottom);
-    expect(fixture.scroll.scrollTop).toBe(60);
     await nextFrame();
 
+    expect(nativeReveal).toHaveBeenCalledOnce();
+    expect(fixture.scroll.scrollTop).toBe(420);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
+
+    // The explicit reveal request is already expired here. A later Folder Nodes
+    // decoration refresh still must not run File Explorer's revealActiveFile().
+    bridge.refresh();
+
+    expect(nativeActiveReveal).not.toHaveBeenCalled();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(fixture.scroll.scrollTop).toBe(420);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
+
+    // Native host auto-reveal remains untouched outside Folder Nodes refresh.
+    host.sort();
+    expect(nativeActiveReveal).toHaveBeenCalledOnce();
+    expect(scrollIntoView).toHaveBeenCalledWith(activeDom, 4);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBeGreaterThan(viewport.bottom);
+
     bridge.dispose();
+    expect(host.revealActiveFile).toBe(nativeActiveReveal);
     fixture.root.remove();
   });
 
@@ -412,21 +436,30 @@ describe("Explorer virtual item ordering", () => {
   it("does not overwrite later host wrappers and becomes inert after disposal", () => {
     const fixture = setup();
     const nativeReveal = vi.fn((_entry: TFolder) => undefined);
+    const nativeActiveReveal = vi.fn(() => undefined);
     const host = fixture.host as typeof fixture.host & {
+      revealActiveFile: () => void;
       revealInFolder: (entry: TFolder) => void | Promise<void>;
     };
     host.revealInFolder = nativeReveal;
+    host.revealActiveFile = nativeActiveReveal;
     const bridge = installExplorerVirtualOrder(host, fixture.root, () => [fixture.b.file.path, fixture.a.file.path])!;
     const installed = fixture.host.getSortedFolderItems;
     const installedReveal = host.revealInFolder;
+    const installedActiveReveal = host.revealActiveFile;
     const later = () => installed(fixture.folder);
     const laterReveal = vi.fn((entry: TFolder) => installedReveal(entry));
+    const laterActiveReveal = vi.fn(() => installedActiveReveal());
     fixture.host.getSortedFolderItems = later;
     host.revealInFolder = laterReveal;
+    host.revealActiveFile = laterActiveReveal;
     bridge.dispose();
     expect(fixture.host.getSortedFolderItems).toBe(later);
     expect(host.revealInFolder).toBe(laterReveal);
+    expect(host.revealActiveFile).toBe(laterActiveReveal);
     expect(later()).toEqual(fixture.native());
+    laterActiveReveal();
+    expect(nativeActiveReveal).toHaveBeenCalledOnce();
     fixture.root.remove();
   });
 
