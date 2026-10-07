@@ -31,6 +31,7 @@ export function installExplorerVirtualOrder(
   const originalReveal = host.revealInFolder;
   const revealDescriptor = Object.getOwnPropertyDescriptor(host, "revealInFolder");
   let disposed = false;
+  let sortingForRefresh = false;
   interface RevealRequest {
     entry: TAbstractFile;
     path: string;
@@ -48,7 +49,7 @@ export function installExplorerVirtualOrder(
   };
   const userTakeover = (): void => { clearReveal(); };
   const scrolled = (): void => {
-    if (pending?.completed && scrollContainer()?.scrollTop !== pending.scrollTop) clearReveal();
+    if (pending?.completed) pending.scrollTop = scrollContainer()?.scrollTop;
   };
   const inputEvents = ["wheel", "pointerdown", "touchstart", "keydown"] as const;
   for (const event of inputEvents) root.addEventListener(event, userTakeover, true);
@@ -87,13 +88,12 @@ export function installExplorerVirtualOrder(
     if (disposed || request === null || !request.completed) return;
     let currentPath: string | null;
     try { currentPath = revealPathFor(request.entry); } catch { currentPath = null; }
-    if (currentPath !== request.path || scrollContainer()?.scrollTop !== request.scrollTop) {
+    if (currentPath !== request.path) {
       clearReveal(request);
       return;
     }
-    const visible = ensureRevealTargetVisible(root, request.path);
+    ensureRevealTargetVisible(root, request.path);
     request.scrollTop = scrollContainer()?.scrollTop;
-    if (visible) clearReveal(request);
   };
   const completeReveal = (request: RevealRequest | null): void => {
     if (disposed || request === null || pending !== request) return;
@@ -112,10 +112,24 @@ export function installExplorerVirtualOrder(
     });
   };
 
+  const completeVoidRevealAfterHostFrame = (request: RevealRequest | null): void => {
+    if (disposed || request === null || pending !== request) return;
+    if (owner === null) {
+      completeReveal(request);
+      return;
+    }
+    request.frame = owner.requestAnimationFrame(() => {
+      if (pending !== request) return;
+      request.frame = null;
+      completeReveal(request);
+    });
+  };
+
   let wrappedReveal: HostSorter["revealInFolder"];
   if (typeof originalReveal === "function") {
     wrappedReveal = function(this: HostSorter, entry: TAbstractFile): Promise<void> | void {
       if (disposed) return originalReveal.call(this, entry);
+      if (sortingForRefresh && pending !== null) return undefined;
       clearReveal();
       let path: string | null;
       try { path = revealPathFor(entry); } catch { path = null; }
@@ -139,7 +153,7 @@ export function installExplorerVirtualOrder(
           },
         );
       }
-      completeReveal(request);
+      completeVoidRevealAfterHostFrame(request);
       return result;
     };
     try { host.revealInFolder = wrappedReveal; } catch { wrappedReveal = undefined; }
@@ -154,12 +168,18 @@ export function installExplorerVirtualOrder(
       return rect.width > 0 && rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom;
     });
     const before = anchor?.getBoundingClientRect().top;
-    host.sort();
+    sortingForRefresh = true;
+    try {
+      host.sort();
+    } finally {
+      sortingForRefresh = false;
+    }
     if (scroll !== null && anchor !== undefined && before !== undefined && anchor.isConnected) {
       const delta = anchor.getBoundingClientRect().top - before;
       if (Number.isFinite(delta) && Math.abs(delta) > 0.5) scroll.scrollTop += delta;
     }
-    // Sorting/anchor compensation is ours, not a later user's scroll takeover.
+    // Sorting/anchor compensation and host programmatic scrolling inside the
+    // bounded reveal window are ours; explicit user input still cancels it.
     if (pending?.completed) pending.scrollTop = scrollContainer()?.scrollTop;
     settleReveal();
   };
