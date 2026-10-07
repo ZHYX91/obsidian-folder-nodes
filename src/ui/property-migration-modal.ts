@@ -1,4 +1,4 @@
-import { App, Notice, Setting } from "obsidian";
+import { App, type ButtonComponent, Notice, Setting } from "obsidian";
 
 import type { MigrationScan, PropertyHealthFinding, PropertyMigrationScan } from "../core/types";
 import { formatError, t } from "./i18n";
@@ -54,10 +54,14 @@ export class PropertyMigrationModal extends SubmittingModal {
     progress.value = 0;
     progress.hidden = this.healthMode || this.scan.changes.length === 0;
     const controls = new Setting(this.contentEl);
-    controls.addButton((button) => button.setButtonText(this.healthMode ? t("confirm") : t("cancel")).onClick(() => {
-      if (this.controller !== null) this.controller.abort(new Error("Folder Nodes property migration cancelled"));
-      else this.close();
-    }));
+    let cancelButton: ButtonComponent | null = null;
+    controls.addButton((button) => {
+      cancelButton = button;
+      button.setButtonText(this.healthMode ? t("confirm") : t("cancel")).onClick(() => {
+        if (this.submitting) return;
+        this.close();
+      });
+    });
     if (this.healthMode) return;
     controls.addButton((button) => button
       .setCta()
@@ -68,6 +72,7 @@ export class PropertyMigrationModal extends SubmittingModal {
         this.submitting = true;
         this.controller = new AbortController();
         button.setDisabled(true);
+        cancelButton?.setDisabled(true);
         try {
           await this.onCommit(this.controller.signal, (completed, total) => {
             progress.max = Math.max(1, total);
@@ -78,6 +83,7 @@ export class PropertyMigrationModal extends SubmittingModal {
         } catch (error) {
           if (!this.controller.signal.aborted) new Notice(formatError(error), 8000);
           button.setDisabled(false);
+          cancelButton?.setDisabled(false);
         } finally {
           this.controller = null;
           this.submitting = false;

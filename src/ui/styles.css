@@ -447,7 +447,8 @@ body {
 }
 
 .nav-folder-title.folder-nodes-node,
-.nav-folder-title.folder-nodes-missing-note { align-items: center; }
+.nav-folder-title.folder-nodes-missing-note,
+.nav-file-title.folder-nodes-missing-folder-note { align-items: center; }
 
 .folder-nodes-explorer-icon > svg { display: block; width: 16px; height: 16px; }
 .folder-nodes-explorer-icon img { display: block; width: 18px; height: 18px; border-radius: 4px; }
