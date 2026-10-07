@@ -6,6 +6,7 @@ interface HostSorter {
   getSortedFolderItems: (folder: TFolder) => unknown;
   sort: () => void;
   revealInFolder?: (entry: TAbstractFile) => Promise<void> | void;
+  revealActiveFile?: () => void;
   tree?: { infinityScroll?: unknown };
 }
 
@@ -30,6 +31,8 @@ export function installExplorerVirtualOrder(
   const descriptor = Object.getOwnPropertyDescriptor(host, "getSortedFolderItems");
   const originalReveal = host.revealInFolder;
   const revealDescriptor = Object.getOwnPropertyDescriptor(host, "revealInFolder");
+  const originalActiveReveal = host.revealActiveFile;
+  const activeRevealDescriptor = Object.getOwnPropertyDescriptor(host, "revealActiveFile");
   let disposed = false;
   let sortingForRefresh = false;
   interface RevealRequest {
@@ -125,11 +128,23 @@ export function installExplorerVirtualOrder(
     });
   };
 
+  let wrappedActiveReveal: HostSorter["revealActiveFile"];
+  if (typeof originalActiveReveal === "function") {
+    wrappedActiveReveal = function(this: HostSorter): void {
+      // File Explorer sort() auto-reveals the active file directly through
+      // revealActiveFile(). Folder Nodes owns this sort call, so preserve the
+      // current viewport instead. Native host calls outside refresh pass through.
+      if (sortingForRefresh) return;
+      originalActiveReveal.call(this);
+    };
+    try { host.revealActiveFile = wrappedActiveReveal; } catch { wrappedActiveReveal = undefined; }
+  }
+
   let wrappedReveal: HostSorter["revealInFolder"];
   if (typeof originalReveal === "function") {
     wrappedReveal = function(this: HostSorter, entry: TAbstractFile): Promise<void> | void {
       if (disposed) return originalReveal.call(this, entry);
-      if (sortingForRefresh && pending !== null) return undefined;
+      if (sortingForRefresh) return undefined;
       clearReveal();
       let path: string | null;
       try { path = revealPathFor(entry); } catch { path = null; }
@@ -201,7 +216,13 @@ export function installExplorerVirtualOrder(
         if (revealDescriptor === undefined) delete host.revealInFolder;
         else Object.defineProperty(host, "revealInFolder", revealDescriptor);
       }
+      // Restore native item order without letting this plugin-owned sort invoke
+      // File Explorer's active-file auto-reveal.
       refresh();
+      if (wrappedActiveReveal !== undefined && host.revealActiveFile === wrappedActiveReveal) {
+        if (activeRevealDescriptor === undefined) delete host.revealActiveFile;
+        else Object.defineProperty(host, "revealActiveFile", activeRevealDescriptor);
+      }
     },
   };
 }
