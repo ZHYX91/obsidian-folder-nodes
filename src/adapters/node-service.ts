@@ -1067,12 +1067,13 @@ export class NodeService {
     const name = sanitizeNodeName(renamedNote.basename);
     const sourcePath = normalizeVaultPath(folder.path);
     if (sourcePath === "") return;
+    const renamedNotePath = renamedNote.path;
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
     const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
     await this.assertAvailable(nextPath);
     this.assertEntryIdentity(folder, sourcePath, TFolder);
-    this.assertEntryIdentity(renamedNote, renamedNote.path, TFile);
-    if (renamedNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${renamedNote.path}`);
+    this.assertEntryIdentity(renamedNote, renamedNotePath, TFile);
+    if (renamedNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${renamedNotePath}`);
     const undos: Undo[] = [];
     try {
       this.expectEvent("rename", nextPath, sourcePath, true);
