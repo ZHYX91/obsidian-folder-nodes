@@ -92,6 +92,20 @@ describe("migration scan", () => {
     expect(scan.conflicts).toEqual([{ path: "a.md", reason: "Target folder differs only by case: A" }]);
   });
 
+  it("blocks leaf notes that sanitize to the same planned node in both scanners", async () => {
+    const inventory = {
+      folders: [],
+      markdown: ["A B.md", "A  B.md"],
+      files: ["A B.md", "A  B.md"],
+    };
+
+    const scan = scanMigration(inventory);
+    expect(scan.leafMarkdown).toEqual([]);
+    expect(scan.conflicts).toHaveLength(2);
+    expect(scan.conflicts.every(({ reason }) => reason.includes("same target: A B/A B.md"))).toBe(true);
+    expect(await scanMigrationAsync(inventory)).toEqual(scan);
+  });
+
   it("keeps canonical notes structural even when a leaf exemption matches them", () => {
     expect(scanMigration(
       { folders: ["A"], markdown: ["A/A.md"] },

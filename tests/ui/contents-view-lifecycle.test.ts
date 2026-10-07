@@ -82,6 +82,10 @@ describe("Node Contents render extension lifecycle", () => {
     const root = Object.assign(new TFolder(), { children: [], name: "", path: "" });
     const visible = Object.assign(new TFolder(), { children: [], name: "Visible", parent: root, path: "Visible" });
     const hidden = Object.assign(new TFolder(), { children: [], name: "Hidden", parent: root, path: "Hidden" });
+    const hiddenFile = Object.assign(new TFile(), {
+      basename: "secret", extension: "txt", name: "secret.txt", parent: hidden, path: "Hidden/secret.txt",
+    });
+    hidden.children.push(hiddenFile);
     root.children.push(visible, hidden);
     const note = (folder: TFolder): TFile => Object.assign(new TFile(), {
       basename: folder.name, extension: "md", name: `${folder.name}.md`, parent: folder, path: `${folder.path}/${folder.name}.md`,
@@ -136,8 +140,55 @@ describe("Node Contents render extension lifecycle", () => {
     expect(view.contentEl.querySelector<HTMLDetailsElement>(".folder-nodes-section")?.open).toBe(false);
     expect(view.contentEl.ownerDocument.activeElement?.getAttribute("data-folder-nodes-focus-key")).toBe("node:Visible");
     expect(view.contentEl.scrollTop).toBe(73);
+
+    reveal = false;
+    view.setFolder("Hidden");
+    expect(view.contentEl.textContent).toContain(t("hiddenNodeDetail"));
+    expect(view.contentEl.textContent).not.toContain("secret.txt");
+    reveal = true;
+    view.refresh();
+    expect(view.contentEl.textContent).toContain("secret.txt");
+
     await view.onClose();
     view.containerEl.remove();
+  });
+
+  it("keeps a same-named Markdown file visible inside an unmanaged folder", async () => {
+    const root = Object.assign(new TFolder(), { children: [], name: "", path: "" });
+    const folder = Object.assign(new TFolder(), { children: [], name: "_Archive", parent: root, path: "_Archive" });
+    const note = Object.assign(new TFile(), {
+      basename: "_Archive", extension: "md", name: "_Archive.md", parent: folder, path: "_Archive/_Archive.md",
+    });
+    folder.children.push(note);
+    root.children.push(folder);
+    const app = {
+      vault: { getAbstractFileByPath: () => null, getName: () => "Vault", getRoot: () => root },
+      workspace: { activeEditor: null },
+    };
+    const service = {
+      children: () => [], getCanonicalFile: () => null, nodeNoteCandidates: () => [], nodeNoteRole: () => "none" as const,
+      folderIdentity: () => "unmanaged" as const, fileIdentity: () => "ordinary" as const,
+      getFile: () => null, getFolder: (path: string) => path === folder.path ? folder : null,
+      isCanonicalFile: (file: TFile) => file === note, isIgnoredPath: (path: string) => path === folder.path,
+      isIgnoredRootPath: (path: string) => path === folder.path,
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: true }), isNodeVisible: () => true,
+      revealingHiddenNodes: () => false, isLeafNoteExempt: () => false, moveFile: vi.fn(async () => undefined),
+      notePathForFolder: () => "Vault.md", openFolderNode: vi.fn(async () => undefined),
+      previewPlacement: () => ({ kind: "blocked" as const, reason: "test" }), placeNode: vi.fn(async (entry: TFolder) => entry),
+    };
+    const actions = {
+      createChild: vi.fn(), createMissingNote: vi.fn(), editVisual: vi.fn(), entryMenu: vi.fn(), homepageEnabled: () => false,
+      nodeMenu: vi.fn(), openHomepage: vi.fn(), problemMenu: vi.fn(), refresh: vi.fn(), reportError: vi.fn(),
+    };
+    const view = new FolderNodeContentsView(
+      { app } as never, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const },
+      { isReferenced: () => false } as never, actions, false,
+    );
+
+    view.setFolder(folder.path);
+    expect(view.contentEl.textContent).toContain("_Archive.md");
+    await view.onClose();
   });
 
   it("keeps a remembered editor only while its exact view and file stay live", () => {

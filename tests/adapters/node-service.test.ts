@@ -170,7 +170,7 @@ describe("NodeService structural safety", () => {
     expect(fake.renames).toEqual([{ from: "A", to: "B" }]);
   });
 
-  it("revalidates mutable sources after asynchronous destination preflights", async () => {
+  it("revalidates mutable participants after asynchronous destination preflights", async () => {
     {
       const fake = new FakeObsidian();
       fake.addFile("Vault.md");
@@ -250,6 +250,89 @@ describe("NodeService structural safety", () => {
       await expect(pending).rejects.toThrow("identity changed");
       expect(file.path).toBe("Elsewhere/Document.pdf");
       expect(fake.files.has("Renamed.pdf")).toBe(false);
+    }
+
+    {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const target = fake.addFolder("Parent");
+      fake.addFile("Parent/Parent.md");
+      const child = fake.addFolder("Child");
+      fake.addFile("Child/Child.md");
+      const nodes = service(fake);
+      const entered = deferred();
+      const release = deferred();
+      fake.app.vault.adapter.exists = async (path: string) => {
+        if (path === "Parent/Child") {
+          entered.resolve();
+          await release.promise;
+        }
+        return fake.files.has(path);
+      };
+
+      const pending = nodes.moveNode(child, "Parent");
+      await entered.promise;
+      await fake.rename(target, "MovedParent");
+      release.resolve();
+
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(child.path).toBe("Child");
+      expect(fake.files.has("Parent/Child")).toBe(false);
+    }
+
+    {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const target = fake.addFolder("Target");
+      const file = fake.addFile("Document.pdf", "body");
+      const nodes = service(fake);
+      const entered = deferred();
+      const release = deferred();
+      fake.app.vault.adapter.exists = async (path: string) => {
+        if (path === "Target/Document.pdf") {
+          entered.resolve();
+          await release.promise;
+        }
+        return fake.files.has(path);
+      };
+
+      const pending = nodes.moveFile(file, "Target");
+      await entered.promise;
+      await fake.rename(target, "MovedTarget");
+      release.resolve();
+
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(file.path).toBe("Document.pdf");
+      expect(fake.files.has("Target/Document.pdf")).toBe(false);
+    }
+
+    {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder("Parent");
+      fake.addFile("Parent/Parent.md");
+      const child = fake.addFolder("Child");
+      const note = fake.addFile("Child/Child.md");
+      const nodes = service(fake);
+      const entered = deferred();
+      const release = deferred();
+      fake.app.vault.adapter.exists = async (path: string) => {
+        if (path === "Parent/Child") {
+          entered.resolve();
+          await release.promise;
+        }
+        return fake.files.has(path);
+      };
+
+      const pending = nodes.moveNode(child, "Parent");
+      await entered.promise;
+      fake.remove(note.path);
+      fake.addFile("Child/Child.md", "replacement");
+      release.resolve();
+
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(child.path).toBe("Child");
+      expect(fake.contents.get("Child/Child.md")).toBe("replacement");
     }
   });
 
