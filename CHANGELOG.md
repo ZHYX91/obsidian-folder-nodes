@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.4
+
+- Settle breadcrumb and explicit File Explorer reveals after the host's deferred scroll, and align both missing-note and missing-folder repair buttons with their row labels.
+- Preserve ordinary properties when merging notes, assign merged children target-relative manual ranks, and restore sibling ranks when a selection-created node is rolled back.
+- Revalidate source notes, folders, and destinations after asynchronous rename and move preflights; leave the Vault root in place when its note is renamed natively.
+- Refresh Node Graph links after reference-only changes, conceal hidden current-node contents, and retain same-named Markdown files inside unmanaged folders.
+- Detect duplicate sanitized targets before bulk organization, prevent menu reordering across hidden siblings, and disable cancellation while property migration writes are submitting.
+
 ## 0.10.3
 
 - Refresh command names and graph-button accessibility labels when changing interface language.
