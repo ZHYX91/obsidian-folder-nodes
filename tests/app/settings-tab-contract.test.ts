@@ -94,7 +94,9 @@ describe("settings tab compatibility contract", () => {
     expect(styles).toContain(".folder-nodes-explorer-icon > svg { display: block; width: 16px; height: 16px; }");
     expect(styles).toContain(".folder-nodes-explorer-icon img { display: block; width: 18px; height: 18px; border-radius: 4px; }");
     expect(styles).toContain(".folder-nodes-explorer-icon .folder-nodes-visual-emoji { font-size: 16px; }");
-    expect(styles).toContain(".nav-folder-title.folder-nodes-missing-note { align-items: center; }");
+    expect(styles).toContain(
+      ".nav-folder-title.folder-nodes-missing-note,\n.nav-file-title.folder-nodes-missing-folder-note { align-items: center; }",
+    );
     expect(styles).toContain("margin-inline-start: auto");
     expect(styles).toContain(".folder-nodes-status-badge.is-hidden");
     expect(styles).toContain("background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary))");

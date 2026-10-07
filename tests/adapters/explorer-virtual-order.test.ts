@@ -41,6 +41,10 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
 describe("Explorer virtual item ordering", () => {
   function revealFixture(native: (entry: TFolder) => Promise<void> | void, allowed = () => true) {
     const fixture = setup();
@@ -107,6 +111,7 @@ describe("Explorer virtual item ordering", () => {
     fixture.b.el.remove();
     await fixture.host.revealInFolder(fixture.target);
     allowed = false;
+    await nextFrame();
     fixture.bridge.settleReveal();
     allowed = true;
     fixture.scroll.scrollTop = 60;
@@ -117,11 +122,12 @@ describe("Explorer virtual item ordering", () => {
     fixture.root.remove();
   });
 
-  it("expires an unmaterialized request after its next rendering opportunity", async () => {
+  it("expires an unmaterialized void request after the host and settlement frames", async () => {
     const fixture = revealFixture(() => undefined);
     fixture.b.el.remove();
     await fixture.host.revealInFolder(fixture.target);
-    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    await nextFrame();
+    await nextFrame();
     fixture.scroll.scrollTop = 60;
     fixture.scroll.append(fixture.b.el);
     fixture.bridge.settleReveal();
@@ -238,6 +244,7 @@ describe("Explorer virtual item ordering", () => {
     bridge.refresh();
 
     await host.revealInFolder(target);
+    await nextFrame();
 
     expect(nativeReveal).toHaveBeenCalledWith(target);
     expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
@@ -269,6 +276,7 @@ describe("Explorer virtual item ordering", () => {
       () => [deepPath, fixture.a.file.path])!;
 
     await host.revealInFolder(target);
+    await nextFrame();
 
     expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(viewport.bottom);
     expect(fixture.scroll.scrollTop).toBe(65);
@@ -297,6 +305,7 @@ describe("Explorer virtual item ordering", () => {
     const bridge = installExplorerVirtualOrder(host, fixture.root, () => null)!;
 
     await host.revealInFolder(rootFolder);
+    await nextFrame();
 
     expect(pluginRoot.getBoundingClientRect().top).toBe(viewport.top);
     expect(fixture.scroll.scrollTop).toBe(20);
@@ -323,12 +332,59 @@ describe("Explorer virtual item ordering", () => {
 
     await host.revealInFolder(target);
     expect(fixture.scroll.scrollTop).toBe(60);
+    await nextFrame();
 
     fixture.scroll.append(fixture.b.el);
     bridge.settleReveal();
 
     expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
     expect(fixture.scroll.scrollTop).toBe(20);
+    bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("keeps a void reveal visible through delayed host scroll and decoration refresh", async () => {
+    const fixture = setup();
+    const viewport = { top: 80, bottom: 180, width: 200, height: 100 } as DOMRect;
+    fixture.scroll.getBoundingClientRect = () => viewport;
+    let decorated = false;
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = (decorated ? 220 : 100) - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    const target = Object.assign(new TFolder(), { path: fixture.b.file.path });
+    const active = Object.assign(new TFolder(), { path: fixture.a.file.path });
+    const nativeReveal = vi.fn((entry: TFolder) => {
+      window.requestAnimationFrame(() => {
+        fixture.scroll.scrollTop = entry.path === target.path ? 60 : 0;
+      });
+    });
+    const host = fixture.host as typeof fixture.host & {
+      revealInFolder: (entry: TFolder) => void | Promise<void>;
+    };
+    const nativeSort = host.sort.bind(host);
+    host.revealInFolder = nativeReveal;
+    host.sort = () => {
+      nativeSort();
+      host.revealInFolder(active);
+    };
+    const bridge = installExplorerVirtualOrder(host, fixture.root, () => null)!;
+
+    expect(host.revealInFolder(target)).toBeUndefined();
+    await nextFrame();
+
+    expect(nativeReveal).toHaveBeenCalledTimes(1);
+    expect(fixture.scroll.scrollTop).toBe(20);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(viewport.top);
+
+    decorated = true;
+    bridge.refresh();
+
+    expect(nativeReveal).toHaveBeenCalledTimes(1);
+    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(viewport.bottom);
+    expect(fixture.scroll.scrollTop).toBe(60);
+    await nextFrame();
+
     bridge.dispose();
     fixture.root.remove();
   });

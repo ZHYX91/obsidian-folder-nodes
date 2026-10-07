@@ -336,16 +336,44 @@ describe("Node Graph plugin integration", () => {
       full: false,
       pathReasons: new Map<string, ReadonlySet<TestRefreshReason>>([
         ["A/Notes.md", new Set(["metadata"])],
-        ["A/A.md", new Set(["reference"])],
       ]),
-      paths: new Set(["A/Notes.md", "A/A.md"]),
-      reasons: new Set(["metadata", "reference"]),
+      paths: new Set(["A/Notes.md"]),
+      reasons: new Set(["metadata"]),
     });
     const afterOrdinary = view.options?.getIndexSnapshot?.() as { revision: number };
     expect(afterOrdinary.revision).toBe(first.revision);
     expect(view.refreshCalls).toBe(0);
     expect(fixture.children).not.toHaveBeenCalled();
     expect(fixture.visuals.resolve).not.toHaveBeenCalled();
+  });
+
+  it("refreshes graph links for a canonical reference-only batch without traversing structure", async () => {
+    const fixture = pluginFixture();
+    const plugin = fixture.createPlugin();
+    await plugin.onload();
+    const view = createRegisteredView(plugin);
+    fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
+    const first = view.options?.getIndexSnapshot?.() as { revision: number };
+    fixture.children.mockClear();
+    fixture.visuals.resolve.mockClear();
+    fixture.app.metadataCache.resolvedLinks = { "A/A.md": { "Test Vault.md": 1 } };
+
+    callRefresh(plugin, {
+      full: false,
+      pathReasons: new Map([["A/A.md", new Set(["reference"])]]),
+      paths: new Set(["A/A.md"]),
+      reasons: new Set(["reference"]),
+    });
+    const refreshed = view.options?.getIndexSnapshot?.() as {
+      links: ReadonlyMap<string, ReadonlySet<string>>;
+      revision: number;
+    };
+
+    expect(refreshed.revision).toBe(first.revision + 1);
+    expect(refreshed.links.get("A")).toEqual(new Set([""]));
+    expect(fixture.children).not.toHaveBeenCalled();
+    expect(fixture.visuals.resolve).not.toHaveBeenCalled();
+    expect(view.refreshCalls).toBe(1);
   });
 
   it("refreshes one canonical metadata record and its graph links without collecting its subtree", async () => {

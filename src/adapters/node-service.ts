@@ -39,6 +39,13 @@ import { editableVisualCandidates } from "../core/visual";
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
 
+interface FileChangeReceipt {
+  readonly after: string;
+  readonly before: string;
+  readonly file: TFile;
+  readonly path: string;
+}
+
 interface OpenMarkdownTarget {
   readonly editor: Editor;
   readonly file: TFile;
@@ -53,7 +60,9 @@ export class NodeService {
     folder: TFolder;
     folderPath: string;
     notePath: string;
-    content: string;
+    initialContent: string;
+    finalContent: string;
+    orderReceipts: readonly FileChangeReceipt[];
   }>();
 
   public constructor(
@@ -208,7 +217,7 @@ export class NodeService {
     return this.operations.run(async () => {
       const receipt = this.createdNodes.get(note);
       if (receipt === undefined) throw new Error("Cannot safely roll back a node without its creation receipt");
-      const { folder, folderPath, notePath, content } = receipt;
+      const { folder, folderPath, notePath, initialContent, finalContent, orderReceipts } = receipt;
       const assertOwned = (): void => {
         this.assertEntryIdentity(folder, folderPath, TFolder);
         this.assertEntryIdentity(note, notePath, TFile);
@@ -218,11 +227,21 @@ export class NodeService {
         }
       };
       assertOwned();
-      if (await this.readCurrentSource(note) !== content) {
+      if (await this.readCurrentSource(note) !== finalContent) {
         throw new Error(`Cannot safely roll back concurrently modified created file: ${notePath}`);
       }
+      for (const orderReceipt of [...orderReceipts].reverse()) {
+        this.assertEntryIdentity(orderReceipt.file, orderReceipt.path, TFile);
+        if (await this.readCurrentSource(orderReceipt.file) !== orderReceipt.after) {
+          throw new Error(`Cannot safely roll back concurrently modified file: ${orderReceipt.path}`);
+        }
+      }
       assertOwned();
-      await this.trashCreatedFile(note, notePath, content);
+      for (const orderReceipt of [...orderReceipts].reverse()) {
+        await this.restoreFileChange(orderReceipt);
+      }
+      assertOwned();
+      await this.trashCreatedFile(note, notePath, initialContent);
       await this.trashCreatedFolder(folder, folderPath);
       this.createdNodes.delete(note);
     });
@@ -287,6 +306,7 @@ export class NodeService {
       const noteCandidates = this.canonicalFiles(sourcePath);
       if (noteCandidates.length > 1) throw new FolderNodesError("multiple_canonical_notes", { path: sourcePath }, `Multiple canonical Node Notes: ${sourcePath}`);
       const note = noteCandidates[0] ?? null;
+      const sourceNotePath = note?.path ?? null;
       const name = sanitizeNodeName(rawName);
       const oldName = folder.name;
       if (name === oldName) return folder;
@@ -295,7 +315,14 @@ export class NodeService {
       const nextNotePath = `${nextPath}/${name}.md`;
       const conflictingNoteBeforeMove = `${sourcePath}/${name}.md`;
       await this.assertAvailable(nextPath, folder);
-      if (note !== null && conflictingNoteBeforeMove !== note.path) await this.assertAvailable(conflictingNoteBeforeMove, note);
+      if (note !== null && sourceNotePath !== null && conflictingNoteBeforeMove !== sourceNotePath) {
+        await this.assertAvailable(conflictingNoteBeforeMove, note);
+      }
+      this.assertEntryIdentity(folder, sourcePath, TFolder);
+      if (note !== null && sourceNotePath !== null) {
+        this.assertEntryIdentity(note, sourceNotePath, TFile);
+        if (note.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
+      }
 
       const undos: Undo[] = [];
       try {
@@ -383,28 +410,33 @@ export class NodeService {
 
   public moveFile(file: TFile, targetFolderPath: string): Promise<void> {
     return this.exclusive(async () => {
+      const sourcePath = file.path;
       targetFolderPath = normalizeVaultPath(targetFolderPath);
       const target = targetFolderPath === "" ? this.app.vault.getRoot() : this.getFolder(targetFolderPath);
       if (target === null) throw new Error(`Unknown target folder: ${targetFolderPath}`);
       const normalizedTarget = normalizeVaultPath(target.path);
       const nextPath = normalizePath(normalizedTarget === "" ? file.name : `${normalizedTarget}/${file.name}`);
-      if (nextPath === file.path) return;
+      if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
+      this.assertEntryIdentity(file, sourcePath, TFile);
+      if (normalizedTarget !== "") this.assertEntryIdentity(target, normalizedTarget, TFolder);
       this.assertActive();
-      this.expectEvent("rename", nextPath, file.path);
+      this.expectEvent("rename", nextPath, sourcePath);
       await this.app.fileManager.renameFile(file, nextPath);
     });
   }
 
   public renameFile(file: TFile, rawName: string): Promise<void> {
     return this.exclusive(async () => {
+      const sourcePath = file.path;
       const name = validateFileName(rawName);
       const parentPath = normalizeVaultPath(file.parent?.path ?? "");
       const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
-      if (nextPath === file.path) return;
+      if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
+      this.assertEntryIdentity(file, sourcePath, TFile);
       this.assertActive();
-      this.expectEvent("rename", nextPath, file.path);
+      this.expectEvent("rename", nextPath, sourcePath);
       await this.app.fileManager.renameFile(file, nextPath);
     });
   }
@@ -448,6 +480,7 @@ export class NodeService {
       this.assertMergeStructure(source, sourcePath, initialSourceChildren);
       this.assertEntryIdentity(target, targetPath, TFolder);
 
+      const movedNodeOrder = this.children(sourcePath);
       const undos: Undo[] = [];
       let latestTarget = targetSnapshot;
       try {
@@ -470,6 +503,12 @@ export class NodeService {
             this.expectEvent("rename", sourceEntryPath, destination, entry instanceof TFolder);
             await this.app.fileManager.renameFile(entry, sourceEntryPath);
           });
+        }
+
+        for (const child of movedNodeOrder) {
+          const destination = normalizePath(`${targetPath}/${basename(child.childPath)}`);
+          const note = this.getCanonicalFile(destination);
+          if (note !== null) await this.appendRankIfManual(targetPath, note, undos);
         }
 
         await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
@@ -736,21 +775,26 @@ export class NodeService {
 
   public canReorder(folder: TFolder, delta: -1 | 1): boolean {
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
-    if (this.sortMode(parentPath) !== "manual") return false;
+    if (this.sortMode(parentPath) !== "manual" || !this.isNodeVisible(folder.path)) return false;
     const children = this.children(parentPath);
     const index = children.findIndex(({ childPath }) => childPath === folder.path);
     const target = index + delta;
-    return index >= 0 && target >= 0 && target < children.length;
+    const adjacent = children[target];
+    return index >= 0 && target >= 0 && target < children.length
+      && adjacent !== undefined && this.isNodeVisible(adjacent.childPath);
   }
 
   public reorder(folder: TFolder, delta: -1 | 1): Promise<void> {
     return this.exclusive(async () => {
       const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
       if (this.sortMode(parentPath) !== "manual") throw new Error("Enable manual child ordering before reordering nodes");
+      if (!this.isNodeVisible(folder.path)) return;
       const children = this.children(parentPath);
       const index = children.findIndex(({ childPath }) => childPath === folder.path);
       const target = index + delta;
-      if (index < 0 || target < 0 || target >= children.length) return;
+      const adjacent = children[target];
+      if (index < 0 || target < 0 || target >= children.length
+        || adjacent === undefined || !this.isNodeVisible(adjacent.childPath)) return;
       const siblings = children.filter(({ childPath }) => childPath !== folder.path);
       const intent: PlacementIntent = {
         kind: "insert",
@@ -815,6 +859,7 @@ export class NodeService {
         }
         return;
       }
+      if (entry instanceof TFile && oldRoot) return;
       if (entry instanceof TFile && oldCanonical && dirname(entry.path) === dirname(oldPath) && !isCanonicalNodeNote(entry.path)) {
         if (entry.parent !== null) await this.renameNodeUnlockedFromRenamedNote(entry.parent, entry);
       }
@@ -875,9 +920,17 @@ export class NodeService {
     if (resolved === null) return folder;
     const { parentPath, siblings, targetIndex } = resolved;
     const sourcePath = normalizeVaultPath(folder.path);
+    const sourceNote = this.requireCanonicalNote(folder);
+    const sourceNotePath = sourceNote.path;
+    const targetParent = parentPath === "" ? null : this.getFolder(parentPath);
+    if (parentPath !== "" && targetParent === null) throw new Error(`Unknown target folder: ${parentPath}`);
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
     const nextPath = normalizePath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
     if (oldParentPath !== parentPath) await this.assertAvailable(nextPath);
+    this.assertEntryIdentity(folder, sourcePath, TFolder);
+    this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+    if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
+    if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
 
     const undos: Undo[] = [];
     try {
@@ -888,6 +941,10 @@ export class NodeService {
         const plan = planInsert(siblings, moved, targetIndex ?? siblings.length);
         await this.applyOrderPatches(plan.patches, folder, undos);
       }
+      this.assertEntryIdentity(folder, sourcePath, TFolder);
+      this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+      if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
+      if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
       if (oldParentPath === parentPath) return folder;
       this.assertActive();
       this.expectEvent("rename", nextPath, sourcePath, true);
@@ -964,12 +1021,15 @@ export class NodeService {
     undos.push(() => this.trashCreatedFile(note, notePath, initialContent));
     this.assertEntryIdentity(note, notePath, TFile);
     this.assertActive();
-    const rank = await this.appendRankIfManual(normalizedParent, note, undos);
+    const orderReceipts: FileChangeReceipt[] = [];
+    const rank = await this.appendRankIfManual(normalizedParent, note, undos, orderReceipts);
     this.createdNodes.set(note, {
       folder: createdFolder,
       folderPath,
       notePath,
-      content: rank === null ? initialContent : patchFolderNodesFrontmatter(initialContent, { rank }),
+      initialContent,
+      finalContent: rank === null ? initialContent : patchFolderNodesFrontmatter(initialContent, { rank }),
+      orderReceipts,
     });
     return note;
   }
@@ -1016,10 +1076,15 @@ export class NodeService {
   private async renameNodeUnlockedFromRenamedNote(folder: TFolder, renamedNote: TFile): Promise<void> {
     this.assertActive();
     const name = sanitizeNodeName(renamedNote.basename);
-    const sourcePath = folder.path;
+    const sourcePath = normalizeVaultPath(folder.path);
+    if (sourcePath === "") return;
+    const renamedNotePath = renamedNote.path;
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
     const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
     await this.assertAvailable(nextPath);
+    this.assertEntryIdentity(folder, sourcePath, TFolder);
+    this.assertEntryIdentity(renamedNote, renamedNotePath, TFile);
+    if (renamedNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${renamedNotePath}`);
     const undos: Undo[] = [];
     try {
       this.expectEvent("rename", nextPath, sourcePath, true);
@@ -1039,6 +1104,7 @@ export class NodeService {
     patches: readonly OrderPatch[],
     movedFolder: TFolder | null,
     undos: Undo[],
+    receipts?: FileChangeReceipt[],
   ): Promise<void> {
     const movedPath = movedFolder === null ? null : normalizeVaultPath(movedFolder.path);
     for (const patch of patches) {
@@ -1046,7 +1112,8 @@ export class NodeService {
       const note = movedPath !== null && patch.childPath === movedPath
         ? this.requireCanonicalNote(movedFolder!)
         : this.getCanonicalFile(patch.childPath);
-      await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos);
+      const receipt = await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos);
+      if (receipt !== null) receipts?.push(receipt);
     }
   }
 
@@ -1064,13 +1131,18 @@ export class NodeService {
     return note === null ? null : this.propertiesForNote(note).rank;
   }
 
-  private async appendRankIfManual(parentPath: string, note: TFile, undos: Undo[]): Promise<number | null> {
+  private async appendRankIfManual(
+    parentPath: string,
+    note: TFile,
+    undos: Undo[],
+    receipts?: FileChangeReceipt[],
+  ): Promise<number | null> {
     if (this.sortMode(parentPath) !== "manual") return null;
     const movedPath = normalizeVaultPath(note.parent?.path ?? "");
     const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== movedPath);
     const moved: ChildOrderRecord = { basename: note.parent?.name ?? note.basename, childPath: movedPath, order: this.readRank(note) };
     const plan = planInsert(siblings, moved, siblings.length);
-    await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos);
+    await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos, receipts);
     return plan.patches.find(({ childPath }) => childPath === movedPath)?.nextOrder ?? null;
   }
 
@@ -1172,7 +1244,11 @@ export class NodeService {
     return resolveFolderNodesProperties(this.app.metadataCache.getFileCache(file)?.frontmatter);
   }
 
-  private async patchFolderNodesTransactional(file: TFile | null, patch: FolderNodesFrontmatterPatch, undos: Undo[]): Promise<void> {
+  private async patchFolderNodesTransactional(
+    file: TFile | null,
+    patch: FolderNodesFrontmatterPatch,
+    undos: Undo[],
+  ): Promise<FileChangeReceipt | null> {
     this.assertActive();
     if (file === null) throw new Error(`Cannot update missing Node Note: ${FOLDER_NODES_PROPERTY}`);
     const path = file.path;
@@ -1182,14 +1258,19 @@ export class NodeService {
       (current) => patchFolderNodesFrontmatter(current, patch),
     );
     const { after, before } = result;
-    if (after === before) return;
-    undos.push(async () => {
-      await this.applyFileChange(file, path, (current) => {
-        if (current !== after) {
-          throw new Error(`Cannot safely roll back concurrently modified file: ${path}`);
-        }
-        return before;
-      });
+    if (after === before) return null;
+    const receipt = { after, before, file, path };
+    undos.push(() => this.restoreFileChange(receipt));
+    return receipt;
+  }
+
+  private async restoreFileChange(receipt: FileChangeReceipt): Promise<void> {
+    const { after, before, file, path } = receipt;
+    await this.applyFileChange(file, path, (current) => {
+      if (current !== after) {
+        throw new Error(`Cannot safely roll back concurrently modified file: ${path}`);
+      }
+      return before;
     });
   }
 
@@ -1525,7 +1606,7 @@ function mergeFrontmatterProperties(
   const parsed = parseMergeFrontmatter(targetSource, targetPath);
   const additions: Array<readonly [string, unknown]> = [];
   for (const [key, value] of Object.entries(sourceProperties)) {
-    if (key === "position" || STRUCTURAL_PROPERTIES.has(key)) continue;
+    if (STRUCTURAL_PROPERTIES.has(key)) continue;
     if (Object.prototype.hasOwnProperty.call(parsed.frontmatter, key)) {
       if (!deepEqual(parsed.frontmatter[key], value)) throw new Error(`Merge property conflict: ${key}`);
       continue;
