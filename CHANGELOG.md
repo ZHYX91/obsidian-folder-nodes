@@ -4,6 +4,7 @@
 
 - Separate first-use instructions from advanced node operations in the English and Chinese guides.
 - Explain incomplete and unmanaged nodes, whole-node actions, and maintenance previews directly in Management settings.
+- Update the development dependency source-map-js to 1.2.2 to address its denial-of-service advisory.
 
 ## 0.10.4
 
