@@ -84,15 +84,20 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 
 ## Usage
 
-1. Back up the Vault and review **Settings → Folder Nodes → General** and **Management**.
-2. In File Explorer, complete any orange **Incomplete** items you want Folder Nodes to manage, or mark them **Unmanaged**.
-3. Use **New node**, node context menus, or the command palette to create and navigate Folder Nodes.
-4. Select editor text and choose **Create Folder Node from selection** when you want the selection to become a child node.
-5. Click an unresolved internal link such as `[[a]]` or `[[a|b]]` in managed scope to create the complete Folder Node directly.
-6. Open **Node contents** to browse the current node's children, media, and files. Right-click an item, use its More button, or press Shift+F10/Menu for the same actions.
-7. Open **Node Graph** to explore the hierarchy. Global shows the Vault structure, Subtree anchors one node, and Local adds its parent for context. Expand branches from node handles, search for nodes, switch between 2D/3D, and enable **Show links** when you want link relationships overlaid.
-8. On desktop, dropping a node into another node changes its parent. Exact before/after ordering is available only after the destination parent is switched to Manual child order. On Android, use native folder move or Folder Nodes' Move/Move up/Move down actions.
-9. Use Obsidian's native file/folder actions when you mean the selected file or folder. From a Node Note tab, choose an explicitly labelled **containing node** action only when you intend to operate on the whole Folder Node.
+### Getting started
+
+1. Back up your Vault and open **Settings → Folder Nodes → General** and **Management**.
+2. In File Explorer, a complete node consists of a folder and a same-named Markdown note, for example `A/` plus `A/A.md`. An orange **Incomplete** item is missing one side. Complete the ones you want managed, or mark them **Unmanaged**; the plugin will not silently create or move missing files.
+3. Use **New node**, the node context menu, or the command palette to create a complete node. **Unmanaged** items remain available in Obsidian, but Folder Nodes does not perform structural node operations there; it does not hide or delete those files.
+
+### More actions and safeguards
+
+1. Use **Create Folder Node from selection** to turn selected text into a child node. In managed scope, selecting an unresolved `[[a]]` or `[[a|b]]` link can also create a complete Folder Node.
+2. Open **Node contents** to browse the current node's children, media, and files. Right-click, More, or Shift+F10/Menu opens the same actions.
+3. Open **Node Graph** to browse the hierarchy: Global covers the Vault, Subtree anchors one node, and Local adds its parent. Expand branches, search, switch between 2D/3D, or enable **Show links** to overlay references.
+4. On desktop, dropping a node into another changes its parent. Exact before/after ordering requires the parent's **Manual** child order. On Android, use native folder movement or **Move / Move up / Move down**.
+5. Native Obsidian commands act on the selected file or folder. Commands explicitly labelled **containing node** act on the whole Folder Node, including its managed folder and note.
+6. **Batch organize** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Health check** is read-only. Cancel if the proposed scope differs from your intention.
 
 ## Settings
 

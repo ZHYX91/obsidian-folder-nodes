@@ -25,6 +25,16 @@ describe("settings tab compatibility contract", () => {
     expect(source).toContain("lockSettingsPanel(panel, compatibility.status === \"incompatible\")");
   });
 
+  it("keeps management guidance before operations and explicitly non-destructive", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
+    const guide = source.indexOf('t("managementGuideTitle")');
+    const unmanaged = source.indexOf('this.renderUnmanagedGroup(panel, "leaf");');
+    expect(guide).toBeGreaterThan(-1);
+    expect(unmanaged).toBeGreaterThan(guide);
+    expect(source).toContain('t("managementGuideBoundary")');
+    expect(source).toContain('t("managementGuideActions")');
+  });
+
   it("places a themed icon guide before the appearance controls", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/app/settings-tab.ts"),

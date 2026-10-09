@@ -335,6 +335,15 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderManagement(panel: HTMLElement): void {
+    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
+    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
+    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
+    setIcon(icon, "info");
+    heading.createEl("strong", { text: t("managementGuideTitle") });
+    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
+    body.createEl("p", { text: t("managementGuideStructure") });
+    body.createEl("p", { text: t("managementGuideBoundary") });
+    body.createEl("p", { text: t("managementGuideActions") });
     this.renderUnmanagedGroup(panel, "leaf");
     this.renderUnmanagedGroup(panel, "folder");
     new Setting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
