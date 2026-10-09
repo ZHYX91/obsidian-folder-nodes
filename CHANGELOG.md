@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.5 - 2026-10-09
+
+- Separate first-use instructions from advanced node operations in the English and Chinese guides.
+- Explain incomplete and unmanaged nodes, whole-node actions, and maintenance previews directly in Management settings.
+- Update the development dependency source-map-js to 1.2.2 to address its denial-of-service advisory.
+
 ## 0.10.4
 
 - Settle breadcrumb and explicit File Explorer reveals after the host's deferred scroll, and align both missing-note and missing-folder repair buttons with their row labels.

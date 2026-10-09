@@ -1,7 +1,7 @@
 {
   "id": "folder-nodes",
   "name": "Folder Nodes",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "minAppVersion": "1.12.7",
   "description": "Organize folders as same-named nodes with visual navigation, node contents, graph views, and scalable ordering.",
   "author": "ZhengYX",
