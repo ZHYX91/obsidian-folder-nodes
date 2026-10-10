@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { Menu } from "obsidian";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -177,6 +179,56 @@ describe("Node Graph progressive view", () => {
       expect(graphNode(view, "Work/A").style.width).toBe("144px");
       expect(graphNode(view, "Work/B").style.width).toBe("144px");
     } finally {
+      matchMedia.mockRestore();
+    }
+  });
+
+  it.each([
+    { childCount: 60, coarse: false, expansionWidth: 40, iconWidth: 30 },
+    { childCount: 60, coarse: true, expansionWidth: 44, iconWidth: 44 },
+    { childCount: 100, coarse: true, expansionWidth: 47, iconWidth: 44 },
+  ])("keeps the vertical expansion button wide enough for $childCount children (coarse: $coarse)", async ({ childCount, coarse, expansionWidth, iconWidth }) => {
+    const matchMedia = vi.spyOn(window, "matchMedia").mockReturnValue({ matches: coarse } as MediaQueryList);
+    const touchPoints = vi.spyOn(window.navigator, "maxTouchPoints", "get").mockReturnValue(coarse ? 1 : 0);
+    const style = document.head.createEl("style");
+    style.textContent = readFileSync("src/ui/node-graph.css", "utf8");
+    const snapshot = nodeGraphSnapshot();
+    for (const path of [...snapshot.records.keys()]) {
+      if (path.startsWith("Work/")) snapshot.records.delete(path);
+    }
+    for (let index = 0; index < childCount; index++) {
+      const path = `Work/Child ${index}`;
+      snapshot.records.set(path, record(path, `Child ${index}`, "Work", `${path}/Child ${index}.md`));
+    }
+    const dependencies = graphViewDependencies(snapshot, {
+      ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), layoutDirection: "top-to-bottom",
+    });
+    const view = new FolderNodeGraphView({ app: dependencies.app } as never, dependencies.service, dependencies.options);
+    openViews.push(view);
+    document.body.append(view.contentEl);
+    try {
+      await view.onOpen();
+      const assertHandles = (): void => {
+        const expand = expandHandle(view, "Work");
+        const icon = graphNode(view, "Work").querySelector<HTMLElement>(".folder-nodes-node-graph-node-icon-handle")!;
+        expect(expand.querySelector(".folder-nodes-node-graph-node-child-count")?.textContent).toBe(String(childCount));
+        expect(window.getComputedStyle(expand).width).toBe(`${expansionWidth}px`);
+        expect(window.getComputedStyle(icon).width).toBe(`${iconWidth}px`);
+        if (coarse) {
+          expect(window.getComputedStyle(expand).minWidth).toBe("44px");
+          expect(window.getComputedStyle(expand).height).toBe("44px");
+        }
+      };
+      assertHandles();
+      expect(expandHandle(view, "Work").getAttribute("aria-expanded")).toBe("false");
+      expandHandle(view, "Work").click();
+      assertHandles();
+      expect(expandHandle(view, "Work").getAttribute("aria-expanded")).toBe("true");
+      expect(visiblePaths(view).filter((path) => path.startsWith("Work/"))).toHaveLength(childCount);
+    } finally {
+      view.contentEl.remove();
+      style.remove();
+      touchPoints.mockRestore();
       matchMedia.mockRestore();
     }
   });
