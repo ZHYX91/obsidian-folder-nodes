@@ -39,7 +39,9 @@ describe("interface language", () => {
     expect(formatError(new FolderNodesError("folder_unmanaged", { path: "Private" }, "Folder is unmanaged: Private")))
       .toBe("此文件夹当前设为不管理：Private");
     expect(formatError(new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview")))
-      .toBe("预览后来源编辑器已变化，创建已停止。");
+      .toBe("创建过程中来源编辑器已变化，创建已停止。");
+    expect(formatError(new FolderNodesError("selection_wikilink_label_unsafe")))
+      .toBe("所选文字无法安全用 WikiLink 表示；可切换 Obsidian 的 Markdown 链接格式后重试。");
   });
 
   it("uses icon terminology consistently in both languages", () => {

@@ -1,3 +1,5 @@
+import { FolderNodesError } from "./folder-nodes-error";
+
 export interface SourcePosition {
   readonly line: number;
   readonly ch: number;
@@ -22,12 +24,29 @@ export function classifySelectionTableContext(
   return pipes.some((index) => index >= from.ch && index < to.ch) ? "cross-cell" : "single-cell";
 }
 
-export function buildSelectionWikiLink(target: string, label: string, context: SelectionTableContext): string {
+export function prepareSelectionLink(generated: string, label: string, context: SelectionTableContext): string {
   if (context === "cross-cell") throw new Error("A cross-cell selection cannot be converted into one link");
-  const normalizedLabel = label.trim().replace(/\s+/gu, " ");
-  const escapedLabel = normalizedLabel.replace(/\|/gu, "\\|").replace(/\]/gu, "\\]");
-  const separator = context === "single-cell" ? "\\|" : "|";
-  return `[[${target}${separator}${escapedLabel}]]`;
+  let link = generated;
+  if (generated.startsWith("[[") && generated.endsWith("]]")) {
+    // Obsidian's WikiLink renderer treats display text literally. Backslashes
+    // cannot protect its opening/closing delimiters, including a trailing ].
+    if (label.includes("[[") || label.includes("]]") || label.endsWith("]")) {
+      throw new FolderNodesError("selection_wikilink_label_unsafe", {}, "The selected text cannot be represented safely as a WikiLink");
+    }
+  } else {
+    // FileManager supplies the path and raw alias. Escape the original label
+    // once, independently of path encoding; never regenerate a relative path.
+    const prefix = `[${label}](`;
+    if (!generated.startsWith(prefix) || !generated.endsWith(")")) throw new Error("Unsupported generated selection link");
+    const target = generated.slice(prefix.length, -1).replaceAll("(", "%28").replaceAll(")", "%29");
+    const escapedLabel = label.replace(/[!"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]/gu, "\\$&");
+    link = `[${escapedLabel}](${target})`;
+  }
+  if (context === "single-cell") {
+    const pipes = new Set(unescapedPipeIndices(link));
+    link = link.split("").map((character, index) => pipes.has(index) ? "\\|" : character).join("");
+  }
+  return link;
 }
 
 function unescapedPipeIndices(line: string): number[] {
