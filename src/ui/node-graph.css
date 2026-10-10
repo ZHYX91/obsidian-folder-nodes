@@ -557,7 +557,6 @@
 
 .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle,
 .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
-  width: var(--folder-nodes-node-graph-expansion-width, 34px);
   position: absolute;
   left: 50%;
   z-index: 2;
@@ -574,6 +573,7 @@
 }
 
 .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
+  width: var(--folder-nodes-node-graph-expansion-width, 34px);
   bottom: -12px;
   background: var(--background-primary-alt);
 }
@@ -780,11 +780,11 @@
 
   .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle,
   .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-expand-handle {
-    width: 44px;
     height: 44px;
   }
 
   .folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node-icon-handle {
+    width: 44px;
     top: -22px;
   }
 
