@@ -8,6 +8,16 @@ import {
 } from "../../src/shared/settings";
 
 describe("settings", () => {
+  it("keeps selection confirmation on for missing or invalid data and persists an explicit off switch", () => {
+    expect(DEFAULT_SETTINGS.confirmSelectionCreation).toBe(true);
+    for (const value of [undefined, null, 0, "false", {}, true]) {
+      expect(normalizeSettings({ confirmSelectionCreation: value }).confirmSelectionCreation).toBe(true);
+    }
+    const saved = createSettingsSnapshot(normalizeSettings({ confirmSelectionCreation: false }));
+    expect(saved.schemaVersion).toBe(CURRENT_SETTINGS_SCHEMA_VERSION);
+    expect(loadSettingsData(saved).settings.confirmSelectionCreation).toBe(false);
+    expect(loadSettingsData(saved).migration).toBeNull();
+  });
   it("applies hidden markers by default and preserves an explicit off switch", () => {
     expect(DEFAULT_SETTINGS.hiddenNodesEnabled).toBe(true);
     expect(normalizeSettings({}).hiddenNodesEnabled).toBe(true);

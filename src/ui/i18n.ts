@@ -125,6 +125,8 @@ const zh = {
   creationGuideAliasResult: "；开启 aliases 时写入 b",
   creationGuideScope: "仅适用于 Folder Nodes 已管理的范围；忽略和豁免路径仍由 Obsidian 处理。",
   selectionPreview: "从选中文字创建 Folder Node", creationLocation: "创建位置", newNode: "新节点",
+  confirmSelectionCreation: "创建前确认",
+  confirmSelectionCreationDesc: "从选中文字创建节点前预览位置、名称和 aliases。关闭后直接创建，仍会检查冲突和选区变化。",
   selectionCrossesTableCells: "选区跨越了 Markdown 表格的单元格或行；为避免破坏表格，本次未创建节点。",
   aliasValue: "Alias", aliasNone: "不添加", reloadLanguage: "命令名称将在插件下次加载时使用新语言。",
   leafMarkdown: "尚未组成节点的 Markdown", missingNotes: "缺失节点笔记", conflicts: "阻塞冲突",
@@ -151,9 +153,10 @@ const zh = {
   errorTargetFolderUnknown: "找不到目标文件夹：{path}", errorTargetNotComplete: "目标不是完整的 Folder Node：{path}", errorSourceNodeChanged: "节点结构已变化，请重新执行操作。",
   errorUnmanagedMerge: "设为不管理的文件夹不能作为 Folder Node 合并。",
   errorMergeNoteOpen: "请先保存并关闭来源与目标节点笔记的所有标签页，再从文件列表重试合并：{path}",
-  errorSelectionSourceChanged: "预览后来源笔记已变化，创建已停止。", errorSelectionTableChanged: "预览后表格结构已变化，创建已停止。", errorSelectionEditorChanged: "预览后来源编辑器已变化，创建已停止。",
+  errorSelectionSourceChanged: "创建过程中来源笔记已变化，创建已停止。", errorSelectionTableChanged: "创建过程中表格结构已变化，创建已停止。", errorSelectionEditorChanged: "创建过程中来源编辑器已变化，创建已停止。",
+  errorSelectionWikiLinkLabelUnsafe: "所选文字无法安全用 WikiLink 表示；可切换 Obsidian 的 Markdown 链接格式后重试。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
-  errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "预览后选区已改变，创建已停止。",
+  errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "创建过程中选区已改变，创建已停止。",
   errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
   errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "为避免误操作，已停止此次操作：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
@@ -282,6 +285,8 @@ const en: typeof zh = {
   creationGuideAliasResult: "; writes b when aliases are enabled",
   creationGuideScope: "This applies only within the Folder Nodes managed scope; ignored and exempt paths remain under Obsidian's control.",
   selectionPreview: "Create Folder Node from selection", creationLocation: "Create in", newNode: "New node",
+  confirmSelectionCreation: "Confirm before creating",
+  confirmSelectionCreationDesc: "Preview the location, name, and aliases before creating a node from selected text. Turn off to create directly; conflicts and selection changes are still checked.",
   selectionCrossesTableCells: "The selection crosses Markdown table cells or rows. No node was created, to keep the table intact.",
   aliasValue: "Alias", aliasNone: "Do not add", reloadLanguage: "Command names will use the new language after the plugin reloads.",
   leafMarkdown: "Leaf Markdown", missingNotes: "Missing node notes", conflicts: "Blocking conflicts",
@@ -308,9 +313,10 @@ const en: typeof zh = {
   errorTargetFolderUnknown: "Target folder not found: {path}", errorTargetNotComplete: "The target is not a complete Folder Node: {path}", errorSourceNodeChanged: "The node structure changed. Try the action again.",
   errorUnmanagedMerge: "An unmanaged folder cannot be merged as a Folder Node.",
   errorMergeNoteOpen: "Save and close all tabs for the source and target node notes, then retry merging from the file explorer: {path}",
-  errorSelectionSourceChanged: "The source note changed after preview; creation stopped.", errorSelectionTableChanged: "The table structure changed after preview; creation stopped.", errorSelectionEditorChanged: "The source editor changed after preview; creation stopped.",
+  errorSelectionSourceChanged: "The source note changed during creation; creation stopped.", errorSelectionTableChanged: "The table structure changed during creation; creation stopped.", errorSelectionEditorChanged: "The source editor changed during creation; creation stopped.",
+  errorSelectionWikiLinkLabelUnsafe: "The selected text cannot be represented safely as a WikiLink. Switch Obsidian to Markdown links and try again.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
-  errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed after preview; creation stopped.",
+  errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed during creation; creation stopped.",
   errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
   errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Operation stopped safely: {message}",
   reconcileErrorsSummary: "Automatic structure synchronization left {count} items incomplete: {message}",
@@ -354,6 +360,7 @@ export function formatError(error: unknown): string {
       case "selection_source_changed": return t("errorSelectionSourceChanged");
       case "selection_table_changed": return t("errorSelectionTableChanged");
       case "selection_editor_changed": return t("errorSelectionEditorChanged");
+      case "selection_wikilink_label_unsafe": return t("errorSelectionWikiLinkLabelUnsafe");
     }
   }
   const message = error instanceof Error ? error.message : String(error);

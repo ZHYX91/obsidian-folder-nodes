@@ -59,6 +59,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       explorerIconPosition: settings.explorerIconPosition,
       showIconInNoteTitle: settings.showIconInNoteTitle,
       addSelectionAlias: settings.addSelectionAlias,
+      confirmSelectionCreation: settings.confirmSelectionCreation,
       nodeGraphEnabled: settings.nodeGraph.enabled,
       nodeGraphDefaultDimension: settings.nodeGraph.defaultDimension,
       nodeGraphLayoutDirection: settings.nodeGraph.layoutDirection,
@@ -104,6 +105,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         break;
       case "showIconInNoteTitle": settings.showIconInNoteTitle = Boolean(value); this.plugin.refreshVisuals(); break;
       case "addSelectionAlias": settings.addSelectionAlias = Boolean(value); break;
+      case "confirmSelectionCreation": settings.confirmSelectionCreation = Boolean(value); break;
       case "nodeGraphEnabled": settings.nodeGraph.enabled = Boolean(value); reconcileNodeGraph = true; break;
       case "nodeGraphDefaultDimension":
         if (value !== "2d" && value !== "3d") throw new Error("Unsupported Node Graph dimension");
@@ -256,6 +258,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const settings = this.plugin.settings;
     const sourceOptions = { "current-file": t("currentFile"), "current-node": t("currentNode"), "current-heading": t("currentHeading"), timestamp: t("timestamp"), custom: t("customText") };
     return [
+      { name: t("confirmSelectionCreation"), desc: t("confirmSelectionCreationDesc"), control: { type: "toggle", key: "confirmSelectionCreation", defaultValue: true } },
       { name: t("aliases"), desc: t("aliasesDesc"), control: { type: "toggle", key: "addSelectionAlias", defaultValue: true } },
       { name: `${t("prefix")}: ${t("enabled")}`, control: { type: "toggle", key: "prefixEnabled", defaultValue: false } },
       { name: `${t("prefix")}: ${t("source")}`, visible: settings.prefix.enabled, control: { type: "dropdown", key: "prefixSource", defaultValue: "current-file", options: sourceOptions } },
@@ -473,6 +476,9 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderNaming(panel: HTMLElement): void {
     this.renderNamingGuide(panel);
+    new Setting(panel).setName(t("confirmSelectionCreation")).setDesc(t("confirmSelectionCreationDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.confirmSelectionCreation).onChange(async (value) => {
+      this.plugin.settings.confirmSelectionCreation = value; await this.plugin.saveSettings();
+    }));
     new Setting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
       this.plugin.settings.addSelectionAlias = value; await this.plugin.saveSettings();
     }));
