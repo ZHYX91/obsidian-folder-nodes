@@ -146,8 +146,9 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       attr: { id: this.panelId(this.activeTab), role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },
     });
     const compatibility = this.plugin.getSettingsCompatibility();
+    const status = panel.createDiv({ cls: "folder-nodes-settings-persistence-status" });
     renderSettingsPersistenceStatus(
-      panel,
+      status,
       compatibility,
       this.plugin.getSettingsSaveState(),
       () => this.retrySettingsSave(),
@@ -162,7 +163,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public refreshPersistenceStatus(): void {
-    if (this.containerEl.isConnected) this.display();
+    if (!this.containerEl.isConnected) return;
+    const status = this.containerEl.querySelector<HTMLElement>(".folder-nodes-settings-persistence-status");
+    if (status === null) return;
+    status.empty();
+    renderSettingsPersistenceStatus(
+      status,
+      this.plugin.getSettingsCompatibility(),
+      this.plugin.getSettingsSaveState(),
+      () => this.retrySettingsSave(),
+    );
   }
 
   private async retrySettingsSave(): Promise<void> {
@@ -529,15 +539,44 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     minimum: number,
     maximum: number,
   ): void {
-    new Setting(panel).setName(name).setDesc(description).addText((text) => {
-      text.inputEl.type = "number";
-      text.inputEl.min = String(minimum);
-      text.inputEl.max = String(maximum);
-      text.setValue(String(this.plugin.settings.nodeGraph[key])).onChange(async (value) => {
-        const parsed = Number(value);
-        if (!Number.isFinite(parsed)) return;
-        this.plugin.settings.nodeGraph[key] = this.graphInteger(parsed, minimum, maximum, this.plugin.settings.nodeGraph[key]);
-        await this.saveNodeGraphSettings(true);
+    const setting = new Setting(panel).setName(name).setDesc(description);
+    setting.addText((text) => {
+      const input = text.inputEl;
+      input.type = "number";
+      input.min = String(minimum);
+      input.max = String(maximum);
+      input.step = "1";
+      text.setValue(String(this.plugin.settings.nodeGraph[key]));
+      const validate = (showMessage: boolean): number | null => {
+        const raw = input.value.trim();
+        const numeric = raw === "" ? NaN : Number(raw);
+        const valid = Number.isInteger(numeric) && numeric >= minimum && numeric <= maximum;
+        input.toggleClass("is-invalid", !valid);
+        input.setAttr("aria-invalid", String(!valid));
+        setting.setDesc(valid || !showMessage
+          ? description
+          : description + " " + t("nodeGraphNumberInvalid", { minimum, maximum }));
+        return valid ? numeric : null;
+      };
+      const commit = (): void => {
+        const value = validate(true);
+        if (value === null || value === this.plugin.settings.nodeGraph[key]) return;
+        this.plugin.settings.nodeGraph[key] = value;
+        void this.saveNodeGraphSettings(true).catch(() => {
+          // SettingsSaveCoordinator retains the snapshot and shows Retry in place.
+        });
+      };
+      text.onChange(() => { validate(false); });
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          input.value = String(this.plugin.settings.nodeGraph[key]);
+          validate(false);
+        }
       });
     });
   }
