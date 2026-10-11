@@ -83,6 +83,7 @@ export function renderNodeGraphToolbar(
   });
   setTooltip(search.inputEl, labels.findNode);
   search.clearButtonEl.setAttribute("aria-label", labels.clearSearch);
+  search.clearButtonEl.addClass("folder-nodes-node-graph-search-clear");
   setTooltip(search.clearButtonEl, labels.clearSearch);
 
   const linksToggle = primary.createEl("button", {
@@ -102,17 +103,7 @@ export function renderNodeGraphToolbar(
   setTooltip(linksToggle, labels.showLinksTooltip);
   linksToggle.addEventListener("click", actions.onShowLinks);
 
-  if (model.showLinks) {
-    const summary = primary.createSpan({
-      cls: `folder-nodes-node-graph-link-summary${model.visibleLinks === 0 ? " is-empty" : ""}`,
-      attr: { role: "status" },
-    });
-    summary.createSpan({
-      cls: "folder-nodes-node-graph-link-swatch",
-      attr: { "aria-hidden": "true" },
-    });
-    summary.createSpan({ text: model.visibleLinks === 0 ? labels.noLinks : model.linkSummary });
-  }
+  updateLinkSummary(primary, model, labels);
 
   const scope = toolbar.createDiv({
     cls: "folder-nodes-node-graph-scope",
@@ -180,6 +171,96 @@ export function renderNodeGraphToolbar(
   setIcon(help, "circle-help");
   setTooltip(help, labels.viewportHelp);
   return toolbar;
+}
+
+export function updateNodeGraphToolbar(
+  toolbar: HTMLElement,
+  model: NodeGraphToolbarModel,
+  labels: NodeGraphToolbarLabels,
+): void {
+  toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-title")?.setText(labels.nodeGraph);
+  const search = toolbar.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
+  if (search !== null) {
+    if (search.value !== model.searchQuery) search.value = model.searchQuery;
+    search.placeholder = labels.findNode;
+    search.setAttribute("aria-label", labels.findNode);
+    setTooltip(search, labels.findNode);
+  }
+  const clearSearch = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-search-clear");
+  if (clearSearch !== null) {
+    clearSearch.setAttribute("aria-label", labels.clearSearch);
+    setTooltip(clearSearch, labels.clearSearch);
+  }
+  const links = toolbar.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle");
+  if (links !== null) {
+    links.toggleClass("is-active", model.showLinks);
+    links.setAttribute("aria-checked", String(model.showLinks));
+    links.setAttribute("aria-label", labels.showLinksTooltip);
+    links.querySelector<HTMLElement>(":scope > span")?.setText(labels.showLinks);
+    setTooltip(links, labels.showLinksTooltip);
+  }
+  const primary = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-toolbar-primary");
+  if (primary !== null) updateLinkSummary(primary, model, labels);
+  const scope = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-scope");
+  if (scope !== null) {
+    scope.dataset.nodeGraphScope = model.scopeMode;
+    scope.setAttribute("aria-label", labels.scope);
+    scope.querySelector<HTMLElement>(".folder-nodes-node-graph-scope-path")?.setText(model.scopeLabel);
+    const global = scope.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-scope-button");
+    if (global !== null) {
+      global.setText(labels.globalScope);
+      global.disabled = model.scopeMode === "global";
+      global.setAttribute("aria-label", labels.globalScopeTooltip);
+      setTooltip(global, labels.globalScopeTooltip);
+    }
+    scope.querySelector<HTMLElement>("[data-node-graph-scope-action='subtree']")?.setText(labels.subtreeScope);
+    scope.querySelector<HTMLElement>("[data-node-graph-scope-action='local']")?.setText(labels.localScope);
+  }
+  const range = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-range-button");
+  if (range !== null) {
+    range.querySelector<HTMLElement>(":scope > span")?.setText(labels.expandRange);
+    range.setAttribute("aria-label", labels.expandRangeTooltip);
+    setTooltip(range, labels.expandRangeTooltip);
+  }
+  const dimension = toolbar.querySelector<HTMLElement>("[data-node-graph-switch='dimension']");
+  if (dimension !== null) {
+    dimension.setAttribute("aria-label", labels.dimension);
+    for (const button of dimension.querySelectorAll<HTMLElement>(".folder-nodes-node-graph-switch-button")) {
+      const active = button.textContent?.toLowerCase() === model.dimension;
+      button.toggleClass("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+      setTooltip(button, `${button.textContent ?? ""} ${labels.dimension}`);
+    }
+  }
+  for (const [action, description] of [["zoom-out", labels.zoomOut], ["zoom-in", labels.zoomIn], ["fit", labels.fitGraph]] as const) {
+    const button = toolbar.querySelector<HTMLElement>(`[data-node-graph-action='${action}']`);
+    if (button === null) continue;
+    button.setAttribute("aria-label", description);
+    setTooltip(button, description);
+  }
+  const reset = toolbar.querySelector<HTMLElement>("[data-node-graph-action='zoom-reset']");
+  if (reset !== null) setTooltip(reset, labels.zoomReset);
+  const viewport = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-viewport-controls");
+  viewport?.setAttribute("aria-label", labels.viewportHelp);
+  const help = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-viewport-help");
+  if (help !== null) {
+    help.setAttribute("aria-label", labels.viewportHelp);
+    setTooltip(help, labels.viewportHelp);
+  }
+}
+
+function updateLinkSummary(primary: HTMLElement, model: NodeGraphToolbarModel, labels: NodeGraphToolbarLabels): void {
+  let summary = primary.querySelector<HTMLElement>(".folder-nodes-node-graph-link-summary");
+  if (!model.showLinks) { summary?.remove(); return; }
+  if (summary === null) {
+    summary = primary.createSpan({ cls: "folder-nodes-node-graph-link-summary", attr: { role: "status" } });
+    summary.createSpan({ cls: "folder-nodes-node-graph-link-swatch", attr: { "aria-hidden": "true" } });
+    summary.createSpan({ cls: "folder-nodes-node-graph-link-summary-text" });
+  }
+  summary.toggleClass("is-empty", model.visibleLinks === 0);
+  summary.querySelector<HTMLElement>(".folder-nodes-node-graph-link-summary-text")?.setText(
+    model.visibleLinks === 0 ? labels.noLinks : model.linkSummary,
+  );
 }
 
 function switchButton(

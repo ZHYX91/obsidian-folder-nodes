@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.6 - 2026-10-11
+
+- Keep vertical Node Graph expansion handles readable and preserve viewport position and the live search input across redraws.
+- Keep vertical card titles clear of touch handles with shared card heights across DOM, Canvas, hit regions, edges, and viewport fitting.
+- Honor Obsidian's configured link format when creating a node from selected text, and let users turn off confirmation before creating.
+- Reject unsupported YAML frontmatter roots before writing node properties.
+- Commit numeric settings after editing, retain focused controls when settings persistence fails or recovers, and apply retained settings after a successful save retry.
+
 ## 0.10.5 - 2026-10-09
 
 - Separate first-use instructions from advanced node operations in the English and Chinese guides.

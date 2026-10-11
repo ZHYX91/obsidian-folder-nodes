@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseDocument } from "yaml";
 
 import {
   analyzeFolderNodesSource,
@@ -81,5 +82,115 @@ describe("source-preserving frontmatter patches", () => {
     expect(createNodeDocument("Selected text", "Selected text")).toBe("---\naliases:\n  - \"Selected text\"\n---\nSelected text");
     expect(createNodeDocument(null, "Body")).toBe("Body");
     expect(createNodeDocument(null, "\n    indented\n")).toBe("\n    indented\n");
+  });
+
+  it.each([
+    "  { title: Example, tags: [one, two] }",
+    "  [one, two]",
+    "  - one\n  - two",
+    "  title: Example\n  folder-nodes: [hidden=true]",
+  ])("rejects an indented root before either patcher writes: %s", (root) => {
+    const source = `---\n# retain\n${root}\n---\nBody`;
+    expect(() => patchFolderNodesFrontmatter(source, { hidden: true })).toThrow("Unsupported top-level frontmatter");
+    expect(() => patchFrontmatterScalar(source, "custom", "value")).toThrow("Unsupported top-level frontmatter");
+  });
+
+  it.each(["hello [world", "hello ] world", "hello {world", "hello } world"])(
+    "preserves collection punctuation in a plain scalar: %s", (title) => {
+      const source = `---\ntitle: ${title}\n---\nBody`;
+      expect(patchFolderNodesFrontmatter(source, { hidden: true })).toBe(
+        `---\ntitle: ${title}\nfolder-nodes:\n  - hidden=true\n---\nBody`,
+      );
+      expect(patchFrontmatterScalar(source, "custom", "value")).toBe(
+        `---\ntitle: ${title}\ncustom: "value"\n---\nBody`,
+      );
+    },
+  );
+
+  it.each([
+    'metadata: {\n  title: "A\n    ] B"\n}',
+    'metadata: {\n  title: "A\n    [ B"\n}',
+    "metadata: {\n  title: 'A\n    } B'\n}",
+    'metadata: &entry {\n  title: "A\\"\n    ] B"\n}',
+  ])("preserves multiline quoted flow values: %s", (metadata) => {
+    const source = `---\n${metadata}\n---\nBody`;
+    expect(patchFolderNodesFrontmatter(source, { hidden: true })).toBe(
+      `---\n${metadata}\nfolder-nodes:\n  - hidden=true\n---\nBody`,
+    );
+    expect(patchFrontmatterScalar(source, "custom", "value")).toBe(
+      `---\n${metadata}\ncustom: "value"\n---\nBody`,
+    );
+  });
+
+  it("does not read or replace column-zero keys nested in a multiline flow value", () => {
+    const metadata = "metadata: {\nfolder-nodes: [nested=true],\ncustom: nested\n}";
+    const source = `---\n${metadata}\nfolder-nodes: [hidden=true]\ncustom: top\n---\nBody`;
+    expect(patchFolderNodesFrontmatter(source, { hidden: false })).toBe(
+      `---\n${metadata}\ncustom: top\n---\nBody`,
+    );
+    expect(patchFrontmatterScalar(source, "custom", "value")).toBe(
+      `---\n${metadata}\nfolder-nodes: [hidden=true]\ncustom: "value"\n---\nBody`,
+    );
+  });
+
+  it.each(["owner's-name: Joe", 'quote"mark: a', "metadata: { owner: John's note }"])(
+    "preserves quotes inside plain YAML keys and values: %s", (property) => {
+      const source = `---\n${property}\n---\nBody`;
+      expect(patchFolderNodesFrontmatter(source, { hidden: true })).toBe(
+        `---\n${property}\nfolder-nodes:\n  - hidden=true\n---\nBody`,
+      );
+      expect(patchFrontmatterScalar(source, "custom", "value")).toContain(`${property}\ncustom: "value"`);
+    },
+  );
+
+  it.each(["&meta", "!!map", "!!map &meta"])("preserves %s multiline flow prefixes", (prefix) => {
+    const property = `metadata: ${prefix} {\n  title: Example\n}`;
+    const source = `---\n${property}\n---\nBody`;
+    expect(patchFolderNodesFrontmatter(source, { hidden: true })).toContain(`${property}\nfolder-nodes:`);
+    expect(patchFrontmatterScalar(source, "custom", "value")).toContain(`${property}\ncustom: "value"`);
+  });
+
+  it.each([
+    "metadata: { url: http:'quote }",
+    'metadata: { url: http:"quote }',
+    "metadata: { http:'quote: value }",
+    "metadata: { url: http:'quote, other: \"value\" }",
+    'metadata: {"a":"b"}',
+    "metadata: {\"a\":http:'quote}",
+  ])("distinguishes plain flow colons from mapping separators: %s", (property) => {
+    const source = `---\n${property}\n---\nBody`;
+    expect(parseDocument(property).errors).toEqual([]);
+    const structural = patchFolderNodesFrontmatter(source, { hidden: true });
+    const scalar = patchFrontmatterScalar(source, "custom", "value");
+    expect(structural).toBe(`---\n${property}\nfolder-nodes:\n  - hidden=true\n---\nBody`);
+    expect(scalar).toBe(`---\n${property}\ncustom: "value"\n---\nBody`);
+    for (const document of [structural, scalar]) {
+      expect(parseDocument(document.slice(4, document.indexOf("\n---", 4))).errors).toEqual([]);
+    }
+  });
+
+  it("replaces an entire generic multiline value without leaving its continuation", () => {
+    for (const value of ['{\n  title: Example\n}', '"A\n  ] B"', "|\n  First\n  Second", "First\n  Second"]) {
+      const source = `---\ncustom: ${value}\nother: retain\n---\nBody`;
+      expect(patchFrontmatterScalar(source, "custom", "value")).toBe(
+        '---\ncustom: "value"\nother: retain\n---\nBody',
+      );
+    }
+  });
+
+  it.each([
+    "title: hello [world", "title: hello } world", "owner's-name: Joe", 'quote"mark: a',
+    "metadata: { owner: John's note }",
+    'metadata: &entry {\n  title: "A\\"\n    ] B"\n}',
+    "metadata: !!map &meta {\n  title: Example\n}",
+    'custom: "A\n  ] B"', "custom: |\n  First\n  Second", "custom: First\n  Second",
+  ])("keeps independently parsed YAML valid when patching %s", (property) => {
+    const source = `---\n${property}\n---\nBody`;
+    const structural = patchFolderNodesFrontmatter(source, { hidden: true });
+    const scalar = patchFrontmatterScalar(source, "custom", "value");
+    for (const document of [source, structural, scalar]) {
+      const yaml = document.slice(4, document.indexOf("\n---", 4));
+      expect(parseDocument(yaml).errors).toEqual([]);
+    }
   });
 });

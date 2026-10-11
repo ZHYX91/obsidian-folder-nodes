@@ -13,7 +13,7 @@ translation_status: source
 
 `folder-nodes` 列表是受保护的结构元数据，不会在合并时从来源节点复制。NodeService 的 `children()` 仍返回完整受管理结构；可见性投影采用 `unmanaged || !hiddenNodesEnabled || showHiddenNodesThisSession || !effectiveHidden(node)`，并向上查找最近的新属性或兼容旧字段隐藏来源。Explorer、Contents 与 Graph 共用该规则，图谱在模型与布局前剪枝隐藏子树。插件只把持久总开关写入当前 schema 3 `data.json`，会话显示开关只存在内存中。兼容的无版本、schema 1 和 schema 2 设置会统一规范化为 schema 3 快照且不改写笔记；已弃用的图谱规则数组会被丢弃并报告条目数。
 
-属性解析同时读取 `folder-nodes` 与已公开的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden`。新旧双写等价时视为冗余；冲突和已知无效值失败关闭。结构属性与通用标量的源码 patcher 只接受顶层块式映射：顶层 flow mapping/序列、显式复合键和标量文档都保守拒绝，且不改动原文；正常块式映射内部仍可包含行内或跨行 flow 值。源码 patcher 只拥有这些精确顶层 key，检测重复/引号 key/未闭合歧义，保留 BOM、换行符、无关 YAML/正文和有效的未知未来 token，并写入规范 token 顺序。属性迁移绝不是启动副作用：只读扫描为精确源码生成指纹；显式提交重新扫描，在适用时固定 TFile 身份与当前未保存编辑器，完成后验证，失败时按原文精确回滚。
+属性解析同时读取 `folder-nodes` 与已公开的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden`。新旧双写等价时视为冗余；冲突和已知无效值失败关闭。结构属性与通用标量的源码 patcher 只接受无缩进的顶层块式映射：非零根缩进、顶层 flow mapping/序列、显式复合键和标量文档都保守拒绝，且不改动原文；正常块式映射保留普通标量中的标点、引号值以及行内或跨行 flow 值，包括 anchor 和 tag。跨行值的边界使内部 key 不会被读作顶层属性，标量替换会移除完整的旧值。源码 patcher 只拥有这些精确顶层 key，检测重复/引号 key/未闭合歧义，保留 BOM、换行符、无关 YAML/正文和有效的未知未来 token，并写入规范 token 顺序。属性迁移绝不是启动副作用：只读扫描为精确源码生成指纹；显式提交重新扫描，在适用时固定 TFile 身份与当前未保存编辑器，完成后验证，失败时按原文精确回滚。
 
 Core 只处理路径、命名、不管理边界规则、批量整理计划、反向引用索引、稀疏排序、frontmatter 最小 patch、Visual declaration 解析，以及节点图谱的纯可见性/几何。命名 Core 只验证公开的 Obsidian/Moment 子集并接收注入的时间格式化函数；真正的 `moment(date).format(pattern)` 位于 Obsidian adapter 边界。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View、节点图谱状态/渲染与批量刷新调度。节点图谱只采用有界的 `GraphIndex → ViewState → VisibleScene → renderer` 流程，不扩展成全插件数据抽象。公开仓库不依赖本地工作区或个人 Vault。
 
@@ -47,7 +47,7 @@ GraphIndex 由节点图谱扩展拥有，复用 NodeService 的分类/排序、�
 
 ViewState 把序列化 workspace 字段与会话状态分开。每次手动设置 expansion 后先从 VisibleScene 得到可见 ID；若 focus 不在其中，就沿 topology parent 链提升到最近可见祖先，再渲染 DOM、Canvas 2D 或 Canvas 3D。搜索使用直接的临时 expansion/focus 快照路径，不经过这条手动调和，因此清空时仍精确恢复进入搜索前状态。每个范围的展开以内存中的一层基线与 expanded/collapsed 分支例外表达。
 
-VisibleScene 是 DOM、Canvas 2D 与 Canvas 3D 消费的唯一过滤模型。搜索以单次线性遍历汇总结果，view 只计算当前维度的布局。共享几何统一拥有卡片尺寸、presentation、hit test、父级/子级把手、结构锚点、链接卡片边缘锚点与链接曲线。结构边保留明确的 parent-to-child 方向：从左到右布局连接父卡右把手到子卡左把手，从上到下布局连接父卡下把手到子卡上把手；链接边与把手及结构骨架独立。Canvas 保留所有可见结构边，只对链接边及聚焦关联链接应用限制。大 2D 保持可读的最小比例，通过空间索引查询视口候选，同时保留所需的父级边端点；大 3D 使用与命中几何一致的圆点，并仅对焦点或悬停显示完整卡片。工作区 Graph View 在自身 ItemView 生命周期内直接拥有 DOM viewport observer；独立 toolbar renderer 负责 SearchComponent 与工具栏 DOM 构建，插件层不再仅为了转接几何生命周期而增加一层继承。渲染状态不成为覆盖图谱的浮层；close/unload 会释放全部订阅、observer、animation frame、canvas 与 DOM。
+VisibleScene 是 DOM、Canvas 2D 与 Canvas 3D 消费的唯一过滤模型。搜索以单次线性遍历汇总结果，view 只计算当前维度的布局。共享几何统一拥有卡片尺寸、presentation、hit test、父级/子级把手、结构锚点、链接卡片边缘锚点与链接曲线。粗指针的从上到下布局使用 72px 卡片高度，其余使用 46px；DOM 与 Canvas 呈现、视口剔除、命中区域、边线和视口拟合使用同一高度，密集 DOM 3D 圆点仍为 16px，Canvas 圆点保留既有尺寸。结构边保留明确的 parent-to-child 方向：从左到右布局连接父卡右把手到子卡左把手，从上到下布局连接父卡下把手到子卡上把手；链接边与把手及结构骨架独立。Canvas 保留所有可见结构边，只对链接边及聚焦关联链接应用限制。大 2D 保持可读的最小比例，通过空间索引查询视口候选，同时保留所需的父级边端点；大 3D 使用与命中几何一致的圆点，并仅对焦点或悬停显示完整卡片。工作区 Graph View 在自身 ItemView 生命周期内直接拥有 DOM viewport observer；独立 toolbar renderer 负责 SearchComponent 与工具栏 DOM 构建，插件层不再仅为了转接几何生命周期而增加一层继承。同范围重绘保留视口状态与仍在编辑的搜索输入，同步全部依赖模型的工具栏字段，替换视口按钮绑定，并在恢复相机后重新投影 DOM 3D 节点与边线。待保存设置重试成功后会调和最新已提交设置，但不会提交控件中尚未完成的文本。渲染状态不成为覆盖图谱的浮层；close/unload 会释放全部订阅、observer、animation frame、canvas 与 DOM。
 
 ## 一致性与失败关闭
 

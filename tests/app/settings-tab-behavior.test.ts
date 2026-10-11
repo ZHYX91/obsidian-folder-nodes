@@ -1,9 +1,9 @@
-import { type App, type TextComponent } from "obsidian";
+import { type App, type PluginManifest, type TextComponent } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
-import type FolderNodesPlugin from "../../src/app/plugin";
+import FolderNodesPlugin from "../../src/app/plugin";
 import { FolderNodesSettingTab } from "../../src/app/settings-tab";
-import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS } from "../../src/shared/settings";
+import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings } from "../../src/shared/settings";
 import type { SettingsSaveState } from "../../src/shared/settings-save-coordinator";
 
 vi.mock("obsidian", async (importOriginal) => {
@@ -26,8 +26,16 @@ vi.mock("obsidian", async (importOriginal) => {
   class TestPluginSettingTab {
     public readonly containerEl = document.createElement("div");
   }
-  return { ...actual, PluginSettingTab: TestPluginSettingTab, Setting: TestSetting };
+  return {
+    ...actual, PluginSettingTab: TestPluginSettingTab, Setting: TestSetting,
+    Plugin: class {
+      public constructor(public app: App, public manifest: PluginManifest) {}
+      public async saveData(_snapshot: unknown): Promise<void> {}
+    },
+  };
 });
+vi.mock("../../src/ui/styles.css", () => ({ default: ".folder-nodes {}" }));
+vi.mock("../../src/ui/node-graph.css", () => ({ default: ".folder-nodes-node-graph {}" }));
 
 function fixture() {
   const state: { current: SettingsSaveState } = { current: "saved" };
@@ -49,8 +57,7 @@ function fixture() {
   return { tab, plugin, state };
 }
 
-function numberControl(tab: FolderNodesSettingTab, name: string, description: string) {
-  const panel = document.body.createDiv();
+function numberControl(tab: FolderNodesSettingTab, name: string, description: string, panel: HTMLElement = document.body.createDiv()) {
   const method = tab as unknown as {
     renderGraphNumberSetting: (
       panel: HTMLElement,
@@ -65,6 +72,25 @@ function numberControl(tab: FolderNodesSettingTab, name: string, description: st
   const input = panel.querySelector<HTMLInputElement>("input");
   if (input === null) throw new Error("Missing graph numeric input");
   return { input, panel };
+}
+
+function persistenceFixture(failures: number) {
+  const plugin = new FolderNodesPlugin({} as App, { id: "folder-nodes", name: "Folder Nodes" } as PluginManifest);
+  const snapshots: PersistedFolderNodesSettings[] = [];
+  vi.spyOn(plugin, "saveData").mockImplementation(async (snapshot: unknown) => {
+    snapshots.push(structuredClone(snapshot as PersistedFolderNodesSettings));
+    if (snapshots.length <= failures) throw new Error("Disk unavailable");
+  });
+  vi.spyOn(plugin, "ensureStyles").mockImplementation(() => undefined);
+  const reconcile = vi.spyOn(plugin, "reconcileSettingsChange").mockResolvedValue(undefined);
+  const tab = new FolderNodesSettingTab({} as App, plugin);
+  Reflect.set(plugin, "settingsTab", tab);
+  Reflect.set(tab, "renderGeneral", (panel: HTMLElement) => numberControl(tab, "Canvas threshold", "Choose the Canvas threshold", panel));
+  Reflect.set(tab, "revealActiveTab", () => undefined);
+  document.body.append(tab.containerEl);
+  tab.display();
+  const input = tab.containerEl.querySelector<HTMLInputElement>("input")!;
+  return { plugin, tab, input, snapshots, reconcile };
 }
 
 describe("imperative settings edit state", () => {
@@ -123,5 +149,51 @@ describe("imperative settings edit state", () => {
     await vi.waitFor(() => expect(tab.containerEl.querySelector(".folder-nodes-settings-warning")).toBeNull());
     expect(tab.containerEl.querySelector("[data-test-editor]")).toBe(editor);
     expect(document.activeElement).toBe(editor);
+  });
+
+  it("applies the retained committed graph snapshot after Retry while preserving an unfinished edit", async () => {
+    const { plugin, tab, input, snapshots, reconcile } = persistenceFixture(1);
+    input.value = "240";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("blur"));
+    await vi.waitFor(() => expect(plugin.getSettingsSaveState()).toBe("pending"));
+    expect(reconcile).not.toHaveBeenCalled();
+    input.value = "2";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+    tab.containerEl.querySelector<HTMLButtonElement>(".folder-nodes-settings-warning button")!.click();
+    await vi.waitFor(() => expect(plugin.getSettingsSaveState()).toBe("saved"));
+    await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce());
+    expect(snapshots.map((snapshot) => snapshot.nodeGraph.largeGraphThreshold)).toEqual([240, 240]);
+    expect(plugin.settings.nodeGraph.largeGraphThreshold).toBe(240);
+    expect(tab.containerEl.querySelector("input")).toBe(input);
+    expect(input.value).toBe("2");
+    expect(document.activeElement).toBe(input);
+    expect(tab.containerEl.querySelector(".folder-nodes-settings-warning")).toBeNull();
+    await plugin.retrySettingsSave();
+    expect(reconcile).toHaveBeenCalledOnce();
+  });
+
+  it("keeps failed retries pending and applies only the latest committed graph snapshot on recovery", async () => {
+    const { plugin, tab, input, snapshots, reconcile } = persistenceFixture(3);
+    for (const value of ["240", "360"]) {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("blur"));
+      await vi.waitFor(() => expect(plugin.getSettingsSaveState()).toBe("pending"));
+    }
+    input.value = "3";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    tab.containerEl.querySelector<HTMLButtonElement>(".folder-nodes-settings-warning button")!.click();
+    await vi.waitFor(() => expect(snapshots).toHaveLength(3));
+    await vi.waitFor(() => expect(plugin.getSettingsSaveState()).toBe("pending"));
+    expect(tab.containerEl.querySelector(".folder-nodes-settings-warning")).not.toBeNull();
+    expect(reconcile).not.toHaveBeenCalled();
+    tab.containerEl.querySelector<HTMLButtonElement>(".folder-nodes-settings-warning button")!.click();
+    await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce());
+    expect(plugin.getSettingsSaveState()).toBe("saved");
+    expect(snapshots.map((snapshot) => snapshot.nodeGraph.largeGraphThreshold)).toEqual([240, 360, 360, 360]);
+    expect(input.value).toBe("3");
+    expect(tab.containerEl.querySelector("input")).toBe(input);
   });
 });

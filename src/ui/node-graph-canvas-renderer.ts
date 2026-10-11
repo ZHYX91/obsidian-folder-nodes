@@ -273,7 +273,7 @@ export class NodeGraphCanvasRenderer {
         target,
       );
     } else {
-      const fitted = fitNodeGraphCamera(this.data.points3D, this.camera3D, this.width, this.height);
+      const fitted = fitNodeGraphCamera(this.data.points3D, this.camera3D, this.width, this.height, 48, 0, this.data.layout.nodeHeight);
       const constrained = fitted.zoom < MIN_READABLE_3D_ZOOM;
       this.camera3D = constrained ? { ...fitted, zoom: MIN_READABLE_3D_ZOOM } : fitted;
       if (constrained && targetPath !== null) this.centerOn(targetPath);
@@ -767,7 +767,7 @@ export class NodeGraphCanvasRenderer {
     for (const point of projected) this.projectedById.set(point.id, point);
     this.drawEdges(this.dimension === "2d" ? this.project2DEdgeEndpoints(projected) : this.projectedById);
     this.visiblePoints = this.orderVisiblePoints(
-      projected.filter((point) => pointIsVisible(point, { width: this.width, height: this.height })),
+      projected.filter((point) => pointIsVisible(point, { width: this.width, height: this.height }, 24, this.data.layout.nodeHeight)),
     );
     const overlayPath = this.hoveredPath ?? this.focusPath;
     for (const point of this.visiblePoints) if (point.id !== overlayPath) this.drawNode(point);
@@ -1175,6 +1175,7 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlay.style.left = `${point.x}px`;
     this.focusOverlay.style.top = `${point.y}px`;
     this.focusOverlay.style.width = `${point.width ?? NODE_GRAPH_CANVAS_NODE_WIDTH}px`;
+    this.focusOverlay.style.height = `${this.data.layout.nodeHeight}px`;
     this.focusOverlay.style.transform = `translate(-50%, -50%) scale(${this.presentationForPoint(point).scale})`;
     this.focusOverlay.classList.toggle("is-selected", path === this.focusPath);
     this.focusOverlay.hidden = false;
@@ -1252,7 +1253,7 @@ export class NodeGraphCanvasRenderer {
 
   private presentationForPoint(point: NodeGraphCanvasPoint): CanvasNodePresentation {
     const active = point.id === (this.hoveredPath ?? this.focusPath);
-    const geometry = nodeGraphCanvasGeometry(active ? Math.max(0.85, point.scale) : point.scale, point.width);
+    const geometry = nodeGraphCanvasGeometry(active ? Math.max(0.85, point.scale) : point.scale, point.width, this.data.layout.nodeHeight);
     const denseDot = this.dimension === "3d"
       && this.data.model.nodes.length > DENSE_3D_DOT_THRESHOLD
       && point.id !== this.focusPath
