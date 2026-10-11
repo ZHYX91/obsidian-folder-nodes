@@ -45,6 +45,38 @@ describe("source-preserving frontmatter patches", () => {
     expect(analyzeFolderNodesSource("---\nfolder-nodes: []\nfolder-nodes: []\n---\n").issues[0]?.code).toBe("source-ambiguous");
   });
 
+  it.each([
+    ["flow mapping", "---\n{ title: Example, tags: [one, two] }\n---\nBody\n"],
+    ["flow sequence", "---\n[one, two]\n---\nBody\n"],
+    ["block sequence", "---\n- one\n- two\n---\nBody\n"],
+    ["complex mapping key", "---\n? [one, two]\n: value\n---\nBody\n"],
+    ["root scalar", "---\nplain scalar\n---\nBody\n"],
+  ])("rejects %s roots before structural or scalar writes", (_shape, source) => {
+    const original = source;
+    expect(() => patchFolderNodesFrontmatter(source, { hidden: true })).toThrow("Unsupported top-level frontmatter");
+    expect(() => patchFrontmatterScalar(source, "custom", "value")).toThrow("Unsupported top-level frontmatter");
+    expect(source).toBe(original);
+  });
+
+  it("accepts flow values inside ordinary block mappings without rewriting other bytes", () => {
+    const source = "\uFEFF---\r\n# retain\r\nmetadata: { name: Example, nested: [one, two] }\r\naliases: [\"A\", \"B\"]\r\n---\r\nBody\r\n";
+    const updated = patchFolderNodesFrontmatter(source, { hidden: true });
+    expect(updated).toBe("\uFEFF---\r\n# retain\r\nmetadata: { name: Example, nested: [one, two] }\r\naliases: [\"A\", \"B\"]\r\nfolder-nodes:\r\n  - hidden=true\r\n---\r\nBody\r\n");
+    expect(patchFrontmatterScalar(source, "custom", "safe")).toContain(
+      "metadata: { name: Example, nested: [one, two] }\r\naliases: [\"A\", \"B\"]\r\ncustom: \"safe\"",
+    );
+  });
+
+  it("accepts multiline flow values under an ordinary block mapping", () => {
+    const source = "---\nmetadata: {\n  title: \"A: B\",\n  tags: [one, two]\n}\npriority: 4\n---\nBody";
+    expect(patchFolderNodesFrontmatter(source, { hidden: true })).toBe(
+      "---\nmetadata: {\n  title: \"A: B\",\n  tags: [one, two]\n}\npriority: 4\nfolder-nodes:\n  - hidden=true\n---\nBody",
+    );
+    expect(patchFrontmatterScalar(source, "priority", 8)).toContain(
+      "metadata: {\n  title: \"A: B\",\n  tags: [one, two]\n}\npriority: 8\n---",
+    );
+  });
+
   it("creates exact aliases from selected text", () => {
     expect(createNodeDocument("Selected text", "Selected text")).toBe("---\naliases:\n  - \"Selected text\"\n---\nSelected text");
     expect(createNodeDocument(null, "Body")).toBe("Body");

@@ -157,6 +157,10 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     return { bom, closingBoundary: -1, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
   }
   const closingBoundary = relativeEnd + 1;
+  if (hasUnsupportedTopLevelStructure(lines, closingBoundary)) {
+    issues.push({ code: "source-ambiguous", field: "all", message: "Unsupported top-level frontmatter structure; use a block mapping" });
+    return { bom, closingBoundary, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
+  }
   const occurrences = new Map<string, SourceRange[]>();
   const frontmatter: Record<string, unknown> = {};
   for (let index = 1; index < closingBoundary; index += 1) {
@@ -195,6 +199,76 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     if (candidate !== undefined) ranges.set(key, candidate);
   }
   return { bom, closingBoundary, eol, frontmatter, hasFrontmatter, issues, lines, ranges };
+}
+
+/**
+ * Only insert top-level properties into block mappings. Flow roots, sequences,
+ * explicit mapping keys, and scalar documents cannot be patched line-by-line.
+ * Track nested flow collections so a block mapping's multiline flow values work.
+ */
+function hasUnsupportedTopLevelStructure(lines: readonly string[], closingBoundary: number): boolean {
+  let flowDepth = 0;
+  for (let index = 1; index < closingBoundary; index += 1) {
+    const line = lines[index] ?? "";
+    if (flowDepth > 0) {
+      flowDepth = flowCollectionDepth(line, flowDepth);
+      if (flowDepth < 0) return true;
+      continue;
+    }
+    if (/^\s*(?:#.*)?$/u.test(line) || /^\s/u.test(line)) continue;
+    const separator = blockMappingSeparator(line);
+    if (separator === null) return true;
+    flowDepth = flowCollectionDepth(line.slice(separator + 1), 0);
+    if (flowDepth < 0) return true;
+  }
+  return flowDepth !== 0;
+}
+
+function blockMappingSeparator(line: string): number | null {
+  let quote: "'" | '"' | null = null;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (quote === '"') {
+      if (character === "\\") { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'" && line[index + 1] === "'") { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') { quote = character; continue; }
+    if (character !== ":" || (line[index + 1] !== undefined && !/\s/u.test(line[index + 1]!))) continue;
+    const key = line.slice(0, index).trim();
+    if (key === "" || /^[-?](?:\s|$)/u.test(key) || key.startsWith("[") || key.startsWith("]") || /^[{}:,#&*!|>]/u.test(key)) return null;
+    return index;
+  }
+  return null;
+}
+
+function flowCollectionDepth(source: string, initial: number): number {
+  let depth = initial;
+  let quote: "'" | '"' | null = null;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote === '"') {
+      if (character === "\\") { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'" && source[index + 1] === "'") { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') { quote = character; continue; }
+    if (character === "#" && (index === 0 || /\s/u.test(source[index - 1] ?? ""))) break;
+    if (character === "{" || character === "[") depth += 1;
+    else if (character === "}" || character === "]") depth -= 1;
+    if (depth < 0) return -1;
+  }
+  return depth;
 }
 
 function parseFolderNodesValue(lines: readonly string[], range: SourceRange): unknown {

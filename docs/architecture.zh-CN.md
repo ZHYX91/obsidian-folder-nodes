@@ -13,7 +13,7 @@ translation_status: source
 
 `folder-nodes` 列表是受保护的结构元数据，不会在合并时从来源节点复制。NodeService 的 `children()` 仍返回完整受管理结构；可见性投影采用 `unmanaged || !hiddenNodesEnabled || showHiddenNodesThisSession || !effectiveHidden(node)`，并向上查找最近的新属性或兼容旧字段隐藏来源。Explorer、Contents 与 Graph 共用该规则，图谱在模型与布局前剪枝隐藏子树。插件只把持久总开关写入当前 schema 3 `data.json`，会话显示开关只存在内存中。兼容的无版本、schema 1 和 schema 2 设置会统一规范化为 schema 3 快照且不改写笔记；已弃用的图谱规则数组会被丢弃并报告条目数。
 
-属性解析同时读取 `folder-nodes` 与已公开的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden`。新旧双写等价时视为冗余；冲突和已知无效值失败关闭。源码 patcher 只拥有这些精确顶层 key，检测重复/引号 key/未闭合歧义，保留 BOM、换行符、无关 YAML/正文和有效的未知未来 token，并写入规范 token 顺序。属性迁移绝不是启动副作用：只读扫描为精确源码生成指纹；显式提交重新扫描，在适用时固定 TFile 身份与当前未保存编辑器，完成后验证，失败时按原文精确回滚。
+属性解析同时读取 `folder-nodes` 与已公开的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden`。新旧双写等价时视为冗余；冲突和已知无效值失败关闭。结构属性与通用标量的源码 patcher 只接受顶层块式映射：顶层 flow mapping/序列、显式复合键和标量文档都保守拒绝，且不改动原文；正常块式映射内部仍可包含行内或跨行 flow 值。源码 patcher 只拥有这些精确顶层 key，检测重复/引号 key/未闭合歧义，保留 BOM、换行符、无关 YAML/正文和有效的未知未来 token，并写入规范 token 顺序。属性迁移绝不是启动副作用：只读扫描为精确源码生成指纹；显式提交重新扫描，在适用时固定 TFile 身份与当前未保存编辑器，完成后验证，失败时按原文精确回滚。
 
 Core 只处理路径、命名、不管理边界规则、批量整理计划、反向引用索引、稀疏排序、frontmatter 最小 patch、Visual declaration 解析，以及节点图谱的纯可见性/几何。命名 Core 只验证公开的 Obsidian/Moment 子集并接收注入的时间格式化函数；真正的 `moment(date).format(pattern)` 位于 Obsidian adapter 边界。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View、节点图谱状态/渲染与批量刷新调度。节点图谱只采用有界的 `GraphIndex → ViewState → VisibleScene → renderer` 流程，不扩展成全插件数据抽象。公开仓库不依赖本地工作区或个人 Vault。
 
