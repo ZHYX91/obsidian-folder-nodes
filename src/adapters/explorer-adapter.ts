@@ -13,6 +13,7 @@ import type { FolderNodesSettings, NodeVisual } from "../core/types";
 import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent } from "../core/placement";
 import { nativeExplorerOrder, restoreExplorerOrder } from "./explorer-native-order";
 import { installExplorerVirtualOrder, type ExplorerVirtualOrder } from "./explorer-virtual-order";
+import { installExplorerDisclosureAnchor } from "./explorer-disclosure-anchor";
 import { normalizeVaultPath } from "../core/paths";
 import { renderVisual } from "../presentation/render-visual";
 import { PlacementSession } from "../core/placement-session";
@@ -23,6 +24,7 @@ interface ExplorerSurface {
   observer: MutationObserver;
   root: HTMLElement;
   ordering: ExplorerVirtualOrder | null;
+  disposeDisclosureAnchor: () => void;
   view: unknown;
 }
 
@@ -120,6 +122,7 @@ export class ExplorerAdapter extends Component {
     for (const surface of this.surfaces.values()) {
       surface.observer.disconnect();
       surface.abort.abort();
+      surface.disposeDisclosureAnchor();
       surface.ordering?.dispose();
       this.cleanupSurface(surface.root);
     }
@@ -164,12 +167,13 @@ export class ExplorerAdapter extends Component {
         root.addEventListener("dragend", () => this.clearDrop(), { capture: true, signal: abort.signal });
       }
       const ordering = this.installVirtualOrder(leaf.view, root);
-      this.surfaces.set(root, { abort, observer, root, ordering, view: leaf.view });
+      this.surfaces.set(root, { abort, observer, root, ordering, disposeDisclosureAnchor: installExplorerDisclosureAnchor(root, () => leaf.view), view: leaf.view });
     }
     for (const [root, surface] of this.surfaces) {
       if (active.has(root) && root.isConnected) continue;
       surface.observer.disconnect();
       surface.abort.abort();
+      surface.disposeDisclosureAnchor();
       surface.ordering?.dispose();
       this.cleanupSurface(root);
       for (const container of this.originalOrders.keys()) if (root.contains(container)) this.originalOrders.delete(container);

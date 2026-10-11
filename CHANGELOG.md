@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.7 - 2026-10-11
+
+- Keep the clicked File Explorer row in place when collapsing near the bottom, and reclaim retained space as you scroll up.
+- Add a representative long-list disclosure fixture and per-frame clicked-row measurements to distinguish stable middle-list behavior from scroll-boundary movement.
+
 ## 0.10.6 - 2026-10-11
 
 - Keep vertical Node Graph expansion handles readable and preserve viewport position and the live search input across redraws.
