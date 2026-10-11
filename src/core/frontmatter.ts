@@ -241,7 +241,7 @@ function blockMappingSeparator(line: string): number | null {
     if (character === "'" || character === '"') { quote = character; continue; }
     if (character !== ":" || (line[index + 1] !== undefined && !/\s/u.test(line[index + 1]!))) continue;
     const key = line.slice(0, index).trim();
-    if (key === "" || /^(?:[-?](?:\s|$)|[:{}\[\],#&*!|>])/u.test(key)) return null;
+    if (key === "" || /^[-?](?:\s|$)/u.test(key) || key.startsWith("[") || key.startsWith("]") || /^[{}:,#&*!|>]/u.test(key)) return null;
     return index;
   }
   return null;
