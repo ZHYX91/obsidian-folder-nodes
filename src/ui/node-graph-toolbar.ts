@@ -67,7 +67,11 @@ export function renderNodeGraphToolbar(
     .setValue(model.searchQuery)
     .onChange(actions.onSearchChange);
   search.inputEl.setAttribute("aria-label", labels.findNode);
+  let composing = false;
+  search.inputEl.addEventListener("compositionstart", () => { composing = true; });
+  search.inputEl.addEventListener("compositionend", () => { composing = false; });
   search.inputEl.addEventListener("keydown", (event) => {
+    if (composing || event.isComposing) return;
     if (event.key === "Escape") {
       event.preventDefault();
       search.setValue("");

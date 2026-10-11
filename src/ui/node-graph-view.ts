@@ -384,13 +384,18 @@ export class FolderNodeGraphView extends ItemView {
     this.refreshTimer = ownerWindow.setTimeout(() => {
       this.refreshTimer = null;
       if (generation !== this.refreshGeneration) return;
+      const viewport = this.captureViewportState();
       this.indexSnapshot = null;
       this.displayGraphData = null;
-      this.render();
+      this.render(this.searchEditorFocused());
+      this.restoreViewportState(viewport);
     }, 50);
   }
 
-  private render(): void {
+  private render(preserveSearchEditor = false): void {
+    const retainedToolbar = preserveSearchEditor
+      ? this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-toolbar")
+      : null;
     this.cardHandleWidth = this.currentCardHandleWidth();
     this.contentEl.style.setProperty("--folder-nodes-node-graph-handle-width", `${this.cardHandleWidth}px`);
     this.canvasRenderer?.destroy();
@@ -406,7 +411,10 @@ export class FolderNodeGraphView extends ItemView {
     this.threeDViewport = null;
     this.drag = null;
     this.pointers.clear();
-    this.contentEl.empty();
+    if (retainedToolbar === null) this.contentEl.empty();
+    else for (const child of [...this.contentEl.children]) {
+      if (child !== retainedToolbar) child.remove();
+    }
     this.contentEl.addClass("folder-nodes-node-graph-view");
     this.contentEl.removeClass("is-canvas-graph");
     this.contentEl.toggleClass("is-3d", this.dimension === "3d");
@@ -422,7 +430,8 @@ export class FolderNodeGraphView extends ItemView {
     this.displayGraphData = data;
     this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
     this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
-    this.renderToolbar();
+    if (retainedToolbar === null) this.renderToolbar();
+    else this.updateScopeControls();
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
     const visibleEdgeCount = edgesForShowLinks(data.model, this.showLinks).length;
     if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
@@ -434,6 +443,11 @@ export class FolderNodeGraphView extends ItemView {
     this.highlightSearch(this.searchQuery);
     this.applyNeighborhood();
     if (this.searchQuery.trim() !== "") this.centerSearchPreview();
+  }
+
+  private searchEditorFocused(): boolean {
+    const input = this.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
+    return input !== null && input === this.contentEl.ownerDocument.activeElement;
   }
 
   private graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
@@ -505,9 +519,11 @@ export class FolderNodeGraphView extends ItemView {
         return true;
       },
       onShowLinks: () => {
+        const viewport = this.captureViewportState();
         this.showLinks = !this.showLinks;
         this.markWorkspaceStateDirty();
         this.render();
+        this.restoreViewportState(viewport);
       },
       onSubtreeScope: () => {
         if (this.focusPath !== null) this.setGraphScope({ mode: "subtree", rootPath: this.focusPath });
@@ -693,7 +709,7 @@ export class FolderNodeGraphView extends ItemView {
       this.focusPath = restored.focusId;
       this.currentExpansion = restored.expansion;
       this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, restored.expansion);
-      this.render();
+      this.render(true);
       this.restoreViewportState(restored.camera);
       if (focusChanged) this.markWorkspaceStateDirty();
       return;
@@ -709,8 +725,7 @@ export class FolderNodeGraphView extends ItemView {
     if (changed) {
       this.currentExpansion = expanded;
       this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expanded);
-      this.render();
-      this.focusSearchInput();
+      this.render(true);
     } else {
       this.highlightSearch(value);
       this.centerSearchPreview();
@@ -826,14 +841,6 @@ export class FolderNodeGraphView extends ItemView {
     surface.scrollLeft = state.dom2D.scrollLeft;
     surface.scrollTop = state.dom2D.scrollTop;
     this.updateZoomIndicator(domScale(canvas));
-  }
-
-  private focusSearchInput(): void {
-    queueMicrotask(() => {
-      const input = this.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
-      input?.focus({ preventScroll: true });
-      input?.setSelectionRange(input.value.length, input.value.length);
-    });
   }
 
   private buildGraphData(): GraphData {

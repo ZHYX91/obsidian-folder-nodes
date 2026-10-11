@@ -705,6 +705,102 @@ describe("Node Graph progressive view", () => {
     expect(disabled.view.contentEl.querySelector(".folder-nodes-node-graph-toolbar")).toBeNull();
   });
 
+  it("preserves an active search input through expansion and clearing during composition", async () => {
+    const { view } = await graphViewFixture();
+    document.body.append(view.contentEl);
+    try {
+      const search = searchInput(view);
+      search.focus();
+      search.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+      search.value = "Deep";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(visiblePaths(view)).toContain("Work/A/One/Deep");
+      expect(searchInput(view)).toBe(search);
+      expect(document.activeElement).toBe(search);
+
+      const composingEnter = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" });
+      Object.defineProperty(composingEnter, "isComposing", { value: true });
+      search.dispatchEvent(composingEnter);
+      expect(view.getState().focus).toBeNull();
+      search.dispatchEvent(new Event("compositionend", { bubbles: true }));
+      search.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+      expect(searchInput(view)).toBe(search);
+      expect(document.activeElement).toBe(search);
+      expect(search.value).toBe("");
+      expect(visiblePaths(view)).not.toContain("Work/A/One/Deep");
+    } finally {
+      view.contentEl.remove();
+    }
+  });
+
+  it("retains DOM 2D pan, scroll, and zoom on link toggles and incremental refresh", async () => {
+    const { view } = await graphViewFixture();
+    const setViewport = () => {
+      const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll")!;
+      const canvas = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas")!;
+      surface.scrollLeft = 29;
+      surface.scrollTop = 43;
+      canvas.style.left = "18px";
+      canvas.style.top = "26px";
+      canvas.style.transform = "scale(0.73)";
+    };
+    const readViewport = () => {
+      const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll")!;
+      const canvas = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas")!;
+      return { x: surface.scrollLeft, y: surface.scrollTop, left: canvas.style.left, top: canvas.style.top, transform: canvas.style.transform };
+    };
+    setViewport();
+    const expected = readViewport();
+    view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!.click();
+    expect(readViewport()).toEqual(expected);
+    const previousCanvas = view.contentEl.querySelector(".folder-nodes-node-graph-canvas");
+    view.refresh();
+    await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-canvas")).not.toBe(previousCanvas));
+    expect(readViewport()).toEqual(expected);
+    view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']")!.click();
+    expect(new DOMMatrix(readViewport().transform).a).toBeCloseTo(1);
+    view.setGraphScope({ mode: "subtree", rootPath: "Work" });
+    expect(readViewport()).not.toEqual(expected);
+  });
+
+  it.each(["2d", "3d"] as const)("retains the Canvas %s camera on same-scope link toggles and refresh", async (dimension) => {
+    const settings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), defaultDimension: dimension, largeGraphThreshold: 1 };
+    const { view } = await graphViewFixture(true, settings);
+    const camera = {
+      camera2D: { panX: 81, panY: -47, zoom: 1.35 },
+      camera3D: { panX: 17, panY: 29, pitch: 0.1, yaw: -0.2, zoom: 1.42 },
+      dimension,
+    };
+    const active = () => (view as unknown as {
+      canvasRenderer: { captureViewportState: () => typeof camera; restoreViewportState: (state: typeof camera) => void } | null;
+    }).canvasRenderer;
+    const originalRenderer = active();
+    if (originalRenderer === null) throw new Error("Expected Canvas graph");
+    originalRenderer.restoreViewportState(camera);
+    view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!.click();
+    expect(active()?.captureViewportState()).toEqual(camera);
+    const afterToggle = active();
+    view.refresh();
+    await vi.waitFor(() => expect(active()).not.toBe(afterToggle));
+    expect(active()?.captureViewportState()).toEqual(camera);
+    view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']")!.click();
+    expect(active()?.captureViewportState()).not.toEqual(camera);
+  });
+
+  it("preserves DOM 3D camera on non-dimensional redraws", async () => {
+    const settings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), defaultDimension: "3d" as const };
+    const { view } = await graphViewFixture(true, settings);
+    const internal = view as unknown as { camera: NodeGraphCamera };
+    internal.camera = { ...defaultNodeGraphCamera(), panX: 83, panY: -12, zoom: 1.45 };
+    const prior = { ...internal.camera };
+    view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!.click();
+    expect(internal.camera).toEqual(prior);
+    const beforeRefresh = view.contentEl.querySelector(".folder-nodes-node-graph-canvas-3d");
+    view.refresh();
+    await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-canvas-3d")).not.toBe(beforeRefresh));
+    expect(internal.camera).toEqual(prior);
+  });
+
   it("releases large transient graph and search state on close", async () => {
     const fixture = await graphViewFixture();
     fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-range-button")?.click();
