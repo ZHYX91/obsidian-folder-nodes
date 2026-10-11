@@ -68,6 +68,7 @@ export function renderNodeGraphToolbar(
     .onChange(actions.onSearchChange);
   search.inputEl.setAttribute("aria-label", labels.findNode);
   search.inputEl.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === "Escape") {
       event.preventDefault();
       search.setValue("");
