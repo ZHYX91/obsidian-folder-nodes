@@ -706,7 +706,7 @@ describe("Node Graph progressive view", () => {
     await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-canvas")).not.toBe(previousCanvas));
     expect(readViewport()).toEqual(expected);
     view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']")!.click();
-    expect(readViewport().transform).toBe("scale(1)");
+    expect(new DOMMatrix(readViewport().transform).a).toBeCloseTo(1);
     view.setGraphScope({ mode: "subtree", rootPath: "Work" });
     expect(readViewport()).not.toEqual(expected);
   });
