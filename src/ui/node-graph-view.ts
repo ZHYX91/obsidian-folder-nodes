@@ -843,14 +843,6 @@ export class FolderNodeGraphView extends ItemView {
     this.updateZoomIndicator(domScale(canvas));
   }
 
-  private focusSearchInput(): void {
-    queueMicrotask(() => {
-      const input = this.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
-      input?.focus({ preventScroll: true });
-      input?.setSelectionRange(input.value.length, input.value.length);
-    });
-  }
-
   private buildGraphData(): GraphData {
     this.graphDataGeneration += 1;
     this.searchResultsCache = null;
