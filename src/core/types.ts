@@ -36,6 +36,7 @@ export interface FolderNodesSettings {
   leafNotePrefixes: string[];
   ignoredFolderPrefixes: string[];
   addSelectionAlias: boolean;
+  confirmSelectionCreation: boolean;
   nodeGraph: NodeGraphSettings;
   prefix: NamingPart;
   suffix: NamingPart;

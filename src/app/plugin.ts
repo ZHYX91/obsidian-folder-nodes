@@ -12,7 +12,7 @@ import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatte
 import { configuredEmojiFontStack } from "../core/emoji-font";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
-import { buildSelectionWikiLink, classifySelectionTableContext } from "../core/selection-link";
+import { classifySelectionTableContext, prepareSelectionLink } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
 import type { FolderNodesSettings } from "../core/types";
 import {
@@ -980,8 +980,8 @@ export default class FolderNodesPlugin extends Plugin {
     const selection = editor.getSelection();
     if (file === null || selection.trim() === "") return;
     const sourcePath = file.path;
-    const from = editor.getCursor("from");
-    const to = editor.getCursor("to");
+    const from = { ...editor.getCursor("from") };
+    const to = { ...editor.getCursor("to") };
     const tableContext = classifySelectionTableContext(from, to, (line) => editor.getLine(line));
     if (tableContext === "cross-cell") {
       new Notice(t("selectionCrossesTableCells"), 8000);
@@ -1006,11 +1006,9 @@ export default class FolderNodesPlugin extends Plugin {
       return;
     }
     const parentPath = normalizeVaultPath(folder.path);
-    const nodePath = parentPath === "" ? name : `${parentPath}/${name}`;
-    const notePath = `${nodePath}/${name}.md`;
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
-    const wikiLink = buildSelectionWikiLink(notePath.slice(0, -3), selection, tableContext);
-    new SelectionCreateModal(this.app, { parentPath, nodeName: name, alias }, async () => {
+    const label = selection.trim().replace(/\s+/gu, " ");
+    const create = async (): Promise<void> => {
       const assertSelectionCurrent = (): void => {
         if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
         if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
@@ -1026,8 +1024,9 @@ export default class FolderNodesPlugin extends Plugin {
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, name, options);
       try {
+        const link = prepareSelectionLink(this.app.fileManager.generateMarkdownLink(note, sourcePath, undefined, label), label, tableContext);
         assertSelectionCurrent();
-        editor.replaceSelection(wikiLink);
+        editor.replaceSelection(link);
       } catch (error) {
         if (note.parent !== null) {
           try { await this.service.rollbackCreatedNode(note); }
@@ -1040,7 +1039,10 @@ export default class FolderNodesPlugin extends Plugin {
       try { await this.app.workspace.getLeaf(false).openFile(note); }
       catch (error) { new Notice(formatError(error), 8000); }
       this.refreshVisuals();
-    }).open();
+    };
+    if (this.settings.confirmSelectionCreation) {
+      new SelectionCreateModal(this.app, { parentPath, nodeName: name, alias }, create).open();
+    } else this.runAction(create());
   }
 
   private promptRenameCurrent(): void { const folder = this.currentFolder(); if (folder !== null && normalizeVaultPath(folder.path) !== "") this.promptRename(folder); }

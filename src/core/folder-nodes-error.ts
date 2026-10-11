@@ -12,6 +12,7 @@ export type FolderNodesErrorCode =
   | "selection_editor_changed"
   | "selection_source_changed"
   | "selection_table_changed"
+  | "selection_wikilink_label_unsafe"
   | "source_node_changed"
   | "target_folder_unknown"
   | "target_not_complete"

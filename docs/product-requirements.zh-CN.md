@@ -21,7 +21,7 @@ Folder Nodes 只拥有一个名为 `folder-nodes` 的扁平 Text List。它只�
 
 ## 选区创建
 
-编辑器命令和右键菜单都可从选中文字创建 Child Node。确认页只显示创建位置、新节点 basename 和 alias 是否添加，不显示最终 Node Note 全路径或原始 WikiLink。确认后，插件仍使用内部固定的 Vault 相对 WikiLink，把选中文字写入新 Node Note 正文并替换来源选区；若预览后选区、来源文件或表格结构变化则停止。源码模式和 Live Preview 都支持单个 Markdown 表格单元格，生成 WikiLink 时使用转义的 `\|` alias 分隔符；选区跨过未转义的单元格边界或表格行时，在创建任何内容前失败关闭。在这条流程中，aliases 只使用选中的可见文字；前缀、后缀、各自连接符和时间戳只影响 basename。来源包括当前文件、当前 Node、最近当前标题、时间戳和自定义文本。前缀与后缀分别保存 Obsidian/Moment 时间戳格式，但一次创建共用同一个捕获时刻；旧 `%Y%m%d-%H%M%S` 设置一次迁移为两个 `YYYYMMDD-HHmmss`，不改变既有输出。
+编辑器命令和右键菜单都可从选中文字创建 Child Node。“选区与命名”中的“创建前确认”默认开启；关闭时仅此选区创建流程跳过预览，仍保留相同的检查与回滚。确认页只显示创建位置、新节点 basename 和 alias 是否添加，不显示最终 Node Note 全路径或原始 WikiLink。目标笔记创建后，由 Obsidian 按全局“新链接格式”和 WikiLink 设置生成链接，包括最短路径的同名消歧。选中文字作为显示文本，空白规范为单个空格；原选区仍写入新 Node Note 正文，去除首尾空白后的选区仍作为可选 alias。替换前重新核对来源文件、range、表格上下文和仍打开的编辑器，失败时回滚新建节点。源码模式和 Live Preview 都支持单个 Markdown 表格单元格，生成链接中未转义的竖线会转义，不重复已有表格转义；Markdown 显示文本按字面转义，目标路径裸括号编码且不重复编码已有百分号转义。WikiLink 显示文本含 `[[`、`]]` 或以 `]` 结尾时，安全停止并提示切换 Obsidian 为 Markdown 链接后重试；选区跨过未转义的单元格边界或表格行时，在创建任何内容前失败关闭。在这条流程中，aliases 只使用选中的可见文字；前缀、后缀、各自连接符和时间戳只影响 basename。来源包括当前文件、当前 Node、最近当前标题、时间戳和自定义文本。前缀与后缀分别保存 Obsidian/Moment 时间戳格式，但一次创建共用同一个捕获时刻；旧 `%Y%m%d-%H%M%S` 设置一次迁移为两个 `YYYYMMDD-HHmmss`，不改变既有输出。
 
 在受管理范围内，点击未解析的内部 Markdown 链接时直接创建完整 Node，不先创建叶子笔记。`[[a]]` 创建空白的 `a/a.md`；显式 Vault 路径会在同一事务中创建所有缺失的完整祖先 Node。共用 aliases 设置开启时，`[[a|b]]` 把显式显示文字 `b` 写入新 Node Note 的 `aliases`；没有显示文字或设置关闭时不写 alias。不管理文件夹、不管理叶子笔记路径、不安全或非 Markdown 目标，以及 Markdown view 之外的链接仍由 Obsidian 原生处理。外部或第三方创建不再自动转换；用户可明确选择“转换为 Folder Node”。冲突必须失败关闭。
 

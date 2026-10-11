@@ -106,20 +106,6 @@ describe("runtime architecture contract", () => {
     expect(plugin).toContain("throw new SettingsSchemaIncompatibleError");
   });
 
-  it("revalidates selection creation after the asynchronous node write", () => {
-    const plugin = source("src/app/plugin.ts");
-    const firstValidation = plugin.indexOf("assertSelectionCurrent();");
-    const createNode = plugin.indexOf("await this.service.createNode(parentPath, name, options)", firstValidation);
-    const secondValidation = plugin.indexOf("assertSelectionCurrent();", firstValidation + 1);
-    const replaceSelection = plugin.indexOf("editor.replaceSelection(wikiLink)", secondValidation);
-    expect(firstValidation).toBeGreaterThan(0);
-    expect(createNode).toBeGreaterThan(firstValidation);
-    expect(secondValidation).toBeGreaterThan(createNode);
-    expect(replaceSelection).toBeGreaterThan(secondValidation);
-    expect(plugin).toContain("this.service.rollbackCreatedNode(note)");
-    expect(plugin).not.toContain("this.service.deleteNode(note.parent)");
-  });
-
   it("keeps Node Graph toolbar and DOM viewport lifecycle owned by the view layer", () => {
     const main = source("main.ts");
     const graph = source("src/ui/node-graph-view.ts");

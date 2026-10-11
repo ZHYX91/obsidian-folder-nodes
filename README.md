@@ -45,7 +45,7 @@ Preview how selected text and uncreated links become node names, paths, note bod
 - **File Explorer integration.** Click a complete node's folder name to open its Node Note. The Root eye temporarily reveals nodes hidden by Folder Nodes for the current session. Name mode leaves Obsidian's native sibling order alone; Manual mode uses explicit Folder Nodes ranks.
 - **Node Contents sidebar.** Browse child nodes, a static media album, and ordinary files in separate paged sections. GIFs use still thumbnails; video and audio never receive inline playback controls.
 - **Node Graph.** Structure is always the hierarchy. An optional **Show links** switch overlays resolved links between Node Notes without changing the structural layout.
-- **Create from selected text.** Choose **Create Folder Node from selection** to create a child node, write the selected text into the new note, and replace the selection with a link. Table-cell selections are handled safely; cross-cell selections are rejected before writing.
+- **Create from selected text.** Choose **Create Folder Node from selection** to create a child node, write the selected text into the new note, and replace the selection with a link. Links follow Obsidian’s global link-format settings. **Confirm before creating** defaults on and can be turned off in Selection & naming. Table-cell selections are handled safely; cross-cell selections are rejected before writing.
 - **Create from uncreated links.** In managed scope, clicking an unresolved `[[a]]` creates `a/a.md`. With aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
 - **Node icons.** Read one Obsidian `icon` Text/List as ordered image, Lucide, glyph, emoji, or `color:` candidates, with optional ancestor inheritance.
 - **Hidden subtrees.** A node can store `hidden=true`. Folder Nodes then hides that subtree only in File Explorer, Node Contents, and Folder Nodes Graph; Obsidian Search, Quick Switcher, backlinks, native Graph, links, and direct file access still work.
@@ -104,7 +104,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 - **General** — interface language, hidden-marker behavior, and optional Root homepage.
 - **Management** — unmanaged Markdown/folder rules, bulk organization, property migration, and read-only Health.
 - **Icons & appearance** — icon inheritance, File Explorer placement, note-title display, and emoji font selection.
-- **Selection & naming** — aliases plus optional prefix/suffix naming sources and timestamp formats.
+- **Selection & naming** — confirmation for selected-text creation, aliases, plus optional prefix/suffix naming sources and timestamp formats.
 - **Node Graph** — enablement, default dimension, 2D direction, and large-graph thresholds.
 
 **Follow Obsidian** uses Simplified Chinese for Chinese Obsidian locales and English for other locales. Choosing English or Simplified Chinese manually overrides that fallback without changing filenames or Markdown properties.
