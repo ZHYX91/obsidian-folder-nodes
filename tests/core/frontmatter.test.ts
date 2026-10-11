@@ -67,6 +67,16 @@ describe("source-preserving frontmatter patches", () => {
     );
   });
 
+  it("accepts multiline flow values under an ordinary block mapping", () => {
+    const source = "---\nmetadata: {\n  title: \"A: B\",\n  tags: [one, two]\n}\npriority: 4\n---\nBody";
+    expect(patchFolderNodesFrontmatter(source, { hidden: true })).toBe(
+      "---\nmetadata: {\n  title: \"A: B\",\n  tags: [one, two]\n}\npriority: 4\nfolder-nodes:\n  - hidden=true\n---\nBody",
+    );
+    expect(patchFrontmatterScalar(source, "priority", 8)).toContain(
+      "metadata: {\n  title: \"A: B\",\n  tags: [one, two]\n}\npriority: 8\n---",
+    );
+  });
+
   it("creates exact aliases from selected text", () => {
     expect(createNodeDocument("Selected text", "Selected text")).toBe("---\naliases:\n  - \"Selected text\"\n---\nSelected text");
     expect(createNodeDocument(null, "Body")).toBe("Body");
