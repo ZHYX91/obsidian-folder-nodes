@@ -23,6 +23,31 @@ function fixture() {
 }
 
 describe("Explorer disclosure anchoring", () => {
+  it("keeps a virtual tree's own height writes independent and unwraps it on teardown", () => {
+    const root = document.createElement("div");
+    const scroll = root.createDiv({ cls: "nav-files-container" });
+    const native = scroll.createDiv();
+    const title = native.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Bottom" } });
+    const control = title.createDiv({ cls: "nav-folder-collapse-indicator" });
+    document.body.append(root);
+    Object.defineProperty(scroll, "clientHeight", { value: 400 });
+    scroll.scrollTop = 600;
+    const dispose = installExplorerDisclosureAnchor(root, () => ({ tree: { infinityScroll: { rootEl: { childrenEl: native } } } }));
+    control.click();
+    const wrapper = native.parentElement!;
+    expect(wrapper).not.toBe(scroll);
+    native.style.minHeight = "919px";
+    expect(wrapper.style.minHeight).toBe("400px");
+    expect(native.style.minHeight).toBe("919px");
+    control.click();
+    expect(native.parentElement).toBe(wrapper);
+    dispose();
+    expect(native.parentElement).toBe(scroll);
+    expect(native.style.minHeight).toBe("919px");
+    expect(root.querySelector(".folder-nodes-disclosure-space")).toBeNull();
+    root.remove();
+  });
+
   it("prevents bottom clamping throughout collapse and recycles space while scrolling up", () => {
     const f = fixture();
     f.control.click();

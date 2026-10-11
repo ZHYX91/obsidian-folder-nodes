@@ -167,7 +167,7 @@ export class ExplorerAdapter extends Component {
         root.addEventListener("dragend", () => this.clearDrop(), { capture: true, signal: abort.signal });
       }
       const ordering = this.installVirtualOrder(leaf.view, root);
-      this.surfaces.set(root, { abort, observer, root, ordering, disposeDisclosureAnchor: installExplorerDisclosureAnchor(root), view: leaf.view });
+      this.surfaces.set(root, { abort, observer, root, ordering, disposeDisclosureAnchor: installExplorerDisclosureAnchor(root, () => leaf.view), view: leaf.view });
     }
     for (const [root, surface] of this.surfaces) {
       if (active.has(root) && root.isConnected) continue;
