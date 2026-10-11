@@ -32,7 +32,8 @@
       "expected": [
         "Every claimed middle-viewport observation has a clicked-row target, complete nonempty frames, and middleViewportEligible=true. Missing rows, empty frames or insufficient boundary headroom are unverified, never a pass.",
         "Away from scroll limits, the clicked row stays within one CSS pixel of its pre-click vertical position throughout expansion and collapse, including the final position. Record topRange and finalDelta; do not infer animation smoothness from endpoint screenshots alone.",
-        "Boundary clamping and native-host behavior are reported separately. Preparation, frame collection and native comparison do not assign a product pass by themselves."
+        "Boundary clamping and native-host behavior are reported separately. Preparation, frame collection and native comparison do not assign a product pass by themselves.",
+        "With Folder Nodes enabled, bottom-boundary disclosure also keeps the clicked row within one CSS pixel by retaining necessary space. Scroll upward to reclaim space; repeated downward scrolling must not grow blank space. Record the disabled native baseline separately."
       ]
     },
     {

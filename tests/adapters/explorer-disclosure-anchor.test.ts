@@ -17,6 +17,7 @@ function fixture() {
       set: (value: number) => { position = value; },
     },
   });
+  content.getBoundingClientRect = () => ({ top: -scroll.scrollTop } as DOMRect);
   const dispose = installExplorerDisclosureAnchor(root);
   return { root, scroll, content, control, collapse: () => { naturalHeight -= 81; }, dispose: () => { dispose(); root.remove(); } };
 }
@@ -58,5 +59,16 @@ describe("Explorer disclosure anchoring", () => {
     expect(f.content.style.getPropertyPriority("min-height")).toBe("important");
     f.control.click();
     expect(f.content.style.minHeight).toBe("42px");
+  });
+
+  it("accounts for a preceding root row and never grows the retained floor while scrolling down", () => {
+    const f = fixture();
+    f.content.getBoundingClientRect = () => ({ top: 40 - f.scroll.scrollTop } as DOMRect);
+    f.control.click();
+    expect(f.content.style.minHeight).toBe("960px");
+    f.scroll.scrollTop = 620;
+    f.scroll.dispatchEvent(new Event("scroll"));
+    expect(f.content.style.minHeight).toBe("960px");
+    f.dispose();
   });
 });
