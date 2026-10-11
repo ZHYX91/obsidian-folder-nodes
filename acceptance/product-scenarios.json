@@ -13,6 +13,29 @@
   },
   "scenarios": [
     {
+      "id": "explorer-disclosure-anchor",
+      "title": "Long-list disclosure anchor with measured scroll-boundary headroom",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Run Prepare long-list disclosure diagnosis in a fresh disposable Vault. This creates Disclosure with 120 siblings and 498 children under Node 060/Wide, and starts the frame recorder. Do not use the initial short fixture as this scenario's evidence.",
+        "Expand Disclosure and scroll Node 060 to the middle of the viewport, with more than one viewport of scroll headroom in both directions. Expand Node 060, then expand/collapse Wide repeatedly and collapse/re-expand Node 060 while Wide is expanded. Keep the pointer at the disclosure control and do not scroll during a sample.",
+        "Repeat with the active note in a different branch, and separately near the bottom scroll boundary. Save Explorer navigation frames. Inspect the pre-click sample and subsequent samples through at least 750 ms. Keep boundary samples separate from eligible middle-viewport samples.",
+        "Compare the same middle-viewport disclosure with Folder Nodes disabled and enabled. Restore the candidate to enabled before finishing. Record the actual theme and viewport."
+      ],
+      "expected": [
+        "Every claimed middle-viewport observation has a clicked-row target, complete nonempty frames, and middleViewportEligible=true. Missing rows, empty frames or insufficient boundary headroom are unverified, never a pass.",
+        "Away from scroll limits, the clicked row stays within one CSS pixel of its pre-click vertical position throughout expansion and collapse, including the final position. Record topRange and finalDelta; do not infer animation smoothness from endpoint screenshots alone.",
+        "Boundary clamping and native-host behavior are reported separately. Preparation, frame collection and native comparison do not assign a product pass by themselves."
+      ]
+    },
+    {
       "id": "explorer-reveal-stability",
       "title": "Deep breadcrumb reveal, native ordering handoff and visible viewport anchoring",
       "surfaces": [
