@@ -587,11 +587,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     updateDeclarativeSettingTab(this);
   }
 
-  private graphInteger(value: unknown, minimum: number, maximum: number, fallback: number): number {
-    const parsed = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, Math.round(parsed))) : fallback;
-  }
-
   private renderNamingGuide(panel: HTMLElement): void {
     const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
     const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
