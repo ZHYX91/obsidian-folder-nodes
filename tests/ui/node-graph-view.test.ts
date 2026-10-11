@@ -8,12 +8,14 @@ import { defaultNodeGraphCamera, projectNodeGraph3D, type NodeGraphCamera, type 
 import type { NodeGraphSettings, NodeVisual } from "../../src/core/types";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../../src/shared/settings";
 import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
+import { setLanguage, t } from "../../src/ui/i18n";
 
 const FALLBACK: NodeVisual = { accent: null, inheritedFrom: null, kind: "fallback", value: "folder" };
 const openViews: FolderNodeGraphView[] = [];
 
 afterEach(async () => {
   for (const view of openViews.splice(0)) await view.onClose();
+  setLanguage("auto");
 });
 
 describe("Node Graph progressive view", () => {
@@ -184,6 +186,39 @@ describe("Node Graph progressive view", () => {
   });
 
   it.each([
+    { direction: "left-to-right", coarse: false, height: 46 },
+    { direction: "left-to-right", coarse: true, height: 46 },
+    { direction: "top-to-bottom", coarse: false, height: 46 },
+    { direction: "top-to-bottom", coarse: true, height: 72 },
+  ] as const)("shares $height px card height between DOM 2D and 3D ($direction, coarse: $coarse)", async ({ direction, coarse, height }) => {
+    const matchMedia = vi.spyOn(window, "matchMedia").mockReturnValue({ matches: coarse } as MediaQueryList);
+    const style = document.head.createEl("style");
+    style.textContent = readFileSync("src/ui/node-graph.css", "utf8");
+    try {
+      const { view } = await graphViewFixture(true, { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), layoutDirection: direction });
+      document.body.append(view.contentEl);
+      expect(graphNode(view, "Work").style.height).toBe(`${height}px`);
+      expect(graphNode(view, "Personal").style.height).toBe(`${height}px`);
+      [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+        .find((button) => button.textContent === "3D")!.click();
+      for (const path of ["Work", "Personal"]) {
+        expect(window.getComputedStyle(graphNode(view, path)).height).toBe(`${height}px`);
+      }
+      const internal = view as unknown as {
+        displayGraphData: { layout: { nodeHeight: number } };
+        projected3D: Map<string, { x: number; y: number; scale: number }>;
+        projectedNodeBox: (point: { x: number; y: number; scale: number }) => { height: number };
+      };
+      expect(internal.displayGraphData.layout.nodeHeight).toBe(height);
+      const point = internal.projected3D.get("Work")!;
+      expect(internal.projectedNodeBox(point).height).toBeCloseTo(height * Math.max(0.65, Math.min(1.2, point.scale)));
+    } finally {
+      style.remove();
+      matchMedia.mockRestore();
+    }
+  });
+
+  it.each([
     { childCount: 60, coarse: false, expansionWidth: 40, iconWidth: 30 },
     { childCount: 60, coarse: true, expansionWidth: 44, iconWidth: 44 },
     { childCount: 100, coarse: true, expansionWidth: 47, iconWidth: 44 },
@@ -229,6 +264,59 @@ describe("Node Graph progressive view", () => {
       view.contentEl.remove();
       style.remove();
       touchPoints.mockRestore();
+      matchMedia.mockRestore();
+    }
+  });
+
+  it("keeps coarse vertical dense DOM dots small and expands selected cards to the shared height", async () => {
+    const matchMedia = vi.spyOn(window, "matchMedia").mockReturnValue({ matches: true } as MediaQueryList);
+    const style = document.head.createEl("style");
+    style.textContent = readFileSync("src/ui/node-graph.css", "utf8");
+    const snapshot = nodeGraphSnapshot();
+    for (let index = 0; index < 30; index++) {
+      const path = `N${index}`;
+      snapshot.records.set(path, record(path, path, "", `${path}/${path}.md`));
+    }
+    const dependencies = graphViewDependencies(snapshot, {
+      ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), defaultDimension: "3d", layoutDirection: "top-to-bottom",
+    });
+    const view = new FolderNodeGraphView({ app: dependencies.app } as never, dependencies.service, dependencies.options);
+    openViews.push(view);
+    document.body.append(view.contentEl);
+    try {
+      await view.onOpen();
+      expect(view.contentEl.classList.contains("is-dense-3d")).toBe(true);
+      expect(window.getComputedStyle(graphNode(view, "N0")).height).toBe("16px");
+      nodeBody(view, "N0").click();
+      expect(window.getComputedStyle(graphNode(view, "N0")).height).toBe("72px");
+      expect(window.getComputedStyle(graphNode(view, "N1")).height).toBe("16px");
+    } finally {
+      view.contentEl.remove();
+      style.remove();
+      matchMedia.mockRestore();
+    }
+  });
+
+  it("passes the shared coarse vertical height through the DOM-to-Canvas boundary", async () => {
+    const matchMedia = vi.spyOn(window, "matchMedia").mockReturnValue({ matches: true } as MediaQueryList);
+    const snapshot = nodeGraphSnapshot();
+    for (let index = 0; index < 60; index++) {
+      const path = `N${index}`;
+      snapshot.records.set(path, record(path, path, "", `${path}/${path}.md`));
+    }
+    const dependencies = graphViewDependencies(snapshot, {
+      ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: 50, layoutDirection: "top-to-bottom",
+    });
+    const view = new FolderNodeGraphView({ app: dependencies.app } as never, dependencies.service, dependencies.options);
+    openViews.push(view);
+    try {
+      await view.onOpen();
+      const internal = view as unknown as { canvasRenderer: { data: { layout: { nodeHeight: number } } } };
+      expect(internal.canvasRenderer.data.layout.nodeHeight).toBe(72);
+      [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")]
+        .find((button) => button.textContent === "3D")!.click();
+      expect(internal.canvasRenderer.data.layout.nodeHeight).toBe(72);
+    } finally {
       matchMedia.mockRestore();
     }
   });
@@ -799,6 +887,187 @@ describe("Node Graph progressive view", () => {
     view.refresh();
     await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-canvas-3d")).not.toBe(beforeRefresh));
     expect(internal.camera).toEqual(prior);
+  });
+
+  it.each([
+    ["DOM 2D", "2d", 500], ["DOM 3D", "3d", 500],
+    ["Canvas 2D", "2d", 1], ["Canvas 3D", "3d", 1],
+  ] as const)("binds one viewport action after retained-toolbar redraws in %s", async (_renderer, dimension, threshold) => {
+    const { view } = await graphViewFixture(true, {
+      ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), defaultDimension: dimension, largeGraphThreshold: threshold,
+    });
+    document.body.append(view.contentEl);
+    try {
+      const originalCanvas = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas");
+      const search = searchInput(view);
+      search.focus();
+      for (let index = 0; index < 3; index += 1) {
+        search.value = "Deep";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.value = "";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const previousSurface = view.contentEl.querySelector(".folder-nodes-node-graph-scroll");
+      view.refresh();
+      await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-scroll")).not.toBe(previousSurface));
+      expect(searchInput(view)).toBe(search);
+      expect(document.activeElement).toBe(search);
+      view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']")!.click();
+      const detachedTransform = originalCanvas?.style.transform;
+      view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']")!.click();
+      const internal = view as unknown as { camera: NodeGraphCamera; canvasRenderer: { currentZoom: () => number } | null };
+      const zoom = internal.canvasRenderer?.currentZoom() ?? (dimension === "3d" ? internal.camera.zoom
+        : new DOMMatrix(view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas")!.style.transform).a);
+      expect(zoom).toBeCloseTo(1.2, 6);
+      expect(originalCanvas?.style.transform).toBe(detachedTransform);
+    } finally { view.contentEl.remove(); }
+  });
+
+  it("updates retained toolbar link counts during search and metadata refresh", async () => {
+    const snapshot = nodeGraphSnapshot();
+    snapshot.links.clear();
+    snapshot.links.set("Work/A/One", new Set(["Work/B"]));
+    const dependencies = graphViewDependencies(snapshot);
+    const view = new FolderNodeGraphView({ app: dependencies.app } as never, dependencies.service, dependencies.options);
+    openViews.push(view);
+    await view.onOpen();
+    document.body.append(view.contentEl);
+    try {
+      view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!.click();
+      const summary = () => view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-link-summary")!;
+      expect(summary().textContent).toContain("No visible links");
+      const search = searchInput(view);
+      search.focus();
+      search.value = "Deep";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(summary().textContent).toBe("1 visible links");
+      expect(summary().classList.contains("is-empty")).toBe(false);
+      snapshot.links.clear();
+      (snapshot as unknown as { revision: number }).revision += 1;
+      view.refresh();
+      await vi.waitFor(() => expect(summary().textContent).toContain("No visible links"));
+      expect(summary().classList.contains("is-empty")).toBe(true);
+      search.value = "";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(searchInput(view)).toBe(search);
+      expect(document.activeElement).toBe(search);
+    } finally { view.contentEl.remove(); }
+  });
+
+  it("synchronizes retained search and scope controls when their subtree is deleted", async () => {
+    const { view, snapshot } = await graphViewFixture();
+    view.setGraphScope({ mode: "subtree", rootPath: "Work" });
+    document.body.append(view.contentEl);
+    try {
+      const search = searchInput(view);
+      search.focus();
+      search.value = "Deep";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      view.removePathState("Work");
+      for (const path of snapshot.records.keys()) if (path === "Work" || path.startsWith("Work/")) snapshot.records.delete(path);
+      (snapshot as unknown as { revision: number }).revision += 1;
+      view.refresh();
+      await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-scope")?.getAttribute("data-node-graph-scope")).toBe("global"));
+      expect(searchInput(view)).toBe(search);
+      expect(search.value).toBe("");
+      expect(document.activeElement).toBe(search);
+      expect(view.contentEl.querySelector(".folder-nodes-node-graph-scope-path")?.textContent).toBe("Current scope: Global");
+      expect(view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-scope-button")?.disabled).toBe(true);
+    } finally { view.contentEl.remove(); }
+  });
+
+  it("reprojects displayed DOM 3D nodes and edges after restoring a Canvas camera", async () => {
+    const { view, settings } = await graphViewFixture(true, {
+      ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), defaultDimension: "3d", largeGraphThreshold: 1,
+    });
+    const internal = view as unknown as {
+      camera: NodeGraphCamera;
+      canvasRenderer: { restoreViewportState: (state: unknown) => void; captureViewportState: () => object } | null;
+      threeDPoints: NodeGraphPoint3D[];
+      threeDViewport: { width: number; height: number };
+      projected3D: Map<string, { x: number; y: number; scale: number }>;
+      update3DProjection: () => void;
+    };
+    const camera = { panX: 100, panY: 80, pitch: 0.3, yaw: 0.7, zoom: 1.8 };
+    const renderer = internal.canvasRenderer!;
+    renderer.restoreViewportState({ ...renderer.captureViewportState(), camera3D: camera });
+    settings.largeGraphThreshold = 500;
+    view.refresh();
+    await vi.waitFor(() => expect(internal.canvasRenderer).toBeNull());
+    const expected = projectNodeGraph3D(internal.threeDPoints, camera, internal.threeDViewport.width, internal.threeDViewport.height);
+    for (const point of expected) {
+      expect(internal.projected3D.get(point.id)).toMatchObject(point);
+      expect(Number.parseFloat(graphNode(view, point.id).style.left)).toBeCloseTo(point.x, 6);
+      expect(Number.parseFloat(graphNode(view, point.id).style.top)).toBeCloseTo(point.y, 6);
+    }
+    const edgeGeometry = [...view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges path")].map((edge) => edge.getAttribute("d"));
+    internal.update3DProjection();
+    expect([...view.contentEl.querySelectorAll(".folder-nodes-node-graph-edges path")].map((edge) => edge.getAttribute("d"))).toEqual(edgeGeometry);
+  });
+
+  it.each(["refresh", "links"] as const)("keeps DOM 3D projections consistent with an active search after %s", async (action) => {
+    const { view } = await graphViewFixture(true, { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), defaultDimension: "3d" });
+    const search = searchInput(view);
+    search.value = "Deep";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    const internal = view as unknown as {
+      camera: NodeGraphCamera; threeDPoints: NodeGraphPoint3D[]; threeDViewport: { width: number; height: number };
+      projected3D: Map<string, object>; update3DProjection: () => void;
+    };
+    internal.camera = { panX: 71, panY: 63, pitch: 0.2, yaw: -0.5, zoom: 1.3 };
+    internal.update3DProjection();
+    const camera = { ...internal.camera };
+    if (action === "links") view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!.click();
+    else {
+      const previousSurface = view.contentEl.querySelector(".folder-nodes-node-graph-scroll");
+      view.refresh();
+      await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-scroll")).not.toBe(previousSurface));
+    }
+    expect(internal.camera).toEqual(camera);
+    for (const point of projectNodeGraph3D(internal.threeDPoints, camera, internal.threeDViewport.width, internal.threeDViewport.height)) {
+      expect(internal.projected3D.get(point.id)).toMatchObject(point);
+      expect(Number.parseFloat(graphNode(view, point.id).style.left)).toBeCloseTo(point.x, 6);
+    }
+  });
+
+  it("updates retained scope names and localized controls without changing the live search editor", async () => {
+    const { view, snapshot } = await graphViewFixture();
+    view.setGraphScope({ mode: "subtree", rootPath: "Work" });
+    document.body.append(view.contentEl);
+    try {
+      const search = searchInput(view);
+      search.focus();
+      search.value = "Deep";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      search.setSelectionRange(2, 2);
+      view.remapPathState("Work", "Projects");
+      for (const [path, recordValue] of [...snapshot.records]) {
+        if (path !== "Work" && !path.startsWith("Work/")) continue;
+        const nextPath = `Projects${path.slice(4)}`;
+        snapshot.records.delete(path);
+        snapshot.records.set(nextPath, {
+          ...recordValue, path: nextPath, label: path === "Work" ? "Projects" : recordValue.label,
+          parentPath: recordValue.parentPath?.replace(/^Work/u, "Projects") ?? null,
+          notePath: recordValue.notePath?.replace(/^Work/u, "Projects") ?? null,
+        });
+      }
+      snapshot.links.clear();
+      (snapshot as unknown as { revision: number }).revision += 1;
+      view.refresh();
+      await vi.waitFor(() => expect(view.contentEl.querySelector(".folder-nodes-node-graph-scope-path")?.textContent).toBe("Current scope: Projects's subtree"));
+      expect(searchInput(view)).toBe(search);
+      expect(document.activeElement).toBe(search);
+      expect(search.value).toBe("Deep");
+      expect(search.selectionStart).toBe(2);
+      const priorPlaceholder = search.placeholder;
+      setLanguage("zh-CN");
+      view.refresh();
+      await vi.waitFor(() => expect(search.placeholder).not.toBe(priorPlaceholder));
+      expect(view.contentEl.querySelector(".folder-nodes-node-graph-title")?.textContent).toBe(t("nodeGraph"));
+      expect(view.contentEl.querySelector(".folder-nodes-node-graph-search-clear")?.getAttribute("aria-label")).toBe(t("nodeGraphClearSearch"));
+      expect(searchInput(view)).toBe(search);
+      expect(search.selectionStart).toBe(2);
+    } finally { view.contentEl.remove(); }
   });
 
   it("releases large transient graph and search state on close", async () => {

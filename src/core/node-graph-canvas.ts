@@ -1,5 +1,5 @@
 import { nodeGraphBoxContains, nodeGraphBoxFromCenter } from "./node-graph-geometry";
-import { NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
+import { NODE_GRAPH_CARD_HEIGHT, NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
 
 export interface NodeGraphCanvasCamera {
   readonly panX: number;
@@ -49,19 +49,20 @@ export interface NodeGraphCanvasWorldBounds {
 
 export const LARGE_NODE_GRAPH_THRESHOLD = 500;
 export const NODE_GRAPH_CANVAS_NODE_WIDTH = NODE_GRAPH_CARD_WIDTH_REGULAR;
-export const NODE_GRAPH_CANVAS_NODE_HEIGHT = 46;
+export const NODE_GRAPH_CANVAS_NODE_HEIGHT = NODE_GRAPH_CARD_HEIGHT;
 export const NODE_GRAPH_CANVAS_OVERVIEW_EDGE_LIMIT = 6_000;
 
 export function nodeGraphCanvasGeometry(
   projectedScale: number,
   nodeWidth = NODE_GRAPH_CANVAS_NODE_WIDTH,
+  nodeHeight = NODE_GRAPH_CANVAS_NODE_HEIGHT,
 ): NodeGraphCanvasGeometry {
   const scale = clamp(Number.isFinite(projectedScale) ? projectedScale : 0, 0, 1.2);
   if (scale < 0.08) {
     return { halfHeight: 4, halfWidth: 4, kind: "dot", label: false, radius: 4, scale };
   }
   const width = Math.max(12, positive(nodeWidth, NODE_GRAPH_CANVAS_NODE_WIDTH) * scale);
-  const height = Math.max(7, NODE_GRAPH_CANVAS_NODE_HEIGHT * scale);
+  const height = Math.max(7, positive(nodeHeight, NODE_GRAPH_CANVAS_NODE_HEIGHT) * scale);
   return {
     halfHeight: height / 2,
     halfWidth: width / 2,
@@ -194,10 +195,11 @@ export function pointIsVisible(
   point: NodeGraphCanvasPoint,
   viewport: NodeGraphCanvasSize,
   padding = 24,
+  nodeHeight = NODE_GRAPH_CANVAS_NODE_HEIGHT,
 ): boolean {
   const width = Math.max(1, viewport.width);
   const height = Math.max(1, viewport.height);
-  const geometry = nodeGraphCanvasGeometry(point.scale, point.width);
+  const geometry = nodeGraphCanvasGeometry(point.scale, point.width, nodeHeight);
   return point.x + geometry.halfWidth >= -padding
     && point.x - geometry.halfWidth <= width + padding
     && point.y + geometry.halfHeight >= -padding
@@ -208,11 +210,12 @@ export function hitTestNodeGraphCanvas(
   points: readonly NodeGraphCanvasPoint[],
   x: number,
   y: number,
+  nodeHeight = NODE_GRAPH_CANVAS_NODE_HEIGHT,
 ): string | null {
   for (let index = points.length - 1; index >= 0; index -= 1) {
     const point = points[index];
     if (point === undefined) continue;
-    const geometry = nodeGraphCanvasGeometry(point.scale, point.width);
+    const geometry = nodeGraphCanvasGeometry(point.scale, point.width, nodeHeight);
     const box = nodeGraphBoxFromCenter(point.x, point.y, geometry.halfWidth, geometry.halfHeight);
     if (!nodeGraphBoxContains(box, { x, y })) continue;
     return point.id;

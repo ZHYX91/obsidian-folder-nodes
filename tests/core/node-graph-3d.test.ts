@@ -134,6 +134,16 @@ describe("Node Graph 3D layout", () => {
     expect(Math.max(...projected.map(({ y }) => y + halfHeight))).toBeLessThanOrEqual(height - padding + 0.001);
   });
 
+  it("fits tall coarse-pointer cards inside the padded viewport", () => {
+    const points = [{ id: "a", depth: 0, x: 0, y: -200, z: 0 }, { id: "b", depth: 0, x: 0, y: 200, z: 0 }];
+    const fitted = fitNodeGraphCamera(points, { ...defaultNodeGraphCamera(), pitch: 0, yaw: 0 }, 800, 300, 48, 0.65, 72);
+    for (const point of projectNodeGraph3D(points, fitted, 800, 300)) {
+      const halfHeight = 36 * Math.max(0.65, Math.min(1.2, point.scale));
+      expect(point.y - halfHeight).toBeGreaterThanOrEqual(48 - 0.001);
+      expect(point.y + halfHeight).toBeLessThanOrEqual(300 - 48 + 0.001);
+    }
+  });
+
   it("fits adaptive Canvas geometry inside the padded viewport at the large-graph boundary", () => {
     const points = layoutNodeGraph3D({
       nodes: Array.from({ length: 501 }, (_, index) => ({ id: String(index), depth: index === 0 ? 0 : 1 })),

@@ -1,6 +1,6 @@
 import type { NodeGraphLayoutDirection } from "./types";
 
-import { NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
+import { NODE_GRAPH_CARD_HEIGHT, NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
 
 export interface NodeGraphTree {
   readonly id: string;
@@ -49,7 +49,7 @@ export interface NodeGraphViewportFit {
 }
 
 const DEFAULT_NODE_WIDTH = NODE_GRAPH_CARD_WIDTH_REGULAR;
-const DEFAULT_NODE_HEIGHT = 46;
+const DEFAULT_NODE_HEIGHT = NODE_GRAPH_CARD_HEIGHT;
 const DEFAULT_LEFT_TO_RIGHT_HORIZONTAL_GAP = 72;
 const DEFAULT_LEFT_TO_RIGHT_VERTICAL_GAP = 18;
 const DEFAULT_TOP_TO_BOTTOM_HORIZONTAL_GAP = 36;

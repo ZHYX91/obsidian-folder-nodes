@@ -332,7 +332,8 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  height: 44px;
+  height: 100%;
+  min-height: 44px;
   color: inherit;
   background: transparent;
   border: 0;
@@ -341,7 +342,7 @@
 .folder-nodes-node-graph-focus-overlay-body {
   flex: 1 1 auto;
   gap: 0;
-  padding-inline: 0;
+  padding: 0;
   overflow: hidden;
   border-radius: 0;
   box-shadow: none;
@@ -349,7 +350,7 @@
 
 .folder-nodes-node-graph-focus-overlay-body .folder-nodes-node-graph-icon {
   flex: 0 0 var(--folder-nodes-node-graph-handle-width, 34px);
-  height: 44px;
+  height: 100%;
   background: var(--folder-nodes-node-graph-handle-background);
   border-inline-end: 1px solid var(--background-modifier-border);
 }
@@ -580,7 +581,8 @@
 
 .folder-nodes-node-graph-node.is-3d {
   width: var(--folder-nodes-node-graph-card-width, 180px);
-  min-height: 46px;
+  height: var(--folder-nodes-node-graph-card-height, 46px);
+  min-height: var(--folder-nodes-node-graph-card-height, 46px);
   transform-origin: center;
 }
 
@@ -616,7 +618,7 @@
 .folder-nodes-node-graph-view.is-dense-3d .folder-nodes-node-graph-node.is-3d:hover {
   z-index: 10000 !important;
   width: var(--folder-nodes-node-graph-card-width, 180px);
-  min-height: 46px;
+  min-height: var(--folder-nodes-node-graph-card-height, 46px);
   background: var(--background-secondary);
   border-radius: 10px;
   box-shadow: var(--shadow-l);

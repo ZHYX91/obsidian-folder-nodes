@@ -157,7 +157,8 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     return { bom, closingBoundary: -1, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
   }
   const closingBoundary = relativeEnd + 1;
-  if (hasUnsupportedTopLevelStructure(lines, closingBoundary)) {
+  const structure = inspectTopLevelStructure(lines, closingBoundary);
+  if (structure === null) {
     issues.push({ code: "source-ambiguous", field: "all", message: "Unsupported top-level frontmatter structure; use a block mapping" });
     return { bom, closingBoundary, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
   }
@@ -165,7 +166,7 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
   const frontmatter: Record<string, unknown> = {};
   for (let index = 1; index < closingBoundary; index += 1) {
     const line = lines[index] ?? "";
-    if (/^\s/u.test(line)) continue;
+    if (!structure.mappingLines.has(index)) continue;
     const quoted = quotedKnownKey(line, keys);
     if (quoted !== null) {
       issues.push({
@@ -177,7 +178,7 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     }
     const key = keys.find((candidate) => new RegExp(`^${escapePattern(candidate)}\\s*:`, "u").test(line));
     if (key === undefined) continue;
-    const range = { start: index, end: continuationEnd(lines, index, closingBoundary) };
+    const range = { start: index, end: structure.valueEnds.get(index) ?? continuationEnd(lines, index, closingBoundary) };
     const existing = occurrences.get(key) ?? [];
     existing.push(range);
     occurrences.set(key, existing);
@@ -204,24 +205,45 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
 /**
  * Only insert top-level properties into block mappings. Flow roots, sequences,
  * explicit mapping keys, and scalar documents cannot be patched line-by-line.
- * Track nested flow collections so a block mapping's multiline flow values work.
+ * Reject indented roots because the source patchers own column-zero keys. Track
+ * multiline quoted/flow values so their nested keys never become root properties.
  */
-function hasUnsupportedTopLevelStructure(lines: readonly string[], closingBoundary: number): boolean {
-  let flowDepth = 0;
+function inspectTopLevelStructure(lines: readonly string[], closingBoundary: number): {
+  readonly mappingLines: ReadonlySet<number>;
+  readonly valueEnds: ReadonlyMap<number, number>;
+} | null {
+  const mappingLines = new Set<number>();
+  const valueEnds = new Map<number, number>();
+  let flow: { readonly stack: string[]; quote: "'" | '"' | null; scalarStart: boolean; quotedScalarEnd: boolean; start: number } | null = null;
   for (let index = 1; index < closingBoundary; index += 1) {
     const line = lines[index] ?? "";
-    if (flowDepth > 0) {
-      flowDepth = flowCollectionDepth(line, flowDepth);
-      if (flowDepth < 0) return true;
+    if (flow !== null) {
+      if (!scanFlowCollection(line, flow)) return null;
+      if (flow.stack.length === 0 && flow.quote === null) {
+        valueEnds.set(flow.start, index + 1);
+        flow = null;
+      }
       continue;
     }
-    if (/^\s*(?:#.*)?$/u.test(line) || /^\s/u.test(line)) continue;
+    if (/^\s*(?:#.*)?$/u.test(line)) continue;
+    if (/^\s/u.test(line)) {
+      if (mappingLines.size === 0) return null;
+      continue;
+    }
     const separator = blockMappingSeparator(line);
-    if (separator === null) return true;
-    flowDepth = flowCollectionDepth(line.slice(separator + 1), 0);
-    if (flowDepth < 0) return true;
+    if (separator === null) return null;
+    mappingLines.add(index);
+    const value = line.slice(separator + 1).trimStart();
+    const collection = /^(?:[&!]\S+\s+)*[[{]/u.exec(value);
+    if (collection === null && !/^["']/u.test(value)) continue;
+    flow = { stack: [], quote: null, scalarStart: true, quotedScalarEnd: false, start: index };
+    if (!scanFlowCollection(value.slice(collection === null ? 0 : collection[0].length - 1), flow)) return null;
+    if (flow.stack.length === 0 && flow.quote === null) {
+      valueEnds.set(index, index + 1);
+      flow = null;
+    }
   }
-  return flowDepth !== 0;
+  return flow === null ? { mappingLines, valueEnds } : null;
 }
 
 function blockMappingSeparator(line: string): number | null {
@@ -238,7 +260,7 @@ function blockMappingSeparator(line: string): number | null {
       if (character === quote) quote = null;
       continue;
     }
-    if (character === "'" || character === '"') { quote = character; continue; }
+    if (index === 0 && (character === "'" || character === '"')) { quote = character; continue; }
     if (character !== ":" || (line[index + 1] !== undefined && !/\s/u.test(line[index + 1]!))) continue;
     const key = line.slice(0, index).trim();
     if (key === "" || /^[-?](?:\s|$)/u.test(key) || key.startsWith("[") || key.startsWith("]") || /^[{}:,#&*!|>]/u.test(key)) return null;
@@ -247,28 +269,60 @@ function blockMappingSeparator(line: string): number | null {
   return null;
 }
 
-function flowCollectionDepth(source: string, initial: number): number {
-  let depth = initial;
-  let quote: "'" | '"' | null = null;
+function scanFlowCollection(source: string, state: { readonly stack: string[]; quote: "'" | '"' | null; scalarStart: boolean; quotedScalarEnd: boolean }): boolean {
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
-    if (quote === '"') {
+    if (state.quote === '"') {
       if (character === "\\") { index += 1; continue; }
-      if (character === quote) quote = null;
+      if (character === state.quote) {
+        state.quote = null;
+        state.quotedScalarEnd = true;
+        if (state.stack.length === 0) return /^\s*(?:#.*)?$/u.test(source.slice(index + 1));
+      }
       continue;
     }
-    if (quote === "'") {
+    if (state.quote === "'") {
       if (character === "'" && source[index + 1] === "'") { index += 1; continue; }
-      if (character === quote) quote = null;
+      if (character === state.quote) {
+        state.quote = null;
+        state.quotedScalarEnd = true;
+        if (state.stack.length === 0) return /^\s*(?:#.*)?$/u.test(source.slice(index + 1));
+      }
       continue;
     }
-    if (character === "'" || character === '"') { quote = character; continue; }
+    if (state.scalarStart && (character === "'" || character === '"')) {
+      state.quote = character;
+      state.scalarStart = false;
+      state.quotedScalarEnd = false;
+      continue;
+    }
     if (character === "#" && (index === 0 || /\s/u.test(source[index - 1] ?? ""))) break;
-    if (character === "{" || character === "[") depth += 1;
-    else if (character === "}" || character === "]") depth -= 1;
-    if (depth < 0) return -1;
+    if (character === "{" || character === "[") {
+      state.stack.push(character);
+      state.scalarStart = true;
+      state.quotedScalarEnd = false;
+    }
+    else if (character === "}" || character === "]") {
+      if (state.stack.pop() !== (character === "}" ? "{" : "[")) return false;
+      if (state.stack.length === 0) return /^\s*(?:#.*)?$/u.test(source.slice(index + 1));
+      state.scalarStart = false;
+      state.quotedScalarEnd = false;
+    }
+    // A colon inside a plain token (http:'quote) is literal. Quoted keys allow
+    // adjacent JSON-style values; plain keys require separation after the colon.
+    else if (character === "," || (character === ":" && (state.quotedScalarEnd
+      || source[index + 1] === undefined || /[\s[\]{},]/u.test(source[index + 1]!)))) {
+      state.scalarStart = true;
+      state.quotedScalarEnd = false;
+    }
+    else if (!/\s/u.test(character ?? "")) {
+      state.quotedScalarEnd = false;
+      if (state.scalarStart && (character === "&" || character === "!")) {
+        while (index + 1 < source.length && !/[\s[\]{},]/u.test(source[index + 1]!)) index += 1;
+      } else state.scalarStart = false;
+    }
   }
-  return depth;
+  return true;
 }
 
 function parseFolderNodesValue(lines: readonly string[], range: SourceRange): unknown {
@@ -292,15 +346,18 @@ function parseFolderNodesValue(lines: readonly string[], range: SourceRange): un
 }
 
 function continuationEnd(lines: readonly string[], start: number, closingBoundary: number): number {
-  const after = valueAfterColon(lines[start] ?? "");
-  if (stripYamlComment(after).trim() !== "") return start + 1;
+  const after = stripYamlComment(valueAfterColon(lines[start] ?? "")).trim();
   let index = start + 1;
+  let hasContent = after === "" || /^[|>]/u.test(after);
   while (index < closingBoundary) {
     const line = lines[index] ?? "";
-    if (line === "" || /^\s/u.test(line)) index += 1;
+    if (line === "" || /^\s/u.test(line)) {
+      if (!/^\s*(?:#.*)?$/u.test(line)) hasContent = true;
+      index += 1;
+    }
     else break;
   }
-  return index;
+  return hasContent ? index : start + 1;
 }
 
 function splitFlowList(value: string): string[] | null {

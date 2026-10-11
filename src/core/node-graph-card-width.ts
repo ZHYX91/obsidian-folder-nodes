@@ -12,10 +12,20 @@ export const NODE_GRAPH_CARD_WIDTH_REGULAR = 180;
 export const NODE_GRAPH_CARD_WIDTH_WIDE = 220;
 export const NODE_GRAPH_CARD_HANDLE_WIDTH = 34;
 export const NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH = 44;
+export const NODE_GRAPH_CARD_HEIGHT = 46;
+export const NODE_GRAPH_CARD_VERTICAL_TOUCH_HEIGHT = 72;
 
 export interface NodeGraphCardWidthOptions {
   readonly direction?: NodeGraphLayoutDirection;
   readonly handleWidth?: number;
+}
+
+export function nodeGraphCardHeight({
+  direction = "left-to-right", handleWidth = NODE_GRAPH_CARD_HANDLE_WIDTH,
+}: NodeGraphCardWidthOptions = {}): number {
+  // Two half-inset 44px handles leave a 24px title line plus borders and gaps.
+  return direction === "top-to-bottom" && handleWidth >= NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH
+    ? NODE_GRAPH_CARD_VERTICAL_TOUCH_HEIGHT : NODE_GRAPH_CARD_HEIGHT;
 }
 
 export function nodeGraphCardExpansionWidth(

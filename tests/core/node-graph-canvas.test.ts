@@ -90,6 +90,16 @@ describe("Node Graph canvas math", () => {
     expect(pointIsVisible({ ...wide, x: 210 }, { width: 100, height: 100 }, 0)).toBe(true);
   });
 
+  it("uses a tall vertical card consistently for drawing bounds, culling, and hits", () => {
+    const point = { id: "touch-card", scale: 1, width: 144, x: 50, y: 132 };
+    expect(nodeGraphCanvasGeometry(1, 144, 72).halfHeight).toBe(36);
+    expect(pointIsVisible(point, { width: 100, height: 100 }, 0, 72)).toBe(true);
+    expect(pointIsVisible(point, { width: 100, height: 100 }, 0, 46)).toBe(false);
+    expect(hitTestNodeGraphCanvas([point], 50, 100, 72)).toBe("touch-card");
+    expect(hitTestNodeGraphCanvas([point], 50, 100, 46)).toBeNull();
+    expect(nodeGraphCanvasGeometry(0.01, 144, 72)).toMatchObject({ kind: "dot", halfHeight: 4 });
+  });
+
   it("selects a deterministic bounded overview from an edge-dense model", () => {
     const edges = Array.from({ length: 124_750 }, (_, index) => index);
     const overview = selectNodeGraphCanvasOverviewEdges(edges);

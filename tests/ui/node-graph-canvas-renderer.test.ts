@@ -16,6 +16,46 @@ function fakeContext() {
 }
 
 describe("large Node Graph canvas renderer", () => {
+  it.each(["2d", "3d"] as const)("uses tall vertical %s cards for drawing and hit testing", (dimension) => {
+    const tree: NodeGraphTree = { id: "root", children: [{ id: "child", children: [] }] };
+    const model = buildNodeGraphModel(tree);
+    const records = new Map(model.nodes.map(({ id }) => [id, {
+      label: id, path: id, childCount: id === "root" ? 1 : 0,
+      visual: { kind: "fallback", value: "folder", accent: null, inheritedFrom: null } as const,
+    }]));
+    const context = fakeContext();
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const surface = document.body.createDiv();
+    const renderer = new NodeGraphCanvasRenderer(surface, {
+      handleWidth: 44, layout: layoutNodeGraph(tree, { direction: "top-to-bottom", nodeHeight: 72 }),
+      model, points3D: layoutNodeGraph3D(model), records,
+    }, dimension, false, null, {
+      label: () => "Node Graph", onOpen: vi.fn(), onSelect: vi.fn(), relationSummary: () => "",
+    });
+    try {
+      const internal = renderer as unknown as {
+        drawNode: (point: NodeGraphCanvasPoint) => void;
+        hitTest: (x: number, y: number) => string | null;
+        visiblePoints: NodeGraphCanvasPoint[];
+        updateFocusOverlay: (projected: ReadonlyMap<string, NodeGraphCanvasPoint>) => void;
+      };
+      const point = { id: "root", scale: 1, width: 144, x: 100, y: 100 };
+      context.roundRect.mockClear();
+      internal.drawNode(point);
+      expect(context.roundRect.mock.calls[0]?.[3]).toBe(72);
+      internal.visiblePoints = [point];
+      expect(internal.hitTest(100, 130)).toBe("root");
+      expect(internal.hitTest(100, 137)).toBeNull();
+      renderer.setFocus("root", false);
+      internal.updateFocusOverlay(new Map([[point.id, point]]));
+      expect(surface.querySelector<HTMLElement>(".folder-nodes-node-graph-focus-overlay")?.style.height).toBe("72px");
+    } finally {
+      renderer.destroy();
+      surface.remove();
+      getContext.mockRestore();
+    }
+  });
+
   it.each(["2d", "3d"] as const)("keeps %s labels equal and limits toggle hits to the appended handle", (dimension) => {
     const tree: NodeGraphTree = { id: "root", children: [{ id: "branch", children: [] }, { id: "leaf", children: [] }] };
     const model = buildNodeGraphModel(tree);

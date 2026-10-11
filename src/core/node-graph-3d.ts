@@ -1,6 +1,6 @@
 import type { NodeGraphModel } from "./node-graph-model";
 import { nodeGraphCanvasGeometry } from "./node-graph-canvas";
-import { NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
+import { NODE_GRAPH_CARD_HEIGHT, NODE_GRAPH_CARD_WIDTH_REGULAR } from "./node-graph-card-width";
 
 export interface NodeGraphPoint3D {
   readonly id: string;
@@ -133,6 +133,7 @@ export function fitNodeGraphCamera(
   viewportHeight: number,
   padding = 48,
   minimumNodeScale = 0,
+  nodeHeight = NODE_GRAPH_CARD_HEIGHT,
 ): NodeGraphCamera {
   const width = Math.max(1, viewportWidth);
   const height = Math.max(1, viewportHeight);
@@ -143,6 +144,7 @@ export function fitNodeGraphCamera(
   const boundsAt = (candidateZoom: number) => projectedBounds(
     projectNodeGraph3D(points, { ...camera, zoom: candidateZoom, panX: 0, panY: 0 }, width, height),
     boundedMinimumNodeScale,
+    nodeHeight,
   );
   let low = MIN_CAMERA_ZOOM;
   let high = 4;
@@ -161,6 +163,7 @@ export function fitNodeGraphCamera(
   const fittedBounds = projectedBounds(
     projectNodeGraph3D(points, fitted, width, height),
     boundedMinimumNodeScale,
+    nodeHeight,
   );
   return {
     ...fitted,
@@ -205,7 +208,7 @@ export function zoomNodeGraphCameraAt(
   };
 }
 
-function projectedBounds(points: readonly NodeGraphProjectedPoint[], minimumNodeScale = 0): {
+function projectedBounds(points: readonly NodeGraphProjectedPoint[], minimumNodeScale = 0, nodeHeight = NODE_GRAPH_CARD_HEIGHT): {
   readonly centerX: number;
   readonly centerY: number;
   readonly height: number;
@@ -216,7 +219,7 @@ function projectedBounds(points: readonly NodeGraphProjectedPoint[], minimumNode
   let top = Number.POSITIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
   for (const point of points) {
-    const geometry = nodeGraphCanvasGeometry(Math.max(minimumNodeScale, point.scale), point.width);
+    const geometry = nodeGraphCanvasGeometry(Math.max(minimumNodeScale, point.scale), point.width, nodeHeight);
     left = Math.min(left, point.x - geometry.halfWidth);
     right = Math.max(right, point.x + geometry.halfWidth);
     top = Math.min(top, point.y - geometry.halfHeight);

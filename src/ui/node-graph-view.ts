@@ -11,6 +11,7 @@ import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
 
 import {
   nodeGraphSiblingCardWidths,
+  nodeGraphCardHeight,
   nodeGraphExpansionHandleWidth,
   NODE_GRAPH_CARD_HANDLE_WIDTH,
   NODE_GRAPH_CARD_TOUCH_HANDLE_WIDTH,
@@ -80,7 +81,7 @@ import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
 import { t } from "./i18n";
 import { observeNodeGraphDomViewport } from "./node-graph-dom-viewport";
-import { renderNodeGraphToolbar } from "./node-graph-toolbar";
+import { renderNodeGraphToolbar, updateNodeGraphToolbar, type NodeGraphToolbarLabels, type NodeGraphToolbarModel } from "./node-graph-toolbar";
 import {
   NodeGraphCanvasRenderer,
   type NodeGraphCanvasRecord,
@@ -185,6 +186,7 @@ export class FolderNodeGraphView extends ItemView {
   private searchPreviewPath: string | null = null;
   private pendingPersistedFocusReveal = false;
   private disconnectDomViewport: (() => void) | null = null;
+  private disconnectViewportButtons: (() => void) | null = null;
   private searchResultsCache: {
     readonly generation: number;
     readonly query: string;
@@ -242,6 +244,8 @@ export class FolderNodeGraphView extends ItemView {
   public override async onClose(): Promise<void> {
     this.disconnectDomViewport?.();
     this.disconnectDomViewport = null;
+    this.disconnectViewportButtons?.();
+    this.disconnectViewportButtons = null;
     this.refreshGeneration += 1;
     if (this.refreshTimer !== null) {
       (this.contentEl.ownerDocument.defaultView ?? window).clearTimeout(this.refreshTimer);
@@ -396,6 +400,8 @@ export class FolderNodeGraphView extends ItemView {
     const retainedToolbar = preserveSearchEditor
       ? this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-toolbar")
       : null;
+    this.disconnectViewportButtons?.();
+    this.disconnectViewportButtons = null;
     this.cardHandleWidth = this.currentCardHandleWidth();
     this.contentEl.style.setProperty("--folder-nodes-node-graph-handle-width", `${this.cardHandleWidth}px`);
     this.canvasRenderer?.destroy();
@@ -428,10 +434,14 @@ export class FolderNodeGraphView extends ItemView {
     const sourceData = this.buildGraphData();
     const data = sourceData;
     this.displayGraphData = data;
+    this.contentEl.style.setProperty("--folder-nodes-node-graph-card-height", `${data.layout.nodeHeight}px`);
     this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
     this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
     if (retainedToolbar === null) this.renderToolbar();
-    else this.updateScopeControls();
+    else {
+      updateNodeGraphToolbar(retainedToolbar, this.toolbarModel(), this.toolbarLabels());
+      this.updateScopeControls();
+    }
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
     const visibleEdgeCount = edgesForShowLinks(data.model, this.showLinks).length;
     if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
@@ -463,9 +473,9 @@ export class FolderNodeGraphView extends ItemView {
       .map(({ label: recordLabel, path }) => ({ label: recordLabel, path }));
   }
 
-  private renderToolbar(): HTMLElement {
+  private toolbarModel(): NodeGraphToolbarModel {
     const visibleLinks = this.displayGraphData?.model.edges.filter((edge) => edge.link).length ?? 0;
-    const toolbar = renderNodeGraphToolbar(this.contentEl, {
+    return {
       dimension: this.dimension,
       focusPath: this.focusPath,
       linkSummary: linkCountLabel(visibleLinks),
@@ -474,7 +484,11 @@ export class FolderNodeGraphView extends ItemView {
       searchQuery: this.searchQuery,
       showLinks: this.showLinks,
       visibleLinks,
-    }, {
+    };
+  }
+
+  private toolbarLabels(): NodeGraphToolbarLabels {
+    return {
       clearSearch: label("clearSearch"),
       dimension: label("dimension"),
       expandRange: label("expandRange"),
@@ -498,7 +512,11 @@ export class FolderNodeGraphView extends ItemView {
       zoomLevel: zoomLevelLabel(1),
       zoomOut: label("zoomOut"),
       zoomReset: label("zoomReset"),
-    }, {
+    };
+  }
+
+  private renderToolbar(): HTMLElement {
+    const toolbar = renderNodeGraphToolbar(this.contentEl, this.toolbarModel(), this.toolbarLabels(), {
       onDimension: (mode) => {
         if (this.dimension === mode) return;
         this.dimension = mode;
@@ -825,6 +843,7 @@ export class FolderNodeGraphView extends ItemView {
       return;
     }
     if (this.dimension === "3d") {
+      this.update3DProjection();
       this.updateZoomIndicator(this.camera.zoom);
       return;
     }
@@ -923,7 +942,7 @@ export class FolderNodeGraphView extends ItemView {
       model,
       layout: layoutNodeGraphForest(
         this.dimension === "2d" ? this.buildForest(records) : [],
-        { direction, nodeWidths },
+        { direction, nodeWidths, nodeHeight: nodeGraphCardHeight({ direction, handleWidth: this.cardHandleWidth }) },
       ),
       points3D: this.dimension === "3d" ? layoutNodeGraph3D(model, { nodeWidths }) : [],
     };
@@ -1438,7 +1457,7 @@ export class FolderNodeGraphView extends ItemView {
       point.x,
       point.y,
       (point.width ?? NODE_GRAPH_CARD_WIDTH_REGULAR) / 2 * scale,
-      23 * scale,
+      (this.displayGraphData?.layout.nodeHeight ?? nodeGraphCardHeight()) / 2 * scale,
     );
   }
 
@@ -1504,14 +1523,21 @@ export class FolderNodeGraphView extends ItemView {
     readonly reset: () => void;
     readonly zoomBy: (factor: number) => void;
   }): void {
+    this.disconnectViewportButtons?.();
     const zoomOut = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-out']");
     const zoomReset = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-reset']");
     const zoomIn = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']");
     const fit = this.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='fit']");
-    zoomOut?.addEventListener("click", () => controls.zoomBy(1 / NODE_GRAPH_ZOOM_STEP));
-    zoomReset?.addEventListener("click", () => controls.reset());
-    zoomIn?.addEventListener("click", () => controls.zoomBy(NODE_GRAPH_ZOOM_STEP));
-    fit?.addEventListener("click", () => controls.fit());
+    const bindings = [
+      [zoomOut, () => controls.zoomBy(1 / NODE_GRAPH_ZOOM_STEP)],
+      [zoomReset, () => controls.reset()],
+      [zoomIn, () => controls.zoomBy(NODE_GRAPH_ZOOM_STEP)],
+      [fit, () => controls.fit()],
+    ] as const;
+    for (const [button, handler] of bindings) button?.addEventListener("click", handler);
+    this.disconnectViewportButtons = () => {
+      for (const [button, handler] of bindings) button?.removeEventListener("click", handler);
+    };
     this.updateZoomIndicator(controls.currentZoom());
   }
 
@@ -1665,6 +1691,7 @@ export class FolderNodeGraphView extends ItemView {
         this.threeDViewport.height,
         48,
         this.denseThreeD ? NODE_GRAPH_DENSE_3D_FIT_SCALE : NODE_GRAPH_DOM_MIN_SCALE,
+        this.displayGraphData?.layout.nodeHeight,
       );
       this.updateZoomIndicator(this.camera.zoom);
       this.update3DProjection();

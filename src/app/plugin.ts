@@ -211,11 +211,15 @@ export default class FolderNodesPlugin extends Plugin {
     return this.settingsSaver.getState();
   }
 
-  public retrySettingsSave(): Promise<void> {
+  public async retrySettingsSave(): Promise<void> {
     if (this.settingsCompatibility.status === "incompatible") {
-      return Promise.reject(new SettingsSchemaIncompatibleError(this.settingsCompatibility));
+      throw new SettingsSchemaIncompatibleError(this.settingsCompatibility);
     }
-    return this.settingsSaver.retry();
+    const wasPending = this.settingsSaver.getState() === "pending";
+    await this.settingsSaver.retry();
+    if (wasPending && this.settingsSaver.getState() === "saved" && !this.unloaded) {
+      await this.reconcileSettingsChange();
+    }
   }
 
   public ensureStyles(document: Document): void {
