@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { setMockLanguage } from "../mocks/obsidian";
 import { FolderNodesError } from "../../src/core/folder-nodes-error";
-import { formatError, resolvedLanguage, setLanguage, t } from "../../src/ui/i18n";
+import { formatError, localeCoverage, resolvedLanguage, setLanguage, t, interfaceTextDirection } from "../../src/ui/i18n";
+import { AVAILABLE_INTERFACE_LOCALES } from "../../src/ui/language-options";
+import { LANGUAGE_OVERRIDES } from "../../src/ui/locale-overrides";
 
 afterEach(() => {
   setLanguage("auto");
@@ -15,7 +17,7 @@ describe("interface language", () => {
     expect(t("auto")).toBe("跟随 Obsidian");
 
     setMockLanguage("zh-tw");
-    expect(resolvedLanguage()).toBe("zh-CN");
+    expect(resolvedLanguage()).toBe("zh-TW");
 
     setMockLanguage("en");
     expect(resolvedLanguage()).toBe("en");
@@ -30,6 +32,53 @@ describe("interface language", () => {
     setMockLanguage("en");
     setLanguage("zh-CN");
     expect(resolvedLanguage()).toBe("zh-CN");
+  });
+
+  it.each([
+    ["zh-Hant-TW", "zh-TW"],
+    ["zh-Hans-CN", "zh-CN"],
+    ["pt-PT", "pt-BR"],
+    ["ja-JP", "ja"],
+    ["ko-KR", "ko"],
+    ["ar-SA", "ar"],
+    ["de-DE", "de"],
+    ["es-ES", "es"],
+    ["fr-FR", "fr"],
+    ["ru-RU", "ru"],
+    ["vi-VN", "vi"],
+    ["xx-XX", "en"],
+  ] as const)("follows the host language %s as %s", (host, locale) => {
+    setMockLanguage(host);
+    expect(resolvedLanguage()).toBe(locale);
+  });
+
+  it("scopes RTL to Arabic and retains placeholders in translated draft strings", () => {
+    setLanguage("ar");
+    expect(interfaceTextDirection()).toBe("rtl");
+    expect(t("hiddenByNode", { path: "Private/A" })).toBe("مخفية بسبب Private/A");
+    expect(t("settings")).toBe("إعدادات Folder Nodes");
+    setLanguage("ja");
+    expect(interfaceTextDirection()).toBe("ltr");
+    expect(t("settings")).toBe("Folder Nodes の設定");
+    expect(AVAILABLE_INTERFACE_LOCALES).toHaveLength(12);
+  });
+
+  it("tracks draft translation completeness instead of calling English fallbacks translated", () => {
+    setLanguage("en");
+    const keys = Object.keys(LANGUAGE_OVERRIDES.ar ?? {});
+    expect(localeCoverage("zh-CN").translated).toBe(localeCoverage("zh-CN").total);
+    expect(localeCoverage("en").translated).toBe(localeCoverage("en").total);
+    expect(localeCoverage("ar").translated).toBe(keys.length);
+    expect(localeCoverage("ar").total).toBe(372);
+    for (const locale of AVAILABLE_INTERFACE_LOCALES) {
+      const values = LANGUAGE_OVERRIDES[locale] ?? {};
+      for (const [key, translated] of Object.entries(values)) {
+        const source = t(key as Parameters<typeof t>[0]);
+        const placeholders = (message: string) =>
+          [...message.matchAll(/\{([A-Za-z][A-Za-z0-9]*)\}/gu)].map((match) => match[1]).sort();
+        expect(placeholders(translated), `${locale}:${key}`).toEqual(placeholders(source));
+      }
+    }
   });
 
   it("localizes stable structural errors without exposing internal English messages", () => {
