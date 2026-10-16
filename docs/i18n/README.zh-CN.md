@@ -2,13 +2,13 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
 
-Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件夹和一个同名 Markdown 笔记组成，例如 `A/A.md`。如果只存在其中一边，插件会把它显示为**不完整**，不会悄悄替你创建或移动文件。
+让 Obsidian 的文件夹拥有一篇专属笔记，并在同一个地方查看文件夹里的内容。比如文件夹 `A` 和笔记 `A/A.md` 组成一个完整节点。如果缺少文件夹或笔记，插件会显示**不完整**，不会擅自帮你新建或移动文件。
 
 ## 截图
 
 ### 节点内容
 
-在一个侧栏里查看子节点、图片和视频、普通文件，以及明确设为“不管理”的边界。
+在同一个侧栏里打开子节点、图片、视频和普通文件。即使某些文件夹设为“不管理”，内容也仍然可以正常访问。
 
 ![Folder Nodes 侧栏显示子节点、媒体和不管理文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,7 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 
 ### 文件列表
 
-直接把 Obsidian 文件列表当作全局节点树使用。Folder Nodes 会增加置顶 Root 行、节点状态、可选图标和手动同级排序，但不会替换 Obsidian 原生文件/文件夹操作。
+继续使用 Obsidian 自带的文件列表。Folder Nodes 会增加根节点入口、提示文件夹有没有对应笔记，还能设置图标和同级节点顺序；原有文件和文件夹操作不受影响。
 
 ![Obsidian 文件列表显示 Root 眼睛与 Folder Nodes 状态标签](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
@@ -28,7 +28,7 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 
 ### 图标与外观
 
-节点图标可使用 Vault 图片、Lucide 图标、文字、Emoji 或颜色回退。设置页会直接预览属性图标与文件名中相同字符的区别。
+图标可以用库内图片、Lucide 图标、文字、表情符号或颜色。设置页会提前展示效果，也能看出图标和文件名里的普通字符有什么区别。
 
 ![Folder Nodes 图标与外观设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
@@ -122,7 +122,7 @@ folder-nodes:
 
 - `order=manual`：让该父节点使用手动子节点排序。
 - `rank=N`：保存某个子节点在手动排序中的稀疏位置。
-- `hidden=true`：从 Folder Nodes 的三个投影中隐藏该节点及其受管理后代。
+- `hidden=true`：在文件列表、节点内容和节点图谱中隐藏此节点及它管理的下级节点。不会删除文件，也不会影响 Obsidian 搜索。
 
 已经公开的旧字段 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 会继续兼容读取。使用 **管理 → 迁移 Folder Nodes 属性** 可以先查看准确受影响的笔记。迁移前请先更新所有设备上的 Folder Nodes；插件启动时不会自动迁移笔记属性。
 
