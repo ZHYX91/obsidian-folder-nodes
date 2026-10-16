@@ -1,7 +1,8 @@
 import type { EmojiFontPreference } from "./emoji-font";
 
 export type SortMode = "natural" | "manual";
-export type InterfaceLanguage = "auto" | "zh-CN" | "en";
+import type { AvailableInterfaceLocale } from "../ui/language-options";
+export type InterfaceLanguage = "auto" | AvailableInterfaceLocale;
 export type ExplorerIconPosition = "before" | "after" | "hidden";
 export type NodeGraphDimension = "2d" | "3d";
 export type NodeGraphLayoutDirection = "left-to-right" | "top-to-bottom";

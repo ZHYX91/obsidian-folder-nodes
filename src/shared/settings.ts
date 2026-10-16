@@ -1,3 +1,4 @@
+import { isInterfaceLanguage } from "../ui/language-options";
 import { isEmojiFontPreference } from "../core/emoji-font";
 import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core/types";
 
@@ -80,7 +81,7 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = deepFreeze({
 
 export function normalizeSettings(value: unknown): FolderNodesSettings {
   const input = isRecord(value) ? value as Partial<FolderNodesSettings> : {};
-  const language = input.language === "zh-CN" || input.language === "en" ? input.language : "auto";
+  const language = isInterfaceLanguage(input.language) ? input.language : "auto";
   const explorerIconPosition = input.explorerIconPosition === "after" || input.explorerIconPosition === "hidden"
     ? input.explorerIconPosition
     : "before";
