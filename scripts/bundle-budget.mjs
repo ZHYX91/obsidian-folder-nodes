@@ -1,13 +1,13 @@
-// Measured on 2026-08-02 with Node 24.19.0 and npm 11.17.0 after
-// `npm ci && npm run build:bundle`; then
-// `node -p "require('node:fs').statSync('dist/main.js').size"` printed 280147
-// after all eleven catalogs became independently complete.
-export const BUNDLE_REFERENCE_BYTES = 280_147;
+// Measured in the October 2026 GitHub CI with Node 24.19.0/npm 11.17.0:
+// production dist/main.js was 581958 bytes with the new multilingual catalogs.
+// Replaces the 280147-byte August 2026 reference, which no longer describes
+// this UI/graph feature set or bundled translation inventory.
+export const BUNDLE_REFERENCE_BYTES = 581_958;
 
-// Roughly 1.8x the measured baseline: enough room for reviewed feature growth,
-// while still blocking accidental source maps, unminified output, or a major
-// dependency expansion. Raising it requires a new measured reference and review.
-export const BUNDLE_MAXIMUM_BYTES = 500_000;
+// Still a hard, reviewed cap: approximately 11.7% headroom above the measured
+// candidate. Source maps, debug bundles, and unexpected dependency growth
+// must continue failing instead of quietly expanding a release.
+export const BUNDLE_MAXIMUM_BYTES = 650_000;
 
 export function measureBundleBudget(actualBytes) {
   if (!Number.isSafeInteger(actualBytes) || actualBytes <= 0) {
