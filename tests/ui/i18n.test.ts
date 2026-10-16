@@ -121,7 +121,8 @@ describe("interface language", () => {
     expect(t("unmanaged")).toBe("Unmanaged");
     expect(t("managementGuideStructure")).toContain("A/A.md");
     expect(t("managementGuideBoundary")).toContain("Unmanaged");
-    expect(t("managementGuideActions")).toContain("containing-node");
+    expect(t("managementGuideActions")).toContain("Rename containing node");
+    expect(t("nodeGraphEdgeLimitDesc")).not.toContain("structure skeleton");
     expect(t("hiddenNode")).toBe("Hidden");
     expect(t("incompleteStatus")).toBe("Incomplete");
     expect(t("conflictStatus")).toBe("Conflict");
