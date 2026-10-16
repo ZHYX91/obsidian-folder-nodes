@@ -1,5 +1,7 @@
 import { getLanguage } from "obsidian";
 import { FolderNodesError } from "../core/folder-nodes-error";
+import { LANGUAGE_OVERRIDES } from "./locale-overrides";
+import { isInterfaceLanguage, type AvailableInterfaceLocale } from "./language-options";
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
@@ -73,7 +75,7 @@ const zh = {
   childOrderNatural: "子节点排序：按名称（切换为手动）", childOrderManual: "子节点排序：手动（恢复按名称）",
   rename: "重命名节点", delete: "删除节点", move: "移动节点", merge: "合并节点",
   renameCurrentNode: "重命名当前节点", moveContainingNode: "移动所在节点", mergeContainingNode: "合并所在节点", deleteContainingNode: "删除所在节点",
-  language: "界面语言", languageDesc: "跟随 Obsidian 时，中文界面使用简体中文，其他语言使用 English；也可以手动指定。", auto: "跟随 Obsidian",
+  language: "界面语言", languageDesc: "默认跟随 Obsidian 的界面语言；尚未支持的语言暂用英语。切换语言不会修改笔记或节点名称。", auto: "跟随 Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "图标继承",
   iconInheritanceDesc: "当前节点没有有效 icon 时，使用最近祖先节点的图标。",
   emojiFont: "Emoji 字体", systemDefault: "系统默认",
@@ -234,7 +236,7 @@ const en: typeof zh = {
   childOrderNatural: "Child order: Name (switch to manual)", childOrderManual: "Child order: Manual (restore name order)",
   rename: "Rename node", delete: "Delete node", move: "Move node", merge: "Merge node",
   renameCurrentNode: "Rename current node", moveContainingNode: "Move containing node", mergeContainingNode: "Merge containing node", deleteContainingNode: "Delete containing node",
-  language: "Interface language", languageDesc: "Follow Obsidian uses Simplified Chinese for Chinese interface languages and English otherwise. You can also choose a language explicitly.", auto: "Follow Obsidian",
+  language: "Interface language", languageDesc: "Follow Obsidian uses its supported interface language. Unsupported host languages use English. Changing languages never edits notes or node names.", auto: "Follow Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "Icon inheritance",
   iconInheritanceDesc: "Use the nearest ancestor icon when the current node has no valid icon.",
   emojiFont: "Emoji font", systemDefault: "System default",
@@ -329,16 +331,34 @@ let configuredLanguage: InterfaceLanguage = "auto";
 
 export function setLanguage(language: InterfaceLanguage): void { configuredLanguage = language; }
 
-export function resolvedLanguage(): "zh-CN" | "en" {
+export function resolvedLanguage(): AvailableInterfaceLocale {
   if (configuredLanguage !== "auto") return configuredLanguage;
-  return getLanguage().toLocaleLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const tag = getLanguage().trim().replaceAll("_", "-").toLowerCase();
+  if (tag === "zh" || tag.startsWith("zh-")) {
+    return /(?:^|[-])(hant|tw|hk|mo)(?:$|[-])/u.test(tag) ? "zh-TW" : "zh-CN";
+  }
+  if (tag === "pt" || tag.startsWith("pt-")) return "pt-BR";
+  const primary = tag.split("-")[0];
+  return isInterfaceLanguage(primary) && primary !== "auto" ? primary : "en";
+}
+
+export function interfaceTextDirection(): "rtl" | "ltr" {
+  return resolvedLanguage() === "ar" ? "rtl" : "ltr";
+}
+
+/** Coverage is an explicit review signal; untranslated draft keys still use English. */
+export function localeCoverage(locale: AvailableInterfaceLocale): { translated: number; total: number } {
+  const values = locale === "en" ? en : locale === "zh-CN" ? zh : LANGUAGE_OVERRIDES[locale] ?? {};
+  return { translated: Object.keys(values).length, total: Object.keys(en).length };
 }
 
 export function t(key: TranslationKey, values: Record<string, string | number> = {}): string {
-  const dictionary = resolvedLanguage() === "zh-CN" ? zh : en;
+  const locale = resolvedLanguage();
+  const dictionary = locale === "zh-CN" ? zh : locale === "en" ? en : LANGUAGE_OVERRIDES[locale] ?? {};
+  const template = dictionary[key] ?? en[key];
   return Object.entries(values).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
-    dictionary[key],
+    template,
   );
 }
 
