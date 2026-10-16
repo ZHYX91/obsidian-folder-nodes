@@ -589,6 +589,8 @@ export const LANGUAGE_OVERRIDES: Readonly<Record<string, Readonly<Record<string,
     "reloadLanguage": "Tên lệnh sẽ đổi ngôn ngữ sau khi tải lại plugin.",
   },
   "ar": {
+    "nodeGraphDisabledDesc": "مخطط العقد معطّل؛ تظل ميزات Folder Nodes الأخرى متاحة.",
+    "moveToTrash": "نقل إلى سلة المحذوفات",
     "leafMarkdown": "ملف Markdown مستقل",
     "missingNotes": "ملاحظات عقد مفقودة",
     "conflicts": "تعارضات تمنع الإجراء",
