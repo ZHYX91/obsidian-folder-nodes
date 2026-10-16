@@ -1,7 +1,7 @@
 import { getLanguage } from "obsidian";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { LANGUAGE_OVERRIDES } from "./locale-overrides";
-import { isInterfaceLanguage, type AvailableInterfaceLocale } from "./language-options";
+import { isInterfaceLanguage, type AvailableInterfaceLocale } from "../core/interface-languages";
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {

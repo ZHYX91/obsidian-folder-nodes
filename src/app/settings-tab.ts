@@ -13,7 +13,7 @@ import {
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { interfaceTextDirection, t } from "../ui/i18n";
-import { isInterfaceLanguage, languageOptions } from "../ui/language-options";
+import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
 import { renderVisual } from "../presentation/render-visual";
 
 type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";

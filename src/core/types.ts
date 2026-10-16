@@ -1,7 +1,7 @@
 import type { EmojiFontPreference } from "./emoji-font";
 
 export type SortMode = "natural" | "manual";
-import type { AvailableInterfaceLocale } from "../ui/language-options";
+import type { AvailableInterfaceLocale } from "./interface-languages";
 export type InterfaceLanguage = "auto" | AvailableInterfaceLocale;
 export type ExplorerIconPosition = "before" | "after" | "hidden";
 export type NodeGraphDimension = "2d" | "3d";

@@ -1,4 +1,4 @@
-import { isInterfaceLanguage } from "../ui/language-options";
+import { isInterfaceLanguage } from "../core/interface-languages";
 import { isEmojiFontPreference } from "../core/emoji-font";
 import type { FolderNodesSettings, NamingPart, NodeGraphSettings } from "../core/types";
 

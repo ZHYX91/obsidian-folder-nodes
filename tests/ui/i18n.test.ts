@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { setMockLanguage } from "../mocks/obsidian";
 import { FolderNodesError } from "../../src/core/folder-nodes-error";
 import { formatError, localeCoverage, resolvedLanguage, setLanguage, t, interfaceTextDirection } from "../../src/ui/i18n";
-import { AVAILABLE_INTERFACE_LOCALES } from "../../src/ui/language-options";
+import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages";
 import { LANGUAGE_OVERRIDES } from "../../src/ui/locale-overrides";
 
 afterEach(() => {
