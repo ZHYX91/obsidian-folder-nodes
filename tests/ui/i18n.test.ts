@@ -81,6 +81,33 @@ describe("interface language", () => {
     }
   });
 
+  it("keeps draft locale coverage visible and rejects unknown keys", () => {
+    setLanguage("en");
+    const canonicalKeys = new Set(Object.keys(LANGUAGE_OVERRIDES["zh-TW"] ?? {}));
+    const partialLocales = ["ja", "ko", "de", "fr", "es", "pt-BR", "ru", "vi"] as const;
+    for (const locale of partialLocales) {
+      const coverage = localeCoverage(locale);
+      expect(coverage.total).toBe(372);
+      expect(coverage.translated, locale).toBeGreaterThanOrEqual(60);
+      expect(coverage.translated, locale).toBeLessThan(coverage.total);
+      for (const key of Object.keys(LANGUAGE_OVERRIDES[locale] ?? {})) {
+        expect(canonicalKeys.has(key), `${locale}:${key} is not a canonical interface key`).toBe(true);
+      }
+    }
+    expect(localeCoverage("zh-TW").translated).toBe(372);
+    expect(localeCoverage("ar").translated).toBe(372);
+  });
+
+  it("explains save failures, migrations, and graph controls in plain Chinese", () => {
+    setLanguage("zh-CN");
+    expect(t("settingsSavePendingDesc")).toContain("重试保存");
+    expect(t("settingsReadOnlyDesc", { stored: 5, current: 4 })).toContain("不会改写 data.json");
+    expect(t("propertyMigrationDesc")).toContain("确认后才会写入");
+    expect(t("nodeGraphLayoutDirectionDesc")).toContain("思维导图");
+    expect(t("languageDesc")).toContain("显示英文");
+    expect(t("iconInheritanceDesc")).toContain("上级节点");
+  });
+
   it("localizes stable structural errors without exposing internal English messages", () => {
     setLanguage("zh-CN");
     expect(formatError(new FolderNodesError("root_cannot_hide", {}, "The Root Node cannot be hidden")))
