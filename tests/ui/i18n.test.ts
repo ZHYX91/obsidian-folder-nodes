@@ -81,21 +81,37 @@ describe("interface language", () => {
     }
   });
 
-  it("keeps draft locale coverage visible and rejects unknown keys", () => {
+  it("requires complete interface coverage in every registered locale", () => {
     setLanguage("en");
-    const canonicalKeys = new Set(Object.keys(LANGUAGE_OVERRIDES["zh-TW"] ?? {}));
-    const partialLocales = ["ja", "ko", "de", "fr", "es", "pt-BR", "ru", "vi"] as const;
-    for (const locale of partialLocales) {
+    const referenceKeys = Object.keys(LANGUAGE_OVERRIDES["zh-TW"] ?? {});
+    const canonicalKeys = new Set(referenceKeys);
+    expect(referenceKeys).toHaveLength(372);
+    expect(AVAILABLE_INTERFACE_LOCALES).toHaveLength(12);
+
+    for (const locale of AVAILABLE_INTERFACE_LOCALES) {
       const coverage = localeCoverage(locale);
-      expect(coverage.total).toBe(372);
-      expect(coverage.translated, locale).toBeGreaterThanOrEqual(60);
-      expect(coverage.translated, locale).toBeLessThan(coverage.total);
-      for (const key of Object.keys(LANGUAGE_OVERRIDES[locale] ?? {})) {
+      expect(coverage, locale).toEqual({ translated: 372, total: 372 });
+      if (locale === "en" || locale === "zh-CN") continue;
+      const translatedKeys = Object.keys(LANGUAGE_OVERRIDES[locale] ?? {});
+      expect(translatedKeys, locale).toHaveLength(372);
+      for (const key of translatedKeys) {
         expect(canonicalKeys.has(key), `${locale}:${key} is not a canonical interface key`).toBe(true);
+        expect(LANGUAGE_OVERRIDES[locale]?.[key]?.trim().length, `${locale}:${key} is blank`).toBeGreaterThan(0);
       }
     }
-    expect(localeCoverage("zh-TW").translated).toBe(372);
-    expect(localeCoverage("ar").translated).toBe(372);
+  });
+
+  it("translates long interface, error, and graph messages instead of falling back to English", () => {
+    setLanguage("en");
+    const keys = ["managementGuideTitle", "errorInvalidMove", "nodeGraphViewportHelp", "settingsSavePendingDesc"] as const;
+    const english = keys.map((key) => t(key));
+    for (const locale of AVAILABLE_INTERFACE_LOCALES) {
+      if (locale === "en") continue;
+      setLanguage(locale);
+      for (const [index, key] of keys.entries()) {
+        expect(t(key), `${locale}:${key}`).not.toBe(english[index]);
+      }
+    }
   });
 
   it("explains save failures, migrations, and graph controls in plain Chinese", () => {
