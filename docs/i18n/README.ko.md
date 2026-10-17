@@ -31,4 +31,4 @@ Obsidian 1.12.7 이상이 필요합니다. '설정 → 커뮤니티 플러그인
 ## 제한과 개인정보
 노드는 현재 Vault 경로로 구분하며 영구 ID를 만들지 않습니다. Folder Nodes는 Vault 데이터를 업로드하거나 네트워크 요청을 보내지 않습니다. 인터페이스 언어를 바꿔도 노트, 파일 이름, 속성은 바뀌지 않습니다.
 
-더 자세한 사용법은 [영어 전체 설명서](../../README.md) 또는 [중국어 간체 설명서](README.zh-CN.md)를 참고하세요. 문제는 [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues)에 알려 주세요。
+더 자세한 사용법은 [영어 전체 설명서](../../README.md) 또는 [중국어 간체 설명서](README.zh-CN.md)를 참고하세요. 문제는 [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues)에 알려 주세요.

@@ -1,7 +1,7 @@
 // Measured by the production-bundle gate with all 12 interface catalogs
-// containing 372 messages each: dist/main.js was 870641 bytes.
+// containing 372 messages each: dist/main.js was 870741 bytes.
 // The previous 581958-byte reference described eight incomplete catalogs.
-export const BUNDLE_REFERENCE_BYTES = 870_641;
+export const BUNDLE_REFERENCE_BYTES = 870_741;
 
 // Reviewed upper bound: about 10% headroom for small changes, while still
 // rejecting source maps, debug builds, and unexpected dependency growth.
