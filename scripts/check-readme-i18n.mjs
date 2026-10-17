@@ -92,8 +92,37 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
         throw new Error(`${relativePath} lacks essential guidance: ${term}`);
       }
     }
-    if (locale !== "zh-CN" && (headings(source).length < 5 || !source.includes("data.json"))) {
-      throw new Error(`${relativePath} must explain installation, navigation, safety and upgrade`);
+    if (locale !== "zh-CN") {
+      if (headings(source).length !== REQUIRED_ENGLISH.length) {
+        throw new Error(`${relativePath} must cover all ${REQUIRED_ENGLISH.length} canonical chapters`);
+      }
+      const essential = [
+        "data.json", "order=manual", "rank=N", "hidden=true",
+        "folderNodeChildrenSort", "folderNodeSiblingRank", "folderNodeHidden",
+        "frontmatter", "Canvas", "HEIC/HEIF", "README.md",
+        "index.md", "_A.md", "npm ci", "npm run check",
+        "npm run release:check", "24.19.0", "11.17.0",
+        "AGENTS.md", "CLAUDE.md",
+      ];
+      // These safeguards must have equivalent localized explanations, not
+      // merely a top navigation bar and a brief introduction.
+      for (const token of essential.filter((value) => value !== "AGENTS.md" && value !== "CLAUDE.md")) {
+        if (!source.includes(token)) throw new Error(`${relativePath} lacks ${token}`);
+      }
+      for (const file of [
+        "folder-nodes-contents-en.png", "folder-nodes-explorer-en.png",
+        "folder-nodes-graph-en.png", "folder-nodes-settings-icons-en.png",
+        "folder-nodes-creation-en.png",
+      ]) {
+        if (!source.includes(file)) throw new Error(`${relativePath} lacks screenshot ${file}`);
+      }
+      if (!source.includes("https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose")) {
+        throw new Error(`${relativePath} must link to actionable support`);
+      }
+      const chapters = source.split(/^## .+$/gmu).slice(1);
+      if (chapters.length !== REQUIRED_ENGLISH.length || chapters.some((chapter) => chapter.trim().length < 60)) {
+        throw new Error(`${relativePath} has missing or empty translated chapters`);
+      }
     }
   }
   return 12;
