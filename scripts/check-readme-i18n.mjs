@@ -60,7 +60,43 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
   if (!english.includes("docs/i18n/README.zh-CN.md")) throw new Error("README.md must link its Chinese translation");
   assertSemanticAnchors(english, SEMANTIC_ANCHORS.map(([anchor]) => anchor), "README.md");
   assertSemanticAnchors(chinese, SEMANTIC_ANCHORS.map(([, anchor]) => anchor), "Chinese README");
-  return 2;
+  // The two complete references and ten localized getting-started guides must
+  // link to every supported reading language. This also checks the draft branch,
+  // where absolute links to main would hide missing translations.
+  const LOCALES = ["zh-CN", "zh-TW", "ja", "ko", "de", "fr", "es", "pt-BR", "ru", "vi", "ar"];
+  const expectedInnerLinks = ["../../README.md", ...LOCALES.map((locale) => `README.${locale}.md`)];
+  const rootNavigation = english.split("\n")[2] ?? "";
+  for (const locale of LOCALES) {
+    if (!rootNavigation.includes(`docs/i18n/README.${locale}.md`)) {
+      throw new Error(`Root README lacks the ${locale} navigation link`);
+    }
+  }
+  if (!rootNavigation.includes("(README.md)")) {
+    throw new Error("Root README lacks the English navigation link");
+  }
+
+  for (const locale of LOCALES) {
+    const relativePath = `docs/i18n/README.${locale}.md`;
+    const source = locale === "zh-CN" ? chinese : await readFile(path.join(projectRoot, relativePath), "utf8");
+    if (!source.startsWith("# Folder Nodes\n\n")) {
+      throw new Error(`${relativePath} must identify Folder Nodes`);
+    }
+    const navigation = source.split("\n")[2] ?? "";
+    for (const link of expectedInnerLinks) {
+      if (!navigation.includes(`(${link})`)) {
+        throw new Error(`${relativePath} lacks navigation to ${link}`);
+      }
+    }
+    for (const term of ["A/A.md", "hidden=true", "icon", "Node Graph", "Obsidian 1.12.7"]) {
+      if (locale !== "zh-CN" && !source.includes(term)) {
+        throw new Error(`${relativePath} lacks essential guidance: ${term}`);
+      }
+    }
+    if (locale !== "zh-CN" && (headings(source).length < 5 || !source.includes("data.json"))) {
+      throw new Error(`${relativePath} must explain installation, navigation, safety and upgrade`);
+    }
+  }
+  return 12;
 }
 
 const entryPoint = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : undefined;
