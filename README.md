@@ -1,6 +1,6 @@
 # Folder Nodes
 
-[English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
+[English](README.md) · [简体中文](docs/i18n/README.zh-CN.md) · [繁體中文](docs/i18n/README.zh-TW.md) · [日本語](docs/i18n/README.ja.md) · [한국어](docs/i18n/README.ko.md) · [Deutsch](docs/i18n/README.de.md) · [Français](docs/i18n/README.fr.md) · [Español](docs/i18n/README.es.md) · [Português (Brasil)](docs/i18n/README.pt-BR.md) · [Русский](docs/i18n/README.ru.md) · [Tiếng Việt](docs/i18n/README.vi.md) · [العربية](docs/i18n/README.ar.md)
 
 Give an Obsidian folder its own note, then browse the folder and its contents together. For example, `A/A.md` is the note for folder `A`. Folder Nodes calls this pair a *node*. If the folder or note is missing, you'll see **Incomplete**; the plugin won't quietly create or move files for you.
 
@@ -107,7 +107,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 - **Selection & naming** — confirmation for selected-text creation, aliases, plus optional prefix/suffix naming sources and timestamp formats.
 - **Node Graph** — enablement, default dimension, 2D direction, and large-graph thresholds.
 
-**Follow Obsidian** picks a supported interface language from Obsidian's current language. You can also choose one of the 12 languages manually. Japanese, Korean, German, French, Spanish, Brazilian Portuguese, Russian, and Vietnamese currently have partial translations: untranslated messages appear in English. Interface language changes never rename nodes or edit your notes.
+**Follow Obsidian** selects the corresponding supported interface language from Obsidian. You can also choose any of the 12 languages manually. Switching languages does not change note contents, filenames, or node properties.
 
 ## Folder Nodes property
 

@@ -1,6 +1,6 @@
 # Folder Nodes
 
-[English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
+[English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
 让 Obsidian 的文件夹拥有一篇专属笔记，并在同一个地方查看文件夹里的内容。比如文件夹 `A` 和笔记 `A/A.md` 组成一个完整节点。如果缺少文件夹或笔记，插件会显示**不完整**，不会擅自帮你新建或移动文件。
 
@@ -107,7 +107,7 @@
 - **选区与命名**：选区创建确认、aliases，以及可选的前缀/后缀来源和时间戳格式。
 - **节点图谱**：是否启用、默认维度、2D 方向和大图阈值。
 
-**跟随 Obsidian** 会根据 Obsidian 的界面语言选择插件已提供的语言，也可以手动选择 12 种界面语言之一。目前日语、韩语、德语、法语、西班牙语、巴西葡萄牙语、俄语和越南语的翻译尚未补齐，未翻译的内容会显示英文。更改界面语言不会修改笔记、文件名或节点属性。
+**跟随 Obsidian** 会根据 Obsidian 的界面语言自动选择已支持的语言，也可以手动选择全部 12 种语言。切换界面语言只影响 Folder Nodes 的文字和布局，不会修改笔记、文件名或节点属性。
 
 ## Folder Nodes 属性
 
