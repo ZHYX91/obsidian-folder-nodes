@@ -26,7 +26,8 @@ Vous pouvez créer, renommer, déplacer, fusionner, trier ou supprimer un nœud 
 
 ## Configuration et compatibilité
 
-Obsidian 1.12.7 ou version ultérieure est nécessaire. Dans « Paramètres → Modules communautaires → Parcourir », recherchez Folder Nodes, installez-le et activez-le. Vous pouvez aussi récupérer les fichiers main.js, manifest.json et styles.css d’une même version dans les [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), puis les placer dans Vault/.obsidian/plugins/folder-nodes/. Conservez data.json lors des mises à jour.
+Obsidian **1.12.7**+
+
 Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements passent par des menus plutôt que par le glisser-déposer de bureau. Les appareils Android physiques et iOS ne font pas partie des essais d’acceptation officiels.
 
 ## Installation

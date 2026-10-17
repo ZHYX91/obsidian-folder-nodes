@@ -26,7 +26,8 @@ Bạn có thể tạo, đổi tên, di chuyển, hợp nhất, sắp xếp và x
 
 ## Yêu cầu và tương thích
 
-Bạn cần Obsidian 1.12.7 trở lên. Mở “Cài đặt → Plugin cộng đồng → Duyệt”, tìm Folder Nodes, cài đặt và bật plugin. Bạn cũng có thể lấy main.js, manifest.json và styles.css từ cùng một phiên bản tại [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), rồi đặt vào Vault/.obsidian/plugins/folder-nodes/. Khi cập nhật, hãy giữ data.json để bảo toàn cài đặt.
+Obsidian **1.12.7**+
+
 Plugin hỗ trợ máy tính và Android. Trên Android, việc di chuyển thư mục dùng menu thay cho thao tác kéo thả trên máy tính. Thiết bị Android thực và iOS chưa nằm trong phạm vi nghiệm thu chính thức.
 
 ## Cài đặt

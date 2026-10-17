@@ -26,7 +26,8 @@ Você pode criar, renomear, mover, mesclar, ordenar e excluir nós completos. O 
 
 ## Requisitos e compatibilidade
 
-É necessário ter o Obsidian 1.12.7 ou mais recente. Acesse "Configurações → Plugins da comunidade → Procurar", pesquise Folder Nodes, instale e ative. Outra opção é baixar main.js, manifest.json e styles.css da mesma versão em [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) e colocá-los em Vault/.obsidian/plugins/folder-nodes/. Ao atualizar, mantenha data.json para preservar suas configurações.
+Obsidian **1.12.7**+
+
 O plugin funciona no computador e no Android. No Android, movimentar pastas usa menus em vez de arrastar e soltar. Aparelhos Android físicos e iOS não fazem parte da matriz de aceitação oficial do projeto.
 
 ## Instalação

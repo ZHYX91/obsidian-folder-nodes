@@ -26,7 +26,8 @@ Folder Nodes 讓 Obsidian 資料夾擁有自己的筆記。資料夾 A 和同名
 
 ## 系統需求與相容性
 
-需要 Obsidian 1.12.7 或更新版本。可在「設定 → 第三方外掛 → 瀏覽」搜尋 Folder Nodes 安裝；也能從 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) 下載同一版本的安裝檔，解壓到 Vault/.obsidian/plugins/folder-nodes/。不要混用不同版本的 main.js、manifest.json、styles.css。升級時保留 data.json。
+Obsidian **1.12.7**+
+
 桌面版和 Android 版可使用；Android 上的移動操作採用原生選單，不依賴桌面拖放。Android 實體裝置及 iOS 尚未列入專案的正式宿主驗收範圍。
 
 ## 安裝

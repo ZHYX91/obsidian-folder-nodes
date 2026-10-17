@@ -26,7 +26,8 @@ Obsidian のファイルエクスプローラーはそのまま使えます。�
 
 ## 動作環境と互換性
 
-Obsidian 1.12.7 以降が必要です。「設定 → コミュニティプラグイン → 閲覧」で Folder Nodes を検索し、インストールして有効にしてください。または [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) の同じバージョンに含まれる main.js、manifest.json、styles.css を Vault/.obsidian/plugins/folder-nodes/ に配置します。更新時は設定を保存した data.json を残してください。
+Obsidian **1.12.7**+
+
 デスクトップと Android に対応しています。Android の移動操作にはメニューを使います。Android 実機および iOS は正式な実機検証の対象外です。
 
 ## インストール

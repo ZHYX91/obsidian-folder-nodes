@@ -26,7 +26,8 @@ Obsidian의 기본 파일 탐색기는 그대로 사용합니다. 여기에 노�
 
 ## 요구 사항과 호환성
 
-Obsidian 1.12.7 이상이 필요합니다. '설정 → 커뮤니티 플러그인 → 찾아보기'에서 Folder Nodes를 검색해 설치하고 활성화하세요. 또는 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases)에서 동일한 버전의 main.js, manifest.json, styles.css를 받아 Vault/.obsidian/plugins/folder-nodes/에 넣으세요. 업데이트할 때는 설정 파일 data.json을 유지해야 합니다.
+Obsidian **1.12.7**+
+
 데스크톱과 Android에서 사용할 수 있습니다. Android에서는 데스크톱 드래그 앤 드롭 대신 메뉴로 폴더를 이동합니다. Android 실기기와 iOS는 정식 호스트 검증 범위에 포함되지 않습니다.
 
 ## 설치

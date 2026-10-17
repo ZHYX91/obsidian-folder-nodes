@@ -26,7 +26,8 @@ Vollständige Knoten lassen sich anlegen, umbenennen, verschieben, zusammenführ
 
 ## Voraussetzungen und Kompatibilität
 
-Sie benötigen Obsidian 1.12.7 oder neuer. Öffnen Sie „Einstellungen → Community-Plugins → Durchsuchen“, suchen Sie nach Folder Nodes und aktivieren Sie das Plugin. Alternativ laden Sie eine passende Version unter [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) herunter und legen main.js, manifest.json und styles.css gemeinsam unter Vault/.obsidian/plugins/folder-nodes/ ab. Bewahren Sie bei Updates die Datei data.json mit Ihren Einstellungen auf.
+Obsidian **1.12.7**+
+
 Desktop und Android werden unterstützt. Auf Android erfolgt das Verschieben über Menüs statt Desktop-Drag-and-drop. Tests auf echten Android-Geräten und auf iOS gehören nicht zur verbindlichen Abnahme.
 
 ## Installation

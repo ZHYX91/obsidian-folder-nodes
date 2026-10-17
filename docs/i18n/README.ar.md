@@ -26,7 +26,8 @@
 
 ## المتطلبات والتوافق
 
-يتطلب الملحق Obsidian 1.12.7 أو أحدث. افتح «الإعدادات ← الإضافات المجتمعية ← تصفح»، وابحث عن Folder Nodes ثم ثبّته وفعّله. ويمكنك تنزيل main.js وmanifest.json وstyles.css من الإصدار نفسه عبر [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) ووضعها في Vault/.obsidian/plugins/folder-nodes/. احتفظ بملف data.json عند التحديث حتى لا تضيع الإعدادات.
+Obsidian **1.12.7**+
+
 يدعم الملحق إصدار سطح المكتب وAndroid. على Android تُستخدم القوائم لنقل المجلدات بدل السحب والإفلات على سطح المكتب. الأجهزة الفعلية بنظام Android وiOS ليست ضمن نطاق اختبار القبول الرسمي للمشروع.
 
 ## التثبيت

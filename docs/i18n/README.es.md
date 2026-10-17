@@ -26,7 +26,8 @@ Puedes crear, renombrar, mover, fusionar, ordenar y eliminar nodos completos. Se
 
 ## Requisitos y compatibilidad
 
-Necesitas Obsidian 1.12.7 o posterior. Ve a «Ajustes → Complementos de la comunidad → Examinar», busca Folder Nodes, instálalo y actívalo. También puedes descargar main.js, manifest.json y styles.css de una misma versión en [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) y colocarlos en Vault/.obsidian/plugins/folder-nodes/. Conserva data.json al actualizar para no perder los ajustes.
+Obsidian **1.12.7**+
+
 Funciona en escritorio y Android. En Android, el movimiento de carpetas se realiza mediante menús en vez de arrastrar y soltar. Los dispositivos Android físicos y iOS están fuera del alcance de las pruebas de aceptación del proyecto.
 
 ## Instalación
