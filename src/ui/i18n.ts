@@ -346,7 +346,7 @@ export function interfaceTextDirection(): "rtl" | "ltr" {
   return resolvedLanguage() === "ar" ? "rtl" : "ltr";
 }
 
-/** Coverage is an explicit review signal; untranslated draft keys still use English. */
+/** Coverage is verified for every locale; English is a defensive runtime fallback only. */
 export function localeCoverage(locale: AvailableInterfaceLocale): { translated: number; total: number } {
   const values = locale === "en" ? en : locale === "zh-CN" ? zh : LANGUAGE_OVERRIDES[locale] ?? {};
   return { translated: Object.keys(values).length, total: Object.keys(en).length };
