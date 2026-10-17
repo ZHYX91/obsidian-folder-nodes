@@ -120,7 +120,7 @@ describe("interface language", () => {
     expect(t("settingsReadOnlyDesc", { stored: 5, current: 4 })).toContain("不会改写 data.json");
     expect(t("propertyMigrationDesc")).toContain("确认后才会写入");
     expect(t("nodeGraphLayoutDirectionDesc")).toContain("思维导图");
-    expect(t("languageDesc")).toContain("显示英文");
+    expect(t("languageDesc")).toContain("不会修改笔记");
     expect(t("iconInheritanceDesc")).toContain("上级节点");
   });
 
