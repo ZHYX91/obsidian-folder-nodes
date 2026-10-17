@@ -1,13 +1,12 @@
-// Measured in the October 2026 GitHub CI with Node 24.19.0/npm 11.17.0:
-// production dist/main.js was 581958 bytes with the new multilingual catalogs.
-// Replaces the 280147-byte August 2026 reference, which no longer describes
-// this UI/graph feature set or bundled translation inventory.
-export const BUNDLE_REFERENCE_BYTES = 581_958;
+// Measured by the production-bundle gate with all 12 interface catalogs
+// containing 372 messages each: dist/main.js was 870641 bytes.
+// The previous 581958-byte reference described eight incomplete catalogs.
+export const BUNDLE_REFERENCE_BYTES = 870_641;
 
-// Still a hard, reviewed cap: approximately 11.7% headroom above the measured
-// candidate. Source maps, debug bundles, and unexpected dependency growth
-// must continue failing instead of quietly expanding a release.
-export const BUNDLE_MAXIMUM_BYTES = 650_000;
+// Reviewed upper bound: about 10% headroom for small changes, while still
+// rejecting source maps, debug builds, and unexpected dependency growth.
+// Any future increase requires another measured production build and review.
+export const BUNDLE_MAXIMUM_BYTES = 960_000;
 
 export function measureBundleBudget(actualBytes) {
   if (!Number.isSafeInteger(actualBytes) || actualBytes <= 0) {
