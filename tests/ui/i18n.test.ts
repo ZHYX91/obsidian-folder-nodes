@@ -63,7 +63,7 @@ describe("interface language", () => {
     expect(AVAILABLE_INTERFACE_LOCALES).toHaveLength(12);
   });
 
-  it("tracks draft translation completeness instead of calling English fallbacks translated", () => {
+  it("checks placeholder compatibility across all full translation catalogs", () => {
     setLanguage("en");
     const keys = Object.keys(LANGUAGE_OVERRIDES.ar ?? {});
     expect(localeCoverage("zh-CN").translated).toBe(localeCoverage("zh-CN").total);
@@ -93,7 +93,7 @@ describe("interface language", () => {
       expect(coverage, locale).toEqual({ translated: 372, total: 372 });
       if (locale === "en" || locale === "zh-CN") continue;
       const translatedKeys = Object.keys(LANGUAGE_OVERRIDES[locale] ?? {});
-      expect(translatedKeys, locale).toHaveLength(372);
+      expect(translatedKeys, locale).toEqual(referenceKeys);
       for (const key of translatedKeys) {
         expect(canonicalKeys.has(key), `${locale}:${key} is not a canonical interface key`).toBe(true);
         expect(LANGUAGE_OVERRIDES[locale]?.[key]?.trim().length, `${locale}:${key} is blank`).toBeGreaterThan(0);
@@ -122,6 +122,19 @@ describe("interface language", () => {
     expect(t("nodeGraphLayoutDirectionDesc")).toContain("思维导图");
     expect(t("languageDesc")).toContain("不会修改笔记");
     expect(t("iconInheritanceDesc")).toContain("上级节点");
+  });
+
+  it("uses natural Traditional Chinese terminology and keeps Arabic RTL scoped", () => {
+    setLanguage("zh-TW");
+    expect(t("nodeGraphDefaults")).toBe("預設視圖");
+    expect(t("filesAndFolders")).toBe("檔案與資料夾");
+    expect(t("nodeGraphVisibleLinks", { count: 3 })).toContain("連結");
+    expect(interfaceTextDirection()).toBe("ltr");
+    setLanguage("ar");
+    expect(interfaceTextDirection()).toBe("rtl");
+    expect(t("errorMissingNote", { path: "A/A.md" })).toContain("A/A.md");
+    setLanguage("en");
+    expect(interfaceTextDirection()).toBe("ltr");
   });
 
   it("localizes stable structural errors without exposing internal English messages", () => {
