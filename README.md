@@ -22,7 +22,7 @@ Keep using Obsidian's own File Explorer. Folder Nodes adds a Root entry, shows w
 
 ### Node Graph
 
-Explore the hierarchy in Global, Subtree, or Local scope, expand branches when needed, and switch between 2D and 3D views.
+Browse every managed node with Global, focus on one node and its descendants with Subtree, or show a node alongside its parent and nearby connections with Local. Expand branches as needed and switch between 2D and 3D.
 
 ![Folder Nodes Graph showing an expanded Projects subtree](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
@@ -32,9 +32,9 @@ Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The se
 
 ![Folder Nodes Icons and appearance settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-### Predictable Node creation
+### Create nodes from text or links
 
-Preview how selected text and uncreated links become node names, paths, note bodies, and aliases.
+Before creating a node from selected text, check its name, location, note content, and alternative names (aliases).
 
 ![Folder Nodes Selection and naming settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
@@ -107,7 +107,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 - **Selection & naming** — confirmation for selected-text creation, aliases, plus optional prefix/suffix naming sources and timestamp formats.
 - **Node Graph** — enablement, default dimension, 2D direction, and large-graph thresholds.
 
-**Follow Obsidian** uses Simplified Chinese for Chinese Obsidian locales and English for other locales. Choosing English or Simplified Chinese manually overrides that fallback without changing filenames or Markdown properties.
+**Follow Obsidian** picks a supported interface language from Obsidian's current language. You can also choose one of the 12 languages manually. Japanese, Korean, German, French, Spanish, Brazilian Portuguese, Russian, and Vietnamese currently have partial translations: untranslated messages appear in English. Interface language changes never rename nodes or edit your notes.
 
 ## Folder Nodes property
 
