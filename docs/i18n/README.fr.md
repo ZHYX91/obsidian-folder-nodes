@@ -26,7 +26,7 @@ Vous pouvez créer, renommer, déplacer, fusionner, trier ou supprimer un nœud 
 
 ## Configuration et compatibilité
 
-Obsidian **1.12.7**+
+Obsidian 1.12.7 ou une version ultérieure est nécessaire.
 
 Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements passent par des menus plutôt que par le glisser-déposer de bureau. Les appareils Android physiques et iOS ne font pas partie des essais d’acceptation officiels.
 

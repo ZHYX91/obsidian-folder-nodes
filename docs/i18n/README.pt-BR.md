@@ -26,7 +26,7 @@ Você pode criar, renomear, mover, mesclar, ordenar e excluir nós completos. O 
 
 ## Requisitos e compatibilidade
 
-Obsidian **1.12.7**+
+É necessário Obsidian 1.12.7 ou mais recente.
 
 O plugin funciona no computador e no Android. No Android, movimentar pastas usa menus em vez de arrastar e soltar. Aparelhos Android físicos e iOS não fazem parte da matriz de aceitação oficial do projeto.
 

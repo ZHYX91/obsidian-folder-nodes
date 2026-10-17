@@ -26,7 +26,7 @@ Vollständige Knoten lassen sich anlegen, umbenennen, verschieben, zusammenführ
 
 ## Voraussetzungen und Kompatibilität
 
-Obsidian **1.12.7**+
+Obsidian 1.12.7 oder neuer ist erforderlich.
 
 Desktop und Android werden unterstützt. Auf Android erfolgt das Verschieben über Menüs statt Desktop-Drag-and-drop. Tests auf echten Android-Geräten und auf iOS gehören nicht zur verbindlichen Abnahme.
 

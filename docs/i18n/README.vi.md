@@ -26,7 +26,7 @@ Bạn có thể tạo, đổi tên, di chuyển, hợp nhất, sắp xếp và x
 
 ## Yêu cầu và tương thích
 
-Obsidian **1.12.7**+
+Cần Obsidian 1.12.7 trở lên.
 
 Plugin hỗ trợ máy tính và Android. Trên Android, việc di chuyển thư mục dùng menu thay cho thao tác kéo thả trên máy tính. Thiết bị Android thực và iOS chưa nằm trong phạm vi nghiệm thu chính thức.
 

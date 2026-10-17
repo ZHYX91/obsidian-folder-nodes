@@ -26,7 +26,7 @@ Puedes crear, renombrar, mover, fusionar, ordenar y eliminar nodos completos. Se
 
 ## Requisitos y compatibilidad
 
-Obsidian **1.12.7**+
+Se necesita Obsidian 1.12.7 o posterior.
 
 Funciona en escritorio y Android. En Android, el movimiento de carpetas se realiza mediante menús en vez de arrastrar y soltar. Los dispositivos Android físicos y iOS están fuera del alcance de las pruebas de aceptación del proyecto.
 

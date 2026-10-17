@@ -26,7 +26,7 @@ Folder Nodes 讓 Obsidian 資料夾擁有自己的筆記。資料夾 A 和同名
 
 ## 系統需求與相容性
 
-Obsidian **1.12.7**+
+需要 Obsidian 1.12.7 或更新版本。
 
 桌面版和 Android 版可使用；Android 上的移動操作採用原生選單，不依賴桌面拖放。Android 實體裝置及 iOS 尚未列入專案的正式宿主驗收範圍。
 
