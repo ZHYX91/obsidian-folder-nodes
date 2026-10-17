@@ -33,8 +33,6 @@ Obsidian 1.12.7 이상이 필요합니다. '설정 → 커뮤니티 플러그인
 
 Obsidian 1.12.7 이상이 필요합니다. '설정 → 커뮤니티 플러그인 → 찾아보기'에서 Folder Nodes를 검색해 설치하고 활성화하세요. 또는 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases)에서 동일한 버전의 main.js, manifest.json, styles.css를 받아 Vault/.obsidian/plugins/folder-nodes/에 넣으세요. 업데이트할 때는 설정 파일 data.json을 유지해야 합니다.
 
-데스크톱과 Android에서 사용할 수 있습니다. Android에서는 데스크톱 드래그 앤 드롭 대신 메뉴로 폴더를 이동합니다. Android 실기기와 iOS는 정식 호스트 검증 범위에 포함되지 않습니다.
-
 ## 사용법
 
 1. Vault를 백업한 뒤 Folder Nodes의 '일반' 및 '관리' 설정을 확인하세요.
@@ -75,8 +73,6 @@ icon:
 
 노드는 현재 Vault 경로로 구분하며 영구 ID를 만들지 않습니다. Folder Nodes는 Vault 데이터를 업로드하거나 네트워크 요청을 보내지 않습니다. 인터페이스 언어를 바꿔도 노트, 파일 이름, 속성은 바뀌지 않습니다.
 
-더 자세한 사용법은 [영어 전체 설명서](../../README.md) 또는 [중국어 간체 설명서](README.zh-CN.md)를 참고하세요. 문제는 [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues)에 알려 주세요.
-
 노드는 현재 Vault 경로로 구별하며 영구 ID는 없습니다. A/A.md 대신 README.md, index.md, _A.md를 쓸 수 없습니다. 경로나 frontmatter 충돌이 있으면 병합을 중단합니다. 원격 이미지, PDF·동영상 썸네일, HEIC/HEIF 미리 보기와 내부 미디어 재생 기능은 없습니다. Android에서는 데스크톱 방식의 드래그 앤 드롭이 지원되지 않습니다. 큰 그래프는 Canvas 렌더링을 사용해도 폴더 계층은 유지합니다.
 
 ## 개인정보와 안전
@@ -89,7 +85,7 @@ Vault 정보는 로컬에서만 처리하며 외부로 업로드하거나 네트
 
 ## 개발
 
-개발에는 Node.js 24.19.0과 npm 11.17.0이 필요합니다. `npm ci`, `npm run check`, `npm run release:check`를 실행하세요. 자세한 설계 문서는 영어나 중국어 간체판에 있습니다.
+개발에는 Node.js 24.19.0과 npm 11.17.0이 필요합니다. the commands below를 실행하세요. 자세한 설계 문서는 영어나 중국어 간체판에 있습니다.
 
 ```bash
 npm ci

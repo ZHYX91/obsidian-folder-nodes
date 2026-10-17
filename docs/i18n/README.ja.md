@@ -33,8 +33,6 @@ Obsidian 1.12.7 以降が必要です。「設定 → コミュニティプラ�
 
 Obsidian 1.12.7 以降が必要です。「設定 → コミュニティプラグイン → 閲覧」で Folder Nodes を検索し、インストールして有効にしてください。または [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) の同じバージョンに含まれる main.js、manifest.json、styles.css を Vault/.obsidian/plugins/folder-nodes/ に配置します。更新時は設定を保存した data.json を残してください。
 
-デスクトップと Android に対応しています。Android の移動操作にはメニューを使います。Android 実機および iOS は正式な実機検証の対象外です。
-
 ## 使い方
 
 1. 先に Vault をバックアップし、Folder Nodes の「一般」と「管理」を確認します。
@@ -73,10 +71,6 @@ icon:
 
 ## 制限事項
 
-ノードの識別には現在の Vault パスを使用し、固定 ID は作成しません。Folder Nodes は Vault の内容をアップロードせず、ネットワーク要求も行いません。表示言語を変更してもノート、ファイル名、プロパティは変わりません。
-
-さらに詳しい説明は [英語版の詳細ガイド](../../README.md) と [簡体字中国語版](README.zh-CN.md) を参照してください。問題は [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues) に報告できます。
-
 ノードは現在の Vault パスで識別され、固定 ID はありません。A/A.md の代わりに README.md、index.md、_A.md を使うことはできません。名前や frontmatter の競合があれば統合を停止します。リモート画像、PDF や動画のサムネイル、HEIC/HEIF プレビュー、動画・音声の埋め込み再生には対応しません。Android にはデスクトップ式のドラッグ操作がありません。大きなグラフは Canvas 表示になっても階層は省略しません。
 
 ## プライバシーと安全性
@@ -89,7 +83,7 @@ Vault の内容はローカルで処理し、アップロードやネットワ�
 
 ## 開発
 
-開発には Node.js 24.19.0 と npm 11.17.0 を使用します。`npm ci`、`npm run check`、`npm run release:check` を実行してください。詳細な設計資料は英語版と簡体字中国語版を参照してください。
+開発には Node.js 24.19.0 と npm 11.17.0 を使用します。実行するコマンドは次のとおりです。詳細な設計資料は英語版と簡体字中国語版を参照してください。
 
 ```bash
 npm ci

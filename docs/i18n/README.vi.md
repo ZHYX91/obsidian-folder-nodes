@@ -33,14 +33,14 @@ Plugin hỗ trợ máy tính và Android. Trên Android, việc di chuyển thư
 
 Bạn cần Obsidian 1.12.7 trở lên. Mở “Cài đặt → Plugin cộng đồng → Duyệt”, tìm Folder Nodes, cài đặt và bật plugin. Bạn cũng có thể lấy main.js, manifest.json và styles.css từ cùng một phiên bản tại [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), rồi đặt vào Vault/.obsidian/plugins/folder-nodes/. Khi cập nhật, hãy giữ data.json để bảo toàn cài đặt.
 
-Plugin hỗ trợ máy tính và Android. Trên Android, việc di chuyển thư mục dùng menu thay cho thao tác kéo thả trên máy tính. Thiết bị Android thực và iOS chưa nằm trong phạm vi nghiệm thu chính thức.
-
 ## Sử dụng
 
 1. Sao lưu kho ghi chú trước, rồi xem mục “Chung” và “Quản lý” trong cài đặt Folder Nodes.
 2. Kiểm tra thư mục A có ghi chú A/A.md hay chưa. Nếu thiếu, bạn có thể chủ động tạo phần còn thiếu hoặc đặt thành “Không được quản lý”.
 3. Chọn “Nút mới” để tạo thư mục cùng ghi chú. Nhấp tên thư mục để mở ghi chú nút. Trong “Nội dung nút”, bạn có thể xem nút con, ảnh, video và các tệp khác.
 4. Mở Node Graph. “Toàn cục” hiển thị tất cả nút được quản lý, “Cây con” hiển thị nút đã chọn và các nút con, còn “Cục bộ” cho thấy khu vực lân cận. Có thể chuyển 2D/3D và bật liên kết giữa các ghi chú.
+
+Khi tạo nút từ văn bản đã chọn, hãy kiểm tra tên, nơi tạo và bí danh. Trong phạm vi quản lý, bạn cũng có thể tạo nút từ liên kết nội bộ chưa tồn tại. Vùng chọn đi qua nhiều ô trong bảng Markdown sẽ bị từ chối để tránh làm hỏng bảng.
 
 ## Thiết lập
 
@@ -61,8 +61,6 @@ Danh sách văn bản `folder-nodes` trong ghi chú nút lưu các thiết lập
 
 Thuộc tính icon của ghi chú nút chấp nhận hình ảnh trong kho, biểu tượng Lucide, một ký tự hoặc emoji theo thứ tự ưu tiên. color: dùng để tô màu chữ/Lucide hoặc làm màu dự phòng. Hãy xem trước trong cài đặt trước khi lưu.
 
-Khi tạo nút từ văn bản đã chọn, hãy kiểm tra tên, nơi tạo và bí danh. Trong phạm vi quản lý, bạn cũng có thể tạo nút từ liên kết nội bộ chưa tồn tại. Vùng chọn đi qua nhiều ô trong bảng Markdown sẽ bị từ chối để tránh làm hỏng bảng.
-
 ```yaml
 icon:
   - "[[Assets/project.svg]]"
@@ -72,10 +70,6 @@ icon:
 ```
 
 ## Giới hạn
-
-Nút được xác định bằng đường dẫn hiện tại trong kho ghi chú, không có mã ID vĩnh viễn. Folder Nodes không tải nội dung kho lên mạng hoặc thực hiện yêu cầu mạng. Đổi ngôn ngữ giao diện không làm thay đổi ghi chú, tên tệp hay thuộc tính.
-
-Hướng dẫn đầy đủ hơn có trong [tài liệu tiếng Anh](../../README.md) và [tài liệu tiếng Trung](README.zh-CN.md). Hãy báo lỗi qua [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues).
 
 Nút được nhận dạng bằng đường dẫn hiện tại trong kho, không có ID vĩnh viễn. Không thể dùng README.md, index.md hoặc _A.md thay A/A.md. Hợp nhất sẽ dừng nếu đường dẫn hoặc frontmatter xung đột. Không tải ảnh từ mạng, không tạo ảnh thu nhỏ PDF/video, không xem trước HEIC/HEIF hoặc phát đa phương tiện trực tiếp. Android không có kéo thả kiểu máy tính. Sơ đồ lớn dùng Canvas nhưng vẫn giữ đủ cây phân cấp.
 
@@ -89,7 +83,7 @@ Mọi xử lý đều tại máy: plugin không tải ghi chú lên mạng hay g
 
 ## Phát triển
 
-Để phát triển, dùng Node.js 24.19.0 và npm 11.17.0. Chạy `npm ci`, `npm run check`, `npm run release:check`. Tài liệu kỹ thuật đầy đủ có bản tiếng Anh và tiếng Trung giản thể.
+Để phát triển, dùng Node.js 24.19.0 và npm 11.17.0. Chạy the commands below. Tài liệu kỹ thuật đầy đủ có bản tiếng Anh và tiếng Trung giản thể.
 
 ```bash
 npm ci

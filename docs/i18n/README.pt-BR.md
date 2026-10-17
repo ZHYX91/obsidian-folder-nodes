@@ -33,14 +33,14 @@ O plugin funciona no computador e no Android. No Android, movimentar pastas usa 
 
 É necessário ter o Obsidian 1.12.7 ou mais recente. Acesse "Configurações → Plugins da comunidade → Procurar", pesquise Folder Nodes, instale e ative. Outra opção é baixar main.js, manifest.json e styles.css da mesma versão em [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) e colocá-los em Vault/.obsidian/plugins/folder-nodes/. Ao atualizar, mantenha data.json para preservar suas configurações.
 
-O plugin funciona no computador e no Android. No Android, movimentar pastas usa menus em vez de arrastar e soltar. Aparelhos Android físicos e iOS não fazem parte da matriz de aceitação oficial do projeto.
-
 ## Como usar
 
 1. Faça um backup do cofre e confira as opções "Geral" e "Gerenciamento" do Folder Nodes.
 2. Verifique se a pasta A contém A/A.md. Se faltar alguma parte, crie-a quando desejar ou marque o item como "Não gerenciado".
 3. Use "Novo nó" para criar pasta e nota juntas. Clique no nome da pasta para abrir a nota do nó. Em "Conteúdo do nó", veja os filhos, imagens, vídeos e outros arquivos.
 4. Abra o Node Graph: "Global" mostra todos os nós gerenciados, "Subárvore" mostra o nó selecionado e seus descendentes, e "Local" mostra a vizinhança. Você pode alternar 2D/3D e exibir links entre notas.
+
+Ao criar um nó a partir de texto selecionado, é possível conferir nome, local e aliases. Links internos que ainda não existem também podem criar nós na área gerenciada. Seleções que atravessam várias células de uma tabela Markdown são recusadas para evitar danos à tabela.
 
 ## Configurações
 
@@ -61,8 +61,6 @@ A lista de texto `folder-nodes` na nota do nó armazena apenas opções diferent
 
 A propriedade icon da nota do nó aceita, em ordem de preferência, imagens do cofre, ícones Lucide, caracteres e emojis. color: muda a cor de caracteres e Lucide ou funciona como cor reserva. Veja uma prévia no painel de configurações antes de salvar.
 
-Ao criar um nó a partir de texto selecionado, é possível conferir nome, local e aliases. Links internos que ainda não existem também podem criar nós na área gerenciada. Seleções que atravessam várias células de uma tabela Markdown são recusadas para evitar danos à tabela.
-
 ```yaml
 icon:
   - "[[Assets/project.svg]]"
@@ -74,8 +72,6 @@ icon:
 ## Limitações
 
 A identidade do nó é o caminho atual no cofre, não um ID permanente. O Folder Nodes não envia conteúdo do cofre nem realiza solicitações de rede. Trocar o idioma da interface não altera notas, nomes de arquivos ou propriedades.
-
-Para mais informações, consulte o [guia completo em inglês](../../README.md) ou o [guia em chinês](README.zh-CN.md). Relate problemas no [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues).
 
 A identidade do nó é o caminho atual do cofre, não um ID permanente. README.md, index.md ou _A.md não substituem A/A.md. Uma mesclagem é interrompida quando há conflito de caminho ou frontmatter. Não há busca de imagens remotas, miniaturas PDF/vídeo, prévia HEIC/HEIF nem reprodução integrada de mídia. O Android não tem arrastar e soltar como no computador. Gráficos grandes usam Canvas sem omitir a hierarquia.
 

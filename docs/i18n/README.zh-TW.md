@@ -33,14 +33,14 @@ Folder Nodes 讓 Obsidian 資料夾擁有自己的筆記。資料夾 A 和同名
 
 需要 Obsidian 1.12.7 或更新版本。可在「設定 → 第三方外掛 → 瀏覽」搜尋 Folder Nodes 安裝；也能從 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) 下載同一版本的安裝檔，解壓到 Vault/.obsidian/plugins/folder-nodes/。不要混用不同版本的 main.js、manifest.json、styles.css。升級時保留 data.json。
 
-桌面版和 Android 版可使用；Android 上的移動操作採用原生選單，不依賴桌面拖放。Android 實體裝置及 iOS 尚未列入專案的正式宿主驗收範圍。
-
 ## 使用方式
 
 1. 先備份 Vault，再開啟 Folder Nodes 的「一般」和「管理」設定。
 2. 找一個資料夾，例如 A，確認裡面有同名筆記 A/A.md。沒有就會顯示「不完整」，可自行建立缺少的部分，或設為「不管理」。
 3. 使用「新增節點」建立完整節點；點選資料夾可開啟節點筆記，在「節點內容」查看子節點、圖片、影片和其他檔案。
 4. 開啟 Node Graph：「全域」看整個結構、「子樹」看所選節點以下的內容、「局部」看所選節點周圍。可切換 2D／3D，或顯示筆記之間的連結。
+
+從選取文字建立節點時，可先檢查名稱、位置和別名。點選尚不存在的內部連結，也能在受管理範圍內建立節點。跨越 Markdown 表格多個儲存格的選取範圍會被拒絕，避免破壞表格。
 
 ## 設定
 
@@ -61,8 +61,6 @@ folder-nodes:
 
 在節點筆記的 icon 屬性中可依序放入 Vault 內圖片、Lucide 圖示、單一字元或 Emoji。color: 可替文字圖示上色，其他候選都無法顯示時可作為備用色標。你也可以在設定中預覽，不必直接修改原始屬性。
 
-從選取文字建立節點時，可先檢查名稱、位置和別名。點選尚不存在的內部連結，也能在受管理範圍內建立節點。跨越 Markdown 表格多個儲存格的選取範圍會被拒絕，避免破壞表格。
-
 ```yaml
 icon:
   - "[[Assets/project.svg]]"
@@ -74,8 +72,6 @@ icon:
 ## 限制
 
 節點以目前的 Vault 路徑識別，不會替每個節點建立永久 ID。Folder Nodes 不會上傳 Vault 內容，也不會發出網路請求。切換界面語言不會改變筆記內容、檔名或節點屬性。
-
-詳細功能、屬性範例和疑難排解請參閱 [英文完整指南](../../README.md) 或 [簡體中文完整指南](README.zh-CN.md)。問題與建議請使用 [GitHub Issues](https://github.com/ZHYX91/obsidian-folder-nodes/issues)。
 
 節點身分取決於目前的 Vault 路徑，不是永久 ID。不支援用 README.md、index.md 或 _A.md 代替 A/A.md。合併遇到路徑或 frontmatter 衝突會停止；不提供遠端圖片、PDF／影片縮圖、HEIC/HEIF 預覽或內嵌影音播放。Android 沒有桌面 HTML5 拖放；節點內容不是第二個完整檔案總管。大型圖譜會改用 Canvas，完整層級不會被截斷。
 
