@@ -1,14 +1,14 @@
 # Folder Nodes
 
-[English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
+[English](README.md) · [简体中文](docs/i18n/README.zh-CN.md) · [繁體中文](docs/i18n/README.zh-TW.md) · [日本語](docs/i18n/README.ja.md) · [한국어](docs/i18n/README.ko.md) · [Deutsch](docs/i18n/README.de.md) · [Français](docs/i18n/README.fr.md) · [Español](docs/i18n/README.es.md) · [Português (Brasil)](docs/i18n/README.pt-BR.md) · [Русский](docs/i18n/README.ru.md) · [Tiếng Việt](docs/i18n/README.vi.md) · [العربية](docs/i18n/README.ar.md)
 
-Folder Nodes lets you organize Obsidian folders as navigable nodes. A complete node is a folder plus one same-named Markdown note, such as `A/A.md`. If only one side exists, Folder Nodes shows it as **Incomplete** instead of silently creating or moving anything.
+Give an Obsidian folder its own note, then browse the folder and its contents together. For example, `A/A.md` is the note for folder `A`. Folder Nodes calls this pair a *node*. If the folder or note is missing, you'll see **Incomplete**; the plugin won't quietly create or move files for you.
 
 ## Screenshots
 
 ### Node contents
 
-Browse child nodes, images and videos, ordinary files, and unmanaged boundaries from one sidebar.
+Open a folder's child notes, pictures, videos and other files from one sidebar. Files you've chosen not to manage are still accessible.
 
 ![Folder Nodes sidebar showing child nodes, visual media, and unmanaged files](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,25 +16,25 @@ Browse child nodes, images and videos, ordinary files, and unmanaged boundaries 
 
 ### File Explorer
 
-Use Obsidian's File Explorer as the global node tree. Folder Nodes adds a pinned Root row, node status labels, optional icons, and manual sibling ordering without replacing Obsidian's normal file and folder actions.
+Keep using Obsidian's own File Explorer. Folder Nodes adds a Root entry, shows which folders have a matching note, and lets you choose icons or reorder nearby nodes. Regular file and folder actions still work.
 
 ![Obsidian File Explorer showing the Root eye and Folder Nodes status badges](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
 ### Node Graph
 
-Explore the hierarchy in Global, Subtree, or Local scope, expand branches when needed, and switch between 2D and 3D views.
+Browse every managed node with Global, focus on one node and its descendants with Subtree, or show a node alongside its parent and nearby connections with Local. Expand branches as needed and switch between 2D and 3D.
 
 ![Folder Nodes Graph showing an expanded Projects subtree](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ### Icons & appearance
 
-Use Vault images, Lucide icons, text, emoji, or a color fallback. The settings page previews how a property icon differs from the same character in a file name.
+Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The settings page shows a preview before you save.
 
 ![Folder Nodes Icons and appearance settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-### Predictable Node creation
+### Create nodes from text or links
 
-Preview how selected text and uncreated links become node names, paths, note bodies, and aliases.
+Before creating a node from selected text, check its name, location, note content, and alternative names (aliases).
 
 ![Folder Nodes Selection and naming settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
@@ -107,7 +107,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 - **Selection & naming** — confirmation for selected-text creation, aliases, plus optional prefix/suffix naming sources and timestamp formats.
 - **Node Graph** — enablement, default dimension, 2D direction, and large-graph thresholds.
 
-**Follow Obsidian** uses Simplified Chinese for Chinese Obsidian locales and English for other locales. Choosing English or Simplified Chinese manually overrides that fallback without changing filenames or Markdown properties.
+**Follow Obsidian** selects the corresponding supported interface language from Obsidian. You can also choose an interface language manually. Switching languages does not change note contents, filenames, or node properties.
 
 ## Folder Nodes property
 
@@ -122,7 +122,7 @@ folder-nodes:
 
 - `order=manual` enables manual child ordering for that parent.
 - `rank=N` stores a child's sparse manual-order rank.
-- `hidden=true` hides that node and its managed descendants from Folder Nodes' three projections.
+- `hidden=true` hides the node and its managed children in File Explorer, Node Contents and Node Graph. It does not delete files or affect Obsidian Search.
 
 Published legacy fields `folderNodeChildrenSort`, `folderNodeSiblingRank`, and `folderNodeHidden` remain readable. Use **Management → Migrate Folder Nodes properties** to preview the exact notes that would change. Update Folder Nodes on every device first, then confirm the migration. Startup never migrates note properties automatically.
 

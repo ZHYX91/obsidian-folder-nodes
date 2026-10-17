@@ -1,14 +1,14 @@
 # Folder Nodes
 
-[English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md)
+[English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
-Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件夹和一个同名 Markdown 笔记组成，例如 `A/A.md`。如果只存在其中一边，插件会把它显示为**不完整**，不会悄悄替你创建或移动文件。
+让 Obsidian 的文件夹拥有一篇专属笔记，并在同一个地方查看文件夹里的内容。比如文件夹 `A` 和笔记 `A/A.md` 组成一个完整节点。如果缺少文件夹或笔记，插件会显示**不完整**，不会擅自帮你新建或移动文件。
 
 ## 截图
 
 ### 节点内容
 
-在一个侧栏里查看子节点、图片和视频、普通文件，以及明确设为“不管理”的边界。
+在同一个侧栏里打开子节点、图片、视频和普通文件。即使某些文件夹设为“不管理”，内容也仍然可以正常访问。
 
 ![Folder Nodes 侧栏显示子节点、媒体和不管理文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,25 +16,25 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 
 ### 文件列表
 
-直接把 Obsidian 文件列表当作全局节点树使用。Folder Nodes 会增加置顶 Root 行、节点状态、可选图标和手动同级排序，但不会替换 Obsidian 原生文件/文件夹操作。
+继续使用 Obsidian 自带的文件列表。Folder Nodes 会增加根节点入口、提示文件夹有没有对应笔记，还能设置图标和同级节点顺序；原有文件和文件夹操作不受影响。
 
 ![Obsidian 文件列表显示 Root 眼睛与 Folder Nodes 状态标签](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
 ### 节点图谱
 
-可在全局、子树或局部范围查看层级结构，按需展开分支，并在 2D 和 3D 之间切换。
+使用“全局”查看所有受管理节点；使用“子树”只看所选节点及其下级；使用“局部”查看所选节点、父级和附近的链接关系。可以展开分支，也可以切换 2D 或 3D 视图。
 
 ![Folder Nodes 图谱显示展开的 Projects 子树](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ### 图标与外观
 
-节点图标可使用 Vault 图片、Lucide 图标、文字、Emoji 或颜色回退。设置页会直接预览属性图标与文件名中相同字符的区别。
+图标可以用库内图片、Lucide 图标、文字、表情符号或颜色。设置页会提前展示效果，也能看出图标和文件名里的普通字符有什么区别。
 
 ![Folder Nodes 图标与外观设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-### 可预测的 Node 创建
+### 从文字或链接创建节点
 
-在创建前预览选中文字和未创建链接将如何变成节点名称、路径、正文和 aliases。
+从选中文字创建节点前，可先检查节点名称、存放位置、笔记内容和别名（aliases）。
 
 ![Folder Nodes 选区与命名设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
@@ -47,7 +47,7 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 - **节点图谱。** 层级结构始终存在；可选的“显示链接”只在结构图上叠加 Node Note 之间的链接，不改变层级布局。
 - **从选中文字创建节点。** 使用“从选中文字创建 Folder Node”后，插件会创建子节点、把选中文字写入新笔记，并用链接替换原选区。链接遵循 Obsidian 全局链接格式设置。“创建前确认”默认开启，可在“选区与命名”中关闭。单个 Markdown 表格单元格可以安全处理；跨单元格选区会在写入前停止。
 - **从未创建链接直接创建节点。** 在受管理范围内点击 `[[a]]` 会创建 `a/a.md`。开启 aliases 后，`[[a|b]]` 还会把 `b` 写入 `aliases`。
-- **节点图标。** 一个 Obsidian `icon` 文本/列表可以按顺序提供图片、Lucide、文字、Emoji 或 `color:` 候选，并可选择继承祖先图标。
+- **节点图标。** 可在 Obsidian 的 `icon` 属性中依次设置图片、Lucide 图标、文字、表情符号或 `color:` 颜色。当前图标无法显示时，还可以选择使用上级节点的图标。
 - **隐藏子树。** 节点可写入 `hidden=true`。它只会从 Folder Nodes 管理的文件列表、节点内容和节点图谱中隐藏；Obsidian 搜索、快速切换、反向链接、原生图谱、链接和直接打开都不受影响。
 - **不管理边界。** 可按精确路径或“名称开头”规则，让某些 Markdown 或整个文件夹子树不参与 Folder Nodes 结构管理，但内容仍正常可见。
 - **先预览再维护。** 批量整理和旧属性迁移都会先显示将要发生的变化。遇到冲突或无法确认安全的输入时，插件会停止操作，不猜测处理。
@@ -95,7 +95,7 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 1. **从选中文字创建 Folder Node**可以生成子节点。在受管理范围内点击未创建的 `[[a]]`、`[[a|b]]` 链接，也可创建完整节点。
 2. 打开**节点内容**浏览当前节点的子节点、媒体和文件。右键、更多操作或 Shift+F10/菜单键都可访问相同操作。
 3. 打开**节点图谱**浏览层级：全局包含整个 Vault，子树锚定一个节点，局部显示该节点父级。可以展开分支、搜索、切换 2D/3D，或打开**显示链接**查看引用关系。
-4. 桌面端将节点拖入另一个节点只改变父级；精确 before/after 排序需先将父节点设为**手动**子节点排序。Android 使用原生文件夹移动或**移动 / 上移 / 下移**。
+4. 桌面端将节点拖入另一个节点只改变父级；要把节点准确地排在另一节点之前或之后，须先将父节点的“子节点排序”设为**手动**。Android 使用原生文件夹移动或**移动 / 上移 / 下移**。
 5. Obsidian 原生命令只处理当前文件或文件夹；明确标注**所在节点**的命令则会作用于整个 Folder Node，包括受管理的文件夹及同名笔记。
 6. **批量整理**与**迁移 Folder Nodes 属性**会在确认前预览涉及的路径；**健康检查**始终只读。若预览范围不符，应取消操作。
 
@@ -107,7 +107,7 @@ Folder Nodes 用文件夹组织可导航的节点。一个完整节点由文件�
 - **选区与命名**：选区创建确认、aliases，以及可选的前缀/后缀来源和时间戳格式。
 - **节点图谱**：是否启用、默认维度、2D 方向和大图阈值。
 
-**跟随 Obsidian** 当前会在 Obsidian 使用中文界面时显示简体中文，其他语言则显示 English。手动选择 English 或简体中文可以覆盖这个回退规则，但不会改变文件名或 Markdown 属性。
+**跟随 Obsidian** 会根据 Obsidian 的界面语言自动选择已支持的语言，也可以手动选择界面语言。切换界面语言只影响 Folder Nodes 的文字和布局，不会修改笔记、文件名或节点属性。
 
 ## Folder Nodes 属性
 
@@ -122,7 +122,7 @@ folder-nodes:
 
 - `order=manual`：让该父节点使用手动子节点排序。
 - `rank=N`：保存某个子节点在手动排序中的稀疏位置。
-- `hidden=true`：从 Folder Nodes 的三个投影中隐藏该节点及其受管理后代。
+- `hidden=true`：在文件列表、节点内容和节点图谱中隐藏此节点及它管理的下级节点。不会删除文件，也不会影响 Obsidian 搜索。
 
 已经公开的旧字段 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 会继续兼容读取。使用 **管理 → 迁移 Folder Nodes 属性** 可以先查看准确受影响的笔记。迁移前请先更新所有设备上的 Folder Nodes；插件启动时不会自动迁移笔记属性。
 

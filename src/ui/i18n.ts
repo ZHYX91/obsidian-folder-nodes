@@ -1,20 +1,22 @@
 import { getLanguage } from "obsidian";
 import { FolderNodesError } from "../core/folder-nodes-error";
+import { LANGUAGE_OVERRIDES } from "./locale-overrides";
+import { isInterfaceLanguage, type AvailableInterfaceLocale } from "../core/interface-languages";
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
   settings: "Folder Nodes 设置", general: "常规", management: "管理", homepage: "主页", icons: "图标与外观", naming: "选区与命名", nodeGraph: "节点图谱",
-  applyHiddenNodes: "应用隐藏标记", applyHiddenNodesDesc: "开启后，folder-nodes 列表中包含 hidden=true 的节点及其子树不会出现在文件列表、节点内容和节点图谱中。关闭只会显示这些节点，不会删除标记。",
+  applyHiddenNodes: "应用隐藏标记", applyHiddenNodesDesc: "开启后，标记了 hidden=true 的节点及其下级节点不会显示在 Folder Nodes 的文件列表、节点内容和节点图谱中。关闭后会重新显示它们，但不会删除隐藏标记。",
   hideNode: "隐藏节点", unhideNode: "取消隐藏节点", hiddenNode: "隐藏", hiddenNodeDetail: "此节点及其子树被隐藏", hiddenByNode: "由 {path} 隐藏",
   showHiddenNodesThisSession: "临时显示隐藏节点", hideHiddenNodesThisSession: "恢复隐藏节点", hiddenAgainOnManage: "重新纳入管理后，此节点会按 {path} 的隐藏标记再次隐藏。",
-  settingsReadOnly: "设置为只读", settingsReadOnlyDesc: "这些设置由较新版本的 Folder Nodes 创建（数据版本 {stored}；本版本支持到 {current}）。请先更新插件再编辑；现有 data.json 不会被改写。",
-  settingsSavePending: "设置尚未保存", settingsSavePendingDesc: "最近的设置更改仍保留在本次会话中，但写入 data.json 失败。请重试保存。", retrySettingsSave: "重试保存",
+  settingsReadOnly: "设置为只读", settingsReadOnlyDesc: "这些设置来自更新版本的 Folder Nodes（设置版本 {stored}，当前插件最多支持 {current}）。请先更新插件。为避免丢失设置，本版本不会改写 data.json。",
+  settingsSavePending: "设置尚未保存", settingsSavePendingDesc: "刚才的设置更改尚未写入 data.json，但本次使用期间仍会保留。请点击“重试保存”。", retrySettingsSave: "重试保存",
   nodeGraphRulesRemoved: "已移除旧版节点图谱的 {count} 条包含/排除规则；没有改写任何笔记。现在统一使用节点笔记的 hidden=true 标记控制可见性。",
-  enableNodeGraph: "启用节点图谱", enableNodeGraphDesc: "启用独立的 Folder Node 图谱视图、命令和右键入口。关闭后会关闭现有图谱并释放渲染资源。",
+  enableNodeGraph: "启用节点图谱", enableNodeGraphDesc: "在命令面板和右键菜单中启用“节点图谱”。关闭此选项会同时关闭已打开的节点图谱，不影响其他功能。",
   nodeGraphDisabledDesc: "节点图谱已关闭；Folder Nodes 的其他功能仍可正常使用。",
   nodeGraphDefaults: "默认视图", nodeGraphDefaultsDesc: "新打开的节点图谱使用这些默认值；已打开视图保留自己的范围、焦点、维度和链接开关。",
   nodeGraphDefaultDimension: "默认维度",
-  nodeGraphLayoutDirection: "2D 布局方向", nodeGraphLayoutDirectionDesc: "从左到右使用横向卡片构成思维导图式层级骨架；链接关系仍可跨层、跨分支显示。",
+  nodeGraphLayoutDirection: "2D 布局方向", nodeGraphLayoutDirectionDesc: "让节点从左向右排列，类似思维导图。即使两个节点不在同一分支，也可以显示它们之间的链接。",
   nodeGraphLeftToRight: "从左到右", nodeGraphTopToBottom: "从上到下",
   nodeGraphShowLinks: "显示链接",
   nodeGraphClearSearch: "清除图谱搜索",
@@ -42,25 +44,25 @@ const zh = {
   nodeGraphShowLinksTooltip: "在结构图上显示节点笔记之间的链接。",
   nodeGraphLargeGraphAria: "大型节点图谱；2D 拖动或滚轮平移，Ctrl/Cmd + 滚轮缩放；3D 拖动旋转、滚轮缩放；回车打开所选节点",
   nodeGraphRelationSummary: "结构 {structure} · 链接 {links}",
-  nodeGraphPerformance: "大型图谱性能", nodeGraphPerformanceDesc: "节点较多时自动切换为 Canvas 渲染，以减少界面元素并保持响应。",
+  nodeGraphPerformance: "大型图谱性能", nodeGraphPerformanceDesc: "图谱很大时，会自动切换显示方式，让拖动和缩放更流畅。",
   nodeGraphCanvasThreshold: "Canvas 节点/边阈值", nodeGraphCanvasThresholdDesc: "当前范围的节点数或可见边数超过此值时使用 Canvas。范围：50–10000。",
-  nodeGraphEdgeLimit: "链接概览边数", nodeGraphEdgeLimitDesc: "大型图谱最多绘制的代表性链接边；结构骨架始终完整，聚焦后补全该节点的全部链接。",
+  nodeGraphEdgeLimit: "链接概览边数", nodeGraphEdgeLimitDesc: "图谱很大时先少显示一些链接，避免挤成一团。节点层级仍会完整显示；选中节点后可以看见它的全部链接。",
   nodeGraphNumberInvalid: "请输入 {minimum} 到 {maximum} 之间的整数；无效输入不会保存。",
   nodeGraphFindNode: "查找节点",
-  managementGuideTitle: "文件与节点并不相同", managementGuideStructure: "文件夹 A 和 A/A.md 构成完整节点；缺少一项显示“不完整”，插件不会自动补全。", managementGuideBoundary: "不管理内容仍能在 Obsidian 中访问，Folder Nodes 只是停止对它执行节点结构操作；并非隐藏或删除。", managementGuideActions: "原生命令针对单个文件或文件夹；“所在节点”操作针对整个节点。批量整理和迁移先预览，健康检查始终只读。",
+  managementGuideTitle: "文件与节点并不相同", managementGuideStructure: "文件夹 A 和 A/A.md 构成完整节点；缺少一项显示“不完整”，插件不会自动补全。", managementGuideBoundary: "不管理内容仍能在 Obsidian 中访问，Folder Nodes 只是停止对它执行节点结构操作；并非隐藏或删除。", managementGuideActions: "“重命名文件”等操作只影响一个文件或文件夹；“重命名所在节点”等操作会处理整个节点。批量整理和属性迁移会先给你看预览，“健康检查”不会改动文件。",
   maintenance: "结构维护", health: "Folder Nodes 健康检查",
   batchOrganize: "批量整理不完整节点", previewOrganizePlan: "预览整理方案",
-  scanningStructure: "正在扫描结构", scanningStructureDesc: "正在分批盘点受管理范围；扫描期间可以继续使用 Obsidian。",
-  scanningProperties: "正在扫描 Folder Nodes 属性", scanningPropertiesDesc: "正在只读检查新旧属性、冲突和无效值；扫描期间可以继续使用 Obsidian。",
-  scanningHealth: "正在检查 Folder Nodes 健康状态", scanningHealthDesc: "正在并行检查结构、属性和图标声明；检查不会修改 Vault。",
+  scanningStructure: "正在扫描结构", scanningStructureDesc: "正在查找 Folder Nodes 管理的文件夹和笔记。扫描期间仍可正常使用 Obsidian。",
+  scanningProperties: "正在扫描 Folder Nodes 属性", scanningPropertiesDesc: "正在检查节点属性是否需要迁移、是否有冲突或无效值。此步骤不会修改笔记。",
+  scanningHealth: "正在检查 Folder Nodes 健康状态", scanningHealthDesc: "正在检查文件夹、节点笔记、属性和图标。检查不会修改任何文件。",
   batchOrganizeDesc: "扫描 Vault 受管理范围内的不完整节点。标记为“不管理”或匹配“不管理”规则的内容会被跳过；确认前不会修改任何文件。",
-  propertyMigration: "迁移 Folder Nodes 属性", propertyMigrationDesc: "预览并将公开旧字段转换为单一 folder-nodes 列表。不会在启动时自动迁移；冲突或无效值会阻止写入。",
+  propertyMigration: "迁移 Folder Nodes 属性", propertyMigrationDesc: "先查看旧属性将如何转换为 folder-nodes 列表，确认后才会写入。插件启动时不会自动迁移；遇到冲突或无效值会停止。",
   previewPropertyMigration: "预览属性迁移", propertyMigrationPreviewNotice: "请先更新所有设备上的 Folder Nodes。下列变更仅在确认后写入，并会在写入前重新检查。",
   propertiesScanned: "已扫描 Markdown 笔记", canonicalPropertyNotes: "使用当前 folder-nodes 格式", legacyPropertyNotes: "使用旧字段", redundantLegacyNotes: "新旧字段等价",
   propertyChanges: "可迁移的属性", propertyConflicts: "阻塞属性冲突", nonCanonicalProperties: "不符合 Folder Nodes 节点结构的笔记属性", invalidIcons: "无效的 icon 属性",
   noPropertyChanges: "没有需要迁移或报告的 Folder Nodes 属性。", applyPropertyMigration: "应用属性迁移", propertyMigrationComplete: "Folder Nodes 属性迁移已完成并验证。", showingFirstItems: "仅显示前 {count} 项。",
   structureMaintenance: "结构维护", structureMaintenanceDesc: "批量整理会先显示准确路径；健康检查始终只读。",
-  maintenanceDesc: "先预览将创建、移动、跳过和阻止的具体路径；确认前不会修改 Vault。",
+  maintenanceDesc: "先查看哪些文件会被创建或移动、哪些会跳过，以及哪些存在冲突。只有确认后才会修改文件。",
   maintenanceManagedDesc: "检查并预览结构修复；确认前不会修改 Vault。",
   reviewStructure: "检查结构", reviewChanges: "查看变更",
   healthDesc: "只读检查当前结构、Folder Nodes 属性和 icon 声明，不提供写入按钮。",
@@ -73,9 +75,9 @@ const zh = {
   childOrderNatural: "子节点排序：按名称（切换为手动）", childOrderManual: "子节点排序：手动（恢复按名称）",
   rename: "重命名节点", delete: "删除节点", move: "移动节点", merge: "合并节点",
   renameCurrentNode: "重命名当前节点", moveContainingNode: "移动所在节点", mergeContainingNode: "合并所在节点", deleteContainingNode: "删除所在节点",
-  language: "界面语言", languageDesc: "跟随 Obsidian 时，中文界面使用简体中文，其他语言使用 English；也可以手动指定。", auto: "跟随 Obsidian",
+  language: "界面语言", languageDesc: "默认跟随 Obsidian 的界面语言，也可以在下方手动选择。切换语言只会改变 Folder Nodes 的界面，不会修改笔记、文件名或节点属性。", auto: "跟随 Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "图标继承",
-  iconInheritanceDesc: "当前节点没有有效 icon 时，使用最近祖先节点的图标。",
+  iconInheritanceDesc: "当前节点没有可用图标时，使用最近一个有图标的上级节点的图标。",
   emojiFont: "Emoji 字体", systemDefault: "系统默认",
   emojiFontDesc: "仅列出本机已安装的受支持彩色 Emoji 字体；所选字体不可用时自动回退到系统字体。",
   detectingFonts: "正在检测本机字体…", fontUnavailable: "不可用", emojiFontUnavailable: "当前选择在本机不可用，现已使用系统默认。",
@@ -89,7 +91,7 @@ const zh = {
   showIconInNoteTitle: "在节点笔记标题前显示图标", showIconInNoteTitleDesc: "仅在同名节点笔记的行内标题前显示节点图标，不修改标题文字。",
   iconDistinctionTitle: "属性图标与文件名对比", iconDistinctionDesc: "icon 属性中的字符位于独立固定图标位，并通过字重、大小和颜色与文件名区分；文件名开头的相同字符仍是普通文字。",
   iconFromProperty: "来自 icon 属性", characterInFilename: "文件名中的字符",
-  aliases: "创建 Node 时添加 aliases", aliasesDesc: "从选区创建时使用选中文字；从 [[a|b]] 创建时使用显示文字 b。",
+  aliases: "创建 Node 时添加 aliases", aliasesDesc: "从选中文字创建节点时，把选中文字加入别名；从 [[a|b]] 创建时，把显示文字 b 加入别名。",
   prefix: "前缀", suffix: "后缀", enabled: "启用", source: "来源", separator: "连接符",
   customText: "自定义文本", currentFile: "当前文件名", currentNode: "当前 Folder Node",
   currentHeading: "当前标题", timestamp: "时间戳", timestampFormat: "时间戳格式",
@@ -159,7 +161,7 @@ const zh = {
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "创建过程中选区已改变，创建已停止。",
   errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
-  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "为避免误操作，已停止此次操作：{message}",
+  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "无法安全完成此次操作：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
 };
 
@@ -203,12 +205,12 @@ const en: typeof zh = {
   nodeGraphShowLinksTooltip: "Overlay links between canonical Node Notes on the structure graph.",
   nodeGraphLargeGraphAria: "Large Node Graph; in 2D drag or wheel to pan and Ctrl/Cmd + wheel to zoom; in 3D drag to rotate and wheel to zoom; press Enter to open the selected node",
   nodeGraphRelationSummary: "Structure {structure} · Links {links}",
-  nodeGraphPerformance: "Large graph performance", nodeGraphPerformanceDesc: "Filtering happens before model construction and layout. Graphs over the threshold use constant-DOM Canvas rendering.",
+  nodeGraphPerformance: "Large graph performance", nodeGraphPerformanceDesc: "For larger graphs, Folder Nodes switches to Canvas so the view stays responsive.",
   nodeGraphCanvasThreshold: "Canvas node/edge threshold", nodeGraphCanvasThresholdDesc: "Use Canvas when the current scope has more nodes or visible edges than this value. Range: 50–10000.",
-  nodeGraphEdgeLimit: "Link overview edge limit", nodeGraphEdgeLimitDesc: "Maximum representative link edges drawn in a large graph. The structure skeleton is always complete, and focusing restores every link for that node.",
+  nodeGraphEdgeLimit: "Link overview edge limit", nodeGraphEdgeLimitDesc: "On large graphs, show fewer links at first to keep them readable. The complete node hierarchy stays visible; selecting a node shows all its links.",
   nodeGraphNumberInvalid: "Enter a whole number from {minimum} to {maximum}; invalid input is not saved.",
   nodeGraphFindNode: "Find node",
-  managementGuideTitle: "Files and nodes are different", managementGuideStructure: "Folder A and A/A.md form a complete node; a missing part shows Incomplete and is not created automatically.", managementGuideBoundary: "Unmanaged items stay available in Obsidian. Folder Nodes stops structural node actions there; it does not hide or delete them.", managementGuideActions: "Native actions target one file or folder; containing-node actions target the whole node. Bulk organization and migration preview first; Health check is read-only.",
+  managementGuideTitle: "Files and nodes are different", managementGuideStructure: "Folder A and A/A.md form a complete node; a missing part shows Incomplete and is not created automatically.", managementGuideBoundary: "Unmanaged items stay available in Obsidian. Folder Nodes stops structural node actions there; it does not hide or delete them.", managementGuideActions: "Actions such as Rename file change one file or folder. Actions such as Rename containing node change the whole node. Bulk organization and property migration show a preview first; Check health never edits files.",
   maintenance: "Structure maintenance", health: "Check Folder Nodes health",
   batchOrganize: "Organize incomplete nodes", previewOrganizePlan: "Preview organization plan",
   scanningStructure: "Scanning structure", scanningStructureDesc: "Inventorying the managed scope in batches. Obsidian remains responsive during the scan.",
@@ -234,7 +236,7 @@ const en: typeof zh = {
   childOrderNatural: "Child order: Name (switch to manual)", childOrderManual: "Child order: Manual (restore name order)",
   rename: "Rename node", delete: "Delete node", move: "Move node", merge: "Merge node",
   renameCurrentNode: "Rename current node", moveContainingNode: "Move containing node", mergeContainingNode: "Merge containing node", deleteContainingNode: "Delete containing node",
-  language: "Interface language", languageDesc: "Follow Obsidian uses Simplified Chinese for Chinese interface languages and English otherwise. You can also choose a language explicitly.", auto: "Follow Obsidian",
+  language: "Interface language", languageDesc: "Use Obsidian’s interface language or choose one below. Switching languages changes only the Folder Nodes interface, not notes, filenames, or node properties.", auto: "Follow Obsidian",
   chinese: "简体中文", english: "English", iconInheritance: "Icon inheritance",
   iconInheritanceDesc: "Use the nearest ancestor icon when the current node has no valid icon.",
   emojiFont: "Emoji font", systemDefault: "System default",
@@ -320,7 +322,7 @@ const en: typeof zh = {
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed during creation; creation stopped.",
   errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
-  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Operation stopped safely: {message}",
+  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Could not complete this action safely: {message}",
   reconcileErrorsSummary: "Automatic structure synchronization left {count} items incomplete: {message}",
 };
 
@@ -329,16 +331,34 @@ let configuredLanguage: InterfaceLanguage = "auto";
 
 export function setLanguage(language: InterfaceLanguage): void { configuredLanguage = language; }
 
-export function resolvedLanguage(): "zh-CN" | "en" {
+export function resolvedLanguage(): AvailableInterfaceLocale {
   if (configuredLanguage !== "auto") return configuredLanguage;
-  return getLanguage().toLocaleLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const tag = getLanguage().trim().replaceAll("_", "-").toLowerCase();
+  if (tag === "zh" || tag.startsWith("zh-")) {
+    return /(?:^|[-])(hant|tw|hk|mo)(?:$|[-])/u.test(tag) ? "zh-TW" : "zh-CN";
+  }
+  if (tag === "pt" || tag.startsWith("pt-")) return "pt-BR";
+  const primary = tag.split("-")[0];
+  return isInterfaceLanguage(primary) && primary !== "auto" ? primary : "en";
+}
+
+export function interfaceTextDirection(): "rtl" | "ltr" {
+  return resolvedLanguage() === "ar" ? "rtl" : "ltr";
+}
+
+/** Coverage is verified for every locale; English is a defensive runtime fallback only. */
+export function localeCoverage(locale: AvailableInterfaceLocale): { translated: number; total: number } {
+  const values = locale === "en" ? en : locale === "zh-CN" ? zh : LANGUAGE_OVERRIDES[locale] ?? {};
+  return { translated: Object.keys(values).length, total: Object.keys(en).length };
 }
 
 export function t(key: TranslationKey, values: Record<string, string | number> = {}): string {
-  const dictionary = resolvedLanguage() === "zh-CN" ? zh : en;
+  const locale = resolvedLanguage();
+  const dictionary = locale === "zh-CN" ? zh : locale === "en" ? en : LANGUAGE_OVERRIDES[locale] ?? {};
+  const template = dictionary[key] ?? en[key];
   return Object.entries(values).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
-    dictionary[key],
+    template,
   );
 }
 

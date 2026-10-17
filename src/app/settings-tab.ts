@@ -12,7 +12,8 @@ import {
 } from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
-import { t } from "../ui/i18n";
+import { interfaceTextDirection, t } from "../ui/i18n";
+import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
 import { renderVisual } from "../presentation/render-visual";
 
 type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";
@@ -84,7 +85,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     let languageChanged = false;
     switch (key) {
       case "language":
-        if (value !== "auto" && value !== "zh-CN" && value !== "en") throw new Error("Unsupported language");
+        if (!isInterfaceLanguage(value)) throw new Error("Unsupported language");
         settings.language = value;
         languageChanged = true;
         new Notice(t("reloadLanguage"));
@@ -138,6 +139,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.plugin.ensureStyles(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
+    this.containerEl.dir = interfaceTextDirection();
     const tabs = this.containerEl.createDiv({
       cls: "folder-nodes-tabs",
       attr: { role: "tablist", "aria-label": t("settings"), "aria-orientation": "horizontal" },
@@ -230,7 +232,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private generalDefinitions(): SettingDefinitionItem[] {
     return [
-      { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: { auto: t("auto"), "zh-CN": t("chinese"), en: t("english") } } },
+      { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: languageOptions(t("auto")) } },
       { name: t("applyHiddenNodes"), desc: t("applyHiddenNodesDesc"), control: { type: "toggle", key: "hiddenNodesEnabled", defaultValue: true } },
       { name: t("enableHomepage"), desc: t("enableHomepageDesc"), control: { type: "toggle", key: "homepageEnabled", defaultValue: false } },
       { name: t("openHomepageOnStartup"), desc: t("openHomepageOnStartupDesc"), visible: this.plugin.settings.homepageEnabled, control: { type: "toggle", key: "openHomepageOnStartup", defaultValue: false } },
@@ -326,7 +328,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderGeneral(panel: HTMLElement): void {
     new Setting(panel).setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
-      .addOptions({ auto: t("auto"), "zh-CN": t("chinese"), en: t("english") }).setValue(this.plugin.settings.language).onChange(async (value) => {
+      .addOptions(languageOptions(t("auto"))).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value as typeof this.plugin.settings.language;
         await this.plugin.applyLanguageSetting();
         new Notice(t("reloadLanguage"));

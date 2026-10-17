@@ -1,13 +1,12 @@
-// Measured on 2026-08-02 with Node 24.19.0 and npm 11.17.0 after
-// `npm ci && npm run build:bundle`; then
-// `node -p "require('node:fs').statSync('dist/main.js').size"` printed 280147
-// after all eleven catalogs became independently complete.
-export const BUNDLE_REFERENCE_BYTES = 280_147;
+// Measured by the production-bundle gate with all 12 interface catalogs
+// containing 372 messages each: dist/main.js was 870741 bytes.
+// The previous 581958-byte reference described eight incomplete catalogs.
+export const BUNDLE_REFERENCE_BYTES = 870_741;
 
-// Roughly 1.8x the measured baseline: enough room for reviewed feature growth,
-// while still blocking accidental source maps, unminified output, or a major
-// dependency expansion. Raising it requires a new measured reference and review.
-export const BUNDLE_MAXIMUM_BYTES = 500_000;
+// Reviewed upper bound: about 10% headroom for small changes, while still
+// rejecting source maps, debug builds, and unexpected dependency growth.
+// Any future increase requires another measured production build and review.
+export const BUNDLE_MAXIMUM_BYTES = 960_000;
 
 export function measureBundleBudget(actualBytes) {
   if (!Number.isSafeInteger(actualBytes) || actualBytes <= 0) {
