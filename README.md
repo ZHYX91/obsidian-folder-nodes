@@ -107,7 +107,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 - **Selection & naming** — confirmation for selected-text creation, aliases, plus optional prefix/suffix naming sources and timestamp formats.
 - **Node Graph** — enablement, default dimension, 2D direction, and large-graph thresholds.
 
-**Follow Obsidian** selects the corresponding supported interface language from Obsidian. You can also choose any of the 12 languages manually. Switching languages does not change note contents, filenames, or node properties.
+**Follow Obsidian** selects the corresponding supported interface language from Obsidian. You can also choose an interface language manually. Switching languages does not change note contents, filenames, or node properties.
 
 ## Folder Nodes property
 
