@@ -32,7 +32,9 @@ Plugin hỗ trợ máy tính và Android. Trên Android, việc di chuyển thư
 
 ## Cài đặt
 
-Bạn cần Obsidian 1.12.7 trở lên. Mở “Cài đặt → Plugin cộng đồng → Duyệt”, tìm Folder Nodes, cài đặt và bật plugin. Bạn cũng có thể lấy main.js, manifest.json và styles.css từ cùng một phiên bản tại [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), rồi đặt vào Vault/.obsidian/plugins/folder-nodes/. Khi cập nhật, hãy giữ data.json để bảo toàn cài đặt.
+Mở “Cài đặt → Plugin cộng đồng → Duyệt”, tìm Folder Nodes rồi cài đặt và bật plugin. Nếu chưa có trong danh mục, tải `folder-nodes-<version>.zip` từ [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), rồi giải nén thư mục `folder-nodes` vào `Vault/.obsidian/plugins/`. ZIP đã chứa thư mục của plugin; đừng giải nén vào bên trong `plugins/folder-nodes/`.
+
+Bạn cũng có thể đặt `main.js`, `manifest.json` và `styles.css` cùng một phiên bản trực tiếp vào `Vault/.obsidian/plugins/folder-nodes/`. Tải lại Obsidian và bật plugin. Không trộn tệp từ các phiên bản khác nhau. Khi cập nhật, giữ `data.json` để bảo toàn tùy chọn và quy tắc không quản lý.
 
 ## Sử dụng
 

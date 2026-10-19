@@ -8,7 +8,7 @@ vi.mock("obsidian", async (importOriginal) => ({
     public addCommand(command: Command): Command {
       return { ...command, id: `${this.manifest.id}:${command.id}`, name: `${this.manifest.name}: ${command.name}` };
     }
-    public async saveData(): Promise<void> {}
+    public async saveData(_snapshot: unknown): Promise<void> {}
   },
 }));
 vi.mock("../../src/app/settings-tab", () => ({ FolderNodesSettingTab: class {} }));
@@ -17,6 +17,7 @@ vi.mock("../../src/ui/styles.css", () => ({ default: ".folder-nodes {}" }));
 import FolderNodesPlugin from "../../src/app/plugin";
 import FolderNodesWithNodeGraphPlugin from "../../src/app/node-graph-plugin";
 import { setLanguage, t } from "../../src/ui/i18n";
+import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages";
 
 class TestPlugin extends FolderNodesWithNodeGraphPlugin {
   public registerGraphCommands(): void {
@@ -72,5 +73,26 @@ describe("plugin localization lifecycle", () => {
     plugin.settings.hiddenNodesEnabled = false;
     await plugin.reconcileSettingsChange();
     expect(command.name).toBe(`Folder Nodes: ${t("showHiddenNodesThisSession")}`);
+  });
+
+  it.each(AVAILABLE_INTERFACE_LOCALES)("persists %s and updates existing commands without accessing Vault files", async (locale) => {
+    const { plugin, chrome } = fixture();
+    const commands = [...chrome.localizedCommands];
+    const ids = commands.map(({ id }) => id);
+    const saved = vi.spyOn(plugin, "saveData");
+    const vault = new Proxy({}, {
+      get(_target, key) { throw new Error(`Language switching must not access vault.${String(key)}`); },
+    });
+    Reflect.set(plugin.app, "vault", vault);
+    plugin.settings.language = locale;
+    await plugin.applyLanguageSetting();
+    expect(saved).toHaveBeenCalledOnce();
+    expect(saved.mock.calls[0]?.[0]).toMatchObject({ language: locale });
+    expect(chrome.localizedCommands).toEqual(commands);
+    expect(commands.map(({ id }) => id)).toEqual(ids);
+    expect(commands.find(({ id }) => id.endsWith(":open-node-graph"))?.name)
+      .toBe(`Folder Nodes: ${t("openNodeGraph")}`);
+    expect(chrome.ribbonElement.getAttribute("aria-label")).toBe(t("contents"));
+    FolderNodesPlugin.prototype.onunload.call(plugin);
   });
 });

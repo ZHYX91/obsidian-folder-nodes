@@ -298,6 +298,29 @@
         "Supported zoom and selected-card position remain stable across renderer changes; percentage and controls stay synchronized.",
         "No pointer remains captured after release or cancellation, and ordinary interaction resumes."
       ]
+    },
+    {
+      "id": "interface-localization",
+      "title": "Complete interface languages, persisted selection and scoped Arabic RTL",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In a fresh disposable Vault, open Folder Nodes settings and switch through English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Spanish, Brazilian Portuguese, Russian, Vietnamese and Arabic. Inspect all five tabs and return to General for each language. Follow Obsidian must resolve to the actual host language when supported, or English otherwise.",
+        "In German and Russian, inspect long setting descriptions, menus, command names and the Node Graph toolbar at narrow width. Inspect Arabic settings right-to-left layout, visible focus, numbers, icons, and the mixed Latin/Arabic Localization node path. On desktop exercise direction-aware Left/Right plus Home/End tab navigation; on Android use touch and horizontal tab scrolling.",
+        "While Arabic is selected, change the Canvas node/edge threshold to 600 using the real input control, leave and reopen settings, and confirm it is retained. Open a path-rule dialog for the mixed Latin/Arabic fixture and cancel without applying a rule. Verify that ordinary Obsidian UI outside the plugin settings is not redirected by the plugin.",
+        "Inspect translated command-palette entries and a node menu after changing language. Disable and re-enable Folder Nodes through the host UI, then reopen its settings and confirm the selected language and threshold remain. Switch back to Follow Obsidian and check the resolved language. Do not create, rename, move, delete or migrate fixture notes in this scenario."
+      ],
+      "expected": [
+        "All twelve selections render their translated tabs and settings without missing keys or unexpected English fallback. Long descriptions and critical controls remain readable; narrow tabs remain reachable. Automatic selection follows the supported host locale.",
+        "Arabic reverses only the plugin-owned settings surface. Mixed-script paths, icons and numbers remain usable; desktop keyboard focus follows the visible tab direction. Command and node-menu text updates to the selected language.",
+        "The selected language and numeric threshold survive closing settings and a real plugin disable/enable cycle. The host outside plugin settings retains its own direction. Fixture note bytes, names and structural properties remain unchanged."
+      ]
     }
   ]
 }

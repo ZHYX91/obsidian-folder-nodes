@@ -6,6 +6,7 @@ import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
   settings: "Folder Nodes 设置", general: "常规", management: "管理", homepage: "主页", icons: "图标与外观", naming: "选区与命名", nodeGraph: "节点图谱",
+  openNodeGraph: "打开节点图谱", openInNodeGraph: "在节点图谱中打开", openSubtreeNodeGraph: "打开此节点的子图谱", openLocalNodeGraph: "打开此节点的局部图谱", nodeGraphDisabled: "节点图谱已在设置中关闭。", noVisibleGraphNode: "当前笔记不属于可显示的 Folder Node。",
   applyHiddenNodes: "应用隐藏标记", applyHiddenNodesDesc: "开启后，标记了 hidden=true 的节点及其下级节点不会显示在 Folder Nodes 的文件列表、节点内容和节点图谱中。关闭后会重新显示它们，但不会删除隐藏标记。",
   hideNode: "隐藏节点", unhideNode: "取消隐藏节点", hiddenNode: "隐藏", hiddenNodeDetail: "此节点及其子树被隐藏", hiddenByNode: "由 {path} 隐藏",
   showHiddenNodesThisSession: "临时显示隐藏节点", hideHiddenNodesThisSession: "恢复隐藏节点", hiddenAgainOnManage: "重新纳入管理后，此节点会按 {path} 的隐藏标记再次隐藏。",
@@ -131,7 +132,7 @@ const zh = {
   confirmSelectionCreation: "创建前确认",
   confirmSelectionCreationDesc: "从选中文字创建节点前预览位置、名称和 aliases。关闭后直接创建，仍会检查冲突和选区变化。",
   selectionCrossesTableCells: "选区跨越了 Markdown 表格的单元格或行；为避免破坏表格，本次未创建节点。",
-  aliasValue: "Alias", aliasNone: "不添加", reloadLanguage: "命令名称将在插件下次加载时使用新语言。",
+  aliasValue: "Alias", aliasNone: "不添加", reloadLanguage: "界面语言已更新。",
   leafMarkdown: "尚未组成节点的 Markdown", missingNotes: "缺失节点笔记", conflicts: "阻塞冲突",
   leafExemptions: "不管理的 Markdown 文件", leafExemptionsDesc: "匹配的 Markdown 只显示为文件，不作为节点，也不要求创建同名文件夹。默认包含路径 AGENTS.md、CLAUDE.md，以及名称以 . 或 _ 开头的规则。",
   folderExemptions: "不管理的文件夹", folderExemptionsDesc: "匹配的文件夹及其完整子树不作为节点管理，也不参与批量整理。默认名称开头规则为 .、_；Vault 配置目录、.git、.trash 始终受系统保护。",
@@ -167,6 +168,7 @@ const zh = {
 
 const en: typeof zh = {
   settings: "Folder Nodes settings", general: "General", management: "Management", homepage: "Homepage", icons: "Icons & appearance", naming: "Selection & naming", nodeGraph: "Node Graph",
+  openNodeGraph: "Open Node Graph", openInNodeGraph: "Open in Node Graph", openSubtreeNodeGraph: "Open subtree Node Graph", openLocalNodeGraph: "Open local Node Graph", nodeGraphDisabled: "Node Graph is disabled in settings.", noVisibleGraphNode: "The current note is not in a visible Folder Node.",
   applyHiddenNodes: "Apply hidden markers", applyHiddenNodesDesc: "When enabled, nodes whose folder-nodes list contains hidden=true, together with their subtrees, are omitted from File Explorer, Node Contents, and Node Graph. Turning this off shows them without deleting markers.",
   hideNode: "Hide node", unhideNode: "Unhide node", hiddenNode: "Hidden", hiddenNodeDetail: "This node and its subtree are hidden", hiddenByNode: "Hidden by {path}",
   showHiddenNodesThisSession: "Temporarily show hidden nodes", hideHiddenNodesThisSession: "Hide hidden nodes again", hiddenAgainOnManage: "After it is managed again, this node will be hidden by the marker on {path}.",
@@ -292,7 +294,7 @@ const en: typeof zh = {
   confirmSelectionCreation: "Confirm before creating",
   confirmSelectionCreationDesc: "Preview the location, name, and aliases before creating a node from selected text. Turn off to create directly; conflicts and selection changes are still checked.",
   selectionCrossesTableCells: "The selection crosses Markdown table cells or rows. No node was created, to keep the table intact.",
-  aliasValue: "Alias", aliasNone: "Do not add", reloadLanguage: "Command names will use the new language after the plugin reloads.",
+  aliasValue: "Alias", aliasNone: "Do not add", reloadLanguage: "Interface language updated.",
   leafMarkdown: "Leaf Markdown", missingNotes: "Missing node notes", conflicts: "Blocking conflicts",
   leafExemptions: "Unmanaged Markdown files", leafExemptionsDesc: "Matching Markdown appears only as files, not nodes, and does not require a same-named folder. Defaults include the AGENTS.md and CLAUDE.md paths, plus rules for names starting with . or _.",
   folderExemptions: "Unmanaged folders", folderExemptionsDesc: "Matching folders and their complete subtrees are not managed as nodes or included in bulk organization. Default name-start rules are . and _. The Vault configuration directory, .git, and .trash are always protected.",

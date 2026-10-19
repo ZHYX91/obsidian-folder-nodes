@@ -69,7 +69,7 @@ describe("interface language", () => {
     expect(localeCoverage("zh-CN").translated).toBe(localeCoverage("zh-CN").total);
     expect(localeCoverage("en").translated).toBe(localeCoverage("en").total);
     expect(localeCoverage("ar").translated).toBe(keys.length);
-    expect(localeCoverage("ar").total).toBe(372);
+    expect(localeCoverage("ar").total).toBe(378);
     for (const locale of AVAILABLE_INTERFACE_LOCALES) {
       const values = LANGUAGE_OVERRIDES[locale] ?? {};
       for (const [key, translated] of Object.entries(values)) {
@@ -85,12 +85,12 @@ describe("interface language", () => {
     setLanguage("en");
     const referenceKeys = Object.keys(LANGUAGE_OVERRIDES["zh-TW"] ?? {});
     const canonicalKeys = new Set(referenceKeys);
-    expect(referenceKeys).toHaveLength(372);
+    expect(referenceKeys).toHaveLength(378);
     expect(AVAILABLE_INTERFACE_LOCALES).toHaveLength(12);
 
     for (const locale of AVAILABLE_INTERFACE_LOCALES) {
       const coverage = localeCoverage(locale);
-      expect(coverage, locale).toEqual({ translated: 372, total: 372 });
+      expect(coverage, locale).toEqual({ translated: 378, total: 378 });
       if (locale === "en" || locale === "zh-CN") continue;
       const translatedKeys = Object.keys(LANGUAGE_OVERRIDES[locale] ?? {});
       expect(translatedKeys, locale).toEqual(referenceKeys);

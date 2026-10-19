@@ -32,7 +32,9 @@ Obsidian 1.12.7 以降が必要です。
 
 ## インストール
 
-Obsidian 1.12.7 以降が必要です。「設定 → コミュニティプラグイン → 閲覧」で Folder Nodes を検索し、インストールして有効にしてください。または [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) の同じバージョンに含まれる main.js、manifest.json、styles.css を Vault/.obsidian/plugins/folder-nodes/ に配置します。更新時は設定を保存した data.json を残してください。
+「設定 → コミュニティプラグイン → 閲覧」で Folder Nodes を検索し、インストールして有効にします。一覧にない場合は [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) から `folder-nodes-<version>.zip` をダウンロードし、中の `folder-nodes` フォルダーを `Vault/.obsidian/plugins/` に展開します。ZIP にはプラグインのフォルダーが含まれるため、`plugins/folder-nodes/` の中には展開しないでください。
+
+同じバージョンの `main.js`、`manifest.json`、`styles.css` を `Vault/.obsidian/plugins/folder-nodes/` に直接配置する方法もあります。Obsidian を再読み込みして有効にし、異なるバージョンのファイルを混在させないでください。更新時は設定と管理対象外ルールを保存する `data.json` を残します。
 
 ## 使い方
 

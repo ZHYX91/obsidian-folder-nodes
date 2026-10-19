@@ -1,5 +1,7 @@
 /** Vietnamese interface text. Keep keys in English catalog order. */
-export const vi: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const vi: Readonly<Record<TranslationKey, string>> = {
   "settings": "Cài đặt Folder Nodes",
   "general": "Chung",
   "management": "Quản lý",
@@ -7,6 +9,12 @@ export const vi: Readonly<Record<string, string>> = {
   "icons": "Biểu tượng và giao diện",
   "naming": "Vùng chọn và tên",
   "nodeGraph": "Đồ thị nút",
+  "openNodeGraph": "Mở đồ thị nút",
+  "openInNodeGraph": "Mở trong đồ thị nút",
+  "openSubtreeNodeGraph": "Mở đồ thị cây con",
+  "openLocalNodeGraph": "Mở đồ thị cục bộ",
+  "nodeGraphDisabled": "Đồ thị nút đã bị tắt trong cài đặt.",
+  "noVisibleGraphNode": "Ghi chú hiện tại không thuộc Folder Node đang hiển thị.",
   "applyHiddenNodes": "Áp dụng dấu ẩn",
   "applyHiddenNodesDesc": "Khi bật, các nút có hidden=true cùng các nút con sẽ bị ẩn khỏi trình duyệt tệp, nội dung nút và sơ đồ nút. Tắt tùy chọn này không xóa dấu ẩn.",
   "hideNode": "Ẩn nút",
@@ -296,7 +304,7 @@ export const vi: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "Phần chọn trải qua nhiều ô hoặc hàng của bảng Markdown. Không tạo nút để tránh làm hỏng bảng.",
   "aliasValue": "Bí danh",
   "aliasNone": "Không thêm",
-  "reloadLanguage": "Tên lệnh sẽ đổi ngôn ngữ sau khi tải lại plugin.",
+  "reloadLanguage": "Đã thay đổi ngôn ngữ giao diện.",
   "leafMarkdown": "Markdown độc lập",
   "missingNotes": "Ghi chú nút còn thiếu",
   "conflicts": "Xung đột",

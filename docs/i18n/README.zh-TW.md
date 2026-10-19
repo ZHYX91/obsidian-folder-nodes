@@ -32,7 +32,9 @@ Folder Nodes 讓 Obsidian 資料夾擁有自己的筆記。資料夾 A 和同名
 
 ## 安裝
 
-需要 Obsidian 1.12.7 或更新版本。可在「設定 → 第三方外掛 → 瀏覽」搜尋 Folder Nodes 安裝；也能從 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) 下載同一版本的安裝檔，解壓到 Vault/.obsidian/plugins/folder-nodes/。不要混用不同版本的 main.js、manifest.json、styles.css。升級時保留 data.json。
+在「設定 → 第三方外掛 → 瀏覽」搜尋 Folder Nodes，安裝並啟用。若目錄中尚未提供，可從 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) 下載 `folder-nodes-<version>.zip`，將內含的 `folder-nodes` 資料夾解壓到 `Vault/.obsidian/plugins/`。壓縮檔已包含外掛資料夾，請勿再解壓到 `plugins/folder-nodes/` 內。
+
+也可將同一版本的 `main.js`、`manifest.json`、`styles.css` 直接放入 `Vault/.obsidian/plugins/folder-nodes/`。重新載入 Obsidian 並啟用外掛；不要混用不同版本的檔案。升級時保留 `data.json`，以保留偏好與不管理規則。
 
 ## 使用方式
 

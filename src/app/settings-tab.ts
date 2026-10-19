@@ -12,7 +12,7 @@ import {
 } from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
-import { interfaceTextDirection, t } from "../ui/i18n";
+import { interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
 import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
 import { renderVisual } from "../presentation/render-visual";
 
@@ -140,6 +140,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
     this.containerEl.dir = interfaceTextDirection();
+    this.containerEl.lang = resolvedLanguage();
     const tabs = this.containerEl.createDiv({
       cls: "folder-nodes-tabs",
       attr: { role: "tablist", "aria-label": t("settings"), "aria-orientation": "horizontal" },

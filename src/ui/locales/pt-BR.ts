@@ -1,5 +1,7 @@
 /** Brazilian Portuguese interface text. Keep keys in English catalog order. */
-export const ptBR: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "settings": "Configurações do Folder Nodes",
   "general": "Geral",
   "management": "Gerenciamento",
@@ -7,6 +9,12 @@ export const ptBR: Readonly<Record<string, string>> = {
   "icons": "Ícones e aparência",
   "naming": "Seleção e nomes",
   "nodeGraph": "Grafo de nós",
+  "openNodeGraph": "Abrir o grafo de nós",
+  "openInNodeGraph": "Abrir no grafo de nós",
+  "openSubtreeNodeGraph": "Abrir o grafo da subárvore",
+  "openLocalNodeGraph": "Abrir o grafo local",
+  "nodeGraphDisabled": "O grafo de nós está desativado nas configurações.",
+  "noVisibleGraphNode": "A nota atual não pertence a nenhum Folder Node visível.",
   "applyHiddenNodes": "Aplicar marcações de ocultação",
   "applyHiddenNodesDesc": "Quando ativado, os nós marcados com hidden=true e seus descendentes ficam ocultos no Explorador de Arquivos, no Conteúdo dos Nós e no Gráfico de Nós. Desativar a opção não remove as marcações.",
   "hideNode": "Ocultar nó",
@@ -296,7 +304,7 @@ export const ptBR: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "A seleção atravessa células ou linhas de uma tabela Markdown. Nenhum nó foi criado para preservar a tabela.",
   "aliasValue": "Alias",
   "aliasNone": "Não adicionar",
-  "reloadLanguage": "Os nomes dos comandos mudam após recarregar o plugin.",
+  "reloadLanguage": "O idioma da interface foi alterado.",
   "leafMarkdown": "Markdown avulso",
   "missingNotes": "Notas de nós ausentes",
   "conflicts": "Conflitos",

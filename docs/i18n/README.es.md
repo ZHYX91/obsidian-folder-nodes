@@ -32,7 +32,9 @@ Funciona en escritorio y Android. En Android, el movimiento de carpetas se reali
 
 ## Instalación
 
-Necesitas Obsidian 1.12.7 o posterior. Ve a «Ajustes → Complementos de la comunidad → Examinar», busca Folder Nodes, instálalo y actívalo. También puedes descargar main.js, manifest.json y styles.css de una misma versión en [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) y colocarlos en Vault/.obsidian/plugins/folder-nodes/. Conserva data.json al actualizar para no perder los ajustes.
+En « Ajustes → Complementos de la comunidad → Explorar », busca Folder Nodes, instálalo y actívalo. Si no aparece, descarga `folder-nodes-<version>.zip` desde [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) y extrae la carpeta `folder-nodes` en `Vault/.obsidian/plugins/`. El ZIP ya contiene la carpeta del complemento; no lo extraigas dentro de `plugins/folder-nodes/`.
+
+También puedes colocar `main.js`, `manifest.json` y `styles.css` de la misma versión directamente en `Vault/.obsidian/plugins/folder-nodes/`. Recarga Obsidian y activa el complemento. No mezcles versiones. Al actualizar, conserva `data.json` para mantener las preferencias y reglas de exclusión.
 
 ## Uso
 

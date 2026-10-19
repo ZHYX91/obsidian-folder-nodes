@@ -32,7 +32,9 @@
 
 ## التثبيت
 
-يتطلب الملحق Obsidian 1.12.7 أو أحدث. افتح «الإعدادات ← الإضافات المجتمعية ← تصفح»، وابحث عن Folder Nodes ثم ثبّته وفعّله. ويمكنك تنزيل main.js وmanifest.json وstyles.css من الإصدار نفسه عبر [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) ووضعها في Vault/.obsidian/plugins/folder-nodes/. احتفظ بملف data.json عند التحديث حتى لا تضيع الإعدادات.
+افتح «الإعدادات ← الإضافات المجتمعية ← تصفح»، وابحث عن Folder Nodes ثم ثبّته وفعّله. إذا لم يظهر في الدليل، نزّل `folder-nodes-<version>.zip` من [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) واستخرج مجلد `folder-nodes` إلى `Vault/.obsidian/plugins/`. يحتوي ZIP على مجلد الإضافة أصلًا، فلا تستخرجه داخل `plugins/folder-nodes/`.
+
+يمكنك أيضًا وضع ملفات `main.js` و`manifest.json` و`styles.css` من الإصدار نفسه مباشرة في `Vault/.obsidian/plugins/folder-nodes/`. أعد تحميل Obsidian وفعّل الإضافة، ولا تخلط ملفات إصدارات مختلفة. احتفظ بملف `data.json` عند التحديث للحفاظ على التفضيلات وقواعد الاستثناء.
 
 ## الاستخدام
 

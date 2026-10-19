@@ -1,5 +1,7 @@
 /** Arabic interface text. Keep keys in English catalog order. */
-export const ar: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const ar: Readonly<Record<TranslationKey, string>> = {
   "settings": "إعدادات Folder Nodes",
   "general": "عام",
   "management": "الإدارة",
@@ -7,6 +9,12 @@ export const ar: Readonly<Record<string, string>> = {
   "icons": "الأيقونات والمظهر",
   "naming": "التحديد والتسمية",
   "nodeGraph": "مخطط العقد",
+  "openNodeGraph": "فتح مخطط العقد",
+  "openInNodeGraph": "فتح في مخطط العقد",
+  "openSubtreeNodeGraph": "فتح مخطط الشجرة الفرعية",
+  "openLocalNodeGraph": "فتح المخطط المحلي",
+  "nodeGraphDisabled": "مخطط العقد معطّل في الإعدادات.",
+  "noVisibleGraphNode": "الملاحظة الحالية ليست ضمن عقدة Folder Node ظاهرة.",
   "applyHiddenNodes": "تطبيق علامات الإخفاء",
   "applyHiddenNodesDesc": "عند التفعيل، لا تظهر العقد التي تتضمن قائمة folder-nodes الخاصة بها القيمة hidden=true، ولا عقدها الفرعية، في مستكشف الملفات أو محتويات العقد أو مخطط العقد. يؤدي تعطيل الخيار إلى إظهارها دون حذف العلامات.",
   "hideNode": "إخفاء العقدة",
@@ -296,7 +304,7 @@ export const ar: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "يمتد التحديد عبر خلايا أو صفوف جدول Markdown. لم تُنشأ عقدة حتى لا يتضرر الجدول.",
   "aliasValue": "اسم بديل",
   "aliasNone": "عدم الإضافة",
-  "reloadLanguage": "ستستخدم أسماء الأوامر اللغة الجديدة بعد إعادة تحميل الإضافة.",
+  "reloadLanguage": "تم تغيير لغة الواجهة.",
   "leafMarkdown": "ملف Markdown مستقل",
   "missingNotes": "ملاحظات عقد مفقودة",
   "conflicts": "تعارضات تمنع الإجراء",

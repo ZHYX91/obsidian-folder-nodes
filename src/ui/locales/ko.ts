@@ -1,5 +1,7 @@
 /** Korean interface text. Keep keys in English catalog order. */
-export const ko: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const ko: Readonly<Record<TranslationKey, string>> = {
   "settings": "Folder Nodes 설정",
   "general": "일반",
   "management": "관리",
@@ -7,6 +9,12 @@ export const ko: Readonly<Record<string, string>> = {
   "icons": "아이콘과 모양",
   "naming": "선택 영역과 이름",
   "nodeGraph": "노드 그래프",
+  "openNodeGraph": "노드 그래프 열기",
+  "openInNodeGraph": "노드 그래프에서 열기",
+  "openSubtreeNodeGraph": "하위 트리 노드 그래프 열기",
+  "openLocalNodeGraph": "주변 노드 그래프 열기",
+  "nodeGraphDisabled": "설정에서 노드 그래프가 비활성화되어 있습니다.",
+  "noVisibleGraphNode": "현재 노트는 표시 가능한 Folder Node에 속하지 않습니다.",
   "applyHiddenNodes": "숨김 표시 적용",
   "applyHiddenNodesDesc": "이 옵션을 켜면 hidden=true로 표시된 노드와 하위 노드가 파일 탐색기, 노드 콘텐츠, 노드 그래프에서 숨겨집니다. 옵션을 꺼도 숨김 표시는 삭제되지 않습니다.",
   "hideNode": "노드 숨기기",
@@ -296,7 +304,7 @@ export const ko: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "선택 범위가 Markdown 표의 여러 셀이나 행에 걸쳐 있습니다. 표를 보호하기 위해 노드를 만들지 않았습니다.",
   "aliasValue": "별칭",
   "aliasNone": "추가 안 함",
-  "reloadLanguage": "플러그인을 다시 로드하면 명령 이름이 새 언어로 표시됩니다.",
+  "reloadLanguage": "인터페이스 언어가 변경되었습니다.",
   "leafMarkdown": "독립 Markdown 파일",
   "missingNotes": "누락된 노드 노트",
   "conflicts": "충돌",

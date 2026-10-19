@@ -2,6 +2,7 @@ import { Notice, TFile, TFolder } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NodeVisual } from "../../src/core/types";
+import { setLanguage } from "../../src/ui/i18n";
 
 const doubles = vi.hoisted(() => {
   class FakeBasePlugin {
@@ -83,7 +84,7 @@ const doubles = vi.hoisted(() => {
     }
   }
 
-  return { FakeBasePlugin, FakeContentsView, FakeGraphView, language: "en" };
+  return { FakeBasePlugin, FakeContentsView, FakeGraphView };
 });
 
 vi.mock("../../src/app/plugin", () => ({ default: doubles.FakeBasePlugin }));
@@ -98,7 +99,6 @@ vi.mock("../../src/ui/contents-view", () => ({
 vi.mock("../../src/app/layout-ready", () => ({
   onLayoutReadyOnce: (_host: unknown, callback: () => void) => callback(),
 }));
-vi.mock("../../src/ui/i18n", () => ({ resolvedLanguage: () => doubles.language }));
 
 import FolderNodesWithNodeGraphPlugin from "../../src/app/node-graph-plugin";
 
@@ -111,7 +111,7 @@ type FakeGraphViewInstance = InstanceType<typeof doubles.FakeGraphView>;
 describe("Node Graph plugin integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    doubles.language = "en";
+    setLanguage("en");
     (Notice as unknown as { messages: string[] }).messages.length = 0;
   });
 
@@ -123,10 +123,10 @@ describe("Node Graph plugin integration", () => {
     await plugin.onload();
     const button = contents.contentEl.querySelector(".folder-nodes-node-graph-entry-button");
     expect(button?.getAttribute("aria-label")).toBe("Open Node Graph");
-    doubles.language = "zh-CN";
+    setLanguage("zh-CN");
     await plugin.reconcileSettingsChange();
     expect(button?.getAttribute("aria-label")).toBe("打开节点图谱");
-    doubles.language = "en";
+    setLanguage("en");
     await plugin.reconcileSettingsChange();
     expect(button?.getAttribute("aria-label")).toBe("Open Node Graph");
     expect(contents.contentEl.querySelectorAll(".folder-nodes-node-graph-entry-button")).toHaveLength(1);

@@ -1,5 +1,7 @@
 /** German interface text. Keep keys in English catalog order. */
-export const de: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const de: Readonly<Record<TranslationKey, string>> = {
   "settings": "Folder Nodes-Einstellungen",
   "general": "Allgemein",
   "management": "Verwaltung",
@@ -7,6 +9,12 @@ export const de: Readonly<Record<string, string>> = {
   "icons": "Symbole und Darstellung",
   "naming": "Auswahl und Benennung",
   "nodeGraph": "Knotengraf",
+  "openNodeGraph": "Knotengraph öffnen",
+  "openInNodeGraph": "Im Knotengraph öffnen",
+  "openSubtreeNodeGraph": "Knotengraph des Unterbaums öffnen",
+  "openLocalNodeGraph": "Lokalen Knotengraph öffnen",
+  "nodeGraphDisabled": "Der Knotengraph ist in den Einstellungen deaktiviert.",
+  "noVisibleGraphNode": "Die aktuelle Notiz gehört zu keinem sichtbaren Folder Node.",
   "applyHiddenNodes": "Ausblendmarkierungen anwenden",
   "applyHiddenNodesDesc": "Wenn diese Option aktiviert ist, werden Knoten mit hidden=true und ihre Unterknoten im Dateiexplorer, in den Knoteninhalten und im Knotengraphen ausgeblendet. Beim Deaktivieren bleiben die Markierungen erhalten.",
   "hideNode": "Knoten ausblenden",
@@ -296,7 +304,7 @@ export const de: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "Die Auswahl umfasst mehrere Zellen oder Zeilen einer Markdown-Tabelle. Zum Schutz der Tabelle wurde kein Knoten erstellt.",
   "aliasValue": "Alias",
   "aliasNone": "Keinen hinzufügen",
-  "reloadLanguage": "Befehlsnamen wechseln nach dem erneuten Laden des Plugins die Sprache.",
+  "reloadLanguage": "Die Oberflächensprache wurde geändert.",
   "leafMarkdown": "Einzelne Markdown-Datei",
   "missingNotes": "Fehlende Knotennotizen",
   "conflicts": "Konflikte",

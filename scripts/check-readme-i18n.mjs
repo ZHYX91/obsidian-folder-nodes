@@ -97,6 +97,8 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
         throw new Error(`${relativePath} must cover all ${REQUIRED_ENGLISH.length} canonical chapters`);
       }
       const essential = [
+        "folder-nodes-<version>.zip", "Vault/.obsidian/plugins/",
+        "Vault/.obsidian/plugins/folder-nodes/", "main.js", "manifest.json", "styles.css",
         "data.json", "order=manual", "rank=N", "hidden=true",
         "folderNodeChildrenSort", "folderNodeSiblingRank", "folderNodeHidden",
         "frontmatter", "Canvas", "HEIC/HEIF", "README.md",

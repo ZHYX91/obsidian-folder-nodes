@@ -32,7 +32,9 @@ O plugin funciona no computador e no Android. No Android, movimentar pastas usa 
 
 ## Instalação
 
-É necessário ter o Obsidian 1.12.7 ou mais recente. Acesse "Configurações → Plugins da comunidade → Procurar", pesquise Folder Nodes, instale e ative. Outra opção é baixar main.js, manifest.json e styles.css da mesma versão em [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) e colocá-los em Vault/.obsidian/plugins/folder-nodes/. Ao atualizar, mantenha data.json para preservar suas configurações.
+Em “Configurações → Plugins da comunidade → Explorar”, procure Folder Nodes, instale e ative o plugin. Se ele não aparecer, baixe `folder-nodes-<version>.zip` em [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) e extraia a pasta `folder-nodes` em `Vault/.obsidian/plugins/`. O ZIP já contém a pasta do plugin; não o extraia dentro de `plugins/folder-nodes/`.
+
+Você também pode colocar `main.js`, `manifest.json` e `styles.css` da mesma versão diretamente em `Vault/.obsidian/plugins/folder-nodes/`. Recarregue o Obsidian e ative o plugin. Não misture versões. Ao atualizar, preserve `data.json` para manter as preferências e regras de exclusão.
 
 ## Como usar
 

@@ -32,7 +32,9 @@ Obsidian 1.12.7 이상이 필요합니다.
 
 ## 설치
 
-Obsidian 1.12.7 이상이 필요합니다. '설정 → 커뮤니티 플러그인 → 찾아보기'에서 Folder Nodes를 검색해 설치하고 활성화하세요. 또는 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases)에서 동일한 버전의 main.js, manifest.json, styles.css를 받아 Vault/.obsidian/plugins/folder-nodes/에 넣으세요. 업데이트할 때는 설정 파일 data.json을 유지해야 합니다.
+'설정 → 커뮤니티 플러그인 → 찾아보기'에서 Folder Nodes를 검색해 설치하고 활성화하세요. 목록에 없다면 [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases)에서 `folder-nodes-<version>.zip`을 받아 안에 있는 `folder-nodes` 폴더를 `Vault/.obsidian/plugins/`에 압축 해제하세요. ZIP에 플러그인 폴더가 이미 들어 있으므로 `plugins/folder-nodes/` 안에 다시 압축 해제하지 마세요.
+
+같은 버전의 `main.js`, `manifest.json`, `styles.css`를 `Vault/.obsidian/plugins/folder-nodes/`에 직접 넣어도 됩니다. Obsidian을 다시 불러와 활성화하고 서로 다른 버전의 파일을 섞지 마세요. 업데이트할 때는 환경설정과 관리 제외 규칙이 들어 있는 `data.json`을 유지하세요.
 
 ## 사용법
 

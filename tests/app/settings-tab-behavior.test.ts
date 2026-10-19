@@ -5,6 +5,8 @@ import FolderNodesPlugin from "../../src/app/plugin";
 import { FolderNodesSettingTab } from "../../src/app/settings-tab";
 import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings } from "../../src/shared/settings";
 import type { SettingsSaveState } from "../../src/shared/settings-save-coordinator";
+import { setLanguage, t } from "../../src/ui/i18n";
+import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages";
 
 vi.mock("obsidian", async (importOriginal) => {
   const actual = await importOriginal<typeof import("obsidian")>();
@@ -94,6 +96,30 @@ function persistenceFixture(failures: number) {
 }
 
 describe("imperative settings edit state", () => {
+  it("scopes language and direction to settings across all supported locales", () => {
+    const { tab } = fixture();
+    for (const method of ["renderGeneral", "renderManagement", "renderIcons", "renderNaming", "renderNodeGraph", "revealActiveTab"]) {
+      Reflect.set(tab, method, () => undefined);
+    }
+    const bodyDirection = document.body.dir;
+    const bodyLanguage = document.body.lang;
+    try {
+      for (const locale of [...AVAILABLE_INTERFACE_LOCALES, "en"] as const) {
+        setLanguage(locale);
+        tab.display();
+        expect(tab.containerEl.lang).toBe(locale);
+        expect(tab.containerEl.dir).toBe(locale === "ar" ? "rtl" : "ltr");
+        const buttons = [...tab.containerEl.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+        expect(buttons.map((button) => button.textContent))
+          .toEqual(["general", "management", "icons", "naming", "nodeGraph"].map((key) => t(key as Parameters<typeof t>[0])));
+        buttons[4]?.click();
+        expect(tab.containerEl.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe(t("nodeGraph"));
+        expect(document.body.dir).toBe(bodyDirection);
+        expect(document.body.lang).toBe(bodyLanguage);
+      }
+    } finally { setLanguage("en"); }
+  });
+
   it("does not write an empty or intermediate graph threshold and commits valid edits on blur", async () => {
     const { tab, plugin } = fixture();
     const saved = plugin.settings.nodeGraph.largeGraphThreshold;

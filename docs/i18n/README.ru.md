@@ -32,7 +32,9 @@ Folder Nodes связывает папку Obsidian с одноимённой з
 
 ## Установка
 
-Нужен Obsidian 1.12.7 или новее. Откройте «Настройки → Сторонние плагины → Просмотр», найдите Folder Nodes, установите и включите его. Также можно скачать main.js, manifest.json и styles.css из одной версии на странице [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) и положить в Vault/.obsidian/plugins/folder-nodes/. При обновлении сохраните data.json с настройками.
+Откройте «Настройки → Сторонние плагины → Просмотр», найдите Folder Nodes, установите и включите его. Если плагина нет в каталоге, скачайте `folder-nodes-<version>.zip` со страницы [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) и распакуйте папку `folder-nodes` в `Vault/.obsidian/plugins/`. Архив уже содержит папку плагина; не распаковывайте его внутрь `plugins/folder-nodes/`.
+
+Можно также поместить `main.js`, `manifest.json` и `styles.css` одной версии непосредственно в `Vault/.obsidian/plugins/folder-nodes/`. Перезагрузите Obsidian и включите плагин. Не смешивайте версии. При обновлении сохраните `data.json`, чтобы не потерять настройки и правила исключения.
 
 ## Использование
 

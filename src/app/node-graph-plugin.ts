@@ -5,7 +5,7 @@ import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view"
 import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view";
 import { isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import type { NodeGraphScope } from "../core/node-graph-scope";
-import { resolvedLanguage } from "../ui/i18n";
+import { t } from "../ui/i18n";
 import type { RefreshBatch } from "./refresh-scheduler";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { NodeGraphIndex } from "./node-graph-index";
@@ -309,12 +309,13 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 function label(
   key: "graphDisabled" | "noGraphNode" | "nodeGraph" | "openGraph" | "openInGraph" | "openLocalGraph" | "openSubtreeGraph",
 ): string {
-  const zh = resolvedLanguage() === "zh-CN";
-  if (key === "nodeGraph") return zh ? "节点图谱" : "Node Graph";
-  if (key === "openInGraph") return zh ? "在节点图谱中打开" : "Open in Node Graph";
-  if (key === "openSubtreeGraph") return zh ? "打开此节点的子图谱" : "Open subtree Node Graph";
-  if (key === "openLocalGraph") return zh ? "打开此节点的局部图谱" : "Open local Node Graph";
-  if (key === "graphDisabled") return zh ? "节点图谱已在设置中关闭。" : "Node Graph is disabled in settings.";
-  if (key === "noGraphNode") return zh ? "当前笔记不属于可显示的 Folder Node。" : "The current note is not in a visible Folder Node.";
-  return zh ? "打开节点图谱" : "Open Node Graph";
+  return t(({
+    nodeGraph: "nodeGraph",
+    openInGraph: "openInNodeGraph",
+    openSubtreeGraph: "openSubtreeNodeGraph",
+    openLocalGraph: "openLocalNodeGraph",
+    graphDisabled: "nodeGraphDisabled",
+    noGraphNode: "noVisibleGraphNode",
+    openGraph: "openNodeGraph",
+  } as const)[key]);
 }

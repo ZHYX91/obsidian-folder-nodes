@@ -1,5 +1,7 @@
 /** Russian interface text. Keep keys in English catalog order. */
-export const ru: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const ru: Readonly<Record<TranslationKey, string>> = {
   "settings": "Настройки Folder Nodes",
   "general": "Общие",
   "management": "Управление",
@@ -7,6 +9,12 @@ export const ru: Readonly<Record<string, string>> = {
   "icons": "Значки и оформление",
   "naming": "Выделение и имена",
   "nodeGraph": "Граф узлов",
+  "openNodeGraph": "Открыть граф узлов",
+  "openInNodeGraph": "Открыть в графе узлов",
+  "openSubtreeNodeGraph": "Открыть граф поддерева",
+  "openLocalNodeGraph": "Открыть локальный граф",
+  "nodeGraphDisabled": "Граф узлов отключён в настройках.",
+  "noVisibleGraphNode": "Текущая заметка не принадлежит видимому Folder Node.",
   "applyHiddenNodes": "Применять метки скрытия",
   "applyHiddenNodesDesc": "Если параметр включён, узлы с меткой hidden=true и их дочерние узлы не показываются в проводнике файлов, содержимом узлов и графе. Отключение не удаляет сами метки.",
   "hideNode": "Скрыть узел",
@@ -296,7 +304,7 @@ export const ru: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "Выделение пересекает несколько ячеек или строк таблицы Markdown. Узел не создан, чтобы не повредить таблицу.",
   "aliasValue": "Псевдоним",
   "aliasNone": "Не добавлять",
-  "reloadLanguage": "Названия команд сменят язык после перезагрузки плагина.",
+  "reloadLanguage": "Язык интерфейса изменён.",
   "leafMarkdown": "Отдельный Markdown",
   "missingNotes": "Отсутствующие заметки узлов",
   "conflicts": "Конфликты",

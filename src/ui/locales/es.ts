@@ -1,5 +1,7 @@
 /** Spanish interface text. Keep keys in English catalog order. */
-export const es: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const es: Readonly<Record<TranslationKey, string>> = {
   "settings": "Ajustes de Folder Nodes",
   "general": "General",
   "management": "Administración",
@@ -7,6 +9,12 @@ export const es: Readonly<Record<string, string>> = {
   "icons": "Iconos y apariencia",
   "naming": "Selección y nombres",
   "nodeGraph": "Gráfico de nodos",
+  "openNodeGraph": "Abrir el gráfico de nodos",
+  "openInNodeGraph": "Abrir en el gráfico de nodos",
+  "openSubtreeNodeGraph": "Abrir el gráfico del subárbol",
+  "openLocalNodeGraph": "Abrir el gráfico local",
+  "nodeGraphDisabled": "El gráfico de nodos está desactivado en los ajustes.",
+  "noVisibleGraphNode": "La nota actual no pertenece a ningún Folder Node visible.",
   "applyHiddenNodes": "Aplicar marcas de ocultación",
   "applyHiddenNodesDesc": "Al activar esta opción, los nodos marcados con hidden=true y sus descendientes se ocultan en el explorador de archivos, el contenido de los nodos y el gráfico. Al desactivarla, las marcas se conservan.",
   "hideNode": "Ocultar nodo",
@@ -296,7 +304,7 @@ export const es: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "La selección cruza varias celdas o filas de una tabla Markdown. No se creó ningún nodo para evitar dañar la tabla.",
   "aliasValue": "Alias",
   "aliasNone": "No añadir",
-  "reloadLanguage": "Los nombres de los comandos cambiarán al recargar el plugin.",
+  "reloadLanguage": "Se ha cambiado el idioma de la interfaz.",
   "leafMarkdown": "Markdown independiente",
   "missingNotes": "Notas de nodo que faltan",
   "conflicts": "Conflictos",

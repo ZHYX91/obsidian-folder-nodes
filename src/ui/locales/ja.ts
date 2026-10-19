@@ -1,5 +1,7 @@
 /** Japanese interface text. Keep keys in English catalog order. */
-export const ja: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const ja: Readonly<Record<TranslationKey, string>> = {
   "settings": "Folder Nodes の設定",
   "general": "一般",
   "management": "管理",
@@ -7,6 +9,12 @@ export const ja: Readonly<Record<string, string>> = {
   "icons": "アイコンと外観",
   "naming": "選択範囲と名前",
   "nodeGraph": "ノードグラフ",
+  "openNodeGraph": "Node Graph を開く",
+  "openInNodeGraph": "Node Graph で開く",
+  "openSubtreeNodeGraph": "下位ツリーの Node Graph を開く",
+  "openLocalNodeGraph": "周辺の Node Graph を開く",
+  "nodeGraphDisabled": "設定で Node Graph が無効になっています。",
+  "noVisibleGraphNode": "現在のノートは表示可能な Folder Node に属していません。",
   "applyHiddenNodes": "非表示の設定を適用",
   "applyHiddenNodesDesc": "有効にすると、hidden=true が設定されたノードとその下位ノードは、ファイルエクスプローラー、ノードの内容、ノードグラフに表示されません。無効にしても非表示設定は削除されません。",
   "hideNode": "ノードを非表示",
@@ -296,7 +304,7 @@ export const ja: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "選択範囲が Markdown テーブルの複数セルや行にまたがっています。表を壊さないよう、ノードは作成されませんでした。",
   "aliasValue": "別名",
   "aliasNone": "追加しない",
-  "reloadLanguage": "コマンド名はプラグインを再読み込みすると新しい言語になります。",
+  "reloadLanguage": "表示言語を変更しました。",
   "leafMarkdown": "単独の Markdown",
   "missingNotes": "不足しているノードノート",
   "conflicts": "競合",

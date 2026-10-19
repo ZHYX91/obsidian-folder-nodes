@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 - 2026-10-19
+
+- Add complete interface translations for Traditional Chinese, Japanese, Korean, German, French, Spanish, Brazilian Portuguese, Russian, Vietnamese, and Arabic, alongside English and Simplified Chinese.
+- Follow supported Obsidian language tags, preserve explicit language choices, and scope Arabic right-to-left settings to the plugin.
+- Translate Node Graph commands, menus and notices through the shared catalogs, and update command labels immediately when the language changes.
+- Clarify node actions and safety messages, and provide linked user guides and consistent manual-installation instructions in every supported language.
+
 ## 0.10.7 - 2026-10-11
 
 - Keep the clicked File Explorer row in place when collapsing near the bottom, and reclaim retained space as you scroll up.

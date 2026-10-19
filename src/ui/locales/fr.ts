@@ -1,5 +1,7 @@
 /** French interface text. Keep keys in English catalog order. */
-export const fr: Readonly<Record<string, string>> = {
+import type { TranslationKey } from "../i18n";
+
+export const fr: Readonly<Record<TranslationKey, string>> = {
   "settings": "Paramètres de Folder Nodes",
   "general": "Général",
   "management": "Gestion",
@@ -7,6 +9,12 @@ export const fr: Readonly<Record<string, string>> = {
   "icons": "Icônes et apparence",
   "naming": "Sélection et nommage",
   "nodeGraph": "Graphe des nœuds",
+  "openNodeGraph": "Ouvrir le graphe des nœuds",
+  "openInNodeGraph": "Ouvrir dans le graphe des nœuds",
+  "openSubtreeNodeGraph": "Ouvrir le graphe du sous-arbre",
+  "openLocalNodeGraph": "Ouvrir le graphe local",
+  "nodeGraphDisabled": "Le graphe des nœuds est désactivé dans les paramètres.",
+  "noVisibleGraphNode": "La note actuelle n’appartient à aucun Folder Node visible.",
   "applyHiddenNodes": "Appliquer les marqueurs de masquage",
   "applyHiddenNodesDesc": "Lorsque cette option est activée, les nœuds marqués hidden=true et leurs descendants sont masqués dans l’explorateur de fichiers, le contenu des nœuds et le graphe. La désactivation ne supprime pas les marqueurs.",
   "hideNode": "Masquer le nœud",
@@ -296,7 +304,7 @@ export const fr: Readonly<Record<string, string>> = {
   "selectionCrossesTableCells": "La sélection traverse plusieurs cellules ou lignes d’un tableau Markdown. Aucun nœud n’a été créé afin de protéger le tableau.",
   "aliasValue": "Alias",
   "aliasNone": "Ne pas ajouter",
-  "reloadLanguage": "Les commandes changent de langue après rechargement du plugin.",
+  "reloadLanguage": "La langue de l’interface a été modifiée.",
   "leafMarkdown": "Markdown isolé",
   "missingNotes": "Notes de nœud manquantes",
   "conflicts": "Conflits",

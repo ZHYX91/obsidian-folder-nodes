@@ -32,7 +32,9 @@ Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements p
 
 ## Installation
 
-Obsidian 1.12.7 ou version ultérieure est nécessaire. Dans « Paramètres → Modules communautaires → Parcourir », recherchez Folder Nodes, installez-le et activez-le. Vous pouvez aussi récupérer les fichiers main.js, manifest.json et styles.css d’une même version dans les [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), puis les placer dans Vault/.obsidian/plugins/folder-nodes/. Conservez data.json lors des mises à jour.
+Dans « Paramètres → Modules communautaires → Parcourir », recherchez Folder Nodes, installez-le et activez-le. S’il est absent du catalogue, téléchargez `folder-nodes-<version>.zip` depuis les [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) et extrayez le dossier `folder-nodes` dans `Vault/.obsidian/plugins/`. Le ZIP contient déjà le dossier du plugin : ne l’extrayez pas dans `plugins/folder-nodes/`.
+
+Vous pouvez aussi placer `main.js`, `manifest.json` et `styles.css` d’une même version directement dans `Vault/.obsidian/plugins/folder-nodes/`. Rechargez Obsidian et activez le plugin, sans mélanger les versions. Lors d’une mise à jour, conservez `data.json` pour préserver vos préférences et règles d’exclusion.
 
 ## Utilisation
 
