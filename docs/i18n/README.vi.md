@@ -80,9 +80,9 @@ Nút được nhận dạng bằng đường dẫn hiện tại trong kho, khôn
 
 **Ẩn**: hidden=true trong thuộc tính folder-nodes chỉ ẩn nút và các nút con trong các giao diện của Folder Nodes: trình duyệt tệp, nội dung nút và Node Graph. Tìm kiếm hay mở trực tiếp bằng Obsidian vẫn hoạt động. **Không quản lý**: Folder Nodes không thực hiện thao tác thay đổi cấu trúc trên các tệp hoặc thư mục này, nhưng không ẩn hay xóa chúng.
 
-“Đổi tên tệp” chỉ tác động một tệp hoặc thư mục; thao tác với “nút chứa ghi chú” ảnh hưởng toàn bộ nút. Sắp xếp hàng loạt và chuyển đổi thuộc tính đều cho xem trước trước khi ghi, còn kiểm tra trạng thái chỉ đọc. Nếu gặp xung đột, plugin dừng thay vì tự đoán cách giải quyết. Xóa nút hoàn chỉnh sẽ dùng thùng rác hệ thống của Obsidian.
+“Đổi tên tệp” chỉ tác động một tệp hoặc thư mục; thao tác với “nút chứa ghi chú” ảnh hưởng toàn bộ nút. Sắp xếp hàng loạt và chuyển đổi thuộc tính đều cho xem trước trước khi ghi, còn kiểm tra trạng thái chỉ đọc. Nếu gặp xung đột, plugin dừng thay vì tự đoán cách giải quyết. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian.
 
-Mọi xử lý đều tại máy: plugin không tải ghi chú lên mạng hay gửi yêu cầu mạng. Sắp xếp hàng loạt và chuyển đổi thuộc tính sẽ cho xem trước, dừng khi có xung đột. Xóa nút hoàn chỉnh dùng thùng rác hệ thống của Obsidian. Chỉ khi bạn chủ động sao chép, liên kết mới được ghi vào bộ nhớ tạm; plugin không bao giờ đọc bộ nhớ tạm. Thiết lập và quy tắc loại trừ được lưu trong data.json.
+Mọi xử lý đều tại máy: plugin không tải ghi chú lên mạng hay gửi yêu cầu mạng. Sắp xếp hàng loạt và chuyển đổi thuộc tính sẽ cho xem trước, dừng khi có xung đột. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian. Chỉ khi bạn chủ động sao chép, liên kết mới được ghi vào bộ nhớ tạm; plugin không bao giờ đọc bộ nhớ tạm. Thiết lập và quy tắc loại trừ được lưu trong data.json.
 
 ## Phát triển
 

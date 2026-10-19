@@ -80,9 +80,9 @@ Los nodos se identifican por la ruta actual del almacén, no por un ID permanent
 
 **Ocultar**: hidden=true en la propiedad folder-nodes oculta el nodo y sus descendientes solo en las vistas de Folder Nodes del explorador, el contenido y Node Graph. La búsqueda y la apertura directa en Obsidian siguen funcionando. **No administrado**: Folder Nodes deja de realizar acciones estructurales sobre estos elementos, pero no los oculta ni los borra.
 
-«Cambiar nombre de archivo» modifica un único archivo o carpeta; las acciones para el «nodo contenedor» afectan a todo el nodo. La organización por lotes y la migración de propiedades muestran una vista previa; la comprobación de estado es de solo lectura. Si hay conflictos, la operación se detiene. La eliminación de nodos completos utiliza la papelera del sistema de Obsidian.
+«Cambiar nombre de archivo» modifica un único archivo o carpeta; las acciones para el «nodo contenedor» afectan a todo el nodo. La organización por lotes y la migración de propiedades muestran una vista previa; la comprobación de estado es de solo lectura. Si hay conflictos, la operación se detiene. La eliminación de nodos completos sigue la opción de eliminación de archivos elegida en Obsidian.
 
-Todo se procesa localmente: no se suben notas ni se hacen solicitudes de red. La organización y la migración muestran una vista previa y se detienen si hay conflictos. Los nodos completos se eliminan mediante la papelera del sistema de Obsidian. Los enlaces solo se escriben en el portapapeles al pulsar Copiar; el plugin nunca lee el portapapeles. Los ajustes y las reglas de exclusión se guardan en data.json.
+Todo se procesa localmente: no se suben notas ni se hacen solicitudes de red. La organización y la migración muestran una vista previa y se detienen si hay conflictos. Los nodos completos se eliminan según la opción de eliminación de archivos elegida en Obsidian. Los enlaces solo se escriben en el portapapeles al pulsar Copiar; el plugin nunca lee el portapapeles. Los ajustes y las reglas de exclusión se guardan en data.json.
 
 ## Desarrollo
 

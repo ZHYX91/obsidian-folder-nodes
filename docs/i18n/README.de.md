@@ -82,9 +82,9 @@ Die Knotenidentität ist der aktuelle Vault-Pfad, keine permanente ID. Andere Na
 
 **Ausblenden**: hidden=true in der Eigenschaft folder-nodes verbirgt einen Knoten samt Nachkommen nur in den Folder-Nodes-Ansichten Dateiexplorer, Knoteninhalte und Node Graph. Die Obsidian-Suche und direkte Dateizugriffe bleiben möglich. **Nicht verwaltet**: Für diese Dateien und Ordner werden keine strukturellen Knotenaktionen ausgeführt. Das bedeutet weder Löschen noch Ausblenden.
 
-„Datei umbenennen“ betrifft nur eine Datei oder einen Ordner; Aktionen für den „enthaltenden Knoten“ betreffen den ganzen Knoten. Sammelorganisation und Eigenschaftsmigration bieten vor Änderungen eine Vorschau; die Zustandsprüfung ist schreibgeschützt. Bei Konflikten wird die Aktion gestoppt statt geraten. Vollständige Knoten werden über den Systempapierkorb von Obsidian gelöscht.
+„Datei umbenennen“ betrifft nur eine Datei oder einen Ordner; Aktionen für den „enthaltenden Knoten“ betreffen den ganzen Knoten. Sammelorganisation und Eigenschaftsmigration bieten vor Änderungen eine Vorschau; die Zustandsprüfung ist schreibgeschützt. Bei Konflikten wird die Aktion gestoppt statt geraten. Für vollständige Knoten gilt die in Obsidian gewählte Einstellung zum Löschen von Dateien.
 
-Der Vault wird lokal verarbeitet; das Plugin lädt keine Inhalte hoch und führt keine Netzwerkanfragen aus. Sammelorganisation und Eigenschaftsmigration zeigen Änderungen zuerst an und stoppen bei Konflikten. Vollständige Knoten werden über den Obsidian-Systempapierkorb gelöscht. Nur nach ausdrücklichem Kopieren werden Links in die Zwischenablage geschrieben; das Plugin liest sie niemals aus. Einstellungen und Ausnahmeregeln liegen in data.json.
+Der Vault wird lokal verarbeitet; das Plugin lädt keine Inhalte hoch und führt keine Netzwerkanfragen aus. Sammelorganisation und Eigenschaftsmigration zeigen Änderungen zuerst an und stoppen bei Konflikten. Für vollständige Knoten gilt die in Obsidian gewählte Einstellung zum Löschen von Dateien. Nur nach ausdrücklichem Kopieren werden Links in die Zwischenablage geschrieben; das Plugin liest sie niemals aus. Einstellungen und Ausnahmeregeln liegen in data.json.
 
 ## Entwicklung
 

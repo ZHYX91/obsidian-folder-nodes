@@ -80,9 +80,9 @@ L’identité d’un nœud dépend de son chemin actuel dans le coffre, pas d’
 
 **Masquer** : hidden=true dans la propriété folder-nodes cache le nœud et ses descendants uniquement dans les vues Folder Nodes de l’explorateur, du contenu et de Node Graph. La recherche Obsidian et l’ouverture directe continuent de fonctionner. **Non géré** : Folder Nodes n’effectue plus d’opérations de structure sur ces éléments, mais ne les masque ni ne les supprime.
 
-« Renommer le fichier » agit sur un seul fichier ou dossier ; les commandes visant le « nœud contenant » agissent sur le nœud entier. L’organisation par lots et la migration de propriétés montrent une prévisualisation avant écriture ; le bilan de santé reste en lecture seule. Les conflits arrêtent l’opération. La suppression d’un nœud complet utilise la corbeille système d’Obsidian.
+« Renommer le fichier » agit sur un seul fichier ou dossier ; les commandes visant le « nœud contenant » agissent sur le nœud entier. L’organisation par lots et la migration de propriétés montrent une prévisualisation avant écriture ; le bilan de santé reste en lecture seule. Les conflits arrêtent l’opération. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian.
 
-Le traitement reste local : le plugin ne téléverse pas vos notes et n’envoie aucune requête réseau. Les opérations groupées et les migrations montrent les modifications avant écriture et s’arrêtent en cas de conflit. La suppression d’un nœud complet utilise la corbeille système d’Obsidian. Le plugin écrit un lien dans le presse-papiers uniquement lorsque vous demandez une copie ; il ne lit jamais le presse-papiers. Les réglages et exclusions sont conservés dans data.json.
+Le traitement reste local : le plugin ne téléverse pas vos notes et n’envoie aucune requête réseau. Les opérations groupées et les migrations montrent les modifications avant écriture et s’arrêtent en cas de conflit. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian. Le plugin écrit un lien dans le presse-papiers uniquement lorsque vous demandez une copie ; il ne lit jamais le presse-papiers. Les réglages et exclusions sont conservés dans data.json.
 
 ## Développement
 

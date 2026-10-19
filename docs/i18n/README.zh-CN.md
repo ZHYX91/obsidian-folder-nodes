@@ -57,7 +57,7 @@
 
 - Obsidian **1.12.7 或更高版本**。
 - 支持桌面版和 Android 版 Obsidian。Android 使用菜单和原生移动文件夹，不使用 HTML5 拖放。
-- Android 真机和 iOS 不属于本项目共享的宿主验收矩阵。
+- iOS 兼容性尚未验证。
 - 完整节点必须只有一个同名 Node Note；“不管理”规则定义 Folder Nodes 不执行结构操作的边界。
 
 ## 安装
@@ -68,7 +68,7 @@
 
 ### 手动安装
 
-从发布页下载 `folder-nodes-<version>.zip`，把其中的 `folder-nodes` 目录解压到 `Vault/.obsidian/plugins/`。也可以使用下面的三个独立文件安装。
+从[最新版本](https://github.com/ZHYX91/obsidian-folder-nodes/releases/latest)下载 `folder-nodes-<version>.zip`，把其中的 `folder-nodes` 目录解压到 `Vault/.obsidian/plugins/`。也可以使用下面的三个独立文件安装。
 
 下载同一版本的发布文件，将以下三个文件放入 `Vault/.obsidian/plugins/folder-nodes/`：
 
@@ -121,7 +121,7 @@ folder-nodes:
 ```
 
 - `order=manual`：让该父节点使用手动子节点排序。
-- `rank=N`：保存某个子节点在手动排序中的稀疏位置。
+- `rank=N`：保存子节点的手动顺序编号，通常无需手动修改。
 - `hidden=true`：在文件列表、节点内容和节点图谱中隐藏此节点及它管理的下级节点。不会删除文件，也不会影响 Obsidian 搜索。
 
 已经公开的旧字段 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 会继续兼容读取。使用 **管理 → 迁移 Folder Nodes 属性** 可以先查看准确受影响的笔记。迁移前请先更新所有设备上的 Folder Nodes；插件启动时不会自动迁移笔记属性。
@@ -156,7 +156,7 @@ Folder Nodes 会按顺序尝试基础候选。图片缺失时继续尝试下一�
 
 Folder Nodes 只在本地运行，不发起网络请求。只有在结构检查、迁移预览、链接索引和节点图谱等明确功能需要时，才读取 Vault 路径、元数据和笔记文字。
 
-用户操作可以创建、修改、移动、重命名、合并笔记和文件夹，或将其移入回收站。多步结构操作会串行执行；发现冲突时停止不安全写入；需要维护 Vault 时会先预览，并在提交前再次核对目标。完整节点删除使用 Obsidian 系统回收站。
+用户操作可以创建、修改、移动、重命名、合并笔记和文件夹，或将其移入回收站。多步结构操作会串行执行；发现冲突时停止不安全写入；需要维护 Vault 时会先预览，并在提交前再次核对目标。完整节点删除遵循 Obsidian 中设置的文件删除方式。
 
 插件只有在用户明确执行复制操作后才把生成的 Markdown 链接写入系统剪贴板，**从不读取剪贴板**。插件偏好和“不管理”规则保存在 `data.json`，结构 token 保存在 Node Note 中。
 
