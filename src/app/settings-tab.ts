@@ -464,7 +464,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     body.createEl("p", { text: t("iconGuideIntro") });
     const example = body.createDiv({ cls: "folder-nodes-settings-guide-example" });
     example.createSpan({ text: t("iconPropertyExampleLabel") });
-    example.createEl("code", { text: "icon: 💰" });
+    example.createEl("code", { text: "icon: 💰", attr: { dir: "ltr" } });
     body.createEl("p", { text: t("iconGuideFormats") });
     body.createEl("p", { text: t("iconColorBehavior") });
     body.createEl("p", { text: t("iconDistinctionDesc") });
@@ -552,6 +552,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     setting.addText((text) => {
       const input = text.inputEl;
       input.type = "number";
+      input.dir = "ltr";
       input.min = String(minimum);
       input.max = String(maximum);
       input.step = "1";
@@ -612,9 +613,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private creationExample(container: HTMLElement, source: string, target: string, detail: string | null): void {
     const example = container.createDiv({ cls: "folder-nodes-settings-guide-example" });
-    example.createEl("code", { text: source });
-    example.createSpan({ text: "→" });
-    example.createEl("code", { text: target });
+    const mapping = example.createSpan({ cls: "folder-nodes-settings-guide-mapping", attr: { dir: "ltr" } });
+    mapping.createEl("code", { text: source });
+    mapping.createSpan({ text: "→" });
+    mapping.createEl("code", { text: target });
     if (detail !== null) example.createSpan({ text: detail });
   }
 

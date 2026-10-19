@@ -159,6 +159,13 @@ body {
   user-select: all;
 }
 
+.folder-nodes-settings-guide-mapping {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  unicode-bidi: isolate;
+}
+
 .folder-nodes-settings-guide-note { color: var(--text-faint); }
 
 .folder-nodes-node-graph-settings-tree {

@@ -137,6 +137,28 @@ describe("imperative settings edit state", () => {
     expect(plugin.reconcileSettingsChange).toHaveBeenCalledOnce();
   });
 
+  it("keeps YAML, link mappings and numeric inputs readable inside Arabic RTL settings", () => {
+    const { tab } = fixture();
+    const panel = document.body.createDiv({ attr: { dir: "rtl" } });
+    const guides = tab as unknown as { renderIconGuide(panel: HTMLElement): void; renderNamingGuide(panel: HTMLElement): void };
+    try {
+      setLanguage("ar");
+      guides.renderIconGuide(panel);
+      guides.renderNamingGuide(panel);
+      const example = panel.querySelector<HTMLElement>("code");
+      expect(example?.textContent).toBe("icon: 💰");
+      expect(example?.dir).toBe("ltr");
+      const mappings = [...panel.querySelectorAll<HTMLElement>(".folder-nodes-settings-guide-mapping")];
+      expect(mappings).toHaveLength(2);
+      expect(mappings.map((mapping) => mapping.dir)).toEqual(["ltr", "ltr"]);
+      expect(mappings.map((mapping) => mapping.textContent)).toEqual(["[[a]]→a/a.md", "[[a|b]]→a/a.md"]);
+      const { input } = numberControl(tab, "Canvas", "Threshold", panel);
+      expect(input.dir).toBe("ltr");
+      expect(input.value).toBe("500");
+      expect(panel.dir).toBe("rtl");
+    } finally { setLanguage("en"); }
+  });
+
   it("reports invalid numeric submissions without clamping or saving", async () => {
     const { tab, plugin } = fixture();
     const saved = plugin.settings.nodeGraph.largeGraphThreshold;
