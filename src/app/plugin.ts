@@ -7,7 +7,7 @@ import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
-import { refreshRibbonLabel } from "../adapters/ribbon-host";
+import { refreshRibbonLabel, ribbonRegistrationTitle } from "../adapters/ribbon-host";
 import { buildNodeName } from "../core/naming";
 import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
@@ -154,7 +154,8 @@ export default class FolderNodesPlugin extends Plugin {
     }, Platform.isDesktopApp));
     this.settingsTab = new FolderNodesSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
-    this.ribbonElement = this.addRibbonIcon("layout-grid", t("contents"), () => this.runAction(this.openContents()));
+    this.ribbonElement = this.addRibbonIcon("layout-grid", ribbonRegistrationTitle(this.app.workspace, this.manifest.id), () => this.runAction(this.openContents()));
+    refreshRibbonLabel(this.app.workspace, this.ribbonElement, t("contents"));
     this.registerCommands();
     this.registerEvents();
     onLayoutReadyOnce(this.app.workspace, () => {
