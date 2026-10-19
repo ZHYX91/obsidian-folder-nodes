@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ar: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "المساعدة والدعم",
+  "userGuide": "دليل الاستخدام",
+  "reportIssue": "الإبلاغ عن مشكلة",
   "settings": "إعدادات Folder Nodes",
   "general": "عام",
   "management": "الإدارة",
@@ -284,7 +287,7 @@ export const ar: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "إزالة الخيار",
   "explorerPreview": "معاينة مستكشف الملفات",
   "contentsPreview": "معاينة محتويات العقدة",
-  "visualUnknownItems": "احتُفظ بـ {count} خيارات غير معروفة وتُجاوز عرضها.",
+  "visualUnknownItems": "لم يُتعرّف على {count} من الخيارات. عدّلها أو أزلها قبل الحفظ؛ لم تتغير الملاحظة بعد.",
   "visualExtraColors": "احتُفظ بـ {count} ألوان إضافية؛ يُستخدم أول لون صالح.",
   "iconGuideTitle": "طريقة تعيين أيقونة العقدة",
   "iconGuideIntro": "انقر بزر الفأرة الأيمن على عقدة في مستكشف الملفات واختر «تعيين أيقونة العقدة»، أو عدّل خاصية icon في ملاحظة العقدة.",

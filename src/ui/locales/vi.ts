@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const vi: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "Trợ giúp và hỗ trợ",
+  "userGuide": "Hướng dẫn sử dụng",
+  "reportIssue": "Báo cáo sự cố",
   "settings": "Cài đặt Folder Nodes",
   "general": "Chung",
   "management": "Quản lý",
@@ -284,7 +287,7 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "Xóa ứng viên",
   "explorerPreview": "Xem trước trình duyệt tệp",
   "contentsPreview": "Xem trước nội dung nút",
-  "visualUnknownItems": "Đã giữ nhưng bỏ qua {count} ứng viên không nhận dạng được.",
+  "visualUnknownItems": "Có {count} ứng viên không được nhận dạng. Hãy sửa hoặc xóa chúng trước khi lưu; ghi chú chưa thay đổi.",
   "visualExtraColors": "Đã giữ {count} màu bổ sung. Sẽ dùng màu hợp lệ đầu tiên.",
   "iconGuideTitle": "Cách đặt biểu tượng nút",
   "iconGuideIntro": "Nhấp chuột phải vào một nút trong trình duyệt tệp và chọn “Đặt biểu tượng nút”, hoặc sửa trực tiếp thuộc tính icon trong ghi chú nút.",

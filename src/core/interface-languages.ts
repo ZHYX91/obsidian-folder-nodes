@@ -1,7 +1,7 @@
 /** Interface language choices: independent of document and node content. */
 export const INTERFACE_LOCALE_LABELS = {
-  "zh-CN": "简体中文",
   "en": "English",
+  "zh-CN": "简体中文",
   "zh-TW": "繁體中文",
   "ja": "日本語",
   "ko": "한국어",

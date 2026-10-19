@@ -1,4 +1,4 @@
-import { type App, type PluginManifest, type TextComponent } from "obsidian";
+import { type App, type PluginManifest } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
 import FolderNodesPlugin from "../../src/app/plugin";
@@ -6,30 +6,15 @@ import { FolderNodesSettingTab } from "../../src/app/settings-tab";
 import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings } from "../../src/shared/settings";
 import type { SettingsSaveState } from "../../src/shared/settings-save-coordinator";
 import { setLanguage, t } from "../../src/ui/i18n";
-import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages";
+import { AVAILABLE_INTERFACE_LOCALES, INTERFACE_LOCALE_LABELS } from "../../src/core/interface-languages";
 
 vi.mock("obsidian", async (importOriginal) => {
   const actual = await importOriginal<typeof import("obsidian")>();
-  class TestSetting extends actual.Setting {
-    public override addText(configure: (component: TextComponent) => unknown): this {
-      const input = this.controlEl.createEl("input");
-      const component = {
-        inputEl: input,
-        setValue(value: string) { input.value = value; return this; },
-        onChange(callback: (value: string) => unknown) {
-          input.addEventListener("input", () => callback(input.value));
-          return this;
-        },
-      } as unknown as TextComponent;
-      configure(component);
-      return this;
-    }
-  }
   class TestPluginSettingTab {
     public readonly containerEl = document.createElement("div");
   }
   return {
-    ...actual, PluginSettingTab: TestPluginSettingTab, Setting: TestSetting,
+    ...actual, PluginSettingTab: TestPluginSettingTab,
     Plugin: class {
       public constructor(public app: App, public manifest: PluginManifest) {}
       public async saveData(_snapshot: unknown): Promise<void> {}
@@ -51,8 +36,11 @@ function fixture() {
     }),
     getSettingsSaveState: () => state.current,
     retrySettingsSave: vi.fn(async () => { state.current = "saved"; }),
-    saveSettings: vi.fn(async () => undefined),
+    saveSettings: vi.fn(async (): Promise<void> => undefined),
     reconcileSettingsChange: vi.fn(async () => undefined),
+    openBatchOrganize: vi.fn(),
+    openPropertyMigration: vi.fn(),
+    showHealth: vi.fn(),
   };
   const tab = new FolderNodesSettingTab({} as App, plugin as unknown as FolderNodesPlugin);
   document.body.append(tab.containerEl);
@@ -96,6 +84,91 @@ function persistenceFixture(failures: number) {
 }
 
 describe("imperative settings edit state", () => {
+  it.each(["en", "zh-CN", "ar"] as const)("offers the local user guide and issue form from General in %s", (locale) => {
+    const { tab } = fixture();
+    try {
+      setLanguage(locale);
+      tab.display();
+      const options = [...tab.containerEl.querySelector<HTMLSelectElement>("select")!.options];
+      expect(options.map((option) => option.textContent)).toEqual([t("auto"), ...Object.values(INTERFACE_LOCALE_LABELS)]);
+      const links = [...tab.containerEl.querySelectorAll<HTMLAnchorElement>(".folder-nodes-settings-support a")];
+      const guide = locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`;
+      expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+        [t("userGuide"), `https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/${guide}`],
+        [t("reportIssue"), "https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose"],
+      ]);
+    } finally { tab.containerEl.remove(); setLanguage("en"); }
+  });
+
+  it("opens the intended five tabs and management actions through the imperative surface", () => {
+    const { tab, plugin } = fixture();
+    expect(tab.getSettingDefinitions()).toEqual([]);
+    tab.display();
+    expect([...tab.containerEl.querySelectorAll("[role=tab]")].map((button) => button.textContent))
+      .toEqual([t("general"), t("management"), t("icons"), t("naming"), t("nodeGraph")]);
+    tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-management")!.click();
+    const panel = tab.containerEl.querySelector<HTMLElement>("[role=tabpanel]")!;
+    const guide = panel.querySelector<HTMLElement>("[role=note]")!;
+    const firstRule = panel.querySelector<HTMLElement>(".setting-item")!;
+    expect(guide.textContent).toContain(t("managementGuideBoundary"));
+    expect(guide.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    for (const [label, action] of [
+      [t("previewOrganizePlan"), plugin.openBatchOrganize],
+      [t("previewPropertyMigration"), plugin.openPropertyMigration],
+      [t("health"), plugin.showHealth],
+    ] as const) {
+      [...panel.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === label)!.click();
+      expect(action).toHaveBeenCalledOnce();
+    }
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    tab.containerEl.remove();
+  });
+
+  it.each([
+    "leafNoteExemptions", "ignoredFolders", "leafNotePrefixes", "ignoredFolderPrefixes",
+  ] as const)("deletes the clicked %s values while saving is pending", async (key) => {
+    const { tab, plugin } = fixture();
+    plugin.settings.leafNoteExemptions = [];
+    plugin.settings.ignoredFolders = [];
+    plugin.settings.leafNotePrefixes = [];
+    plugin.settings.ignoredFolderPrefixes = [];
+    plugin.settings[key] = ["Alpha", "Bravo", "Charlie"];
+    const pending: Array<() => void> = [];
+    plugin.saveSettings.mockImplementation(() => new Promise<void>((resolve) => { pending.push(resolve); }));
+    tab.display();
+    tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-management")!.click();
+    const rules = [...tab.containerEl.querySelectorAll<HTMLElement>(".setting-item")]
+      .filter((row) => row.querySelector(".clickable-icon[aria-label]") !== null);
+    const first = rules[0]!.querySelector<HTMLElement>(".clickable-icon")!;
+    const second = rules[1]!.querySelector<HTMLElement>(".clickable-icon")!;
+    first.click();
+    second.click();
+    first.click();
+    expect(plugin.settings[key]).toEqual(["Charlie"]);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
+    for (const resolve of pending) resolve();
+    await vi.waitFor(() => expect(plugin.reconcileSettingsChange).toHaveBeenCalledTimes(2));
+    expect(plugin.settings[key]).toEqual(["Charlie"]);
+    const remaining = [...tab.containerEl.querySelectorAll<HTMLElement>(".setting-item")]
+      .filter((row) => row.querySelector(".clickable-icon[aria-label]") !== null);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.textContent).toContain("Charlie");
+    tab.containerEl.remove();
+  });
+
+  it("retains a failed rule deletion for Retry and does not reconcile unsaved settings", async () => {
+    const { tab, plugin, state } = fixture();
+    plugin.settings.leafNoteExemptions = ["Alpha"];
+    plugin.saveSettings.mockImplementation(async () => { state.current = "pending"; throw new Error("Disk unavailable"); });
+    tab.display();
+    tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-management")!.click();
+    tab.containerEl.querySelector<HTMLElement>(".clickable-icon[aria-label]")!.click();
+    await vi.waitFor(() => expect(tab.containerEl.querySelector(".folder-nodes-settings-warning")).not.toBeNull());
+    expect(plugin.settings.leafNoteExemptions).toEqual([]);
+    expect(plugin.reconcileSettingsChange).not.toHaveBeenCalled();
+    tab.containerEl.remove();
+  });
+
   it("scopes language and direction to settings across all supported locales", () => {
     const { tab } = fixture();
     for (const method of ["renderGeneral", "renderManagement", "renderIcons", "renderNaming", "renderNodeGraph", "revealActiveTab"]) {

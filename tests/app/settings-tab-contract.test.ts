@@ -4,37 +4,6 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("settings tab compatibility contract", () => {
-  it("routes Obsidian 1.13 through the intentional imperative top tabs", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "src/app/settings-tab.ts"),
-      "utf8",
-    );
-
-    expect(source).toContain("const ENABLE_DECLARATIVE_SETTINGS = false");
-    expect(source).toContain(
-      "return ENABLE_DECLARATIVE_SETTINGS ? this.getDeclarativeSettingDefinitions() : [];",
-    );
-    expect(source).toContain("public getDeclarativeSettingDefinitions()");
-    expect(source).toContain('attr: { role: "tablist"');
-    expect(source).toContain('"general", "management", "icons", "naming", "nodeGraph"');
-    expect(source).toContain("this.renderManagement(panel)");
-    expect(source).toContain('t("propertyMigration")');
-    expect(source).not.toContain("renderNodeGraphRules");
-    expect(source).toContain('else this.renderNodeGraph(panel)');
-    expect(source).toContain("renderSettingsPersistenceStatus(");
-    expect(source).toContain("lockSettingsPanel(panel, compatibility.status === \"incompatible\")");
-  });
-
-  it("keeps management guidance before operations and explicitly non-destructive", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
-    const guide = source.indexOf('t("managementGuideTitle")');
-    const unmanaged = source.indexOf('this.renderUnmanagedGroup(panel, "leaf");');
-    expect(guide).toBeGreaterThan(-1);
-    expect(unmanaged).toBeGreaterThan(guide);
-    expect(source).toContain('t("managementGuideBoundary")');
-    expect(source).toContain('t("managementGuideActions")');
-  });
-
   it("places a themed icon guide before the appearance controls", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/app/settings-tab.ts"),

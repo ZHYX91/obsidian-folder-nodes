@@ -12,7 +12,7 @@ import {
 } from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
-import { interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
+import { formatError, interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
 import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
 import { renderVisual } from "../presentation/render-visual";
 
@@ -299,6 +299,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
     const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
     const heading = kind === "leaf" ? t("leafExemptions") : t("folderExemptions");
+    const rules = [
+      ...paths.map((value) => ({ type: "path" as const, value })),
+      ...prefixes.map((value) => ({ type: "prefix" as const, value })),
+    ];
     const items = [
       ...paths.map((path) => ({ name: path, desc: t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")) })),
       ...prefixes.map((prefix) => ({ name: t("nameStartsWith", { prefix }), desc: t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")) })),
@@ -309,7 +313,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         heading,
         emptyState: t("noUnmanagedRules"),
         items,
-        onDelete: (index) => void this.removeUnmanagedRule(kind, index, paths.length),
+        onDelete: (index) => {
+          const rule = rules[index];
+          if (rule !== undefined) void this.removeUnmanagedRule(kind, rule.type, rule.value);
+        },
       },
       this.actionDefinition(t("addRule"), t("addRuleDesc"), (setting) => {
         setting.addButton((button) => button.setButtonText(t("addPathRule")).onClick(() => this.promptExemption(kind)));
@@ -348,6 +355,19 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       this.plugin.settings.openHomepageOnStartup = value; await this.plugin.saveSettings();
     }));
     new Setting(panel).setName(t("openHomepage")).setDesc(t("openHomepageDesc")).addButton((button) => button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()));
+    const support = new Setting(panel).setName(t("helpAndSupport")).setClass("folder-nodes-settings-support");
+    const locale = resolvedLanguage();
+    const guide = locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`;
+    support.controlEl.createEl("a", {
+      text: t("userGuide"),
+      attr: { href: `https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/${guide}` },
+      cls: "external-link",
+    });
+    support.controlEl.createEl("a", {
+      text: t("reportIssue"),
+      attr: { href: "https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose" },
+      cls: "external-link",
+    });
   }
 
   private renderManagement(panel: HTMLElement): void {
@@ -673,14 +693,20 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       .setName(kind === "leaf" ? t("leafExemptions") : t("folderExemptions"))
       .setDesc(kind === "leaf" ? t("leafExemptionsDesc") : t("folderExemptionsDesc"))
       .setHeading();
-    for (const [index, path] of paths.entries()) new Setting(panel)
+    for (const path of paths) new Setting(panel)
       .setName(path)
       .setDesc(t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")))
-      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removeExemption(kind, index)));
-    for (const [index, prefix] of prefixes.entries()) new Setting(panel)
+      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
+        button.setDisabled(true);
+        void this.removeUnmanagedRule(kind, "path", path);
+      }));
+    for (const prefix of prefixes) new Setting(panel)
       .setName(t("nameStartsWith", { prefix }))
       .setDesc(t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")))
-      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => void this.removePrefix(kind, index)));
+      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
+        button.setDisabled(true);
+        void this.removeUnmanagedRule(kind, "prefix", prefix);
+      }));
     if (paths.length + prefixes.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noUnmanagedRules") });
     new Setting(panel)
       .setName(t("addRule"))
@@ -717,27 +743,24 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     }).open();
   }
 
-  private async removeUnmanagedRule(kind: ExemptionKind, index: number, pathCount: number): Promise<void> {
-    if (index < pathCount) await this.removeExemption(kind, index);
-    else await this.removePrefix(kind, index - pathCount);
-  }
-
-  private async removePrefix(kind: ExemptionKind, index: number): Promise<void> {
-    const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
-    prefixes.splice(index, 1);
-    await this.plugin.saveSettings();
-    await this.plugin.reconcileSettingsChange();
-    this.display();
-    updateDeclarativeSettingTab(this);
-  }
-
-  private async removeExemption(kind: ExemptionKind, index: number): Promise<void> {
-    const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
-    paths.splice(index, 1);
-    await this.plugin.saveSettings();
-    await this.plugin.reconcileSettingsChange();
-    this.display();
-    updateDeclarativeSettingTab(this);
+  private async removeUnmanagedRule(kind: ExemptionKind, type: "path" | "prefix", value: string): Promise<void> {
+    const rules = type === "path"
+      ? kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders
+      : kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
+    // Rows can outlive an earlier deletion while its save is pending. Resolve
+    // the clicked value against current settings instead of using its old index.
+    const index = rules.indexOf(value);
+    if (index < 0) return;
+    rules.splice(index, 1);
+    try {
+      await this.plugin.saveSettings();
+      await this.plugin.reconcileSettingsChange();
+    } catch (error) {
+      new Notice(formatError(error), 8000);
+    } finally {
+      this.display();
+      updateDeclarativeSettingTab(this);
+    }
   }
 
   private updatePreview(panel: HTMLElement): void {

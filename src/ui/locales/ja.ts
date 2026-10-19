@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ja: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "ヘルプとサポート",
+  "userGuide": "使い方ガイド",
+  "reportIssue": "問題を報告",
   "settings": "Folder Nodes の設定",
   "general": "一般",
   "management": "管理",
@@ -284,7 +287,7 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "候補を削除",
   "explorerPreview": "ファイルエクスプローラーのプレビュー",
   "contentsPreview": "ノード内容のプレビュー",
-  "visualUnknownItems": "認識できない候補 {count} 件を残してスキップしました。",
+  "visualUnknownItems": "認識できない候補が {count} 件あります。保存前に修正または削除してください。ノートはまだ変更されていません。",
   "visualExtraColors": "追加の色を {count} 件保持しました。最初の有効な色を使用します。",
   "iconGuideTitle": "ノードアイコンの設定方法",
   "iconGuideIntro": "ファイルエクスプローラーでノードを右クリックし、「ノードアイコンを設定」を選ぶか、ノードノートの icon プロパティを直接編集します。",

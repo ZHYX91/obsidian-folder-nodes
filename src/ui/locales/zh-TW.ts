@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const zhTW: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "說明與支援",
+  "userGuide": "使用指南",
+  "reportIssue": "回報問題",
   "settings": "Folder Nodes 設定",
   "general": "一般",
   "management": "管理",
@@ -276,7 +279,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "unmanageFolderConfirm": "資料夾 {path} 及其完整子樹將不再作為節點管理。",
   "editVisual": "設定節點圖示",
   "visualValue": "icon 屬性",
-  "visualValueDesc": "按順序添加 Vault 圖片 WikiLink、Lucide、單個文字或 Emoji；color: 為文字/Lucide 著色，並在其他基礎候選都失敗時回退為色標。可排序、保留未知項並即時預覽。",
+  "visualValueDesc": "按順序添加 Vault 圖片 WikiLink、Lucide、單個文字或 Emoji；color: 為文字/Lucide 著色，並在其他基礎候選都失敗時回退為色標。可排序並即時預覽；所有候選都能識別後才可儲存。",
   "visualCandidate": "圖示候選",
   "addCandidate": "添加候選",
   "moveCandidateUp": "候選上移",
@@ -284,7 +287,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "移除候選",
   "explorerPreview": "檔案列表",
   "contentsPreview": "節點內容",
-  "visualUnknownItems": "已保留並跳過 {count} 個無法識別的候選。",
+  "visualUnknownItems": "有 {count} 個候選無法識別。請修改或移除後再儲存；原筆記尚未更改。",
   "visualExtraColors": "已保留 {count} 個額外顏色；使用第一個有效顏色。",
   "iconGuideTitle": "如何設定節點圖示",
   "iconGuideIntro": "在檔案列表中右鍵節點，選擇“設定節點圖示”；也可以直接編輯節點筆記的 icon 屬性。",

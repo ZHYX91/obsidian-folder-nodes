@@ -31,6 +31,7 @@ export default defineConfig({
         "src/app/node-graph-plugin.ts",
         "src/app/refresh-scheduler.ts",
         "src/app/settings-persistence-status.ts",
+        "src/app/settings-tab.ts",
         "src/presentation/**/*.ts",
         "src/ui/contents-interactions.ts",
         "src/ui/node-graph-canvas-renderer.ts",
@@ -38,6 +39,7 @@ export default defineConfig({
         "src/ui/node-graph-toolbar.ts",
         "src/ui/node-graph-view.ts",
         "src/ui/runtime-styles.ts",
+        "src/ui/prompt-modal.ts",
         "src/ui/submitting-modal.ts",
       ],
       provider: "v8",
@@ -50,6 +52,7 @@ export default defineConfig({
         "src/adapters/node-service.ts": { branches: 70, functions: 75, lines: 80, statements: 80 },
         "src/adapters/explorer-events.ts": { branches: 70, functions: 90, lines: 90, statements: 90 },
         "src/shared/settings.ts": { branches: 90, functions: 100, lines: 100, statements: 100 },
+        "src/ui/prompt-modal.ts": { branches: 80, functions: 85, lines: 90, statements: 90 },
       }
     },
     environment: "happy-dom",

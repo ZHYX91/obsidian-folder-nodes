@@ -49,6 +49,59 @@ export class ButtonComponent {
   public onClick(callback: () => void): this { this.click = callback; return this; }
   public setButtonText(value: string): this { this.buttonEl.textContent = value; return this; }
   public setDisabled(value: boolean): this { this.buttonEl.disabled = value; return this; }
+  public setCta(): this { this.buttonEl.classList.add("mod-cta"); return this; }
+}
+export class TextComponent {
+  public readonly inputEl: HTMLInputElement;
+  public constructor(container: HTMLElement) { this.inputEl = container.createEl("input", { attr: { type: "text" } }); }
+  public setValue(value: string): this { this.inputEl.value = value; return this; }
+  public setPlaceholder(value: string): this { this.inputEl.placeholder = value; return this; }
+  public setDisabled(value: boolean): this { this.inputEl.disabled = value; return this; }
+  public onChange(callback: (value: string) => unknown): this {
+    this.inputEl.addEventListener("input", () => callback(this.inputEl.value));
+    return this;
+  }
+}
+export class DropdownComponent {
+  public readonly selectEl: HTMLSelectElement;
+  public constructor(container: HTMLElement) { this.selectEl = container.createEl("select"); }
+  public addOptions(options: Record<string, string>): this {
+    for (const [value, text] of Object.entries(options)) this.selectEl.createEl("option", { attr: { value }, text });
+    return this;
+  }
+  public setValue(value: string): this { this.selectEl.value = value; return this; }
+  public setDisabled(value: boolean): this { this.selectEl.disabled = value; return this; }
+  public onChange(callback: (value: string) => unknown): this {
+    this.selectEl.addEventListener("change", () => callback(this.selectEl.value));
+    return this;
+  }
+}
+export class ToggleComponent {
+  public readonly toggleEl: HTMLInputElement;
+  public constructor(container: HTMLElement) { this.toggleEl = container.createEl("input", { attr: { type: "checkbox" } }); }
+  public setValue(value: boolean): this { this.toggleEl.checked = value; return this; }
+  public onChange(callback: (value: boolean) => unknown): this {
+    this.toggleEl.addEventListener("change", () => callback(this.toggleEl.checked));
+    return this;
+  }
+}
+export class ExtraButtonComponent {
+  public readonly extraSettingsEl: HTMLDivElement;
+  private disabled = false;
+  public constructor(container: HTMLElement) {
+    this.extraSettingsEl = container.createDiv({ cls: "clickable-icon", attr: { role: "button", tabindex: "0" } });
+  }
+  public setIcon(value: string): this { setIcon(this.extraSettingsEl, value); return this; }
+  public setTooltip(value: string): this { this.extraSettingsEl.setAttribute("aria-label", value); return this; }
+  public setDisabled(value: boolean): this {
+    this.disabled = value;
+    this.extraSettingsEl.setAttribute("aria-disabled", String(value));
+    return this;
+  }
+  public onClick(callback: () => unknown): this {
+    this.extraSettingsEl.addEventListener("click", () => { if (!this.disabled) callback(); });
+    return this;
+  }
 }
 export class Setting {
   public readonly settingEl: HTMLDivElement;
@@ -67,6 +120,11 @@ export class Setting {
     configure(new ButtonComponent(this.controlEl));
     return this;
   }
+  public addText(configure: (text: TextComponent) => unknown): this { configure(new TextComponent(this.controlEl)); return this; }
+  public addDropdown(configure: (dropdown: DropdownComponent) => unknown): this { configure(new DropdownComponent(this.controlEl)); return this; }
+  public addToggle(configure: (toggle: ToggleComponent) => unknown): this { configure(new ToggleComponent(this.controlEl)); return this; }
+  public addExtraButton(configure: (button: ExtraButtonComponent) => unknown): this { configure(new ExtraButtonComponent(this.controlEl)); return this; }
+  public setHeading(): this { this.settingEl.classList.add("mod-settings-heading"); return this; }
   public setClass(value: string): this { this.settingEl.classList.add(value); return this; }
   public setDesc(value: string): this { this.descEl.textContent = value; return this; }
   public setName(value: string): this { this.nameEl.textContent = value; return this; }
@@ -143,8 +201,16 @@ export class SearchComponent {
   public setValue(value: string): this { this.inputEl.value = value; return this; }
 }
 export class Modal {
+  public readonly modalEl = document.createElement("div");
+  public readonly contentEl = this.modalEl.createDiv();
+  public readonly titleEl = this.modalEl.createEl("h2");
   public closeCount = 0;
-  public close(): void { this.closeCount += 1; }
+  public constructor(public readonly app?: unknown) {}
+  public setTitle(value: string): this { this.titleEl.textContent = value; return this; }
+  public onOpen(): void {}
+  public onClose(): void {}
+  public open(): void { document.body.append(this.modalEl); this.onOpen(); }
+  public close(): void { this.closeCount += 1; this.onClose(); this.modalEl.remove(); }
 }
 export class MarkdownView { public containerEl = document.createElement("div"); public file: TFile | null = null; }
 
