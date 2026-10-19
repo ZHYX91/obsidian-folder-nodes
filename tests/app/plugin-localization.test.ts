@@ -52,7 +52,7 @@ describe("plugin localization lifecycle", () => {
     const { plugin } = fixture();
     const state = { type: CONTENTS_VIEW_TYPE, state: { folder: "Work" } };
     const ephemeral = { scroll: 47 };
-    const contents = { getViewState: () => state, getEphemeralState: () => ephemeral, setViewState: vi.fn(async () => undefined) };
+    const contents = { view: { containerEl: document.createElement("div") }, getViewState: () => state, getEphemeralState: () => ephemeral, setViewState: vi.fn(async () => undefined) };
     const graph = Object.create(FolderNodeGraphView.prototype) as FolderNodeGraphView;
     const refreshGraph = vi.spyOn(graph, "refreshLocalizedTitle").mockResolvedValue();
     const leaves = vi.fn((type: string) => type === CONTENTS_VIEW_TYPE ? [contents] : type === NODE_GRAPH_VIEW_TYPE ? [{ view: graph }] : []);

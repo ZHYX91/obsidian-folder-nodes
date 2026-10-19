@@ -50,7 +50,7 @@ body {
   box-sizing: border-box;
   box-shadow: none !important;
   color: var(--text-muted) !important;
-  cursor: pointer;
+  cursor: var(--cursor, default);
   flex: 0 0 auto;
   font-family: inherit !important;
   font-size: var(--font-ui-small) !important;
@@ -365,7 +365,7 @@ body {
   background: transparent;
   box-shadow: none;
   color: var(--text-normal);
-  cursor: pointer;
+  cursor: var(--cursor, default);
 }
 
 .folder-nodes-explorer-root.has-hidden-visibility {
@@ -679,7 +679,7 @@ body {
 
 button.folder-nodes-current {
   appearance: none;
-  cursor: pointer;
+  cursor: var(--cursor, default);
 }
 button.folder-nodes-current:hover { background: var(--background-modifier-hover); }
 button.folder-nodes-current:focus-visible {
@@ -718,7 +718,7 @@ button.folder-nodes-current:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: var(--size-4-2);
-  cursor: pointer;
+  cursor: var(--cursor, default);
   font-weight: var(--font-semibold);
 }
 .folder-nodes-section-count { color: var(--text-faint); font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; }
@@ -758,10 +758,10 @@ button.folder-nodes-current:focus-visible {
   padding: 7px;
   opacity: 0;
   color: var(--text-muted);
-  cursor: grab;
+  cursor: var(--cursor, default);
 }
 
-.folder-nodes-node-drag-handle:active { cursor: grabbing; }
+.folder-nodes-node-drag-handle:active { cursor: var(--cursor, default); }
 .folder-nodes-node-shell:hover > .folder-nodes-node-drag-handle,
 .folder-nodes-node-shell:focus-within > .folder-nodes-node-drag-handle,
 .folder-nodes-node-drag-handle:focus-visible { opacity: 1; }

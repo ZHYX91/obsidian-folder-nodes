@@ -272,13 +272,13 @@
 }
 
 .folder-nodes-node-graph-scroll.is-mouse-pannable {
-  cursor: grab;
+  cursor: var(--cursor, default);
 }
 
 .folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll,
 .folder-nodes-node-graph-scroll.folder-nodes-node-graph-canvas-surface {
   overflow: hidden;
-  cursor: grab;
+  cursor: var(--cursor, default);
   touch-action: none;
   user-select: none;
 }
@@ -286,7 +286,7 @@
 .folder-nodes-node-graph-scroll.is-mouse-pannable.is-dragging,
 .folder-nodes-node-graph-view.is-3d .folder-nodes-node-graph-scroll.is-dragging,
 .folder-nodes-node-graph-scroll.folder-nodes-node-graph-canvas-surface.is-dragging {
-  cursor: grabbing;
+  cursor: var(--cursor, default);
 }
 
 .folder-nodes-node-graph-render-canvas {

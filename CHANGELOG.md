@@ -8,7 +8,8 @@
 - Keep YAML and link examples and numeric controls left-to-right inside Arabic settings so their syntax remains readable.
 - Refresh existing File Explorer repair-button tooltips and accessible names when the interface language changes.
 - Refresh the mobile ribbon menu label when switching languages, while preserving its configured action and position.
-- Update already-open content and graph tab titles when switching languages, while retaining the graph viewport and search.
+- Update already-open content and graph tab, navigation and active-window titles when switching languages, while retaining the graph viewport and search.
+- Follow the host cursor style on plugin controls and drag surfaces instead of forcing browser hand cursors.
 - Clarify node actions and safety messages, and provide linked user guides and consistent manual-installation instructions in every supported language.
 
 ## 0.10.7 - 2026-10-11

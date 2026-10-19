@@ -8,6 +8,7 @@ import { NodeService } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
 import { refreshRibbonLabel, ribbonRegistrationTitle } from "../adapters/ribbon-host";
+import { refreshItemViewTitle } from "../ui/item-view-title";
 import { buildNodeName } from "../core/naming";
 import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
@@ -242,8 +243,10 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   protected async refreshLocalizedViewTitles(): Promise<void> {
-    await Promise.all(this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE).map((leaf) =>
-      leaf.setViewState(leaf.getViewState(), leaf.getEphemeralState())));
+    await Promise.all(this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE).map(async (leaf) => {
+      await leaf.setViewState(leaf.getViewState(), leaf.getEphemeralState());
+      refreshItemViewTitle(leaf.view);
+    }));
   }
 
   public previewSelectionName(selection: string): string {

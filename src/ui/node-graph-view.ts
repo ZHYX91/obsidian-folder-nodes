@@ -8,6 +8,7 @@ import {
 } from "obsidian";
 
 import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
+import { refreshItemViewTitle } from "./item-view-title";
 
 import {
   nodeGraphSiblingCardWidths,
@@ -384,6 +385,7 @@ export class FolderNodeGraphView extends ItemView {
   public async refreshLocalizedTitle(): Promise<void> {
     const viewport = this.captureViewportState();
     await this.leaf.setViewState(this.leaf.getViewState(), this.leaf.getEphemeralState());
+    refreshItemViewTitle(this);
     this.restoreViewportState(viewport);
   }
 
