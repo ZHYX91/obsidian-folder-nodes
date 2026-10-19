@@ -236,6 +236,12 @@ export default class FolderNodesPlugin extends Plugin {
     this.refreshLocalizedChrome();
     this.refreshVisuals();
     await this.saveSettings();
+    await this.refreshLocalizedViewTitles();
+  }
+
+  protected async refreshLocalizedViewTitles(): Promise<void> {
+    await Promise.all(this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE).map((leaf) =>
+      leaf.setViewState(leaf.getViewState(), leaf.getEphemeralState())));
   }
 
   public previewSelectionName(selection: string): string {

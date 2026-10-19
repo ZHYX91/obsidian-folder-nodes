@@ -103,6 +103,12 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     });
   }
 
+  protected override async refreshLocalizedViewTitles(): Promise<void> {
+    await super.refreshLocalizedViewTitles();
+    await Promise.all(this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE).map((leaf) =>
+      leaf.view instanceof FolderNodeGraphView ? leaf.view.refreshLocalizedTitle() : Promise.resolve()));
+  }
+
   protected override localizedCommandNames(): Record<string, string> {
     return {
       ...super.localizedCommandNames(),

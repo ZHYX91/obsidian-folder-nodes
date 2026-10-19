@@ -18,6 +18,8 @@ import FolderNodesPlugin from "../../src/app/plugin";
 import FolderNodesWithNodeGraphPlugin from "../../src/app/node-graph-plugin";
 import { setLanguage, t } from "../../src/ui/i18n";
 import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages";
+import { CONTENTS_VIEW_TYPE } from "../../src/ui/contents-view";
+import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../../src/ui/node-graph-view";
 
 class TestPlugin extends FolderNodesWithNodeGraphPlugin {
   public registerGraphCommands(): void {
@@ -41,6 +43,22 @@ function fixture() {
 
 describe("plugin localization lifecycle", () => {
   beforeEach(() => setLanguage("en"));
+
+  it("refreshes owned host view titles through the public leaf API", async () => {
+    const { plugin } = fixture();
+    const state = { type: CONTENTS_VIEW_TYPE, state: { folder: "Work" } };
+    const ephemeral = { scroll: 47 };
+    const contents = { getViewState: () => state, getEphemeralState: () => ephemeral, setViewState: vi.fn(async () => undefined) };
+    const graph = Object.create(FolderNodeGraphView.prototype) as FolderNodeGraphView;
+    const refreshGraph = vi.spyOn(graph, "refreshLocalizedTitle").mockResolvedValue();
+    const leaves = vi.fn((type: string) => type === CONTENTS_VIEW_TYPE ? [contents] : type === NODE_GRAPH_VIEW_TYPE ? [{ view: graph }] : []);
+    Reflect.set(plugin.app.workspace, "getLeavesOfType", leaves);
+    plugin.settings.language = "ru";
+    await plugin.applyLanguageSetting();
+    expect(contents.setViewState).toHaveBeenCalledExactlyOnceWith(state, ephemeral);
+    expect(refreshGraph).toHaveBeenCalledOnce();
+    expect(leaves.mock.calls.map(([type]) => type)).toEqual([CONTENTS_VIEW_TYPE, NODE_GRAPH_VIEW_TYPE]);
+  });
 
   it("updates all host-prefixed command objects and ribbon labels across language changes", async () => {
     const { plugin, chrome } = fixture();

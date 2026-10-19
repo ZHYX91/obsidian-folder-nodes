@@ -381,6 +381,12 @@ export class FolderNodeGraphView extends ItemView {
     if (JSON.stringify(this.getState()) !== serializedBefore) this.markWorkspaceStateDirty();
   }
 
+  public async refreshLocalizedTitle(): Promise<void> {
+    const viewport = this.captureViewportState();
+    await this.leaf.setViewState(this.leaf.getViewState(), this.leaf.getEphemeralState());
+    this.restoreViewportState(viewport);
+  }
+
   public refresh(): void {
     const generation = ++this.refreshGeneration;
     const ownerWindow = this.contentEl.ownerDocument.defaultView ?? window;
