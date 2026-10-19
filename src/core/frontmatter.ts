@@ -431,9 +431,45 @@ function valueAfterColon(line: string): string {
 }
 
 function quotedKnownKey(line: string, keys: readonly string[]): string | null {
-  const match = /^(?:"([^"]+)"|'([^']+)')\s*:/u.exec(line);
-  const key = match?.[1] ?? match?.[2] ?? null;
+  if (line[0] !== '"' && line[0] !== "'") return null;
+  const separator = blockMappingSeparator(line);
+  if (separator === null) return null;
+  const raw = line.slice(0, separator).trimEnd();
+  const key = raw.startsWith("'")
+    ? raw.slice(1, -1).replaceAll("''", "'")
+    : decodeDoubleQuotedKey(raw);
   return key !== null && keys.includes(key) ? key : null;
+}
+
+/** Compare YAML key identities before allowing a source-preserving write. */
+function decodeDoubleQuotedKey(raw: string): string | null {
+  if (!raw.endsWith('"')) return null;
+  const escapes: Readonly<Record<string, string>> = {
+    "0": "\0", a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f", r: "\r",
+    e: "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+    N: "\u0085", _: "\u00a0", L: "\u2028", P: "\u2029",
+  };
+  let result = "";
+  for (let index = 1; index < raw.length - 1; index += 1) {
+    const character = raw[index] ?? "";
+    if (character !== "\\") { result += character; continue; }
+    const escape = raw[index + 1] ?? "";
+    const width = escape === "x" ? 2 : escape === "u" ? 4 : escape === "U" ? 8 : 0;
+    if (width > 0) {
+      const digits = raw.slice(index + 2, index + 2 + width);
+      if (digits.length !== width || !/^[\da-f]+$/iu.test(digits)) return null;
+      const codePoint = Number.parseInt(digits, 16);
+      if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return null;
+      result += String.fromCodePoint(codePoint);
+      index += width + 1;
+    } else {
+      const value = escapes[escape];
+      if (value === undefined) return null;
+      result += value;
+      index += 1;
+    }
+  }
+  return result;
 }
 
 function tokenKeysInPatch(patch: FolderNodesFrontmatterPatch): FolderNodesTokenKey[] {

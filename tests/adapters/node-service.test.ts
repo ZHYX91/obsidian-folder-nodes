@@ -4,7 +4,7 @@ import { parseYaml } from "obsidian";
 import { NodeService } from "../../src/adapters/node-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { FakeObsidian } from "../helpers/fake-obsidian";
-import { expectFrontmatterPropertyChanges } from "../helpers/frontmatter-oracle";
+import { expectFrontmatterPropertyChanges, parseFrontmatterDocument } from "../helpers/frontmatter-oracle";
 
 function service(fake: FakeObsidian): NodeService {
   const settings = structuredClone(DEFAULT_SETTINGS);
@@ -36,6 +36,39 @@ function markdownEditorLeaf(file: ReturnType<FakeObsidian["requireFile"]>, initi
 }
 
 describe("NodeService structural safety", () => {
+  it.each([
+    String.raw`"folder\x2dnodes"`,
+    String.raw`"folder\u002dnodes"`,
+    String.raw`"\U00000066older-nodes"`,
+  ])("refuses hidden writes through an escaped canonical key %s", async (rawKey) => {
+    for (const hidden of [true, false]) {
+      const fake = new FakeObsidian();
+      const source = `---\n${rawKey}: [rank=1, hidden=true, future=value]\naliases: [Example]\n---\nBody\n`;
+      const folder = fake.addFolder("Alpha");
+      const note = fake.addFile("Alpha/Alpha.md", source);
+      const original = parseFrontmatterDocument(source);
+      expect(original.data).toMatchObject({ "folder-nodes": ["rank=1", "hidden=true", "future=value"] });
+      await expect(service(fake).setNodeHidden(folder, hidden)).rejects.toThrow("Quoted Folder Nodes property keys");
+      expect(fake.contents.get(note.path)).toBe(source);
+      expect(parseFrontmatterDocument(fake.contents.get(note.path) ?? "")).toEqual(original);
+    }
+  });
+
+  it("refuses an escaped canonical key in an open editor without requesting save", async () => {
+    const fake = new FakeObsidian();
+    const source = '---\n"folder\\u002dnodes": [rank=1, future=value]\n---\nUnsaved body\n';
+    const folder = fake.addFolder("Alpha");
+    const note = fake.addFile("Alpha/Alpha.md", source);
+    const open = markdownEditorLeaf(note, source);
+    vi.spyOn(fake.app.workspace, "getLeavesOfType").mockReturnValue([open.leaf] as never);
+    expect(parseFrontmatterDocument(source).data).toMatchObject({ "folder-nodes": ["rank=1", "future=value"] });
+    await expect(service(fake).setNodeHidden(folder, true)).rejects.toThrow("Quoted Folder Nodes property keys");
+    expect(open.leaf.view.editor.transaction).not.toHaveBeenCalled();
+    expect(open.requestSave).not.toHaveBeenCalled();
+    expect(open.value()).toBe(source);
+    expect(fake.contents.get(note.path)).toBe(source);
+  });
+
   it("preserves an unknown token's meaning through a real hidden-property write", async () => {
     const fake = new FakeObsidian();
     const source = "---\naliases: [Example]\nfolder-nodes:\n  - future=Bob's # a comment\n---\nBody\n";

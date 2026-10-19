@@ -63,6 +63,36 @@ describe("source-preserving frontmatter patches", () => {
   });
 
   it.each([
+    [String.raw`"folder\x2dnodes"`, "folder-nodes", "[rank=1, future=value]"],
+    [String.raw`"\u0066older-nodes"`, "folder-nodes", "[rank=1, future=value]"],
+    [String.raw`"folder\U0000002Dnodes"`, "folder-nodes", "[rank=1, future=value]"],
+    [String.raw`"folderNode\u0048idden"`, "folderNodeHidden", "true"],
+    [String.raw`"folderNodeSibling\x52ank"`, "folderNodeSiblingRank", "1024"],
+    [String.raw`"folderNodeChildren\U00000053ort"`, "folderNodeChildrenSort", "manual"],
+  ])("refuses the decoded known property key %s before writing", (rawKey, key, value) => {
+    const source = `---\n${rawKey}: ${value}\naliases: [Example]\n---\nBody\n`;
+    expect(Object.keys(parseFrontmatterDocument(source).data as object)).toContain(key);
+    expect(analyzeFolderNodesSource(source).issues).toEqual([
+      expect.objectContaining({ code: "source-ambiguous", field: "all" }),
+    ]);
+    expect(() => patchFolderNodesFrontmatter(source, { hidden: true })).toThrow("Quoted Folder Nodes property keys");
+    expect(() => patchFolderNodesFrontmatter(source, { migrateLegacy: true })).toThrow("Quoted Folder Nodes property keys");
+    expect(() => patchFrontmatterScalar(source, key, "replacement")).toThrow("Quoted Folder Nodes property keys");
+  });
+
+  it.each([
+    [String.raw`"folder\\u002dnodes"`, String.raw`folder\u002dnodes`],
+    [String.raw`'folder\u002dnodes'`, String.raw`folder\u002dnodes`],
+    [String.raw`"unrelated\"key:part"`, 'unrelated"key:part'],
+  ])("preserves the distinct quoted property %s", (rawKey, key) => {
+    const source = `---\n${rawKey}: [keep]\n---\nBody\n`;
+    expect(parseFrontmatterDocument(source).data).toEqual({ [key]: ["keep"] });
+    const written = patchFolderNodesFrontmatter(source, { hidden: true });
+    expectFrontmatterPropertyChanges(source, written, { "folder-nodes": ["hidden=true"] });
+    expect(written).toContain(`${rawKey}: [keep]`);
+  });
+
+  it.each([
     ["flow mapping", "---\n{ title: Example, tags: [one, two] }\n---\nBody\n"],
     ["flow sequence", "---\n[one, two]\n---\nBody\n"],
     ["block sequence", "---\n- one\n- two\n---\nBody\n"],

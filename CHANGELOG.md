@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reject escaped quoted node-property keys before structural writes, preserving existing ranks, hidden markers, future tokens and note text instead of creating duplicate YAML keys or reporting an ineffective unhide.
+
 ## 0.11.0 - 2026-10-19
 
 - Add complete interface translations for Traditional Chinese, Japanese, Korean, German, French, Spanish, Brazilian Portuguese, Russian, Vietnamese, and Arabic, alongside English and Simplified Chinese.
