@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseDocument } from "yaml";
+import { expectFrontmatterPropertyChanges, parseFrontmatterDocument } from "../helpers/frontmatter-oracle";
 
 import {
   analyzeFolderNodesSource,
@@ -9,6 +10,21 @@ import {
 } from "../../src/core/frontmatter";
 
 describe("source-preserving frontmatter patches", () => {
+  it.each([
+    ["plain apostrophe and comment", "\n  - future=Bob's # a comment", ["future=Bob's"]],
+    ["plain double quote and comment", '\n  - future=inch"wide # a comment', ['future=inch"wide']],
+    ["single-quoted apostrophe", "\n  - 'future=Bob''s' # a comment", ["future=Bob's"]],
+    ["quoted literal hash", '\n  - "future=Bob\'s # literal" # a comment', ["future=Bob's # literal"]],
+    ["flow plain apostrophe", " [future=Bob's, other=yes] # a comment", ["future=Bob's", "other=yes"]],
+    ["flow quoted comma and hash", " ['future=Bob''s, # literal', other=yes] # a comment", ["future=Bob's, # literal", "other=yes"]],
+  ])("preserves the YAML meaning of unknown tokens: %s", (_name, value, entries) => {
+    const source = `---\n# retain\naliases: [Example]\nfolder-nodes:${value}\n---\nBody\n`;
+    expect(parseFrontmatterDocument(source).data).toMatchObject({ "folder-nodes": entries });
+    const updated = patchFolderNodesFrontmatter(source, { hidden: true });
+    expectFrontmatterPropertyChanges(source, updated, { "folder-nodes": ["hidden=true", ...entries] });
+    expect(updated).toContain("# retain\naliases: [Example]\n");
+  });
+
   it("changes one generic scalar without changing unrelated YAML or body", () => {
     const source = "---\n# keep\naliases: [A]\ncustom: 1\n---\nBody\n";
     expect(patchFrontmatterScalar(source, "custom", 1536)).toBe("---\n# keep\naliases: [A]\ncustom: 1536\n---\nBody\n");

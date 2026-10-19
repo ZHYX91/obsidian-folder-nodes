@@ -364,19 +364,25 @@ function splitFlowList(value: string): string[] | null {
   const parts: string[] = [];
   let quote: "\"" | "'" | null = null;
   let escaped = false;
+  let scalarStart = true;
   let start = 0;
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
     if (escaped) { escaped = false; continue; }
     if (character === "\\" && quote === "\"") { escaped = true; continue; }
     if (quote !== null) {
+      if (quote === "'" && character === "'" && value[index + 1] === "'") { index += 1; continue; }
       if (character === quote) quote = null;
       continue;
     }
-    if (character === "\"" || character === "'") { quote = character; continue; }
-    if (character !== ",") continue;
+    if (scalarStart && (character === "\"" || character === "'")) { quote = character; scalarStart = false; continue; }
+    if (character !== ",") {
+      if (!/\s/u.test(character ?? "")) scalarStart = false;
+      continue;
+    }
     parts.push(value.slice(start, index).trim());
     start = index + 1;
+    scalarStart = true;
   }
   if (quote !== null) return null;
   parts.push(value.slice(start).trim());
@@ -399,16 +405,22 @@ function parseYamlScalar(raw: string): unknown {
 function stripYamlComment(value: string): string {
   let quote: "\"" | "'" | null = null;
   let escaped = false;
+  let scalarStart = true;
+  const flow = /^[[{]/u.test(value.trimStart());
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
     if (escaped) { escaped = false; continue; }
     if (character === "\\" && quote === "\"") { escaped = true; continue; }
     if (quote !== null) {
+      if (quote === "'" && character === "'" && value[index + 1] === "'") { index += 1; continue; }
       if (character === quote) quote = null;
       continue;
     }
-    if (character === "\"" || character === "'") { quote = character; continue; }
+    // Quotes inside a plain scalar (future=Bob's) are literal characters.
+    if (scalarStart && (character === "\"" || character === "'")) { quote = character; scalarStart = false; continue; }
     if (character === "#" && (index === 0 || /\s/u.test(value[index - 1] ?? ""))) return value.slice(0, index);
+    if (flow && (character === "[" || character === "{" || character === ",")) scalarStart = true;
+    else if (!/\s/u.test(character ?? "")) scalarStart = false;
   }
   return value;
 }

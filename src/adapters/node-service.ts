@@ -334,21 +334,26 @@ export class NodeService {
           this.expectEvent("rename", sourcePath, nextPath, true);
           await this.app.fileManager.renameFile(folder, sourcePath);
         });
-        if (note === null) {
+        if (note === null || sourceNotePath === null) {
           this.assertEntryIdentity(folder, nextPath, TFolder);
           return folder;
         }
         const oldNoteAtNewLocation = note;
-        this.assertEntryIdentity(oldNoteAtNewLocation, `${nextPath}/${oldName}.md`, TFile);
+        // A canonical note can differ in case or Unicode spelling from its
+        // folder. Moving the folder preserves the actual file name first.
+        const movedNotePath = `${nextPath}${sourceNotePath.slice(sourcePath.length)}`;
+        this.assertEntryIdentity(oldNoteAtNewLocation, movedNotePath, TFile);
         const oldNotePathAtNewLocation = oldNoteAtNewLocation.path;
         this.assertActive();
-        this.expectEvent("rename", nextNotePath, oldNoteAtNewLocation.path);
-        await this.app.fileManager.renameFile(oldNoteAtNewLocation, nextNotePath);
-        undos.push(async () => {
-          this.assertEntryIdentity(oldNoteAtNewLocation, nextNotePath, TFile);
-          this.expectEvent("rename", oldNotePathAtNewLocation, nextNotePath);
-          await this.app.fileManager.renameFile(oldNoteAtNewLocation, oldNotePathAtNewLocation);
-        });
+        if (oldNotePathAtNewLocation !== nextNotePath) {
+          this.expectEvent("rename", nextNotePath, oldNotePathAtNewLocation);
+          await this.app.fileManager.renameFile(oldNoteAtNewLocation, nextNotePath);
+          undos.push(async () => {
+            this.assertEntryIdentity(oldNoteAtNewLocation, nextNotePath, TFile);
+            this.expectEvent("rename", oldNotePathAtNewLocation, nextNotePath);
+            await this.app.fileManager.renameFile(oldNoteAtNewLocation, oldNotePathAtNewLocation);
+          });
+        }
         this.assertEntryIdentity(folder, nextPath, TFolder);
         this.assertEntryIdentity(oldNoteAtNewLocation, nextNotePath, TFile);
         return folder;
