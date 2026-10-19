@@ -6,6 +6,7 @@
 - Follow supported Obsidian language tags, preserve explicit language choices, and scope Arabic right-to-left settings to the plugin.
 - Translate Node Graph commands, menus and notices through the shared catalogs, and update command labels immediately when the language changes.
 - Keep YAML and link examples and numeric controls left-to-right inside Arabic settings so their syntax remains readable.
+- Refresh existing File Explorer repair-button tooltips and accessible names when the interface language changes.
 - Clarify node actions and safety messages, and provide linked user guides and consistent manual-installation instructions in every supported language.
 
 ## 0.10.7 - 2026-10-11

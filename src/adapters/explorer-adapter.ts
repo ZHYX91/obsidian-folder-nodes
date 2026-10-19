@@ -336,6 +336,8 @@ export class ExplorerAdapter extends Component {
       if (identity === "incomplete" && file instanceof TFile) {
         if (repair === null) repair = this.createRepairButton(element, file.path, "folder-plus", this.getRootLabels().missingNodeFolder);
         repair.dataset.path = file.path;
+        repair.setAttribute("aria-label", labels.missingNodeFolder);
+        repair.setAttribute("title", labels.missingNodeFolder);
       } else repair?.remove();
     }
 
@@ -406,6 +408,8 @@ export class ExplorerAdapter extends Component {
         problemBadge.setAttr("title", this.getRootLabels().missingNodeNote);
         if (repair === null) repair = this.createRepairButton(element, folder.path, "file-plus", this.getRootLabels().missingNodeNote);
         repair.dataset.path = folder.path;
+        repair.setAttribute("aria-label", this.getRootLabels().missingNodeNote);
+        repair.setAttribute("title", this.getRootLabels().missingNodeNote);
         continue;
       }
 

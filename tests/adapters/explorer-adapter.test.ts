@@ -5,8 +5,65 @@ import { ExplorerAdapter } from "../../src/adapters/explorer-adapter";
 import type { NodeService } from "../../src/adapters/node-service";
 import type { VisualService } from "../../src/adapters/visual-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
+import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages";
+import { setLanguage, t } from "../../src/ui/i18n";
 
 describe("ExplorerAdapter lifecycle", () => {
+  it("updates existing repair tooltips and accessible names across all interface languages", () => {
+    const root = document.createElement("div");
+    root.createDiv({ cls: "nav-files-container" });
+    const folderTitle = root.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Missing" } });
+    folderTitle.createSpan({ cls: "nav-folder-title-content", text: "Missing" });
+    const fileTitle = root.createDiv({ cls: "nav-file-title", attr: { "data-path": "Loose.md" } });
+    fileTitle.createSpan({ cls: "nav-file-title-content", text: "Loose" });
+    document.body.append(root);
+    const folder = Object.assign(new TFolder(), { children: [], name: "Missing", path: "Missing" });
+    const file = Object.assign(new TFile(), { basename: "Loose", extension: "md", name: "Loose.md", path: "Loose.md", parent: { path: "" } });
+    const entries = new Map<string, TFile | TFolder>([[folder.path, folder], [file.path, file]]);
+    const app = {
+      vault: { getName: () => "Vault", getRoot: () => ({ path: "" }), getAbstractFileByPath: (path: string) => entries.get(path) ?? null },
+      workspace: { getActiveFile: () => null, getLeavesOfType: (type: string) => type === "file-explorer" ? [{ view: { containerEl: root } }] : [] },
+    } as unknown as App;
+    const service = {
+      children: () => [], getFolder: (path: string) => path === folder.path ? folder : null, getFile: () => file,
+      getCanonicalFile: () => null, nodeNoteCandidates: () => [], nodeNoteRole: () => "none", folderIdentity: () => "incomplete", fileIdentity: () => "incomplete", isCanonicalFile: () => false,
+      isIgnoredPath: () => false, isIgnoredRootPath: () => false, isLeafNoteExempt: () => false, notePathForFolder: () => "Missing/Missing.md",
+      openFolderNode: async () => undefined, rootNotePath: () => "Vault.md",
+      hiddenState: () => ({ explicit: false, sourcePath: null, unmanaged: false }), isNodeVisible: () => true, revealingHiddenNodes: () => false,
+    } as unknown as NodeService;
+    const complete = vi.fn();
+    const adapter = new ExplorerAdapter(app, service,
+      { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) } as unknown as VisualService,
+      () => structuredClone(DEFAULT_SETTINGS),
+      () => ({ createNode: t("createNode"), incompleteNode: t("incompleteNode"), missingNodeFolder: t("missingNodeFolder"), missingNodeNote: t("missingNodeNote"), node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" }),
+      () => undefined, complete, () => undefined, () => undefined);
+    try {
+      setLanguage("en");
+      adapter.start();
+      const noteRepair = folderTitle.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
+      const folderRepair = fileTitle.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
+      expect(noteRepair).not.toBeNull();
+      expect(folderRepair).not.toBeNull();
+      for (const locale of AVAILABLE_INTERFACE_LOCALES) {
+        setLanguage(locale);
+        adapter.refresh();
+        expect(folderTitle.querySelector(".folder-nodes-explorer-repair")).toBe(noteRepair);
+        expect(fileTitle.querySelector(".folder-nodes-explorer-repair")).toBe(folderRepair);
+        for (const [button, label] of [[noteRepair, t("missingNodeNote")], [folderRepair, t("missingNodeFolder")]] as const) {
+          expect(button?.getAttribute("aria-label")).toBe(label);
+          expect(button?.getAttribute("title")).toBe(label);
+        }
+      }
+      noteRepair?.click();
+      folderRepair?.click();
+      expect(complete.mock.calls).toEqual([[folder], [file]]);
+    } finally {
+      adapter.stop();
+      root.remove();
+      setLanguage("auto");
+    }
+  });
+
   it("binds and decorates a File Explorer surface mounted after startup", () => {
     const root = document.createElement("div");
     root.className = "workspace-leaf-content";
