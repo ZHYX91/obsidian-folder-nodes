@@ -7,6 +7,7 @@ import { ExplorerAdapter } from "../adapters/explorer-adapter";
 import { NodeService } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
+import { refreshRibbonLabel } from "../adapters/ribbon-host";
 import { buildNodeName } from "../core/naming";
 import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatter";
 import { configuredEmojiFontStack } from "../core/emoji-font";
@@ -430,9 +431,7 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private refreshLocalizedChrome(): void {
-    const ribbonLabel = t("contents");
-    this.ribbonElement?.setAttribute("aria-label", ribbonLabel);
-    this.ribbonElement?.setAttribute("title", ribbonLabel);
+    refreshRibbonLabel(this.app.workspace, this.ribbonElement, t("contents"));
     const names = this.localizedCommandNames();
     const idPrefix = `${this.manifest.id}:`;
     const namePrefix = `${this.manifest.name}: `;

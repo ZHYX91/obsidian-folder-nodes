@@ -38,7 +38,11 @@ function fixture() {
   chrome.registerCommands();
   plugin.registerGraphCommands();
   chrome.ribbonElement = document.createElement("button");
-  return { plugin, chrome };
+  const ribbonItem = { id: "folder-nodes:Open node contents", title: "Open node contents", buttonEl: chrome.ribbonElement, hidden: false, callback: vi.fn() };
+  const unrelatedItem = { id: "other-plugin:action", title: "Other action", buttonEl: document.createElement("button") };
+  const ribbonItems = [unrelatedItem, ribbonItem];
+  Reflect.set(plugin.app.workspace, "leftRibbon", { items: ribbonItems });
+  return { plugin, chrome, ribbonItem, unrelatedItem, ribbonItems };
 }
 
 describe("plugin localization lifecycle", () => {
@@ -94,7 +98,8 @@ describe("plugin localization lifecycle", () => {
   });
 
   it.each(AVAILABLE_INTERFACE_LOCALES)("persists %s and updates existing commands without accessing Vault files", async (locale) => {
-    const { plugin, chrome } = fixture();
+    const { plugin, chrome, ribbonItem, unrelatedItem, ribbonItems } = fixture();
+    const originalRibbon = { ...ribbonItem };
     const commands = [...chrome.localizedCommands];
     const ids = commands.map(({ id }) => id);
     const saved = vi.spyOn(plugin, "saveData");
@@ -111,6 +116,9 @@ describe("plugin localization lifecycle", () => {
     expect(commands.find(({ id }) => id.endsWith(":open-node-graph"))?.name)
       .toBe(`Folder Nodes: ${t("openNodeGraph")}`);
     expect(chrome.ribbonElement.getAttribute("aria-label")).toBe(t("contents"));
+    expect(ribbonItem).toEqual({ ...originalRibbon, title: t("contents") });
+    expect(unrelatedItem.title).toBe("Other action");
+    expect(ribbonItems).toEqual([unrelatedItem, ribbonItem]);
     FolderNodesPlugin.prototype.onunload.call(plugin);
   });
 });

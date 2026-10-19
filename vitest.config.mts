@@ -21,6 +21,7 @@ export default defineConfig({
         "src/adapters/explorer-adapter.ts",
         "src/adapters/explorer-events.ts",
         "src/adapters/explorer-host.ts",
+        "src/adapters/ribbon-host.ts",
         "src/adapters/explorer-native-order.ts",
         "src/adapters/explorer-virtual-order.ts",
         "src/app/document-event-registry.ts",

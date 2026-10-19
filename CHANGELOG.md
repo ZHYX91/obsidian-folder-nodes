@@ -7,6 +7,7 @@
 - Translate Node Graph commands, menus and notices through the shared catalogs, and update command labels immediately when the language changes.
 - Keep YAML and link examples and numeric controls left-to-right inside Arabic settings so their syntax remains readable.
 - Refresh existing File Explorer repair-button tooltips and accessible names when the interface language changes.
+- Refresh the mobile ribbon menu label when switching languages, while preserving its configured action and position.
 - Update already-open content and graph tab titles when switching languages, while retaining the graph viewport and search.
 - Clarify node actions and safety messages, and provide linked user guides and consistent manual-installation instructions in every supported language.
 
