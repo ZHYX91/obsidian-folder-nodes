@@ -11,6 +11,18 @@ import {
 
 describe("source-preserving frontmatter patches", () => {
   it.each([
+    "future=Bob's # preserve this comment",
+    'future=inch"wide # preserve this comment',
+    "'future=Bob''s' # preserve this comment",
+    '"future=Bob\'s # literal" # preserve this comment',
+  ])("retains unknown block-item source through hide and unhide: %s", (item) => {
+    const source = `---\r\nfolder-nodes:\r\n  - ${item}\r\n---\r\nBody sentinel.\r\n`;
+    const hidden = patchFolderNodesFrontmatter(source, { hidden: true });
+    expect(hidden).toContain(`  - ${item}\r\n`);
+    expect(patchFolderNodesFrontmatter(hidden, { hidden: false })).toBe(source);
+  });
+
+  it.each([
     ["plain apostrophe and comment", "\n  - future=Bob's # a comment", ["future=Bob's"]],
     ["plain double quote and comment", '\n  - future=inch"wide # a comment', ['future=inch"wide']],
     ["single-quoted apostrophe", "\n  - 'future=Bob''s' # a comment", ["future=Bob's"]],

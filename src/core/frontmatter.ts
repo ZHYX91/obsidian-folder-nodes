@@ -84,7 +84,7 @@ export function patchFolderNodesFrontmatter(source: string, patch: FolderNodesFr
   } else {
     for (const field of touched) legacyToRemove.add(legacyPropertyFor(field));
   }
-  return patchParsedSource(parsed, nextEntries, legacyToRemove);
+  return patchParsedSource(parsed, nextEntries, legacyToRemove, current.unknownEntries);
 }
 
 export function patchFrontmatterScalar(source: string, key: string, value: string | number | boolean | null): string {
@@ -106,7 +106,7 @@ export function createNodeDocument(alias: string | null, body: string): string {
   return `---\naliases:\n  - ${JSON.stringify(alias.trim())}\n---\n${body}`;
 }
 
-function patchParsedSource(parsed: ParsedSource, entries: readonly string[], legacyToRemove: ReadonlySet<string>): string {
+function patchParsedSource(parsed: ParsedSource, entries: readonly string[], legacyToRemove: ReadonlySet<string>, unknownEntries: readonly string[]): string {
   if (!parsed.hasFrontmatter) {
     if (entries.length === 0) return `${parsed.bom}${parsed.lines.join(parsed.eol)}`;
     const rendered = renderFolderNodes(entries, parsed.eol);
@@ -117,8 +117,26 @@ function patchParsedSource(parsed: ParsedSource, entries: readonly string[], leg
     ...[...legacyToRemove].map((key) => parsed.ranges.get(key)),
   ].filter((range): range is SourceRange => range !== undefined);
   const insertion = ranges.reduce((minimum, range) => Math.min(minimum, range.start), parsed.closingBoundary);
-  const rendered = entries.length === 0 ? [] : renderFolderNodes(entries, parsed.eol).split(parsed.eol);
+  const preserved = unknownBlockItems(parsed, new Set(unknownEntries));
+  const rendered = entries.length === 0 ? [] : [FOLDER_NODES_PROPERTY + ":", ...entries.map((entry) =>
+    preserved.get(entry)?.shift() ?? `  - ${renderListItem(entry)}`)];
   return rebuildSource(parsed, ranges, insertion, rendered);
+}
+
+function unknownBlockItems(parsed: ParsedSource, unknown: ReadonlySet<string>): Map<string, string[]> {
+  const preserved = new Map<string, string[]>();
+  const range = parsed.ranges.get(FOLDER_NODES_PROPERTY);
+  if (range === undefined || stripYamlComment(valueAfterColon(parsed.lines[range.start] ?? "")).trim() !== "") return preserved;
+  for (const line of parsed.lines.slice(range.start + 1, range.end)) {
+    const match = /^\s+-\s+(.+)$/u.exec(line);
+    if (match === null) continue;
+    const value = parseYamlScalar(match[1]!);
+    if (typeof value !== "string" || !unknown.has(value)) continue;
+    const rows = preserved.get(value) ?? [];
+    rows.push(`  ${line.trimStart()}`);
+    preserved.set(value, rows);
+  }
+  return preserved;
 }
 
 function rebuildSource(parsed: ParsedSource, removedRanges: readonly SourceRange[], insertion: number, rendered: readonly string[]): string {

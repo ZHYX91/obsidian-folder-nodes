@@ -5,6 +5,7 @@
 ## 0.11.1 - 2026-10-21
 
 - Preserve recognized node-note spelling during renames and unknown YAML tokens around quotes and comments.
+- Keep unknown block-list entries' original quoting and inline comments when hiding or showing a node.
 - Prevent IME confirmation from submitting prompts and keep rule deletion stable during asynchronous saves.
 - Align localized help, language navigation and host cursor preferences.
 
