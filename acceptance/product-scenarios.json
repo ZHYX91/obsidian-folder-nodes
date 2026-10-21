@@ -321,6 +321,30 @@
         "Arabic reverses only the plugin-owned settings surface. Mixed-script paths, icons and numbers remain usable; desktop keyboard focus follows the visible tab direction. Command and node-menu text updates to the selected language.",
         "The selected language and numeric threshold survive closing settings and a real plugin disable/enable cycle. The host outside plugin settings retains its own direction. Fixture note bytes, names and structural properties remain unchanged."
       ]
+    },
+    {
+      "id": "node-write-safety-and-settings",
+      "title": "Quoted-key protection, recognized note renaming and stable settings rules",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Try hiding SafetyQuoted, whose canonical node property uses an escaped quoted key; verify the operation refuses and original note bytes are unchanged.",
+        "Hide and show SafetyPlain; verify the unknown future token and its comment survive.",
+        "Rename SafetyRename through the product prompt; verify its recognized safetyrename.MD note follows the folder and retains its content. Cancel a prompt before confirming the intended rename.",
+        "Remove two explicitly added temporary unmanaged rules through settings and verify the intended rows disappear. Inspect localized help at narrow width."
+      ],
+      "expected": [
+        "Ambiguous quoted source keys fail before writes.",
+        "Supported property edits preserve unknown tokens and comments.",
+        "The actual recognized note is renamed, and cancelling does not mutate it.",
+        "Rule removal and localized settings remain usable."
+      ]
     }
   ]
 }
