@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.11.1 - 2026-10-21
+
+- Preserve recognized node-note spelling during renames and unknown YAML tokens around quotes and comments.
+- Prevent IME confirmation from submitting prompts and keep rule deletion stable during asynchronous saves.
+- Align localized help, language navigation and host cursor preferences.
+
 - Reject escaped quoted node-property keys before structural writes, preserving existing ranks, hidden markers, future tokens and note text instead of creating duplicate YAML keys or reporting an ineffective unhide.
 
 ## 0.11.0 - 2026-10-19
