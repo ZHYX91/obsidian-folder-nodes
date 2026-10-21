@@ -82,9 +82,9 @@ A identidade do nó é o caminho atual do cofre, não um ID permanente. README.m
 
 **Ocultar**: hidden=true na propriedade folder-nodes oculta o nó e seus descendentes apenas nas visualizações do Folder Nodes no Explorador, no Conteúdo dos Nós e no Node Graph. A busca e a abertura direta do Obsidian continuam funcionando. **Não gerenciado**: o Folder Nodes não executa operações estruturais nesses itens, mas não os esconde nem apaga.
 
-"Renomear arquivo" modifica apenas um arquivo ou pasta; ações do "nó que contém a nota" afetam o nó inteiro. Organização em lote e migração de propriedades mostram uma prévia antes da gravação; a verificação de integridade é somente leitura. Conflitos interrompem a ação, sem tentar adivinhar a solução. A exclusão de um nó completo usa a lixeira do sistema do Obsidian.
+"Renomear arquivo" modifica apenas um arquivo ou pasta; ações do "nó que contém a nota" afetam o nó inteiro. Organização em lote e migração de propriedades mostram uma prévia antes da gravação; a verificação de integridade é somente leitura. Conflitos interrompem a ação, sem tentar adivinhar a solução. A exclusão de um nó completo segue a opção de exclusão de arquivos definida no Obsidian.
 
-O processamento é local: o plugin não envia conteúdo do cofre nem faz solicitações de rede. Organização e migração exibem prévia e param em caso de conflito. A exclusão de nós completos usa a lixeira do sistema do Obsidian. Links só são gravados na área de transferência após uma ação explícita de copiar; o plugin nunca lê a área de transferência. Configurações e exclusões ficam em data.json.
+O processamento é local: o plugin não envia conteúdo do cofre nem faz solicitações de rede. Organização e migração exibem prévia e param em caso de conflito. A exclusão de nós completos segue a opção de exclusão de arquivos definida no Obsidian. Links só são gravados na área de transferência após uma ação explícita de copiar; o plugin nunca lê a área de transferência. Configurações e exclusões ficam em data.json.
 
 ## Desenvolvimento
 

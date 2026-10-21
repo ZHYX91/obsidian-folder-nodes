@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const es: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "Ayuda y soporte",
+  "userGuide": "Guía de uso",
+  "reportIssue": "Informar de un problema",
   "settings": "Ajustes de Folder Nodes",
   "general": "General",
   "management": "Administración",
@@ -284,7 +287,7 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "Quitar candidato",
   "explorerPreview": "Vista previa del explorador",
   "contentsPreview": "Vista previa del contenido de nodos",
-  "visualUnknownItems": "Se conservaron y omitieron {count} candidatos no reconocidos.",
+  "visualUnknownItems": "No se reconocen {count} candidatos. Edítalos o elimínalos antes de guardar; la nota no ha cambiado.",
   "visualExtraColors": "Se conservaron {count} colores adicionales. Se usará el primer color válido.",
   "iconGuideTitle": "Cómo establecer un icono de nodo",
   "iconGuideIntro": "Haz clic derecho en un nodo del explorador y elige «Elegir icono de nodo», o edita directamente la propiedad icon de su nota.",

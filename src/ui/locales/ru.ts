@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ru: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "Справка и поддержка",
+  "userGuide": "Руководство пользователя",
+  "reportIssue": "Сообщить о проблеме",
   "settings": "Настройки Folder Nodes",
   "general": "Общие",
   "management": "Управление",
@@ -284,7 +287,7 @@ export const ru: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "Удалить вариант",
   "explorerPreview": "Предпросмотр проводника",
   "contentsPreview": "Предпросмотр содержимого узлов",
-  "visualUnknownItems": "{count} неизвестных вариантов сохранены, но пропущены.",
+  "visualUnknownItems": "Не распознано вариантов: {count}. Измените или удалите их перед сохранением. Заметка пока не изменена.",
   "visualExtraColors": "Сохранено дополнительных цветов: {count}. Используется первый допустимый цвет.",
   "iconGuideTitle": "Как настроить значок узла",
   "iconGuideIntro": "Нажмите правой кнопкой на узел в проводнике и выберите «Настроить значок узла» или отредактируйте свойство icon в заметке узла.",

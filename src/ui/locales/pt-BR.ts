@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ptBR: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "Ajuda e suporte",
+  "userGuide": "Guia de uso",
+  "reportIssue": "Relatar um problema",
   "settings": "Configurações do Folder Nodes",
   "general": "Geral",
   "management": "Gerenciamento",
@@ -284,7 +287,7 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "Remover candidato",
   "explorerPreview": "Prévia do Explorador",
   "contentsPreview": "Prévia do Conteúdo dos Nós",
-  "visualUnknownItems": "{count} candidatos desconhecidos foram mantidos e ignorados.",
+  "visualUnknownItems": "{count} candidatos não foram reconhecidos. Edite ou remova esses itens antes de salvar; a nota não foi alterada.",
   "visualExtraColors": "{count} cores adicionais foram mantidas. A primeira cor válida será usada.",
   "iconGuideTitle": "Como definir um ícone de nó",
   "iconGuideIntro": "Clique com o botão direito em um nó no Explorador e escolha \"Definir ícone do nó\", ou edite a propriedade icon diretamente na nota do nó.",

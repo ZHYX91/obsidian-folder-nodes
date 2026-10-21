@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ko: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "도움말 및 지원",
+  "userGuide": "사용 안내서",
+  "reportIssue": "문제 보고",
   "settings": "Folder Nodes 설정",
   "general": "일반",
   "management": "관리",
@@ -284,7 +287,7 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "후보 제거",
   "explorerPreview": "파일 탐색기 미리 보기",
   "contentsPreview": "노드 콘텐츠 미리 보기",
-  "visualUnknownItems": "인식할 수 없는 후보 {count}개는 보존하되 건너뛰었습니다.",
+  "visualUnknownItems": "인식할 수 없는 후보가 {count}개 있습니다. 저장하기 전에 수정하거나 제거하세요. 노트는 아직 변경되지 않았습니다.",
   "visualExtraColors": "추가 색상 {count}개를 보존했습니다. 첫 번째 유효한 색을 사용합니다.",
   "iconGuideTitle": "노드 아이콘 설정 방법",
   "iconGuideIntro": "파일 탐색기에서 노드를 우클릭해 '노드 아이콘 설정'을 선택하거나 노드 노트의 icon 속성을 직접 편집하세요.",

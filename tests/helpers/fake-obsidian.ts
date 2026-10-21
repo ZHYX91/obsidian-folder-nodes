@@ -1,4 +1,19 @@
 import { App, TAbstractFile, TFile, TFolder } from "obsidian";
+import { parseDocument, stringify } from "yaml";
+
+type FakeWrite = "create" | "modify" | "process" | "append" | "frontmatter" | "rename" | "trash";
+interface FakeObsidianOptions {
+  readonly metadataUpdates?: "immediate" | "deferred";
+  readonly modifyEvents?: "immediate" | "deferred";
+}
+
+/**
+ * A focused Vault/FileManager contract, not an Obsidian host. Source writes,
+ * metadata refreshes and modify notifications are separate observable steps.
+ * Normal fixtures derive caches from YAML; explicit cache overrides support
+ * cache-only read scenarios and lag tests. Deferred modes model asynchronous
+ * refreshes and notifications. failNext() fails before a mutation.
+ */
 
 export class FakeObsidian {
   public readonly root = folder("");
@@ -9,9 +24,13 @@ export class FakeObsidian {
   public readonly trashed: string[] = [];
   public readonly opened: string[] = [];
   public readonly modifyListeners = new Set<(file: TFile) => void>();
+  public readonly metadataListeners = new Set<(file: TFile, source: string, cache: { frontmatter: Record<string, unknown> }) => void>();
   public readonly app: App;
+  private readonly pendingMetadata = new Set<TFile>();
+  private readonly pendingModifyEvents: TFile[] = [];
+  private readonly failures = new Map<FakeWrite, Error[]>();
 
-  public constructor(public readonly vaultName = "Vault") {
+  public constructor(public readonly vaultName = "Vault", private readonly options: FakeObsidianOptions = {}) {
     const vault = {
       on: (event: string, callback: (file: TFile) => void) => {
         if (event !== "modify") throw new Error(`Unsupported fake Vault event: ${event}`);
@@ -28,38 +47,45 @@ export class FakeObsidian {
       getName: () => this.vaultName,
       getRoot: () => this.root,
       createFolder: async (path: string) => this.addFolder(path),
-      create: async (path: string, source: string) => this.addFile(path, source),
+      create: async (path: string, source: string) => { this.failIfRequested("create"); return this.addFile(path, source); },
       read: async (file: TFile) => this.contents.get(file.path) ?? "",
       cachedRead: async (file: TFile) => this.contents.get(file.path) ?? "",
       modify: async (file: TFile, source: string) => {
-        this.contents.set(file.path, source);
-        this.frontmatters.set(file.path, parseFrontmatter(source));
-        for (const callback of this.modifyListeners) callback(file);
+        this.failIfRequested("modify");
+        this.writeSource(file, source);
       },
       process: async (file: TFile, update: (source: string) => string) => {
+        this.failIfRequested("process");
         const next = update(this.contents.get(file.path) ?? "");
-        this.contents.set(file.path, next);
-        this.frontmatters.set(file.path, parseFrontmatter(next));
+        this.writeSource(file, next);
         return next;
       },
       append: async (file: TFile, source: string) => {
+        this.failIfRequested("append");
         const next = (this.contents.get(file.path) ?? "") + source;
-        this.contents.set(file.path, next);
-        this.frontmatters.set(file.path, parseFrontmatter(next));
+        this.writeSource(file, next);
       },
     };
     const fileManager = {
       renameFile: async (entry: TAbstractFile, nextPath: string) => this.rename(entry, nextPath),
       trashFile: async (entry: TAbstractFile) => this.trash(entry),
       processFrontMatter: async (file: TFile, update: (frontmatter: Record<string, unknown>) => void) => {
-        const value = structuredClone(this.frontmatters.get(file.path) ?? {});
+        this.failIfRequested("frontmatter");
+        const source = this.contents.get(file.path) ?? "";
+        const value = parseFrontmatter(source, true);
         update(value);
-        this.frontmatters.set(file.path, value);
+        this.writeSource(file, replaceFrontmatter(source, value));
       },
     };
     this.app = {
       fileManager,
       metadataCache: {
+        on: (event: string, callback: (file: TFile, source: string, cache: { frontmatter: Record<string, unknown> }) => void) => {
+          if (event !== "changed") throw new Error(`Unsupported fake metadata event: ${event}`);
+          this.metadataListeners.add(callback);
+          return callback;
+        },
+        offref: (callback: (file: TFile, source: string, cache: { frontmatter: Record<string, unknown> }) => void) => { this.metadataListeners.delete(callback); },
         getFileCache: (file: TFile) => ({ frontmatter: this.frontmatters.get(file.path) }),
         resolvedLinks: {},
       },
@@ -83,7 +109,8 @@ export class FakeObsidian {
     return created;
   }
 
-  public addFile(rawPath: string, source = "", frontmatter: Record<string, unknown> = {}): TFile {
+  /** A supplied cache is intentionally independent of source for cache-only or lag fixtures. */
+  public addFile(rawPath: string, source = "", frontmatter?: Record<string, unknown>): TFile {
     const path = normalize(rawPath);
     if (this.files.has(path)) throw new Error(`Path exists: ${path}`);
     const parent = this.requireFolder(parentPath(path));
@@ -91,8 +118,47 @@ export class FakeObsidian {
     parent.children.push(created);
     this.files.set(path, created);
     this.contents.set(path, source);
-    this.frontmatters.set(path, structuredClone(frontmatter));
+    this.frontmatters.set(path, frontmatter === undefined ? parseFrontmatter(source) : structuredClone(frontmatter));
     return created;
+  }
+
+  public failNext(operation: FakeWrite, error = new Error(`Fake ${operation} failed`)): void {
+    const failures = this.failures.get(operation) ?? [];
+    failures.push(error);
+    this.failures.set(operation, failures);
+  }
+
+  public flushMetadata(): void {
+    for (const file of this.pendingMetadata) this.refreshMetadata(file);
+  }
+
+  public refreshMetadata(file: TFile): void {
+    this.pendingMetadata.delete(file);
+    if (this.files.get(file.path) !== file) return;
+    const source = this.contents.get(file.path) ?? "";
+    const frontmatter = parseFrontmatter(source);
+    this.frontmatters.set(file.path, frontmatter);
+    for (const callback of this.metadataListeners) callback(file, source, { frontmatter });
+  }
+
+  public flushModifyEvents(): void {
+    for (const file of this.pendingModifyEvents.splice(0)) {
+      if (this.files.get(file.path) === file) for (const callback of this.modifyListeners) callback(file);
+    }
+  }
+
+  private writeSource(file: TFile, source: string): void {
+    if (this.files.get(file.path) !== file) throw new Error(`File identity changed: ${file.path}`);
+    this.contents.set(file.path, source);
+    if (this.options.metadataUpdates === "deferred") this.pendingMetadata.add(file);
+    else this.refreshMetadata(file);
+    if (this.options.modifyEvents === "deferred") this.pendingModifyEvents.push(file);
+    else for (const callback of this.modifyListeners) callback(file);
+  }
+
+  private failIfRequested(operation: FakeWrite): void {
+    const error = this.failures.get(operation)?.shift();
+    if (error !== undefined) throw error;
   }
 
   public remove(rawPath: string): void {
@@ -113,6 +179,7 @@ export class FakeObsidian {
   }
 
   public async rename(entry: TAbstractFile, rawNextPath: string): Promise<void> {
+    this.failIfRequested("rename");
     const nextPath = normalize(rawNextPath);
     const from = entry.path;
     if (this.files.has(nextPath)) throw new Error(`Path exists: ${nextPath}`);
@@ -137,6 +204,7 @@ export class FakeObsidian {
   }
 
   private async trash(entry: TAbstractFile): Promise<void> {
+    this.failIfRequested("trash");
     this.trashed.push(entry.path);
     this.removeEntry(entry);
   }
@@ -147,6 +215,7 @@ export class FakeObsidian {
     this.files.delete(entry.path);
     this.contents.delete(entry.path);
     this.frontmatters.delete(entry.path);
+    if (entry instanceof TFile) this.pendingMetadata.delete(entry);
   }
 }
 
@@ -181,34 +250,30 @@ function setPath(entry: TAbstractFile, path: string): void {
   }
 }
 
-function parseFrontmatter(source: string): Record<string, unknown> {
-  if (!source.startsWith("---\n")) return {};
-  const end = source.indexOf("\n---\n", 4);
-  if (end < 0) return {};
-  const result: Record<string, unknown> = {};
-  const lines = source.slice(4, end).split("\n");
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    const separator = line.indexOf(":");
-    if (separator < 0) continue;
-    const key = line.slice(0, separator).trim();
-    const raw = line.slice(separator + 1).trim();
-    if (raw === "" && /^\S/u.test(line)) {
-      const values: unknown[] = [];
-      while (/^\s+-\s+/u.test(lines[index + 1] ?? "")) {
-        index += 1;
-        const item = (lines[index] ?? "").replace(/^\s+-\s+/u, "");
-        try { values.push(JSON.parse(item)); }
-        catch { values.push(item); }
-      }
-      result[key] = values;
-      continue;
-    }
-    if (/^\d+$/u.test(raw)) result[key] = Number(raw);
-    else {
-      try { result[key] = JSON.parse(raw); }
-      catch { result[key] = raw; }
-    }
+function parseFrontmatter(source: string, strict = false): Record<string, unknown> {
+  const match = frontmatterBounds(source);
+  if (match === null) return {};
+  const document = parseDocument(match[1] ?? "");
+  if (document.errors.length > 0) {
+    if (strict) throw new Error("Invalid YAML in frontmatter write");
+    return {};
   }
-  return result;
+  const data: unknown = document.toJS();
+  if (data !== null && typeof data === "object" && !Array.isArray(data)) return data as Record<string, unknown>;
+  if (strict && data !== null) throw new Error("Frontmatter write requires a mapping");
+  return {};
+}
+
+function frontmatterBounds(source: string): RegExpExecArray | null {
+  const match = /^(?:\uFEFF)?---[ \t]*\r?\n([\s\S]*?)^(?:---|\.\.\.)[ \t]*(?=\r?\n|$)/mu.exec(source);
+  return match?.index === 0 ? match : null;
+}
+
+function replaceFrontmatter(source: string, value: Record<string, unknown>): string {
+  const bounds = frontmatterBounds(source);
+  const bom = source.startsWith("\uFEFF") ? "\uFEFF" : "";
+  const eol = source.includes("\r\n") ? "\r\n" : "\n";
+  const body = bounds === null ? source.slice(bom.length) : source.slice(bounds[0].length).replace(/^\r?\n/u, "");
+  const yaml = Object.keys(value).length === 0 ? "" : stringify(value).replaceAll("\n", eol);
+  return `${bom}---${eol}${yaml}---${eol}${body}`;
 }

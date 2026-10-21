@@ -1,6 +1,6 @@
 # Folder Nodes
 
-[English](README.md) · [简体中文](docs/i18n/README.zh-CN.md) · [繁體中文](docs/i18n/README.zh-TW.md) · [日本語](docs/i18n/README.ja.md) · [한국어](docs/i18n/README.ko.md) · [Deutsch](docs/i18n/README.de.md) · [Français](docs/i18n/README.fr.md) · [Español](docs/i18n/README.es.md) · [Português (Brasil)](docs/i18n/README.pt-BR.md) · [Русский](docs/i18n/README.ru.md) · [Tiếng Việt](docs/i18n/README.vi.md) · [العربية](docs/i18n/README.ar.md)
+[English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md) · [繁體中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-TW.md) · [日本語](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ja.md) · [한국어](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ko.md) · [Deutsch](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.de.md) · [Français](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.fr.md) · [Español](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.es.md) · [Português (Brasil)](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.pt-BR.md) · [Русский](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ru.md) · [Tiếng Việt](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.vi.md) · [العربية](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ar.md)
 
 Give an Obsidian folder its own note, then browse the folder and its contents together. For example, `A/A.md` is the note for folder `A`. Folder Nodes calls this pair a *node*. If the folder or note is missing, you'll see **Incomplete**; the plugin won't quietly create or move files for you.
 
@@ -57,7 +57,7 @@ Before creating a node from selected text, check its name, location, note conten
 
 - Obsidian **1.12.7 or later**.
 - Desktop Obsidian and Android Obsidian are supported. Android uses menus and native folder moves instead of HTML5 drag-and-drop.
-- Android physical devices and iOS are not part of the project's shared host-acceptance matrix.
+- iOS compatibility has not been verified.
 - A complete node uses exactly one same-named Node Note. Unmanaged rules define boundaries where Folder Nodes does not perform structural actions.
 
 ## Installation
@@ -68,7 +68,7 @@ Open **Settings → Community plugins → Browse**, search for **Folder Nodes**,
 
 ### Manual installation
 
-Download the versioned `folder-nodes-<version>.zip` from the release and extract its `folder-nodes` directory into `Vault/.obsidian/plugins/`. You can also install the three loose files below.
+Download the versioned `folder-nodes-<version>.zip` from the [latest release](https://github.com/ZHYX91/obsidian-folder-nodes/releases/latest) and extract its `folder-nodes` directory into `Vault/.obsidian/plugins/`. You can also install the three loose files below.
 
 Download one matching release and place these three files in `Vault/.obsidian/plugins/folder-nodes/`:
 
@@ -121,7 +121,7 @@ folder-nodes:
 ```
 
 - `order=manual` enables manual child ordering for that parent.
-- `rank=N` stores a child's sparse manual-order rank.
+- `rank=N` stores a child's manual order number, which usually needs no manual editing.
 - `hidden=true` hides the node and its managed children in File Explorer, Node Contents and Node Graph. It does not delete files or affect Obsidian Search.
 
 Published legacy fields `folderNodeChildrenSort`, `folderNodeSiblingRank`, and `folderNodeHidden` remain readable. Use **Management → Migrate Folder Nodes properties** to preview the exact notes that would change. Update Folder Nodes on every device first, then confirm the migration. Startup never migrates note properties automatically.
@@ -156,7 +156,7 @@ The picker loads the current list, supports add/remove/reorder/presets, and prev
 
 Folder Nodes runs locally and makes no network requests. It reads Vault paths, metadata, and note text only for documented features such as structure checks, migration previews, link indexing, and Node Graph.
 
-User actions can create, edit, move, rename, merge, or trash notes and folders. Multi-step structural operations are serialized, conflicts stop before unsafe writes, and preview-first maintenance rechecks targets before commit. Complete-node deletion uses Obsidian's system trash.
+User actions can create, edit, move, rename, merge, or trash notes and folders. Multi-step structural operations are serialized, conflicts stop before unsafe writes, and preview-first maintenance rechecks targets before commit. Complete-node deletion follows Obsidian's configured deletion setting.
 
 The plugin writes generated Markdown links to the system clipboard only after an explicit copy action and **never reads the clipboard**. Preferences and unmanaged rules stay in plugin `data.json`; structural tokens stay in Node Notes.
 

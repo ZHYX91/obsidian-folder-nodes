@@ -4,6 +4,7 @@ import { parseYaml } from "obsidian";
 import { NodeService } from "../../src/adapters/node-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { FakeObsidian } from "../helpers/fake-obsidian";
+import { expectFrontmatterPropertyChanges, parseFrontmatterDocument } from "../helpers/frontmatter-oracle";
 
 function service(fake: FakeObsidian): NodeService {
   const settings = structuredClone(DEFAULT_SETTINGS);
@@ -35,6 +36,86 @@ function markdownEditorLeaf(file: ReturnType<FakeObsidian["requireFile"]>, initi
 }
 
 describe("NodeService structural safety", () => {
+  it.each([
+    String.raw`"folder\x2dnodes"`,
+    String.raw`"folder\u002dnodes"`,
+    String.raw`"\U00000066older-nodes"`,
+  ])("refuses hidden writes through an escaped canonical key %s", async (rawKey) => {
+    for (const hidden of [true, false]) {
+      const fake = new FakeObsidian();
+      const source = `---\n${rawKey}: [rank=1, hidden=true, future=value]\naliases: [Example]\n---\nBody\n`;
+      const folder = fake.addFolder("Alpha");
+      const note = fake.addFile("Alpha/Alpha.md", source);
+      const original = parseFrontmatterDocument(source);
+      expect(original.data).toMatchObject({ "folder-nodes": ["rank=1", "hidden=true", "future=value"] });
+      await expect(service(fake).setNodeHidden(folder, hidden)).rejects.toThrow("Quoted Folder Nodes property keys");
+      expect(fake.contents.get(note.path)).toBe(source);
+      expect(parseFrontmatterDocument(fake.contents.get(note.path) ?? "")).toEqual(original);
+    }
+  });
+
+  it("refuses an escaped canonical key in an open editor without requesting save", async () => {
+    const fake = new FakeObsidian();
+    const source = '---\n"folder\\u002dnodes": [rank=1, future=value]\n---\nUnsaved body\n';
+    const folder = fake.addFolder("Alpha");
+    const note = fake.addFile("Alpha/Alpha.md", source);
+    const open = markdownEditorLeaf(note, source);
+    vi.spyOn(fake.app.workspace, "getLeavesOfType").mockReturnValue([open.leaf] as never);
+    expect(parseFrontmatterDocument(source).data).toMatchObject({ "folder-nodes": ["rank=1", "future=value"] });
+    await expect(service(fake).setNodeHidden(folder, true)).rejects.toThrow("Quoted Folder Nodes property keys");
+    expect(open.leaf.view.editor.transaction).not.toHaveBeenCalled();
+    expect(open.requestSave).not.toHaveBeenCalled();
+    expect(open.value()).toBe(source);
+    expect(fake.contents.get(note.path)).toBe(source);
+  });
+
+  it("preserves an unknown token's meaning through a real hidden-property write", async () => {
+    const fake = new FakeObsidian();
+    const source = "---\naliases: [Example]\nfolder-nodes:\n  - future=Bob's # a comment\n---\nBody\n";
+    const folder = fake.addFolder("Alpha");
+    const note = fake.addFile("Alpha/Alpha.md", source);
+    await service(fake).setNodeHidden(folder, true);
+    expectFrontmatterPropertyChanges(source, fake.contents.get(note.path) ?? "", {
+      "folder-nodes": ["hidden=true", "future=Bob's"],
+    });
+  });
+
+  it.each([
+    ["Alpha", "alpha.md", "Bravo"],
+    ["Alpha", "Alpha.MD", "Bravo"],
+    ["Café", "Cafe\u0301.md", "Bravo"],
+    ["Alpha", "alpha.md", "alpha"],
+    ["Cafe\u0301", "Café.md", "Café"],
+  ])("renames the recognized canonical note %s/%s as %s", async (folderName, fileName, name) => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder(folderName);
+    const note = fake.addFile(`${folderName}/${fileName}`, "Canonical content");
+    const attachment = fake.addFile(`${folderName}/reference.pdf`, "Attachment");
+    const nodes = service(fake);
+    expect(nodes.getCanonicalFile(folder.path)).toBe(note);
+
+    expect(await nodes.renameNode(folder, name)).toBe(folder);
+    expect(fake.requireFile(`${name}/${name}.md`)).toBe(note);
+    expect(fake.contents.get(note.path)).toBe("Canonical content");
+    expect(fake.requireFile(`${name}/reference.pdf`)).toBe(attachment);
+    expect(fake.files.has(folderName)).toBe(false);
+  });
+
+  it("restores the original canonical-note spelling when the second rename fails", async () => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Alpha");
+    const note = fake.addFile("Alpha/Alpha.MD", "Canonical content");
+    vi.spyOn(fake.app.fileManager, "renameFile").mockImplementation(async (entry, path) => {
+      if (entry === note && path === "Bravo/Bravo.md") throw new Error("Disk unavailable");
+      await fake.rename(entry, path);
+    });
+    await expect(service(fake).renameNode(folder, "Bravo")).rejects.toThrow("Disk unavailable");
+    expect(folder.path).toBe("Alpha");
+    expect(fake.requireFile("Alpha/Alpha.MD")).toBe(note);
+    expect(fake.contents.get(note.path)).toBe("Canonical content");
+    expect(fake.files.has("Bravo")).toBe(false);
+  });
+
   it("uses only exact true hidden markers, inherits them, and lets unmanaged override visibility", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");

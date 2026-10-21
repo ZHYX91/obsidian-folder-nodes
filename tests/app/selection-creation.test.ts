@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const host = vi.hoisted(() => ({ modals: [] as Array<{ contentEl: HTMLElement; closeCount: number }> }));
 vi.mock("obsidian", async (importOriginal) => {
   const original = await importOriginal<typeof import("../mocks/obsidian")>();
-  class Button extends original.ButtonComponent { public setCta(): this { return this; } }
   return {
     ...original,
     Plugin: class {
@@ -15,25 +14,9 @@ vi.mock("obsidian", async (importOriginal) => {
       public async saveData(): Promise<void> {}
     },
     Modal: class extends original.Modal {
-      public contentEl = document.createElement("div");
-      public setTitle(): void {}
-      public onOpen(): void {}
-      public open(): void { host.modals.push(this); this.onOpen(); }
+      public override open(): void { host.modals.push(this); super.open(); }
     },
     PluginSettingTab: class { public containerEl = document.createElement("div"); },
-    Setting: class extends original.Setting {
-      public override addButton(configure: (button: Button) => unknown): this { configure(new Button(this.controlEl)); return this; }
-      public setHeading(): this { return this; }
-      public addToggle(configure: (toggle: { setValue(value: boolean): unknown; onChange(callback: (value: boolean) => Promise<void>): unknown }) => unknown): this {
-        const input = this.controlEl.createEl("input", { attr: { type: "checkbox" } });
-        const toggle = {
-          setValue(value: boolean) { input.checked = value; return toggle; },
-          onChange(callback: (value: boolean) => Promise<void>) { input.addEventListener("change", () => { void callback(input.checked); }); return toggle; },
-        };
-        configure(toggle);
-        return this;
-      }
-    },
   };
 });
 vi.mock("../../src/ui/styles.css", () => ({ default: ".folder-nodes {}" }));
@@ -111,7 +94,7 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
 }
 
 describe("selection creation through the plugin", () => {
-  beforeEach(() => { host.modals.length = 0; notices.length = 0; setLanguage("en"); });
+  beforeEach(() => { host.modals.length = 0; notices.length = 0; document.body.replaceChildren(); setLanguage("en"); });
 
   for (const entry of ["command", "editor-menu"] as const) {
     it.each([true, false])(`${entry} shares creation with confirmation %s`, async (confirm) => {

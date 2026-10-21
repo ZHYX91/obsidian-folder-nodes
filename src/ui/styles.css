@@ -318,8 +318,17 @@ body {
 
 .folder-nodes-leaf-indicator {
   position: relative;
-  cursor: default;
+  cursor: var(--cursor, default);
   pointer-events: auto;
+}
+
+.folder-nodes-settings-support .setting-item-control {
+  flex-wrap: wrap;
+  gap: var(--size-4-3);
+}
+
+.folder-nodes-settings-support a {
+  cursor: var(--cursor, default);
 }
 .folder-nodes-leaf-indicator > svg { visibility: hidden; }
 .folder-nodes-leaf-indicator::after {

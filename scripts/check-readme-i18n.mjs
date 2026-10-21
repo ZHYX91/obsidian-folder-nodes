@@ -1,8 +1,28 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { assertSemanticAnchors } from "./markdown-contract.mjs";
+import { INTERFACE_LOCALE_LABELS } from "../src/core/interface-languages.ts";
+
+const REPOSITORY_URL = "https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/";
+const RAW_REPOSITORY_URL = "https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/";
+
+export async function assertReadmeRepositoryLinks(projectRoot, relativePath, source) {
+  for (const [, target] of source.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/gu)) {
+    const urlPrefix = [REPOSITORY_URL, RAW_REPOSITORY_URL].find((prefix) => target.startsWith(prefix));
+    if (urlPrefix === undefined && /^(?:[a-z]+:|#)/iu.test(target)) continue;
+    if (urlPrefix === undefined && relativePath === "README.md") {
+      throw new Error(`${relativePath} must use canonical repository URLs: ${target}`);
+    }
+    const repositoryPath = decodeURIComponent(target.slice(urlPrefix?.length ?? 0).split(/[?#]/u)[0]);
+    const absolute = path.resolve(projectRoot, urlPrefix === undefined ? path.dirname(relativePath) : ".", repositoryPath);
+    const relative = path.relative(path.resolve(projectRoot), absolute);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error(`Repository link escapes the checkout: ${target}`);
+    try { await access(absolute); }
+    catch { throw new Error(`${relativePath} links to a missing local repository file: ${target}`); }
+  }
+}
 
 const REQUIRED_ENGLISH = [
   "Screenshots",
@@ -60,20 +80,17 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
   if (!english.includes("docs/i18n/README.zh-CN.md")) throw new Error("README.md must link its Chinese translation");
   assertSemanticAnchors(english, SEMANTIC_ANCHORS.map(([anchor]) => anchor), "README.md");
   assertSemanticAnchors(chinese, SEMANTIC_ANCHORS.map(([, anchor]) => anchor), "Chinese README");
-  // The two complete references and ten localized getting-started guides must
-  // link to every supported reading language. This also checks the draft branch,
-  // where absolute links to main would hide missing translations.
-  const LOCALES = ["zh-CN", "zh-TW", "ja", "ko", "de", "fr", "es", "pt-BR", "ru", "vi", "ar"];
-  const expectedInnerLinks = ["../../README.md", ...LOCALES.map((locale) => `README.${locale}.md`)];
+  // Public root links use main for Community Plugins. Resolve their files in
+  // this checkout, so a draft cannot hide a missing translation behind main.
+  const readingLanguages = Object.entries(INTERFACE_LOCALE_LABELS);
+  const LOCALES = readingLanguages.map(([locale]) => locale).filter((locale) => locale !== "en");
+  const expectedRootNavigation = readingLanguages.map(([locale, label]) =>
+    `[${label}](${REPOSITORY_URL}${locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`})`).join(" · ");
+  const expectedInnerNavigation = readingLanguages.map(([locale, label]) =>
+    `[${label}](${locale === "en" ? "../../README.md" : `README.${locale}.md`})`).join(" · ");
   const rootNavigation = english.split("\n")[2] ?? "";
-  for (const locale of LOCALES) {
-    if (!rootNavigation.includes(`docs/i18n/README.${locale}.md`)) {
-      throw new Error(`Root README lacks the ${locale} navigation link`);
-    }
-  }
-  if (!rootNavigation.includes("(README.md)")) {
-    throw new Error("Root README lacks the English navigation link");
-  }
+  if (rootNavigation !== expectedRootNavigation) throw new Error("Root README language navigation must match the interface catalog");
+  await assertReadmeRepositoryLinks(projectRoot, "README.md", english);
 
   for (const locale of LOCALES) {
     const relativePath = `docs/i18n/README.${locale}.md`;
@@ -82,11 +99,8 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
       throw new Error(`${relativePath} must identify Folder Nodes`);
     }
     const navigation = source.split("\n")[2] ?? "";
-    for (const link of expectedInnerLinks) {
-      if (!navigation.includes(`(${link})`)) {
-        throw new Error(`${relativePath} lacks navigation to ${link}`);
-      }
-    }
+    if (navigation !== expectedInnerNavigation) throw new Error(`${relativePath} language navigation must match the interface catalog`);
+    await assertReadmeRepositoryLinks(projectRoot, relativePath, source);
     for (const term of ["A/A.md", "hidden=true", "icon", "Node Graph", "Obsidian 1.12.7"]) {
       if (locale !== "zh-CN" && !source.includes(term)) {
         throw new Error(`${relativePath} lacks essential guidance: ${term}`);

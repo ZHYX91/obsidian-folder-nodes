@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const fr: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "Aide et assistance",
+  "userGuide": "Guide d’utilisation",
+  "reportIssue": "Signaler un problème",
   "settings": "Paramètres de Folder Nodes",
   "general": "Général",
   "management": "Gestion",
@@ -284,7 +287,7 @@ export const fr: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "Retirer le candidat",
   "explorerPreview": "Aperçu de l’explorateur",
   "contentsPreview": "Aperçu du contenu des nœuds",
-  "visualUnknownItems": "{count} candidats inconnus ont été conservés mais ignorés.",
+  "visualUnknownItems": "{count} candidats ne sont pas reconnus. Modifiez-les ou retirez-les avant d’enregistrer ; la note n’a pas changé.",
   "visualExtraColors": "{count} couleurs supplémentaires conservées ; la première couleur valide sera utilisée.",
   "iconGuideTitle": "Comment définir une icône de nœud",
   "iconGuideIntro": "Dans l’explorateur, faites un clic droit sur un nœud et choisissez « Définir l’icône du nœud », ou modifiez directement la propriété icon de sa note.",

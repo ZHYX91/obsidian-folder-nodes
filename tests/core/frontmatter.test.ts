@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseDocument } from "yaml";
+import { expectFrontmatterPropertyChanges, parseFrontmatterDocument } from "../helpers/frontmatter-oracle";
 
 import {
   analyzeFolderNodesSource,
@@ -9,6 +10,33 @@ import {
 } from "../../src/core/frontmatter";
 
 describe("source-preserving frontmatter patches", () => {
+  it.each([
+    "future=Bob's # preserve this comment",
+    'future=inch"wide # preserve this comment',
+    "'future=Bob''s' # preserve this comment",
+    '"future=Bob\'s # literal" # preserve this comment',
+  ])("retains unknown block-item source through hide and unhide: %s", (item) => {
+    const source = `---\r\nfolder-nodes:\r\n  - ${item}\r\n---\r\nBody sentinel.\r\n`;
+    const hidden = patchFolderNodesFrontmatter(source, { hidden: true });
+    expect(hidden).toContain(`  - ${item}\r\n`);
+    expect(patchFolderNodesFrontmatter(hidden, { hidden: false })).toBe(source);
+  });
+
+  it.each([
+    ["plain apostrophe and comment", "\n  - future=Bob's # a comment", ["future=Bob's"]],
+    ["plain double quote and comment", '\n  - future=inch"wide # a comment', ['future=inch"wide']],
+    ["single-quoted apostrophe", "\n  - 'future=Bob''s' # a comment", ["future=Bob's"]],
+    ["quoted literal hash", '\n  - "future=Bob\'s # literal" # a comment', ["future=Bob's # literal"]],
+    ["flow plain apostrophe", " [future=Bob's, other=yes] # a comment", ["future=Bob's", "other=yes"]],
+    ["flow quoted comma and hash", " ['future=Bob''s, # literal', other=yes] # a comment", ["future=Bob's, # literal", "other=yes"]],
+  ])("preserves the YAML meaning of unknown tokens: %s", (_name, value, entries) => {
+    const source = `---\n# retain\naliases: [Example]\nfolder-nodes:${value}\n---\nBody\n`;
+    expect(parseFrontmatterDocument(source).data).toMatchObject({ "folder-nodes": entries });
+    const updated = patchFolderNodesFrontmatter(source, { hidden: true });
+    expectFrontmatterPropertyChanges(source, updated, { "folder-nodes": ["hidden=true", ...entries] });
+    expect(updated).toContain("# retain\naliases: [Example]\n");
+  });
+
   it("changes one generic scalar without changing unrelated YAML or body", () => {
     const source = "---\n# keep\naliases: [A]\ncustom: 1\n---\nBody\n";
     expect(patchFrontmatterScalar(source, "custom", 1536)).toBe("---\n# keep\naliases: [A]\ncustom: 1536\n---\nBody\n");
@@ -44,6 +72,36 @@ describe("source-preserving frontmatter patches", () => {
       { hidden: true },
     )).toThrow("Invalid folder-nodes item");
     expect(analyzeFolderNodesSource("---\nfolder-nodes: []\nfolder-nodes: []\n---\n").issues[0]?.code).toBe("source-ambiguous");
+  });
+
+  it.each([
+    [String.raw`"folder\x2dnodes"`, "folder-nodes", "[rank=1, future=value]"],
+    [String.raw`"\u0066older-nodes"`, "folder-nodes", "[rank=1, future=value]"],
+    [String.raw`"folder\U0000002Dnodes"`, "folder-nodes", "[rank=1, future=value]"],
+    [String.raw`"folderNode\u0048idden"`, "folderNodeHidden", "true"],
+    [String.raw`"folderNodeSibling\x52ank"`, "folderNodeSiblingRank", "1024"],
+    [String.raw`"folderNodeChildren\U00000053ort"`, "folderNodeChildrenSort", "manual"],
+  ])("refuses the decoded known property key %s before writing", (rawKey, key, value) => {
+    const source = `---\n${rawKey}: ${value}\naliases: [Example]\n---\nBody\n`;
+    expect(Object.keys(parseFrontmatterDocument(source).data as object)).toContain(key);
+    expect(analyzeFolderNodesSource(source).issues).toEqual([
+      expect.objectContaining({ code: "source-ambiguous", field: "all" }),
+    ]);
+    expect(() => patchFolderNodesFrontmatter(source, { hidden: true })).toThrow("Quoted Folder Nodes property keys");
+    expect(() => patchFolderNodesFrontmatter(source, { migrateLegacy: true })).toThrow("Quoted Folder Nodes property keys");
+    expect(() => patchFrontmatterScalar(source, key, "replacement")).toThrow("Quoted Folder Nodes property keys");
+  });
+
+  it.each([
+    [String.raw`"folder\\u002dnodes"`, String.raw`folder\u002dnodes`],
+    [String.raw`'folder\u002dnodes'`, String.raw`folder\u002dnodes`],
+    [String.raw`"unrelated\"key:part"`, 'unrelated"key:part'],
+  ])("preserves the distinct quoted property %s", (rawKey, key) => {
+    const source = `---\n${rawKey}: [keep]\n---\nBody\n`;
+    expect(parseFrontmatterDocument(source).data).toEqual({ [key]: ["keep"] });
+    const written = patchFolderNodesFrontmatter(source, { hidden: true });
+    expectFrontmatterPropertyChanges(source, written, { "folder-nodes": ["hidden=true"] });
+    expect(written).toContain(`${rawKey}: [keep]`);
   });
 
   it.each([

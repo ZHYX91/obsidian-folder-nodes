@@ -84,7 +84,7 @@ export function patchFolderNodesFrontmatter(source: string, patch: FolderNodesFr
   } else {
     for (const field of touched) legacyToRemove.add(legacyPropertyFor(field));
   }
-  return patchParsedSource(parsed, nextEntries, legacyToRemove);
+  return patchParsedSource(parsed, nextEntries, legacyToRemove, current.unknownEntries);
 }
 
 export function patchFrontmatterScalar(source: string, key: string, value: string | number | boolean | null): string {
@@ -106,7 +106,7 @@ export function createNodeDocument(alias: string | null, body: string): string {
   return `---\naliases:\n  - ${JSON.stringify(alias.trim())}\n---\n${body}`;
 }
 
-function patchParsedSource(parsed: ParsedSource, entries: readonly string[], legacyToRemove: ReadonlySet<string>): string {
+function patchParsedSource(parsed: ParsedSource, entries: readonly string[], legacyToRemove: ReadonlySet<string>, unknownEntries: readonly string[]): string {
   if (!parsed.hasFrontmatter) {
     if (entries.length === 0) return `${parsed.bom}${parsed.lines.join(parsed.eol)}`;
     const rendered = renderFolderNodes(entries, parsed.eol);
@@ -117,8 +117,26 @@ function patchParsedSource(parsed: ParsedSource, entries: readonly string[], leg
     ...[...legacyToRemove].map((key) => parsed.ranges.get(key)),
   ].filter((range): range is SourceRange => range !== undefined);
   const insertion = ranges.reduce((minimum, range) => Math.min(minimum, range.start), parsed.closingBoundary);
-  const rendered = entries.length === 0 ? [] : renderFolderNodes(entries, parsed.eol).split(parsed.eol);
+  const preserved = unknownBlockItems(parsed, new Set(unknownEntries));
+  const rendered = entries.length === 0 ? [] : [FOLDER_NODES_PROPERTY + ":", ...entries.map((entry) =>
+    preserved.get(entry)?.shift() ?? `  - ${renderListItem(entry)}`)];
   return rebuildSource(parsed, ranges, insertion, rendered);
+}
+
+function unknownBlockItems(parsed: ParsedSource, unknown: ReadonlySet<string>): Map<string, string[]> {
+  const preserved = new Map<string, string[]>();
+  const range = parsed.ranges.get(FOLDER_NODES_PROPERTY);
+  if (range === undefined || stripYamlComment(valueAfterColon(parsed.lines[range.start] ?? "")).trim() !== "") return preserved;
+  for (const line of parsed.lines.slice(range.start + 1, range.end)) {
+    const match = /^\s+-\s+(.+)$/u.exec(line);
+    if (match === null) continue;
+    const value = parseYamlScalar(match[1]!);
+    if (typeof value !== "string" || !unknown.has(value)) continue;
+    const rows = preserved.get(value) ?? [];
+    rows.push(`  ${line.trimStart()}`);
+    preserved.set(value, rows);
+  }
+  return preserved;
 }
 
 function rebuildSource(parsed: ParsedSource, removedRanges: readonly SourceRange[], insertion: number, rendered: readonly string[]): string {
@@ -364,19 +382,25 @@ function splitFlowList(value: string): string[] | null {
   const parts: string[] = [];
   let quote: "\"" | "'" | null = null;
   let escaped = false;
+  let scalarStart = true;
   let start = 0;
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
     if (escaped) { escaped = false; continue; }
     if (character === "\\" && quote === "\"") { escaped = true; continue; }
     if (quote !== null) {
+      if (quote === "'" && character === "'" && value[index + 1] === "'") { index += 1; continue; }
       if (character === quote) quote = null;
       continue;
     }
-    if (character === "\"" || character === "'") { quote = character; continue; }
-    if (character !== ",") continue;
+    if (scalarStart && (character === "\"" || character === "'")) { quote = character; scalarStart = false; continue; }
+    if (character !== ",") {
+      if (!/\s/u.test(character ?? "")) scalarStart = false;
+      continue;
+    }
     parts.push(value.slice(start, index).trim());
     start = index + 1;
+    scalarStart = true;
   }
   if (quote !== null) return null;
   parts.push(value.slice(start).trim());
@@ -399,16 +423,22 @@ function parseYamlScalar(raw: string): unknown {
 function stripYamlComment(value: string): string {
   let quote: "\"" | "'" | null = null;
   let escaped = false;
+  let scalarStart = true;
+  const flow = /^[[{]/u.test(value.trimStart());
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
     if (escaped) { escaped = false; continue; }
     if (character === "\\" && quote === "\"") { escaped = true; continue; }
     if (quote !== null) {
+      if (quote === "'" && character === "'" && value[index + 1] === "'") { index += 1; continue; }
       if (character === quote) quote = null;
       continue;
     }
-    if (character === "\"" || character === "'") { quote = character; continue; }
+    // Quotes inside a plain scalar (future=Bob's) are literal characters.
+    if (scalarStart && (character === "\"" || character === "'")) { quote = character; scalarStart = false; continue; }
     if (character === "#" && (index === 0 || /\s/u.test(value[index - 1] ?? ""))) return value.slice(0, index);
+    if (flow && (character === "[" || character === "{" || character === ",")) scalarStart = true;
+    else if (!/\s/u.test(character ?? "")) scalarStart = false;
   }
   return value;
 }
@@ -419,9 +449,45 @@ function valueAfterColon(line: string): string {
 }
 
 function quotedKnownKey(line: string, keys: readonly string[]): string | null {
-  const match = /^(?:"([^"]+)"|'([^']+)')\s*:/u.exec(line);
-  const key = match?.[1] ?? match?.[2] ?? null;
+  if (line[0] !== '"' && line[0] !== "'") return null;
+  const separator = blockMappingSeparator(line);
+  if (separator === null) return null;
+  const raw = line.slice(0, separator).trimEnd();
+  const key = raw.startsWith("'")
+    ? raw.slice(1, -1).replaceAll("''", "'")
+    : decodeDoubleQuotedKey(raw);
   return key !== null && keys.includes(key) ? key : null;
+}
+
+/** Compare YAML key identities before allowing a source-preserving write. */
+function decodeDoubleQuotedKey(raw: string): string | null {
+  if (!raw.endsWith('"')) return null;
+  const escapes: Readonly<Record<string, string>> = {
+    "0": "\0", a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f", r: "\r",
+    e: "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+    N: "\u0085", _: "\u00a0", L: "\u2028", P: "\u2029",
+  };
+  let result = "";
+  for (let index = 1; index < raw.length - 1; index += 1) {
+    const character = raw[index] ?? "";
+    if (character !== "\\") { result += character; continue; }
+    const escape = raw[index + 1] ?? "";
+    const width = escape === "x" ? 2 : escape === "u" ? 4 : escape === "U" ? 8 : 0;
+    if (width > 0) {
+      const digits = raw.slice(index + 2, index + 2 + width);
+      if (digits.length !== width || !/^[\da-f]+$/iu.test(digits)) return null;
+      const codePoint = Number.parseInt(digits, 16);
+      if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return null;
+      result += String.fromCodePoint(codePoint);
+      index += width + 1;
+    } else {
+      const value = escapes[escape];
+      if (value === undefined) return null;
+      result += value;
+      index += 1;
+    }
+  }
+  return result;
 }
 
 function tokenKeysInPatch(patch: FolderNodesFrontmatterPatch): FolderNodesTokenKey[] {

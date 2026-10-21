@@ -21,10 +21,15 @@ export class PromptModal extends SubmittingModal {
     new Setting(this.contentEl)
       .setName(this.titleText)
       .addText((text) => {
+        let composing = false;
         text.setValue(this.value).onChange((value) => { this.value = value; });
         window.setTimeout(() => text.inputEl.focus(), 0);
+        text.inputEl.addEventListener("compositionstart", () => { composing = true; });
+        text.inputEl.addEventListener("compositionend", () => { composing = false; });
         text.inputEl.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") void this.submit();
+          if (event.key !== "Enter" || event.isComposing || composing) return;
+          event.preventDefault();
+          void this.submit();
         });
       });
     new Setting(this.contentEl)

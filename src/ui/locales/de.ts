@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const de: Readonly<Record<TranslationKey, string>> = {
+  "helpAndSupport": "Hilfe und Support",
+  "userGuide": "Benutzerhandbuch",
+  "reportIssue": "Problem melden",
   "settings": "Folder Nodes-Einstellungen",
   "general": "Allgemein",
   "management": "Verwaltung",
@@ -284,7 +287,7 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "removeCandidate": "Kandidat entfernen",
   "explorerPreview": "Dateiexplorer-Vorschau",
   "contentsPreview": "Vorschau der Knoteninhalte",
-  "visualUnknownItems": "{count} unbekannte Kandidaten wurden beibehalten und übersprungen.",
+  "visualUnknownItems": "{count} Kandidaten werden nicht erkannt. Bearbeiten oder entfernen Sie diese vor dem Speichern. Die Notiz wurde noch nicht geändert.",
   "visualExtraColors": "{count} zusätzliche Farben wurden beibehalten. Die erste gültige Farbe wird verwendet.",
   "iconGuideTitle": "Knotensymbol festlegen",
   "iconGuideIntro": "Klicken Sie im Dateiexplorer mit der rechten Maustaste auf einen Knoten und wählen Sie „Knotensymbol festlegen“ oder bearbeiten Sie die icon-Eigenschaft der Knotennotiz direkt.",
