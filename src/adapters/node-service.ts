@@ -35,6 +35,7 @@ import type {
   PropertyMigrationScan,
 } from "../core/types";
 import { editableVisualCandidates } from "../core/visual";
+import { assertMergeLinksKeepDestinations } from "../core/merge-link-safety";
 
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
@@ -479,6 +480,14 @@ export class NodeService {
         targetNotePath,
       );
       const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
+      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath);
+      const movingMarkdown = this.app.vault.getMarkdownFiles()
+        .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
+        .map((file) => ({ file, from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
+      for (const entry of movingMarkdown) {
+        const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
+        assertMergeLinksKeepDestinations(contents, entry.from, entry.to, sourcePath, targetPath, sourceNotePath);
+      }
 
       await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
       await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
@@ -574,6 +583,10 @@ export class NodeService {
           this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
           this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");
           this.assertMergeStructure(source, sourcePath, [sourceNote]);
+          for (const entry of movingMarkdown) {
+            const contents = await this.readClosedMergeNote(entry.file, entry.to, "source");
+            assertMergeLinksKeepDestinations(contents, entry.from, entry.to, sourcePath, targetPath, sourceNotePath);
+          }
           if (notesChanged) throw new Error("Node Note changed during final merge validation");
           this.expectEvent("delete", sourcePath, null, true);
           await this.app.fileManager.trashFile(source);
