@@ -94,7 +94,11 @@ function maskInlineLiterals(line: string, initial: "html" | "obsidian" | null) {
       continue;
     }
     if (line.startsWith("<!--", cursor) || line.startsWith("%%", cursor)) {
-      comment = line.startsWith("<!--", cursor) ? "html" : "obsidian";
+      const isHtml = line.startsWith("<!--", cursor);
+      comment = isHtml ? "html" : "obsidian";
+      const openingLength = isHtml ? 4 : 2;
+      for (let i = cursor; i < cursor + openingLength; i += 1) chars[i] = " ";
+      cursor += openingLength;
       continue;
     }
     if (line[cursor] === "\x60") {
