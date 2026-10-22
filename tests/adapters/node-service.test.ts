@@ -1529,6 +1529,41 @@ describe("NodeService structural safety", () => {
     expect(fake.frontmatters.get("Target/Target.md")).not.toHaveProperty("folderNodeHidden");
   });
 
+  it.each(["source", "child"])("refuses %s relative links that would change meaning before moving anything", async (which) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFile("Reference.md", "the original reference");
+    const source = fake.addFolder("Source");
+    const sourceText = which === "source" ? "[ref](../Reference.md)" : "source body";
+    fake.addFile("Source/Source.md", sourceText);
+    fake.addFolder("Source/Sub");
+    const childText = which === "child" ? "[ref](../../Reference.md)" : "child body";
+    fake.addFile("Source/Sub/Child.md", childText);
+    fake.addFolder("Deep");
+    const target = fake.addFolder("Deep/B");
+    fake.addFile("Deep/B/B.md", "target body");
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("change a relative link target");
+    expect(fake.renames).toEqual([]);
+    expect(fake.trashed).toEqual([]);
+    expect(fake.contents.get("Source/Source.md")).toBe(sourceText);
+    expect(fake.contents.get("Source/Sub/Child.md")).toBe(childText);
+    expect(fake.contents.get("Deep/B/B.md")).toBe("target body");
+  });
+
+  it("preserves relative link meaning when an attached child moves with the source", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "See [asset](asset.bin)");
+    fake.addFile("Source/asset.bin", "attachment");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    await service(fake).mergeNode(source, target);
+    expect(fake.requireFile("Target/asset.bin")).toBeDefined();
+    expect(fake.contents.get("Target/Target.md")).toContain("See [asset](asset.bin)");
+    expect(fake.files.has("Source")).toBe(false);
+  });
+
   it("blocks merge property and path conflicts before writing", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
