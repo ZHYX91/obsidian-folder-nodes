@@ -47,7 +47,9 @@ export function assertMergeLinksKeepDestinations(
     for (let index = visible.indexOf("]("); index >= 0; index = visible.indexOf("](", index + 2)) {
       if (!covered.has(index)) throw new Error("Cannot safely merge an unsupported Markdown link");
     }
-    const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S+)/u.exec(visible);
+    // An empty first line can continue its destination on the next line.
+    // Refuse that unsupported form at the opener, before any merge effects.
+    const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S*)/u.exec(visible);
     if (definition?.[1] != null && !absolute(definition[1])) {
       throw new Error("Cannot safely merge a relative reference definition");
     }

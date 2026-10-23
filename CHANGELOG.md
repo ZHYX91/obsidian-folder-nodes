@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Refuse node merges that would change supported relative Markdown link targets, including multiline reference definitions and moved descendant notes.
+- Recheck lifecycle, editors, file identity and source structure after all final merge reads; preserve notes and compensate owned changes if those conditions change before source removal.
+
 ## 0.11.1 - 2026-10-21
 
 - Preserve recognized node-note spelling during renames and unknown YAML tokens around quotes and comments.

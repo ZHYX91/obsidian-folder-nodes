@@ -31,4 +31,12 @@ describe("Node merge link preflight", () => {
     expect(() => assertSafe('<a href="../Reference.md">a</a>')).toThrow("relative HTML link");
     expect(() => assertSafe("[link](../Some%20File.md)")).toThrow("ambiguous");
   });
+
+  it.each([
+    "[ref]\n\n[ref]:\n  ../Reference.md",
+    "[ref]\r\n\r\n[ref]:\r\n  <../Reference.md>",
+    "[ref]:\n  ../Reference.md \"title\"",
+  ])("refuses a reference definition whose destination starts on the next line: %s", (source) => {
+    expect(() => assertSafe(source)).toThrow("reference definition");
+  });
 });
