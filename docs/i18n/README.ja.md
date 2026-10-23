@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+このページは基本操作と注意事項をまとめた短いガイドです。詳しい手順は[英語版](../../README.md)または[簡体字中国語版](README.zh-CN.md)をご覧ください。
+
 ## 画面例
 
 ノードの内容、標準ファイルエクスプローラー、Node Graph、アイコン設定、選択テキストからの作成画面を紹介します。
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![子ノードとメディアを表示するノード内容のサイドバー](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian のファイルエクスプローラーとノード状態](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![ノードの階層を表示する Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![ノードアイコンと外観の設定](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![選択テキストからノードを作成](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 機能
 
@@ -74,13 +76,15 @@ icon:
 
 ## 制限事項
 
+**ノードを統合する前に：** 元と先のノードノートを保存し、編集タブを閉じてください。リリース版 **0.11.1** は相対 Markdown リンクを書き換えません。`[参照](../Reference.md)` はフォルダー間の統合後に別のファイルを指すことがあります。事前に Vault をバックアップし、リンクと添付ファイルを確認してください。安全性を確認できない統合は避けてください（修正案は別の PR #47 で審査中です）。
+
 ノードは現在の Vault パスで識別され、固定 ID はありません。A/A.md の代わりに README.md、index.md、_A.md を使うことはできません。名前や frontmatter の競合があれば統合を停止します。リモート画像、PDF や動画のサムネイル、HEIC/HEIF プレビュー、動画・音声の埋め込み再生には対応しません。Android にはデスクトップ式のドラッグ操作がありません。大きなグラフは Canvas 表示になっても階層は省略しません。
 
 ## プライバシーと安全性
 
 **非表示**：folder-nodes プロパティの hidden=true は、Folder Nodes のファイルエクスプローラー表示、ノードの内容、Node Graph だけでノードと子孫を隠します。Obsidian の検索や直接アクセスは使えます。**管理対象外**：そのファイルやフォルダーにノード構造の操作をしない設定です。隠したり削除したりするものではありません。
 
-「ファイル名を変更」は 1 件のファイルまたはフォルダーを変更します。「所属ノード」の操作はノード全体に適用されます。一括整理と古いプロパティの移行は変更前にプレビューを表示し、状態チェックは読み取り専用です。競合がある場合は自動的に統合しません。削除方法は Obsidian のファイル削除設定に従います。
+通常の移動・削除は選択したファイルやフォルダーに作用します。ただし、完全なノードのフォルダーや同名ノートを名前変更すると、問題がない場合はもう一方の名前も同期されます。「所属ノード」の操作はノード全体に適用されます。一括整理と古いプロパティの移行は変更前にプレビューを表示し、状態チェックは読み取り専用です。競合がある場合は自動的に統合しません。削除方法は Obsidian のファイル削除設定に従います。
 
 Vault の内容はローカルで処理し、アップロードやネットワーク要求は行いません。一括整理とプロパティ移行は変更内容を先に表示し、競合時には停止します。完全なノードの削除方法は Obsidian のファイル削除設定に従います。明示的にコピーしたときだけクリップボードにリンクを書き込み、クリップボードを読み取ることはありません。設定と管理対象外ルールは data.json に保存されます。
 
