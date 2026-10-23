@@ -80,8 +80,8 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
   if (!english.includes("docs/i18n/README.zh-CN.md")) throw new Error("README.md must link its Chinese translation");
   assertSemanticAnchors(english, SEMANTIC_ANCHORS.map(([anchor]) => anchor), "README.md");
   assertSemanticAnchors(chinese, SEMANTIC_ANCHORS.map(([, anchor]) => anchor), "Chinese README");
-  // Documentation-only contract: never claim that the released merge
-  // preserves relative destinations or that deletion always uses system trash.
+  // Keep actionable merge guidance without release-status narratives, and
+  // never claim that deletion always uses system trash.
   for (const [filename, source] of [["README.md", english], ["docs/i18n/README.zh-CN.md", chinese]]) {
     if (!source.includes("../Reference.md")) {
       throw new Error(filename + " must explain relative link risks during node merges");
@@ -116,7 +116,7 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
     }
     if (locale !== "zh-CN") {
       if (!source.includes("../Reference.md")) {
-        throw new Error(`${relativePath} must warn about relative links in 0.11.1 merges`);
+        throw new Error(`${relativePath} must explain relative links during node merges`);
       }
       const screenshotLines = source.split("\n").filter((line) => line.startsWith("!["));
       if (screenshotLines.length !== 5) {

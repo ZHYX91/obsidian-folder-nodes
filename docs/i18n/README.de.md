@@ -76,7 +76,7 @@ icon:
 
 ## Einschränkungen
 
-**Vor dem Zusammenführen:** Speichern und schließen Sie die geöffneten Quell- und Ziel-Knotennotizen. Die veröffentlichte Version **0.11.1** passt relative Markdown-Links nicht an. Ein Link wie `../Reference.md` kann nach dem Verschieben in einen anderen Ordner auf eine andere Datei zeigen. Sichern Sie den Vault und prüfen Sie die Links und Anhänge. Wenn sich das Ziel nicht sicher bestimmen lässt, verzichten Sie auf die Zusammenführung; eine Schutzmaßnahme wird separat in PR #47 geprüft.
+**Vor dem Zusammenführen:** Speichern und schließen Sie Quell- und Ziel-Knotennotizen sowie alle verschobenen Markdown-Notizen. Die Prüfung lehnt unterstützte relative Links wie `../Reference.md` ab, wenn sich ihr Ziel ändern würde oder die Schreibweise nicht sicher geprüft werden kann; dazu gehören relative Referenzdefinitionen mit dem Ziel in der nächsten Zeile. Links werden nicht automatisch umgeschrieben. Korrigieren Sie gemeldete Links vor einem neuen Versuch, bewahren Sie wichtige Notizen wiederherstellbar auf und prüfen Sie Links und Anhänge nach erfolgreichem Zusammenführen.
 
 Folder Nodes lädt keine Vault-Inhalte hoch und stellt keine Netzwerkanfragen. Die Spracheinstellung verändert weder Notizen noch Dateinamen oder Knoteneigenschaften.
 

@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 0.11.2 - 2026-10-23
+
 - Refuse node merges that would change supported relative Markdown link targets, including multiline reference definitions and moved descendant notes.
 - Recheck lifecycle, editors, file identity and source structure after all final merge reads; preserve notes and compensate owned changes if those conditions change before source removal.
+- Clarify whole-node actions, merge precautions, deletion settings, and localized user guides.
 
 ## 0.11.1 - 2026-10-21
 

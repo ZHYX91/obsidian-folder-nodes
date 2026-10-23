@@ -101,9 +101,9 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 
 ### Before merging nodes
 
-Save and close every tab editing the **source and target Node Notes** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder. A conflict may stop the operation; this is not a preview of all resulting links.
+Save and close every tab editing the **source and target Node Notes and the Markdown descendants being moved** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder according to Obsidian's deletion setting.
 
-**Important for version 0.11.1:** the merge does not rewrite relative Markdown link destinations. If the source note or its moved descendants contain links such as `../Reference.md`, those links can resolve to different files after a cross-folder move. Back up the Vault, inspect relative references and attachments before the merge, and check them afterward; avoid cross-folder merges whose link destinations you cannot verify. The separate [pending link-safety PR #47](https://github.com/ZHYX91/obsidian-folder-nodes/pull/47) proposes refusing such moves, but it is **not included in 0.11.1**.
+The merge checks supported relative Markdown links such as `../Reference.md` before writing. It refuses links whose targets would change, unsupported relative reference definitions (including a destination on the next line), and other ambiguous destinations. It does not rewrite relative links. Resolve the reported links before retrying, keep a recoverable copy of important notes, and check links and attachments after a successful merge. If an editor opens, checked notes change, or the plugin unloads before source removal, the operation stops and attempts to roll back its own changes while preserving user edits.
 
 ## Settings
 
@@ -152,7 +152,7 @@ The picker loads the current list, supports add/remove/reorder/presets, and prev
 
 - Structural identity is the current normalized Vault path, not a permanent node ID.
 - Alternate canonical note names such as `README.md`, `index.md`, or `_A.md` are not supported.
-- Merge stops on path or frontmatter conflicts rather than offering a complex conflict-resolution UI. In released 0.11.1, relative links are not rewritten and can change targets when notes move; see **Before merging nodes**.
+- Merge stops on path or frontmatter conflicts and relative-link safety refusals rather than offering a complex conflict-resolution UI or a general link rewriter; see **Before merging nodes**.
 - Android has no HTML5 drag handles or drop targets.
 - Node visuals do not fetch remote images, recolor arbitrary inline SVG, generate PDF/video thumbnails, preview HEIC/HEIF, or provide inline video/audio playback.
 - Node Contents is not a second complete Vault tree and does not transactionally move multiple ordinary files.
@@ -162,7 +162,7 @@ The picker loads the current list, supports add/remove/reorder/presets, and prev
 
 Folder Nodes runs locally and makes no network requests. It reads Vault paths, metadata, and note text only for documented features such as structure checks, migration previews, link indexing, and Node Graph.
 
-User actions can create, edit, move, rename, merge, or trash notes and folders. Multi-step operations are serialized and check known conflicts; preview-first maintenance rechecks targets before commit. These checks do not prove that a relative link retains its meaning after a merge. Complete-node deletion follows **Obsidian's configured deletion setting**, which need not be the system trash.
+User actions can create, edit, move, rename, merge, or trash notes and folders. Multi-step operations are serialized and check known conflicts; preview-first maintenance rechecks targets before commit. Merge checks supported relative links and refuses unsafe or ambiguous destinations. Complete-node deletion follows **Obsidian's configured deletion setting**, which need not be the system trash.
 
 The plugin writes generated Markdown links to the system clipboard only after an explicit copy action and **never reads the clipboard**. Preferences and unmanaged rules stay in plugin `data.json`; structural tokens stay in Node Notes.
 

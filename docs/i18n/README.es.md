@@ -76,7 +76,7 @@ icon:
 
 ## Limitaciones
 
-**Antes de fusionar nodos:** guarda las notas de origen y destino y cierra sus pestañas de edición. La versión publicada **0.11.1** no ajusta los enlaces relativos de Markdown: `../Reference.md` puede pasar a apuntar a otro archivo al mover notas entre carpetas. Haz una copia de seguridad, revisa enlaces y adjuntos y evita la fusión si no puedes confirmar sus destinos. Hay una protección pendiente de revisión en la PR #47.
+**Antes de fusionar nodos:** guarda y cierra las notas de origen, destino y todas las notas Markdown que se moverán. La comprobación previa rechaza enlaces relativos admitidos como `../Reference.md` si cambiarían de destino o no se pueden comprobar con seguridad, incluidas las definiciones relativas cuyo destino está en la línea siguiente. No reescribe los enlaces automáticamente. Corrige los enlaces indicados antes de reintentar, conserva una copia recuperable de las notas importantes y revisa enlaces y adjuntos tras una fusión correcta.
 
 Los nodos se identifican por la ruta actual del almacén, no por un ID permanente. README.md, index.md y _A.md no pueden sustituir A/A.md. La fusión se detiene ante conflictos de ruta o frontmatter. No se cargan imágenes remotas ni se crean miniaturas de PDF/vídeo, vistas HEIC/HEIF o reproductores integrados. Android no ofrece arrastrar y soltar como en escritorio. Los gráficos grandes usan Canvas sin perder la jerarquía.
 

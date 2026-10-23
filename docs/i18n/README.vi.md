@@ -76,7 +76,7 @@ icon:
 
 ## Giới hạn
 
-**Trước khi hợp nhất nút:** lưu và đóng các tab đang chỉnh sửa ghi chú nút nguồn và đích. Bản phát hành **0.11.1** không sửa đường dẫn liên kết Markdown tương đối. Ví dụ `../Reference.md` có thể trỏ sang tệp khác sau khi chuyển thư mục. Hãy sao lưu Vault và kiểm tra liên kết, tệp đính kèm; không hợp nhất nếu chưa xác định được đích. Biện pháp bảo vệ đang được xem xét riêng trong PR #47.
+**Trước khi hợp nhất nút:** lưu và đóng ghi chú nguồn, đích và mọi ghi chú Markdown sẽ được di chuyển. Kiểm tra trước sẽ từ chối các liên kết tương đối được hỗ trợ như `../Reference.md` nếu đích thay đổi hoặc không thể xác minh cú pháp an toàn, kể cả định nghĩa tham chiếu tương đối có đích ở dòng tiếp theo. Liên kết không được tự động viết lại. Sửa các liên kết được báo trước khi thử lại, giữ bản có thể khôi phục của ghi chú quan trọng và kiểm tra liên kết, tệp đính kèm sau khi hợp nhất thành công.
 
 Nút được nhận dạng bằng đường dẫn hiện tại trong kho, không có ID vĩnh viễn. Không thể dùng README.md, index.md hoặc _A.md thay A/A.md. Hợp nhất sẽ dừng nếu đường dẫn hoặc frontmatter xung đột. Không tải ảnh từ mạng, không tạo ảnh thu nhỏ PDF/video, không xem trước HEIC/HEIF hoặc phát đa phương tiện trực tiếp. Android không có kéo thả kiểu máy tính. Sơ đồ lớn dùng Canvas nhưng vẫn giữ đủ cây phân cấp.
 
