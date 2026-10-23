@@ -35,6 +35,7 @@ import type {
   PropertyMigrationScan,
 } from "../core/types";
 import { editableVisualCandidates } from "../core/visual";
+import { assertMergeLinksKeepDestinations } from "../core/merge-link-safety";
 
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
@@ -479,6 +480,14 @@ export class NodeService {
         targetNotePath,
       );
       const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
+      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath);
+      const movingMarkdown = this.app.vault.getMarkdownFiles()
+        .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
+        .map((file) => ({ file, from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
+      for (const entry of movingMarkdown) {
+        const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
+        assertMergeLinksKeepDestinations(contents, entry.from, entry.to, sourcePath, targetPath, sourceNotePath);
+      }
 
       await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
       await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
@@ -557,16 +566,21 @@ export class NodeService {
           await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
         }
 
-        // Observe both notes across the final asynchronous reads, so checking one
-        // cannot silently invalidate the other. Trash dispatch is the commit point.
+        // Observe all checked notes across the final asynchronous reads. Finish
+        // every await before the synchronous checks at the trash commit point.
         let notesChanged = false;
+        const checkedNotes = new Set<TAbstractFile>([sourceNote, targetNote, ...movingMarkdown.map(({ file }) => file)]);
         const modification = this.app.vault.on("modify", (file) => {
-          if (file === sourceNote || file === targetNote) notesChanged = true;
+          if (checkedNotes.has(file)) notesChanged = true;
         });
         try {
           this.assertEntryIdentity(target, targetPath, TFolder);
           await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
           await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
+          for (const entry of movingMarkdown) {
+            const contents = await this.readClosedMergeNote(entry.file, entry.to, "source");
+            assertMergeLinksKeepDestinations(contents, entry.from, entry.to, sourcePath, targetPath, sourceNotePath);
+          }
           this.assertActive();
           this.assertEntryIdentity(target, targetPath, TFolder);
           this.assertEntryIdentity(targetNote, targetNotePath, TFile);
@@ -574,6 +588,10 @@ export class NodeService {
           this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
           this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");
           this.assertMergeStructure(source, sourcePath, [sourceNote]);
+          for (const entry of movingMarkdown) {
+            this.assertEntryIdentity(entry.file, entry.to, TFile);
+            this.assertMergeNoteClosed(entry.file, entry.to, "source");
+          }
           if (notesChanged) throw new Error("Node Note changed during final merge validation");
           this.expectEvent("delete", sourcePath, null, true);
           await this.app.fileManager.trashFile(source);

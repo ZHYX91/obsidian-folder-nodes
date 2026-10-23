@@ -11,6 +11,12 @@ fixture** creates `Viewport/` for large-graph checks. Each command refuses to re
 folder; if generation is interrupted, start with a fresh disposable Vault. The provider is a fixture
 and is excluded from release assets.
 
+**Prepare merge safety fixture** creates independent unsafe-link, safe-attachment, and final-read
+race cases under `MergeSafety/`. The two **Arm merge ... race** commands only arrange a deterministic
+editor-open or plugin-unload condition; invoke the actual merge through Folder Nodes. **Save merge
+safety observations** records note contents and triggered conditions without issuing a verdict.
+Use a fresh Vault when repeating this scenario.
+
 With the graph scoped to the Viewport subtree and the default large-graph threshold of 500,
 expanding Wide changes the visible graph from 3 to 501 nodes. Collapsing it changes back. This
 exercises DOM and Canvas transitions without changing settings or editing the product runtime.

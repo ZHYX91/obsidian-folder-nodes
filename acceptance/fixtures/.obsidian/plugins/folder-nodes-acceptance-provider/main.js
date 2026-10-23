@@ -31,6 +31,97 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
       name: "Create 501-node viewport fixture (disposable Vault only)",
       callback: () => this.createFixture().catch((error) => new Notice(String(error))),
     });
+    this.addCommand({
+      id: "prepare-merge-safety",
+      name: "Prepare merge safety fixture (disposable Vault only)",
+      callback: () => this.prepareMergeSafety().catch((error) => new Notice(String(error))),
+    });
+    for (const kind of ["editor", "unload"]) this.addCommand({
+      id: `arm-merge-${kind}-race`,
+      name: `Arm merge ${kind} race (disposable Vault only)`,
+      callback: () => this.armMergeRace(kind),
+    });
+    this.addCommand({
+      id: "save-merge-safety",
+      name: "Save merge safety observations (disposable Vault only)",
+      callback: () => this.saveMergeSafety().catch((error) => new Notice(String(error))),
+    });
+  }
+
+  async prepareMergeSafety() {
+    if (this.creating || this.app.vault.getAbstractFileByPath("MergeSafety")) {
+      new Notice("MergeSafety already exists or is being created. Use a fresh disposable Vault.");
+      return;
+    }
+    this.creating = true;
+    try {
+      await this.app.vault.createFolder("MergeSafety");
+      await this.app.vault.create("MergeSafety/MergeSafety.md", "# Merge safety\n");
+      for (const name of ["Inline", "Reference", "Nested", "Safe", "EditorRace", "UnloadRace"]) {
+        const root = `MergeSafety/${name}`;
+        for (const folder of [root, `${root}/Source`, `${root}/Source/Sub`, `${root}/Deep`, `${root}/Deep/Target`]) {
+          await this.app.vault.createFolder(folder);
+          const basename = folder.slice(folder.lastIndexOf("/") + 1);
+          await this.app.vault.create(`${folder}/${basename}.md`, `# ${basename}\n`);
+        }
+        await this.app.vault.create(`${root}/Reference.md`, "Original reference.\n");
+        await this.app.vault.create(`${root}/Deep/Reference.md`, "Different reference: must never replace the original target.\n");
+        const body = name === "Inline" ? "[ref](../Reference.md)\n" : name === "Reference"
+          ? "[ref]\n\n[ref]:\n  ../Reference.md\n" : "Source body. See [asset](asset.bin).\n";
+        await this.app.vault.modify(this.app.vault.getAbstractFileByPath(`${root}/Source/Source.md`), body);
+        await this.app.vault.create(`${root}/Source/asset.bin`, "attachment\n");
+        await this.app.vault.create(`${root}/Source/Sub/Child.md`, name === "Nested" ? "[ref](../../Reference.md)\n" : "Child body.\n");
+      }
+      this.mergeRaces = [];
+      new Notice("MergeSafety ready: Inline, Reference and Nested must refuse; Safe may merge; arm each race before its product action.");
+    } finally { this.creating = false; }
+  }
+
+  armMergeRace(kind) {
+    const root = `MergeSafety/${kind === "editor" ? "EditorRace" : "UnloadRace"}`;
+    if (this.mergeRaceArmed || !this.app.vault.getAbstractFileByPath(`${root}/Source/Source.md`)) {
+      new Notice("Prepare a fresh merge fixture and finish the previous race first.");
+      return;
+    }
+    const vault = this.app.vault;
+    const original = vault.read;
+    const wrapper = async (file) => {
+      const contents = await original.call(vault, file);
+      if (file.path === `${root}/Deep/Target/Sub/Child.md`) {
+        if (vault.read === wrapper) vault.read = original;
+        this.mergeRaceArmed = false;
+        const observation = { kind, path: file.path, at: new Date().toISOString(), triggered: true };
+        this.mergeRaces.push(observation);
+        if (kind === "editor") {
+          const note = vault.getAbstractFileByPath(`${root}/Source/Source.md`);
+          const sourceContents = await original.call(vault, note);
+          const leaf = this.app.workspace.getLeaf(true);
+          await leaf.openFile(note, { state: { mode: "source" } });
+          leaf.view.editor.setValue(sourceContents + "\nUnsaved merge-race user edit.\n");
+          observation.editorPath = leaf.view.file?.path;
+        } else {
+          await this.app.plugins.disablePlugin("folder-nodes");
+          observation.pluginLoadedAfter = Boolean(this.app.plugins.plugins["folder-nodes"]);
+        }
+      }
+      return contents;
+    };
+    vault.read = wrapper;
+    this.mergeRaceArmed = true;
+    this.register(() => { if (vault.read === wrapper) vault.read = original; });
+    new Notice(`Merge ${kind} race armed. Use the product Merge node action on ${root}/Source.`);
+  }
+
+  async saveMergeSafety() {
+    const files = [];
+    for (const file of this.app.vault.getMarkdownFiles().filter((file) => file.path.startsWith("MergeSafety/"))) {
+      files.push({ path: file.path, contents: await this.app.vault.read(file) });
+    }
+    await this.app.vault.adapter.write("_merge-safety-observations.json", JSON.stringify({
+      at: new Date().toISOString(), pluginLoaded: Boolean(this.app.plugins.plugins["folder-nodes"]),
+      races: this.mergeRaces ?? [], files,
+    }, null, 2));
+    new Notice("Merge observations saved; inspect actual files and UI before assigning a verdict.");
   }
 
   recordExplorerTrace() {
