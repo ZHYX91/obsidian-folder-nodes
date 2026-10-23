@@ -335,7 +335,7 @@
       },
       "steps": [
         "Run Prepare merge safety fixture in a fresh disposable Vault. Save and close all source, target and descendant editors before each merge. Use the product Merge node action on each case's Source, selecting its Deep/Target.",
-        "Try Inline, Reference and Nested. Reference uses a destination on the line after [ref]:. Confirm a refusal notice and inspect the original notes, target body, child paths and attachments. The original and destination directories contain different Reference.md files.",
+        "Try Inline, Definition and Nested. Definition uses a destination on the line after [ref]:. Confirm a refusal notice and inspect the original notes, target body, child paths and attachments. The original and destination directories contain different Reference.md files.",
         "Merge Safe using the product UI. Open the appended attachment link and moved child, then inspect the surviving attachment and target note. Confirm only this successful source folder is removed according to the host deletion setting.",
         "Run Arm merge editor race, then merge EditorRace/Source through the product UI. The provider opens the source editor at the final descendant read. Inspect the refusal, source editor content, restored child path and target body. Close that editor before continuing.",
         "Run Arm merge unload race, then merge UnloadRace/Source through the product UI. The provider disables the candidate at the final descendant read. Inspect source/child preservation and target rollback; re-enable Folder Nodes through the host UI. Run Save merge safety observations and record the real host environment."

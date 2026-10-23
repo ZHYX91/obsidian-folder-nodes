@@ -57,7 +57,7 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
     try {
       await this.app.vault.createFolder("MergeSafety");
       await this.app.vault.create("MergeSafety/MergeSafety.md", "# Merge safety\n");
-      for (const name of ["Inline", "Reference", "Nested", "Safe", "EditorRace", "UnloadRace"]) {
+      for (const name of ["Inline", "Definition", "Nested", "Safe", "EditorRace", "UnloadRace"]) {
         const root = `MergeSafety/${name}`;
         for (const folder of [root, `${root}/Source`, `${root}/Source/Sub`, `${root}/Deep`, `${root}/Deep/Target`]) {
           await this.app.vault.createFolder(folder);
@@ -66,14 +66,14 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
         }
         await this.app.vault.create(`${root}/Reference.md`, "Original reference.\n");
         await this.app.vault.create(`${root}/Deep/Reference.md`, "Different reference: must never replace the original target.\n");
-        const body = name === "Inline" ? "[ref](../Reference.md)\n" : name === "Reference"
+        const body = name === "Inline" ? "[ref](../Reference.md)\n" : name === "Definition"
           ? "[ref]\n\n[ref]:\n  ../Reference.md\n" : "Source body. See [asset](asset.bin).\n";
         await this.app.vault.modify(this.app.vault.getAbstractFileByPath(`${root}/Source/Source.md`), body);
         await this.app.vault.create(`${root}/Source/asset.bin`, "attachment\n");
         await this.app.vault.create(`${root}/Source/Sub/Child.md`, name === "Nested" ? "[ref](../../Reference.md)\n" : "Child body.\n");
       }
       this.mergeRaces = [];
-      new Notice("MergeSafety ready: Inline, Reference and Nested must refuse; Safe may merge; arm each race before its product action.");
+      new Notice("MergeSafety ready: Inline, Definition and Nested must refuse; Safe may merge; arm each race before its product action.");
     } finally { this.creating = false; }
   }
 
