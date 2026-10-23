@@ -76,7 +76,7 @@ icon:
 
 ## Limitações
 
-**Antes de mesclar nós:** salve e feche as abas de edição das notas de origem e destino. A versão publicada **0.11.1** não reescreve links relativos do Markdown. Um link como `[referência](../Reference.md)` pode apontar para outro arquivo após a mudança de pasta. Faça backup do cofre e confira links e anexos; não mescle se não puder verificar os destinos. Uma proteção está em análise na PR #47.
+**Antes de mesclar nós:** salve e feche as abas de edição das notas de origem e destino. A versão publicada **0.11.1** não reescreve links relativos do Markdown. Um link como `../Reference.md` pode apontar para outro arquivo após a mudança de pasta. Faça backup do cofre e confira links e anexos; não mescle se não puder verificar os destinos. Uma proteção está em análise na PR #47.
 
 O Folder Nodes não envia conteúdo do cofre nem realiza solicitações de rede. Trocar o idioma da interface não altera notas, nomes de arquivos ou propriedades.
 
