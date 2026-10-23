@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+هذا دليل مختصر للمهام الشائعة والاحتياطات المهمة. للتفاصيل، راجع الدليل الكامل [بالإنجليزية](../../README.md) أو [بالصينية المبسطة](README.zh-CN.md).
+
 ## صور الواجهة
 
 توضح الصور محتويات العقد ومستكشف الملفات الأصلي وNode Graph وإعدادات الأيقونات وإنشاء العقد من نص محدد.
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![الشريط الجانبي لمحتويات العقد والملفات والوسائط](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![مستكشف ملفات Obsidian وحالات العقد](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Node Graph يعرض التسلسل الهرمي للمجلدات](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![إعدادات أيقونات العقد والمظهر](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![إنشاء عقدة من النص المحدد](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## الميزات
 
@@ -74,13 +76,15 @@ icon:
 
 ## القيود
 
+**قبل دمج العقد:** احفظ ملاحظتي العقدة المصدر والهدف وأغلق علامات تبويب التحرير الخاصة بهما. الإصدار المنشور **0.11.1** لا يعيد كتابة روابط Markdown النسبية؛ فقد يشير الرابط `[مرجع](../Reference.md)` إلى ملف مختلف بعد النقل بين المجلدات. أنشئ نسخة احتياطية وافحص الروابط والمرفقات، ولا تدمج عندما يتعذر التأكد من الوجهات. يجري فحص تحسين الحماية بشكل منفصل في PR #47.
+
 تُحدد هوية العقدة بمسارها الحالي في الخزنة وليس بمعرّف دائم. لا يمكن استبدال A/A.md بأسماء README.md أو index.md أو _A.md. يتوقف الدمج عند تعارض المسار أو frontmatter. لا يدعم الملحق الصور البعيدة أو إنشاء صور مصغرة لملفات PDF/الفيديو أو معاينة HEIC/HEIF أو تشغيل الوسائط داخليًا. لا تتوفر طريقة السحب والإفلات المكتبية على Android. تتحول الرسوم الكبيرة إلى Canvas مع بقاء التسلسل الهرمي كاملًا.
 
 ## الخصوصية والأمان
 
 **الإخفاء**: تؤدي العلامة hidden=true في الخاصية folder-nodes إلى إخفاء العقدة ونسلها في عروض Folder Nodes فقط: مستكشف الملفات ومحتويات العقد وNode Graph. يبقى البحث في Obsidian وفتح الملفات مباشرة متاحين. **غير مُدار**: لن يغيّر Folder Nodes بنية هذه الملفات والمجلدات، لكنه لا يخفيها ولا يحذفها.
 
-أمر «إعادة تسمية ملف» يؤثر في ملف أو مجلد واحد، أما أوامر «العقدة التي تحتوي الملاحظة» فتؤثر في العقدة كاملة. تعرض عمليات التنظيم الجماعي وترحيل الخصائص معاينة قبل الكتابة، وفحص الحالة للقراءة فقط. عند وجود تعارض يتوقف الملحق بدل التخمين. يتبع حذف العقد المكتملة طريقة حذف الملفات المحددة في إعدادات Obsidian.
+تؤثر عمليتا النقل والحذف العاديتان في الملف أو المجلد المحدد. أما إعادة تسمية مجلد العقدة المكتملة أو ملاحظتها التي تحمل الاسم نفسه فتزامن اسم الجزء الآخر أيضًا عند عدم وجود تعارض. أوامر «العقدة التي تحتوي الملاحظة» تستهدف العقدة كاملة. تعرض عمليات التنظيم الجماعي وترحيل الخصائص معاينة قبل الكتابة، وفحص الحالة للقراءة فقط. عند وجود تعارض يتوقف الملحق بدل التخمين. يتبع حذف العقد المكتملة طريقة حذف الملفات المحددة في إعدادات Obsidian.
 
 تتم المعالجة محليًا دون رفع الملاحظات أو إرسال طلبات شبكة. تُعرض معاينة قبل التنظيم الجماعي وترحيل الخصائص وتتوقف العملية عند التعارضات. يتبع حذف العقدة المكتملة طريقة حذف الملفات المحددة في إعدادات Obsidian. تُكتب الروابط في الحافظة فقط إذا اخترت النسخ صراحةً، ولا يقرأ الملحق الحافظة أبدًا. تُحفظ الإعدادات وقواعد الاستثناء في data.json.
 
