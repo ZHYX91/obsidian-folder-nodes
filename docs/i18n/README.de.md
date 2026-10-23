@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+Diese Kurzfassung behandelt die wichtigsten Abläufe und Risiken. Ausführliche Anleitungen stehen auf [Englisch](../../README.md) und [vereinfachtem Chinesisch](README.zh-CN.md) bereit.
+
 ## Screenshots
 
 Die Bilder zeigen Knoteninhalte, den gewohnten Dateiexplorer, den Node Graph, Symboleinstellungen und das Erstellen eines Knotens aus markiertem Text.
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![Knoteninhalte mit Kindern, Medien und Dateien](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian-Dateiexplorer mit Knotenstatus](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Node Graph mit Ordnerhierarchie](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![Einstellungen für Knotensymbole und Darstellung](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Knotenerstellung aus markiertem Text](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Funktionen
 
@@ -74,7 +76,9 @@ icon:
 
 ## Einschränkungen
 
-Die Knotenidentität ist der aktuelle Vault-Pfad, keine dauerhafte Kennung. Folder Nodes lädt keine Vault-Inhalte hoch und stellt keine Netzwerkanfragen. Die Spracheinstellung verändert weder Notizen noch Dateinamen oder Knoteneigenschaften.
+**Vor dem Zusammenführen:** Speichern und schließen Sie Quell- und Ziel-Knotennotizen sowie alle verschobenen Markdown-Notizen. Die Prüfung lehnt unterstützte relative Links wie `../Reference.md` ab, wenn sich ihr Ziel ändern würde oder die Schreibweise nicht sicher geprüft werden kann; dazu gehören relative Referenzdefinitionen mit dem Ziel in der nächsten Zeile. Links werden nicht automatisch umgeschrieben. Korrigieren Sie gemeldete Links vor einem neuen Versuch, bewahren Sie wichtige Notizen wiederherstellbar auf und prüfen Sie Links und Anhänge nach erfolgreichem Zusammenführen.
+
+Folder Nodes lädt keine Vault-Inhalte hoch und stellt keine Netzwerkanfragen. Die Spracheinstellung verändert weder Notizen noch Dateinamen oder Knoteneigenschaften.
 
 Die Knotenidentität ist der aktuelle Vault-Pfad, keine permanente ID. Andere Namen wie README.md, index.md oder _A.md können A/A.md nicht ersetzen. Bei Pfad- oder frontmatter-Konflikten wird das Zusammenführen abgebrochen. Keine entfernten Bilder, PDF-/Video-Vorschaubilder, HEIC/HEIF-Vorschau oder eingebaute Medienwiedergabe. Android bietet keine Desktop-Drag-and-drop-Ziele. Große Graphen wechseln zu Canvas; die Hierarchie bleibt vollständig.
 
@@ -82,7 +86,7 @@ Die Knotenidentität ist der aktuelle Vault-Pfad, keine permanente ID. Andere Na
 
 **Ausblenden**: hidden=true in der Eigenschaft folder-nodes verbirgt einen Knoten samt Nachkommen nur in den Folder-Nodes-Ansichten Dateiexplorer, Knoteninhalte und Node Graph. Die Obsidian-Suche und direkte Dateizugriffe bleiben möglich. **Nicht verwaltet**: Für diese Dateien und Ordner werden keine strukturellen Knotenaktionen ausgeführt. Das bedeutet weder Löschen noch Ausblenden.
 
-„Datei umbenennen“ betrifft nur eine Datei oder einen Ordner; Aktionen für den „enthaltenden Knoten“ betreffen den ganzen Knoten. Sammelorganisation und Eigenschaftsmigration bieten vor Änderungen eine Vorschau; die Zustandsprüfung ist schreibgeschützt. Bei Konflikten wird die Aktion gestoppt statt geraten. Für vollständige Knoten gilt die in Obsidian gewählte Einstellung zum Löschen von Dateien.
+Normales Verschieben und Löschen betrifft das ausgewählte Element. Wird jedoch der Ordner oder die gleichnamige Notiz eines vollständigen Knotens umbenannt, synchronisiert das Plugin bei eindeutiger Zuordnung auch den anderen Namen. Aktionen für den „enthaltenden Knoten“ betreffen ausdrücklich den ganzen Knoten. Sammelorganisation und Eigenschaftsmigration bieten vor Änderungen eine Vorschau; die Zustandsprüfung ist schreibgeschützt. Bei Konflikten wird die Aktion gestoppt statt geraten. Für vollständige Knoten gilt die in Obsidian gewählte Einstellung zum Löschen von Dateien.
 
 Der Vault wird lokal verarbeitet; das Plugin lädt keine Inhalte hoch und führt keine Netzwerkanfragen aus. Sammelorganisation und Eigenschaftsmigration zeigen Änderungen zuerst an und stoppen bei Konflikten. Für vollständige Knoten gilt die in Obsidian gewählte Einstellung zum Löschen von Dateien. Nur nach ausdrücklichem Kopieren werden Links in die Zwischenablage geschrieben; das Plugin liest sie niemals aus. Einstellungen und Ausnahmeregeln liegen in data.json.
 

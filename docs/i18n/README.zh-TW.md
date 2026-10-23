@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+這是精簡入門說明，涵蓋常用操作與資料安全提醒。更多細節請參閱[英文完整指南](../../README.md)或[簡體中文完整指南](README.zh-CN.md)。
+
 ## 畫面預覽
 
 這些畫面分別展示節點內容、Obsidian 檔案列表、節點圖譜、圖示設定，以及從選取文字建立節點。
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![節點內容側欄顯示子節點、媒體及檔案](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Obsidian 檔案列表與節點狀態](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Folder Nodes 節點圖譜的階層](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![節點圖示與外觀設定](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![從選取文字建立節點](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 功能
 
@@ -74,7 +76,9 @@ icon:
 
 ## 限制
 
-節點以目前的 Vault 路徑識別，不會替每個節點建立永久 ID。Folder Nodes 不會上傳 Vault 內容，也不會發出網路請求。切換界面語言不會改變筆記內容、檔名或節點屬性。
+**合併節點前：** 先儲存並關閉來源、目標節點筆記及所有將移動的 Markdown 筆記編輯分頁。合併前會檢查受支援的相對連結，例如 `../Reference.md`；若目標會改變或語法無法安全判定，就會拒絕操作，包括目標寫在下一行的相對參照定義。外掛不會自動改寫連結。請先處理提示的連結再重試，為重要筆記保留可復原副本，成功後再核對連結與附件。
+
+Folder Nodes 不會上傳 Vault 內容，也不會發出網路請求。切換界面語言不會改變筆記內容、檔名或節點屬性。
 
 節點身分取決於目前的 Vault 路徑，不是永久 ID。不支援用 README.md、index.md 或 _A.md 代替 A/A.md。合併遇到路徑或 frontmatter 衝突會停止；不提供遠端圖片、PDF／影片縮圖、HEIC/HEIF 預覽或內嵌影音播放。Android 沒有桌面 HTML5 拖放；節點內容不是第二個完整檔案總管。大型圖譜會改用 Canvas，完整層級不會被截斷。
 
@@ -82,9 +86,9 @@ icon:
 
 **隱藏**：節點的 folder-nodes 屬性含 hidden=true 時，Folder Nodes 會在檔案列表、節點內容和 Node Graph 隱藏該節點及其下級；Obsidian 搜尋、連結和直接開啟仍正常。**不管理**：Folder Nodes 不對這些檔案或資料夾執行節點結構操作，但內容仍可存取；這不等於刪除或隱藏。
 
-一般「重新命名檔案」只操作單一檔案；明確標示「所在節點」的操作會影響整個節點。大量整理和舊屬性遷移會先顯示預覽；「健康檢查」只讀，不會修改筆記。有衝突時停止，不會猜測如何合併。刪除完整節點時遵循 Obsidian 設定的檔案刪除方式。
+原生移動或刪除通常作用於選取的檔案／資料夾；但完整節點的資料夾或同名筆記重新命名時，外掛會在無歧義時同步另一半。明確標示「所在節點」的操作會影響整個節點。大量整理和舊屬性遷移會先顯示預覽；「健康檢查」只讀，不會修改筆記。有衝突時停止，不會猜測如何合併。刪除完整節點時遵循 Obsidian 設定的檔案刪除方式。
 
-所有處理都在本機，不會上傳 Vault 內容或主動發送網路請求。批次整理與屬性遷移會先預覽再寫入；衝突時停止。完整節點刪除會使用 Obsidian 系統垃圾桶。只有使用者明確按下複製，才會寫入剪貼簿；插件不會讀取剪貼簿。偏好與不管理規則保存在 data.json；結構屬性仍寫在節點筆記。
+所有處理都在本機，不會上傳 Vault 內容或主動發送網路請求。批次整理與屬性遷移會先預覽再寫入；衝突時停止。完整節點的刪除方式依 Obsidian 目前的檔案刪除設定，不保證一定使用系統垃圾桶。只有使用者明確按下複製，才會寫入剪貼簿；插件不會讀取剪貼簿。偏好與不管理規則保存在 data.json；結構屬性仍寫在節點筆記。
 
 ## 開發
 

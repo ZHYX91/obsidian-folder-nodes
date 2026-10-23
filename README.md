@@ -2,7 +2,7 @@
 
 [English](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/README.md) · [简体中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-CN.md) · [繁體中文](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.zh-TW.md) · [日本語](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ja.md) · [한국어](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ko.md) · [Deutsch](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.de.md) · [Français](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.fr.md) · [Español](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.es.md) · [Português (Brasil)](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.pt-BR.md) · [Русский](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ru.md) · [Tiếng Việt](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.vi.md) · [العربية](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/i18n/README.ar.md)
 
-Give an Obsidian folder its own note, then browse the folder and its contents together. For example, `A/A.md` is the note for folder `A`. Folder Nodes calls this pair a *node*. If the folder or note is missing, you'll see **Incomplete**; the plugin won't quietly create or move files for you.
+Keep a folder and its same-named note together in Obsidian. For example, `A/A.md` belongs to folder `A`; Folder Nodes treats this pair as a *node*. Browse its children, files, and connections without replacing Obsidian's File Explorer. If either half is missing, it appears as **Incomplete** for you to fix or leave unmanaged.
 
 ## Screenshots
 
@@ -46,7 +46,7 @@ Before creating a node from selected text, check its name, location, note conten
 - **Node Contents sidebar.** Browse child nodes, a static media album, and ordinary files in separate paged sections. GIFs use still thumbnails; video and audio never receive inline playback controls.
 - **Node Graph.** Structure is always the hierarchy. An optional **Show links** switch overlays resolved links between Node Notes without changing the structural layout.
 - **Create from selected text.** Choose **Create Folder Node from selection** to create a child node, write the selected text into the new note, and replace the selection with a link. Links follow Obsidian’s global link-format settings. **Confirm before creating** defaults on and can be turned off in Selection & naming. Table-cell selections are handled safely; cross-cell selections are rejected before writing.
-- **Create from uncreated links.** In managed scope, clicking an unresolved `[[a]]` creates `a/a.md`. With aliases enabled, `[[a|b]]` also writes `b` to `aliases`.
+- **Create from uncreated links.** In managed scope, clicking an unresolved `[[a]]` creates the complete `a/a.md` node; an explicit nested link path can also create missing ancestor nodes. With aliases enabled, `[[a|b]]` writes `b` to `aliases`. Unsafe or unmanaged targets keep Obsidian's native behavior.
 - **Node icons.** Read one Obsidian `icon` Text/List as ordered image, Lucide, glyph, emoji, or `color:` candidates, with optional ancestor inheritance.
 - **Hidden subtrees.** A node can store `hidden=true`. Folder Nodes then hides that subtree only in File Explorer, Node Contents, and Folder Nodes Graph; Obsidian Search, Quick Switcher, backlinks, native Graph, links, and direct file access still work.
 - **Unmanaged boundaries.** Exact paths and name-start rules let you exclude Markdown files or whole folder subtrees from Folder Nodes management without hiding them.
@@ -96,13 +96,19 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 2. Open **Node contents** to browse the current node's children, media, and files. Right-click, More, or Shift+F10/Menu opens the same actions.
 3. Open **Node Graph** to browse the hierarchy: Global covers the Vault, Subtree anchors one node, and Local adds its parent. Expand branches, search, switch between 2D/3D, or enable **Show links** to overlay references.
 4. On desktop, dropping a node into another changes its parent. Exact before/after ordering requires the parent's **Manual** child order. On Android, use native folder movement or **Move / Move up / Move down**.
-5. Native Obsidian commands act on the selected file or folder. Commands explicitly labelled **containing node** act on the whole Folder Node, including its managed folder and note.
+5. Native Move/Delete operates on the selected file or folder; a native rename of a complete node's folder or Node Note also synchronizes the other half when unambiguous. Commands labelled **containing node** explicitly act on the whole Folder Node. Check the target before moving or deleting.
 6. **Batch organize** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Health check** is read-only. Cancel if the proposed scope differs from your intention.
+
+### Before merging nodes
+
+Save and close every tab editing the **source and target Node Notes and the Markdown descendants being moved** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder according to Obsidian's deletion setting.
+
+The merge checks supported relative Markdown links such as `../Reference.md` before writing. It refuses links whose targets would change, unsupported relative reference definitions (including a destination on the next line), and other ambiguous destinations. It does not rewrite relative links. Resolve the reported links before retrying, keep a recoverable copy of important notes, and check links and attachments after a successful merge. If an editor opens, checked notes change, or the plugin unloads before source removal, the operation stops and attempts to roll back its own changes while preserving user edits.
 
 ## Settings
 
 - **General** — interface language, hidden-marker behavior, and optional Root homepage.
-- **Management** — unmanaged Markdown/folder rules, bulk organization, property migration, and read-only Health.
+- **Management** — unmanaged Markdown/folder rules, bulk organization, property migration, and read-only Health. By default, Markdown names beginning with `.` or `_` and root `AGENTS.md` / `CLAUDE.md` are unmanaged; folders whose names begin with `.` or `_` are unmanaged. Protected Vault/system folders remain outside managed structure.
 - **Icons & appearance** — icon inheritance, File Explorer placement, note-title display, and emoji font selection.
 - **Selection & naming** — confirmation for selected-text creation, aliases, plus optional prefix/suffix naming sources and timestamp formats.
 - **Node Graph** — enablement, default dimension, 2D direction, and large-graph thresholds.
@@ -146,7 +152,7 @@ The picker loads the current list, supports add/remove/reorder/presets, and prev
 
 - Structural identity is the current normalized Vault path, not a permanent node ID.
 - Alternate canonical note names such as `README.md`, `index.md`, or `_A.md` are not supported.
-- Merge stops on path or frontmatter conflicts rather than offering a complex conflict-resolution UI.
+- Merge stops on path or frontmatter conflicts and relative-link safety refusals rather than offering a complex conflict-resolution UI or a general link rewriter; see **Before merging nodes**.
 - Android has no HTML5 drag handles or drop targets.
 - Node visuals do not fetch remote images, recolor arbitrary inline SVG, generate PDF/video thumbnails, preview HEIC/HEIF, or provide inline video/audio playback.
 - Node Contents is not a second complete Vault tree and does not transactionally move multiple ordinary files.
@@ -156,7 +162,7 @@ The picker loads the current list, supports add/remove/reorder/presets, and prev
 
 Folder Nodes runs locally and makes no network requests. It reads Vault paths, metadata, and note text only for documented features such as structure checks, migration previews, link indexing, and Node Graph.
 
-User actions can create, edit, move, rename, merge, or trash notes and folders. Multi-step structural operations are serialized, conflicts stop before unsafe writes, and preview-first maintenance rechecks targets before commit. Complete-node deletion follows Obsidian's configured deletion setting.
+User actions can create, edit, move, rename, merge, or trash notes and folders. Multi-step operations are serialized and check known conflicts; preview-first maintenance rechecks targets before commit. Merge checks supported relative links and refuses unsafe or ambiguous destinations. Complete-node deletion follows **Obsidian's configured deletion setting**, which need not be the system trash.
 
 The plugin writes generated Markdown links to the system clipboard only after an explicit copy action and **never reads the clipboard**. Preferences and unmanaged rules stay in plugin `data.json`; structural tokens stay in Node Notes.
 

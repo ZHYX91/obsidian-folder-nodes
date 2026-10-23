@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+Este guia curto explica as tarefas mais comuns e os cuidados necessários. As instruções completas estão em [inglês](../../README.md) e [chinês simplificado](README.zh-CN.md).
+
 ## Capturas de tela
 
 As imagens mostram o conteúdo dos nós, o Explorador de Arquivos, o Node Graph, os ícones e a criação de nós a partir de texto selecionado.
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![Painel com nós filhos, mídia e arquivos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Explorador de arquivos do Obsidian e estado dos nós](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Node Graph com a hierarquia de pastas](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![Configurações de ícones e aparência dos nós](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Criação de nó a partir do texto selecionado](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Recursos
 
@@ -74,7 +76,9 @@ icon:
 
 ## Limitações
 
-A identidade do nó é o caminho atual no cofre, não um ID permanente. O Folder Nodes não envia conteúdo do cofre nem realiza solicitações de rede. Trocar o idioma da interface não altera notas, nomes de arquivos ou propriedades.
+**Antes de mesclar nós:** salve e feche as notas de origem, destino e todas as notas Markdown que serão movidas. A verificação recusa links relativos compatíveis como `../Reference.md` se o destino mudar ou a sintaxe não puder ser verificada com segurança, incluindo definições relativas cujo destino começa na linha seguinte. Os links não são reescritos automaticamente. Corrija os links indicados antes de tentar novamente, mantenha uma cópia recuperável das notas importantes e confira links e anexos após uma mesclagem bem-sucedida.
+
+O Folder Nodes não envia conteúdo do cofre nem realiza solicitações de rede. Trocar o idioma da interface não altera notas, nomes de arquivos ou propriedades.
 
 A identidade do nó é o caminho atual do cofre, não um ID permanente. README.md, index.md ou _A.md não substituem A/A.md. Uma mesclagem é interrompida quando há conflito de caminho ou frontmatter. Não há busca de imagens remotas, miniaturas PDF/vídeo, prévia HEIC/HEIF nem reprodução integrada de mídia. O Android não tem arrastar e soltar como no computador. Gráficos grandes usam Canvas sem omitir a hierarquia.
 
@@ -82,7 +86,7 @@ A identidade do nó é o caminho atual do cofre, não um ID permanente. README.m
 
 **Ocultar**: hidden=true na propriedade folder-nodes oculta o nó e seus descendentes apenas nas visualizações do Folder Nodes no Explorador, no Conteúdo dos Nós e no Node Graph. A busca e a abertura direta do Obsidian continuam funcionando. **Não gerenciado**: o Folder Nodes não executa operações estruturais nesses itens, mas não os esconde nem apaga.
 
-"Renomear arquivo" modifica apenas um arquivo ou pasta; ações do "nó que contém a nota" afetam o nó inteiro. Organização em lote e migração de propriedades mostram uma prévia antes da gravação; a verificação de integridade é somente leitura. Conflitos interrompem a ação, sem tentar adivinhar a solução. A exclusão de um nó completo segue a opção de exclusão de arquivos definida no Obsidian.
+Mover ou excluir normalmente afeta o arquivo ou pasta selecionados. Já renomear a pasta ou a nota homônima de um nó completo sincroniza a outra parte quando não há ambiguidade. Ações do "nó que contém a nota" afetam explicitamente o nó inteiro. Organização em lote e migração de propriedades mostram uma prévia antes da gravação; a verificação de integridade é somente leitura. Conflitos interrompem a ação, sem tentar adivinhar a solução. A exclusão de um nó completo segue a opção de exclusão de arquivos definida no Obsidian.
 
 O processamento é local: o plugin não envia conteúdo do cofre nem faz solicitações de rede. Organização e migração exibem prévia e param em caso de conflito. A exclusão de nós completos segue a opção de exclusão de arquivos definida no Obsidian. Links só são gravados na área de transferência após uma ação explícita de copiar; o plugin nunca lê a área de transferência. Configurações e exclusões ficam em data.json.
 
