@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+Esta es una guía breve de uso y precauciones. Los casos avanzados se explican en las guías completas en [inglés](../../README.md) y [chino simplificado](README.zh-CN.md).
+
 ## Capturas de pantalla
 
 Las imágenes muestran el contenido de un nodo, el explorador habitual, Node Graph, los iconos y la creación a partir de texto seleccionado.
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![Panel de contenido con nodos hijos y archivos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Explorador de archivos de Obsidian y estados de los nodos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Node Graph con la jerarquía de carpetas](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![Opciones de iconos y apariencia de los nodos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Creación de nodos a partir del texto seleccionado](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Funciones
 
@@ -74,13 +76,15 @@ icon:
 
 ## Limitaciones
 
+**Antes de fusionar nodos:** guarda las notas de origen y destino y cierra sus pestañas de edición. La versión publicada **0.11.1** no ajusta los enlaces relativos de Markdown: `[referencia](../Reference.md)` puede pasar a apuntar a otro archivo al mover notas entre carpetas. Haz una copia de seguridad, revisa enlaces y adjuntos y evita la fusión si no puedes confirmar sus destinos. Hay una protección pendiente de revisión en la PR #47.
+
 Los nodos se identifican por la ruta actual del almacén, no por un ID permanente. README.md, index.md y _A.md no pueden sustituir A/A.md. La fusión se detiene ante conflictos de ruta o frontmatter. No se cargan imágenes remotas ni se crean miniaturas de PDF/vídeo, vistas HEIC/HEIF o reproductores integrados. Android no ofrece arrastrar y soltar como en escritorio. Los gráficos grandes usan Canvas sin perder la jerarquía.
 
 ## Privacidad y seguridad
 
 **Ocultar**: hidden=true en la propiedad folder-nodes oculta el nodo y sus descendientes solo en las vistas de Folder Nodes del explorador, el contenido y Node Graph. La búsqueda y la apertura directa en Obsidian siguen funcionando. **No administrado**: Folder Nodes deja de realizar acciones estructurales sobre estos elementos, pero no los oculta ni los borra.
 
-«Cambiar nombre de archivo» modifica un único archivo o carpeta; las acciones para el «nodo contenedor» afectan a todo el nodo. La organización por lotes y la migración de propiedades muestran una vista previa; la comprobación de estado es de solo lectura. Si hay conflictos, la operación se detiene. La eliminación de nodos completos sigue la opción de eliminación de archivos elegida en Obsidian.
+Mover o eliminar normalmente afecta al archivo o carpeta seleccionados. Sin embargo, renombrar la carpeta o la nota homónima de un nodo completo también sincroniza la otra parte si no hay ambigüedad. Las acciones para el «nodo contenedor» afectan explícitamente al nodo entero. La organización por lotes y la migración de propiedades muestran una vista previa; la comprobación de estado es de solo lectura. Si hay conflictos, la operación se detiene. La eliminación de nodos completos sigue la opción de eliminación de archivos elegida en Obsidian.
 
 Todo se procesa localmente: no se suben notas ni se hacen solicitudes de red. La organización y la migración muestran una vista previa y se detienen si hay conflictos. Los nodos completos se eliminan según la opción de eliminación de archivos elegida en Obsidian. Los enlaces solo se escriben en el portapapeles al pulsar Copiar; el plugin nunca lee el portapapeles. Los ajustes y las reglas de exclusión se guardan en data.json.
 
