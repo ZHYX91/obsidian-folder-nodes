@@ -103,7 +103,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 
 Save and close every tab editing the **source and target Node Notes** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder. A conflict may stop the operation; this is not a preview of all resulting links.
 
-**Important for version 0.11.1:** the merge does not rewrite relative Markdown link destinations. If the source note or its moved descendants contain links such as `[reference](../Reference.md)`, those links can resolve to different files after a cross-folder move. Back up the Vault, inspect relative references and attachments before the merge, and check them afterward; avoid cross-folder merges whose link destinations you cannot verify. The separate [pending link-safety PR #47](https://github.com/ZHYX91/obsidian-folder-nodes/pull/47) proposes refusing such moves, but it is **not included in 0.11.1**.
+**Important for version 0.11.1:** the merge does not rewrite relative Markdown link destinations. If the source note or its moved descendants contain links such as `../Reference.md`, those links can resolve to different files after a cross-folder move. Back up the Vault, inspect relative references and attachments before the merge, and check them afterward; avoid cross-folder merges whose link destinations you cannot verify. The separate [pending link-safety PR #47](https://github.com/ZHYX91/obsidian-folder-nodes/pull/47) proposes refusing such moves, but it is **not included in 0.11.1**.
 
 ## Settings
 
