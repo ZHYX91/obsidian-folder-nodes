@@ -76,7 +76,7 @@ icon:
 
 ## Limites
 
-**Avant de fusionner des nœuds :** enregistrez et fermez les notes source et cible ouvertes dans l’éditeur. La version publiée **0.11.1** ne réécrit pas les liens Markdown relatifs : `[référence](../Reference.md)` peut pointer vers un autre fichier après un déplacement entre dossiers. Sauvegardez le coffre et vérifiez les liens et les pièces jointes. Évitez une fusion si les destinations restent incertaines ; une protection est en cours d’examen dans la PR #47.
+**Avant de fusionner des nœuds :** enregistrez et fermez les notes source et cible ouvertes dans l’éditeur. La version publiée **0.11.1** ne réécrit pas les liens Markdown relatifs : `../Reference.md` peut pointer vers un autre fichier après un déplacement entre dossiers. Sauvegardez le coffre et vérifiez les liens et les pièces jointes. Évitez une fusion si les destinations restent incertaines ; une protection est en cours d’examen dans la PR #47.
 
 L’identité d’un nœud dépend de son chemin actuel dans le coffre, pas d’un identifiant permanent. README.md, index.md ou _A.md ne remplacent pas A/A.md. Une fusion s’arrête en cas de conflit de chemin ou de frontmatter. Pas d’images distantes, de miniatures PDF/vidéo, d’aperçu HEIC/HEIF ni de lecteur multimédia intégré. Le glisser-déposer de bureau n’est pas disponible sur Android. Un grand graphe utilise Canvas sans perdre la hiérarchie.
 
