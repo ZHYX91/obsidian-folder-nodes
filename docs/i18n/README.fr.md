@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+Ce guide abrégé présente les opérations courantes et les précautions essentielles. Les guides complets sont disponibles en [anglais](../../README.md) et en [chinois simplifié](README.zh-CN.md).
+
 ## Captures d’écran
 
 Les images présentent le contenu des nœuds, l’explorateur de fichiers, le Node Graph, les réglages des icônes et la création depuis une sélection.
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![Volet des nœuds enfants, médias et fichiers](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Explorateur Obsidian avec états des nœuds](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Node Graph montrant la hiérarchie des dossiers](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![Paramètres des icônes et de l'apparence des nœuds](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Création de nœud à partir d'un texte sélectionné](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Fonctionnalités
 
@@ -74,13 +76,15 @@ icon:
 
 ## Limites
 
+**Avant de fusionner des nœuds :** enregistrez et fermez les notes source et cible ouvertes dans l’éditeur. La version publiée **0.11.1** ne réécrit pas les liens Markdown relatifs : `[référence](../Reference.md)` peut pointer vers un autre fichier après un déplacement entre dossiers. Sauvegardez le coffre et vérifiez les liens et les pièces jointes. Évitez une fusion si les destinations restent incertaines ; une protection est en cours d’examen dans la PR #47.
+
 L’identité d’un nœud dépend de son chemin actuel dans le coffre, pas d’un identifiant permanent. README.md, index.md ou _A.md ne remplacent pas A/A.md. Une fusion s’arrête en cas de conflit de chemin ou de frontmatter. Pas d’images distantes, de miniatures PDF/vidéo, d’aperçu HEIC/HEIF ni de lecteur multimédia intégré. Le glisser-déposer de bureau n’est pas disponible sur Android. Un grand graphe utilise Canvas sans perdre la hiérarchie.
 
 ## Confidentialité et sécurité
 
 **Masquer** : hidden=true dans la propriété folder-nodes cache le nœud et ses descendants uniquement dans les vues Folder Nodes de l’explorateur, du contenu et de Node Graph. La recherche Obsidian et l’ouverture directe continuent de fonctionner. **Non géré** : Folder Nodes n’effectue plus d’opérations de structure sur ces éléments, mais ne les masque ni ne les supprime.
 
-« Renommer le fichier » agit sur un seul fichier ou dossier ; les commandes visant le « nœud contenant » agissent sur le nœud entier. L’organisation par lots et la migration de propriétés montrent une prévisualisation avant écriture ; le bilan de santé reste en lecture seule. Les conflits arrêtent l’opération. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian.
+Déplacer ou supprimer un élément agit normalement sur le fichier ou dossier sélectionné. En revanche, renommer le dossier ou la note homonyme d’un nœud complet synchronise aussi l’autre nom lorsque la correspondance est certaine. Les commandes « nœud contenant » visent explicitement tout le nœud. L’organisation par lots et la migration de propriétés montrent une prévisualisation avant écriture ; le bilan de santé reste en lecture seule. Les conflits arrêtent l’opération. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian.
 
 Le traitement reste local : le plugin ne téléverse pas vos notes et n’envoie aucune requête réseau. Les opérations groupées et les migrations montrent les modifications avant écriture et s’arrêtent en cas de conflit. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian. Le plugin écrit un lien dans le presse-papiers uniquement lorsque vous demandez une copie ; il ne lit jamais le presse-papiers. Les réglages et exclusions sont conservés dans data.json.
 
