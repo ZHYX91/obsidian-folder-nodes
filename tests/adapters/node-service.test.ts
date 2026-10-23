@@ -1529,6 +1529,126 @@ describe("NodeService structural safety", () => {
     expect(fake.frontmatters.get("Target/Target.md")).not.toHaveProperty("folderNodeHidden");
   });
 
+  it.each([
+    ["source", "inline"], ["child", "inline"],
+    ["source", "reference"], ["child", "reference"],
+  ])("refuses %s %s links that would change meaning before moving anything", async (which, syntax) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFile("Reference.md", "the original reference");
+    const source = fake.addFolder("Source");
+    const link = (path: string) => syntax === "inline" ? `[ref](${path})` : `[ref]\n\n[ref]:\n  ${path}`;
+    const sourceText = which === "source" ? link("../Reference.md") : "source body";
+    fake.addFile("Source/Source.md", sourceText);
+    fake.addFolder("Source/Sub");
+    const childText = which === "child" ? link("../../Reference.md") : "child body";
+    fake.addFile("Source/Sub/Child.md", childText);
+    fake.addFolder("Deep");
+    const target = fake.addFolder("Deep/B");
+    fake.addFile("Deep/B/B.md", "target body");
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow(syntax === "inline" ? "change a relative link target" : "reference definition");
+    expect(fake.renames).toEqual([]);
+    expect(fake.trashed).toEqual([]);
+    expect(fake.contents.get("Source/Source.md")).toBe(sourceText);
+    expect(fake.contents.get("Source/Sub/Child.md")).toBe(childText);
+    expect(fake.contents.get("Deep/B/B.md")).toBe("target body");
+  });
+
+  it.each(["unload", "source-open", "target-open", "source-replace", "target-replace", "new-source-child"])(
+    "revalidates the commit boundary after the final descendant read: %s", async (change) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const source = fake.addFolder("Source");
+      const sourceNote = fake.addFile("Source/Source.md", "source body");
+      fake.addFolder("Source/Sub");
+      const child = fake.addFile("Source/Sub/Child.md", "child body");
+      const target = fake.addFolder("Target");
+      const targetNote = fake.addFile("Target/Target.md", "target body");
+      const nodes = service(fake);
+      const read = fake.app.vault.read.bind(fake.app.vault);
+      let triggered = false;
+      fake.app.vault.read = async (file) => {
+        const content = await read(file);
+        if (file === child && file.path === "Target/Sub/Child.md" && !triggered) {
+          triggered = true;
+          if (change === "unload") nodes.dispose();
+          if (change === "source-open" || change === "target-open") {
+            const note = change === "source-open" ? sourceNote : targetNote;
+            const editor = markdownEditorLeaf(note, "unsaved user edit");
+            fake.app.workspace.getLeavesOfType = vi.fn(() => [editor.leaf] as never);
+          }
+          if (change === "source-replace" || change === "target-replace") {
+            const note = change === "source-replace" ? sourceNote : targetNote;
+            fake.remove(note.path);
+            fake.addFile(note.path, "external replacement");
+          }
+          if (change === "new-source-child") fake.addFile("Source/new.md", "new user content");
+        }
+        return content;
+      };
+      await expect(nodes.mergeNode(source, target)).rejects.toThrow();
+      expect(triggered).toBe(true);
+      expect(fake.trashed).toEqual([]);
+      expect(fake.requireFolder("Source")).toBe(source);
+      expect(fake.requireFile("Source/Sub/Child.md")).toBe(child);
+      if (change === "source-replace") expect(fake.contents.get("Source/Source.md")).toBe("external replacement");
+      if (change === "target-replace") expect(fake.contents.get("Target/Target.md")).toBe("external replacement");
+      if (change === "new-source-child") expect(fake.contents.get("Source/new.md")).toBe("new user content");
+      expect(fake.modifyListeners.size).toBe(0);
+    },
+  );
+
+  it("preserves relative link meaning when an attached child moves with the source", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "See [asset](asset.bin)");
+    fake.addFile("Source/asset.bin", "attachment");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    await service(fake).mergeNode(source, target);
+    expect(fake.requireFile("Target/asset.bin")).toBeDefined();
+    expect(fake.contents.get("Target/Target.md")).toContain("See [asset](asset.bin)");
+    expect(fake.files.has("Source")).toBe(false);
+  });
+
+  it.each(["edit", "open", "replace"])("preserves an earlier descendant changed during a later final read: %s", async (change) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", "source body");
+    const first = fake.addFile("Source/first.md", "first body");
+    const second = fake.addFile("Source/second.md", "second body");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target body");
+    const read = fake.app.vault.read.bind(fake.app.vault);
+    let triggered = false;
+    fake.app.vault.read = async (file) => {
+      const content = await read(file);
+      if (file === second && file.path === "Target/second.md" && !triggered) {
+        triggered = true;
+        if (change === "edit") await fake.app.vault.modify(first, "external descendant edit");
+        if (change === "open") {
+          const editor = markdownEditorLeaf(first, "unsaved descendant edit");
+          fake.app.workspace.getLeavesOfType = vi.fn(() => [editor.leaf] as never);
+        }
+        if (change === "replace") {
+          fake.remove(first.path);
+          fake.addFile(first.path, "external replacement");
+        }
+      }
+      return content;
+    };
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow();
+    expect(triggered).toBe(true);
+    expect(fake.trashed).toEqual([]);
+    expect(fake.requireFolder("Source")).toBe(source);
+    expect(fake.contents.get("Target/Target.md")).toBe("target body");
+    if (change === "edit") expect(fake.contents.get("Source/first.md")).toBe("external descendant edit");
+    if (change === "replace") expect(fake.contents.get("Target/first.md")).toBe("external replacement");
+    expect(fake.modifyListeners.size).toBe(0);
+  });
+
   it("blocks merge property and path conflicts before writing", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
