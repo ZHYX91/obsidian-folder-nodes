@@ -2,19 +2,21 @@
 
 [English](../../README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Tiếng Việt](README.vi.md) · [العربية](README.ar.md)
 
+Đây là hướng dẫn ngắn cho các thao tác thường dùng và những điều cần lưu ý. Xem tài liệu đầy đủ bằng [tiếng Anh](../../README.md) hoặc [tiếng Trung giản thể](README.zh-CN.md) khi cần chi tiết.
+
 ## Ảnh minh họa
 
 Ảnh minh họa cho thấy nội dung nút, trình duyệt tệp, Node Graph, phần chỉnh biểu tượng và cách tạo nút từ văn bản đã chọn.
 
-![Node contents](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+![Thanh bên nội dung nút gồm nút con, ảnh và tệp](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
-![File Explorer](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+![Trình duyệt tệp Obsidian với trạng thái nút](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Node Graph hiển thị cây thư mục](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
-![Icons](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+![Thiết lập biểu tượng và giao diện nút](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Node creation](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Tạo nút từ phần văn bản được chọn](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Tính năng
 
@@ -74,19 +76,21 @@ icon:
 
 ## Giới hạn
 
+**Trước khi hợp nhất nút:** lưu và đóng các tab đang chỉnh sửa ghi chú nút nguồn và đích. Bản phát hành **0.11.1** không sửa đường dẫn liên kết Markdown tương đối. Ví dụ `[tham khảo](../Reference.md)` có thể trỏ sang tệp khác sau khi chuyển thư mục. Hãy sao lưu Vault và kiểm tra liên kết, tệp đính kèm; không hợp nhất nếu chưa xác định được đích. Biện pháp bảo vệ đang được xem xét riêng trong PR #47.
+
 Nút được nhận dạng bằng đường dẫn hiện tại trong kho, không có ID vĩnh viễn. Không thể dùng README.md, index.md hoặc _A.md thay A/A.md. Hợp nhất sẽ dừng nếu đường dẫn hoặc frontmatter xung đột. Không tải ảnh từ mạng, không tạo ảnh thu nhỏ PDF/video, không xem trước HEIC/HEIF hoặc phát đa phương tiện trực tiếp. Android không có kéo thả kiểu máy tính. Sơ đồ lớn dùng Canvas nhưng vẫn giữ đủ cây phân cấp.
 
 ## Quyền riêng tư và an toàn
 
 **Ẩn**: hidden=true trong thuộc tính folder-nodes chỉ ẩn nút và các nút con trong các giao diện của Folder Nodes: trình duyệt tệp, nội dung nút và Node Graph. Tìm kiếm hay mở trực tiếp bằng Obsidian vẫn hoạt động. **Không quản lý**: Folder Nodes không thực hiện thao tác thay đổi cấu trúc trên các tệp hoặc thư mục này, nhưng không ẩn hay xóa chúng.
 
-“Đổi tên tệp” chỉ tác động một tệp hoặc thư mục; thao tác với “nút chứa ghi chú” ảnh hưởng toàn bộ nút. Sắp xếp hàng loạt và chuyển đổi thuộc tính đều cho xem trước trước khi ghi, còn kiểm tra trạng thái chỉ đọc. Nếu gặp xung đột, plugin dừng thay vì tự đoán cách giải quyết. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian.
+Thao tác di chuyển hoặc xóa thông thường tác động đến tệp hay thư mục được chọn. Tuy nhiên, đổi tên thư mục hoặc ghi chú cùng tên của một nút hoàn chỉnh cũng sẽ đồng bộ tên phần còn lại khi không có xung đột. Thao tác với “nút chứa ghi chú” áp dụng cho cả nút. Sắp xếp hàng loạt và chuyển đổi thuộc tính đều cho xem trước trước khi ghi, còn kiểm tra trạng thái chỉ đọc. Nếu gặp xung đột, plugin dừng thay vì tự đoán cách giải quyết. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian.
 
 Mọi xử lý đều tại máy: plugin không tải ghi chú lên mạng hay gửi yêu cầu mạng. Sắp xếp hàng loạt và chuyển đổi thuộc tính sẽ cho xem trước, dừng khi có xung đột. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian. Chỉ khi bạn chủ động sao chép, liên kết mới được ghi vào bộ nhớ tạm; plugin không bao giờ đọc bộ nhớ tạm. Thiết lập và quy tắc loại trừ được lưu trong data.json.
 
 ## Phát triển
 
-Để phát triển, dùng Node.js 24.19.0 và npm 11.17.0. Chạy the commands below. Tài liệu kỹ thuật đầy đủ có bản tiếng Anh và tiếng Trung giản thể.
+Để phát triển, dùng Node.js 24.19.0 và npm 11.17.0. Chạy các lệnh sau. Tài liệu kỹ thuật đầy đủ có bản tiếng Anh và tiếng Trung giản thể.
 
 ```bash
 npm ci
