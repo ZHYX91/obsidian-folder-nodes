@@ -34,6 +34,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   public constructor(app: App, private readonly plugin: FolderNodesPlugin) { super(app, plugin); }
 
+  public showManagement(): void { this.selectTab("management", true); }
+
   public override getSettingDefinitions(): SettingDefinitionItem[] {
     return ENABLE_DECLARATIVE_SETTINGS ? this.getDeclarativeSettingDefinitions() : [];
   }

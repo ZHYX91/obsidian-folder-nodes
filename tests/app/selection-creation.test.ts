@@ -200,7 +200,10 @@ describe("selection creation through the plugin", () => {
     });
     f.trigger();
     await vi.waitFor(() => expect(notices).toHaveLength(1));
-    expect(notices[0]).toContain("could not be rolled back");
+    expect(notices[0]).toContain("Automatic cleanup stopped");
+    expect(notices[0]).toContain("Parent/Selected text/Selected text.md");
+    expect(notices[0]).toContain("host generation failed");
+    expect(notices[0]).toContain("concurrently modified created file");
     expect(f.fake.contents.get("Parent/Selected text/Selected text.md")).toBe("user-owned edit");
     expect(f.editor.replaceSelection).not.toHaveBeenCalled();
   });

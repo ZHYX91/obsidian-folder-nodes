@@ -5,7 +5,10 @@ import { setLanguage, t } from "../../src/ui/i18n";
 
 import { FolderNodeContentsView } from "../../src/ui/contents-view";
 
-function createView(): FolderNodeContentsView {
+function createView(
+  identity: "node" | "incomplete" = "incomplete",
+  statusActions: { openManagement?: () => void; showHealth?: () => void } = {},
+): FolderNodeContentsView {
   const root = Object.assign(new TFolder(), { children: [], name: "", path: "" });
   const app = {
     vault: {
@@ -20,7 +23,7 @@ function createView(): FolderNodeContentsView {
     getCanonicalFile: () => null,
     nodeNoteCandidates: () => [],
     nodeNoteRole: () => "none" as const,
-    folderIdentity: () => "incomplete" as const,
+    folderIdentity: () => identity,
     fileIdentity: () => "ordinary" as const,
     getFile: () => null,
     getFolder: () => null,
@@ -37,6 +40,7 @@ function createView(): FolderNodeContentsView {
     placeNode: vi.fn(async (folder: TFolder) => folder),
   };
   const actions = {
+    ...statusActions,
     createChild: vi.fn(),
     createMissingNote: vi.fn(),
     editVisual: vi.fn(),
@@ -59,6 +63,22 @@ function createView(): FolderNodeContentsView {
 }
 
 describe("Node Contents render extension lifecycle", () => {
+  it("explains incomplete content and opens only explicit management and read-only health actions", async () => {
+    const openManagement = vi.fn();
+    const showHealth = vi.fn();
+    const view = createView("incomplete", { openManagement, showHealth });
+    await view.onOpen();
+    const state = view.contentEl.querySelector<HTMLElement>(".folder-nodes-contents-status");
+    expect(state?.textContent).toContain("Root.md");
+    expect(state?.querySelector("[role='status']")).not.toBeNull();
+    state?.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='status:rules']")?.click();
+    state?.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='status:health']")?.click();
+    expect(openManagement).toHaveBeenCalledOnce();
+    expect(showHealth).toHaveBeenCalledOnce();
+    expect(state?.querySelector("[data-folder-nodes-focus-key='status:parent']")).toBeNull();
+    await view.onClose();
+  });
+
   it("refreshes existing Contents labels when the language changes", async () => {
     const view = createView();
     try {
@@ -215,10 +235,10 @@ describe("Node Contents render extension lifecycle", () => {
   });
 
   it("uses one unified empty state instead of three zero-count disclosure rows", async () => {
-    const view = createView();
+    const view = createView("node");
     await view.onOpen();
     expect(view.contentEl.querySelectorAll(".folder-nodes-section")).toHaveLength(0);
-    expect(view.contentEl.querySelector(".folder-nodes-contents-empty")?.textContent).toContain("no child nodes");
+    expect(view.contentEl.querySelector(".folder-nodes-contents-status")?.textContent).toContain("no child nodes");
     await view.onClose();
   });
 

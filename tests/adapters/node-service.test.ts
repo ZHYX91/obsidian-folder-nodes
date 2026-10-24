@@ -36,6 +36,80 @@ function markdownEditorLeaf(file: ReturnType<FakeObsidian["requireFile"]>, initi
 }
 
 describe("NodeService structural safety", () => {
+  it("rejects a queued metadata callback after disposal", async () => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("A");
+    const note = fake.addFile("A/A.md", "body");
+    const nodes = service(fake);
+    const process = fake.app.vault.process.bind(fake.app.vault);
+    fake.app.vault.process = async (file, update) => {
+      nodes.dispose();
+      return process(file, update);
+    };
+    await expect(nodes.setNodeHidden(folder, true)).rejects.toThrow("service unloaded");
+    expect(fake.contents.get(note.path)).toBe("body");
+  });
+
+  it.each(["note", "folder"])("does not dispatch native %s reconciliation after disposal during preflight", async (mode) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const folder = fake.addFolder("A");
+    const note = fake.addFile("A/A.md", "body");
+    const nodes = service(fake);
+    if (mode === "note") await fake.rename(note, "A/B.md");
+    else await fake.rename(folder, "B");
+    fake.app.vault.adapter.exists = async () => { nodes.dispose(); return false; };
+    const count = fake.renames.length;
+    await expect(nodes.reconcileRenamed(mode === "note" ? note : folder, mode === "note" ? "A/A.md" : "A"))
+      .rejects.toThrow("service unloaded");
+    expect(fake.renames).toHaveLength(count);
+  });
+
+  it("rejects a replacement note during native folder reconciliation preflight", async () => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("A");
+    const note = fake.addFile("A/A.md", "body");
+    const nodes = service(fake);
+    await fake.rename(folder, "B");
+    fake.app.vault.adapter.exists = async () => {
+      fake.remove(note.path);
+      fake.addFile(note.path, "replacement");
+      return false;
+    };
+    const count = fake.renames.length;
+    await expect(nodes.reconcileRenamed(folder, "A")).rejects.toThrow("identity changed");
+    expect(fake.renames).toHaveLength(count);
+    expect(fake.contents.get("B/A.md")).toBe("replacement");
+  });
+
+  it.each(["unchanged", "edited", "replaced"])("settles an accepted migration write before compensation after unload: %s", async (change) => {
+    const fake = new FakeObsidian();
+    const source = "---\nfolderNodeHidden: true\n---\nBody\n";
+    fake.addFolder("A");
+    fake.addFolder("B");
+    fake.addFile("A/A.md", source);
+    fake.addFile("B/B.md", source);
+    const nodes = service(fake);
+    const preview = await nodes.scanPropertiesAsync();
+    const process = fake.app.vault.process.bind(fake.app.vault);
+    const published: string[] = [];
+    fake.app.vault.process = async (file, update) => {
+      const result = await process(file, update);
+      published.push(result);
+      if (published.length === 1) {
+        nodes.dispose();
+        if (change === "edited") await fake.app.vault.modify(file, "external edit");
+        if (change === "replaced") { fake.remove(file.path); fake.addFile(file.path, "replacement"); }
+      }
+      return result;
+    };
+    await expect(nodes.migrateProperties(preview)).rejects.toThrow();
+    expect(published[0]).toContain("hidden=true");
+    expect(fake.contents.get("B/B.md")).toBe(source);
+    expect(fake.contents.get("A/A.md")).toBe(change === "unchanged" ? source : change === "edited" ? "external edit" : "replacement");
+    expect(published).toHaveLength(change === "unchanged" ? 2 : 1);
+  });
+
   it.each([
     String.raw`"folder\x2dnodes"`,
     String.raw`"folder\u002dnodes"`,
@@ -473,7 +547,50 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("A")).toBe(false);
   });
 
-  it("restores sibling ranks materialized by a compensated manual-order creation", async () => {
+  it.each(["unchanged", "dirty", "multiple", "without-save", "unloaded"])(
+    "keeps a creation claimed by a %s pane during the final rollback read", async (mode) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const nodes = service(fake);
+      const note = await nodes.createNode("", "A", { body: "initial body" });
+      const buffer = mode === "unchanged" ? "initial body" : "new unsaved input";
+      const pane = markdownEditorLeaf(note, buffer);
+      const originalRead = fake.app.vault.read;
+      fake.app.vault.read = async (file) => {
+        const disk = await originalRead(file);
+        const leaves = mode === "multiple" ? [pane.leaf, markdownEditorLeaf(note, buffer).leaf]
+          : mode === "without-save" ? [{ view: { file: note, editor: pane.leaf.view.editor } }] : [pane.leaf];
+        fake.app.workspace.getLeavesOfType = () => leaves as never;
+        if (mode === "unloaded") nodes.dispose();
+        return disk;
+      };
+
+      await expect(nodes.rollbackCreatedNode(note)).rejects.toThrow("Created artifacts retained at A/A.md, A");
+      expect(fake.requireFile("A/A.md")).toBe(note);
+      expect(pane.value()).toBe(buffer);
+      expect(fake.contents.get("A/A.md")).toBe("initial body");
+      expect(fake.trashed).toEqual([]);
+    },
+  );
+
+  it("keeps a replacement at the creation path during the final rollback read", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const nodes = service(fake);
+    const note = await nodes.createNode("", "A", { body: "initial body" });
+    const originalRead = fake.app.vault.read;
+    fake.app.vault.read = async (file) => {
+      const disk = await originalRead(file);
+      fake.remove("A/A.md");
+      fake.addFile("A/A.md", "replacement");
+      return disk;
+    };
+    await expect(nodes.rollbackCreatedNode(note)).rejects.toThrow("identity changed");
+    expect(fake.contents.get("A/A.md")).toBe("replacement");
+    expect(fake.trashed).toEqual([]);
+  });
+
+  it.each([false, true])("restores sibling ranks materialized by a compensated manual-order creation after unload=%s", async (unload) => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
     fake.addFolder("A");
@@ -486,6 +603,7 @@ describe("NodeService structural safety", () => {
     expect(fake.contents.get("A/A.md")).toContain("rank=1024");
     expect(fake.contents.get("B/B.md")).toContain("rank=2048");
     expect(fake.contents.get(created.path)).toContain("rank=3072");
+    if (unload) nodes.dispose();
 
     await nodes.rollbackCreatedNode(created);
 

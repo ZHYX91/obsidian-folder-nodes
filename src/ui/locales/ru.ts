@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ru: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "Правила управления",
+  "errorCreatedFileOpen": "Файл {path} сохранён, поскольку он открыт в панели Markdown. Сохраните и проверьте заметку, прежде чем удалять её вручную.",
+  "errorCreatedNodeRetained": "Автоматическая очистка остановлена. Сохранённые файлы и папки: {paths}. Причина: {reason}",
   "helpAndSupport": "Справка и поддержка",
   "userGuide": "Руководство пользователя",
   "reportIssue": "Сообщить о проблеме",

@@ -11,6 +11,15 @@ afterEach(() => {
 });
 
 describe("interface language", () => {
+  it("explains retained creation paths through the selection workflow aggregate error", () => {
+    setLanguage("en");
+    const cause = new FolderNodesError("created_file_open", { path: "A/A.md" });
+    const retained = new FolderNodesError("created_node_retained", { paths: "A/A.md, A" }, "retained", { cause });
+    const message = formatError(new AggregateError([new FolderNodesError("selection_changed"), retained]));
+    expect(message).toContain("A/A.md, A");
+    expect(message).toContain("open in a Markdown pane");
+    expect(message).toContain("Save and review");
+  });
   it("follows Obsidian's current language in automatic mode", () => {
     setMockLanguage("zh-cn");
     expect(resolvedLanguage()).toBe("zh-CN");

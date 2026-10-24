@@ -23,6 +23,7 @@ import type { ReferenceIndex } from "../core/reference-index";
 import { PlacementSession } from "../core/placement-session";
 import { placementFeedback } from "../presentation/placement-feedback";
 import { formatError } from "./i18n";
+import { renderContentsStatus } from "./contents-status";
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "svg", "webp"]);
 const VIDEO_EXTENSIONS = new Set(["m4v", "mkv", "mov", "mp4", "webm"]);
@@ -69,6 +70,9 @@ interface ContentsActions {
   homepageEnabled(): boolean;
   refresh(): void;
   reportError(error: unknown): void;
+  openManagement?(): void;
+  showHealth?(): void;
+  showHidden?(): void;
 }
 
 type NodeEntry =
@@ -157,7 +161,7 @@ export class FolderNodeContentsView extends ItemView {
     container.addClass("folder-nodes-contents");
     const folder = requestedPath === "" ? this.app.vault.getRoot() : this.service.getFolder(this.folderPath);
     if (folder === null) {
-      container.createEl("p", { cls: "setting-item-description", text: t("noCurrentNode") });
+      this.renderStatus(container, requestedPath, t("noCurrentNode"));
       this.runRenderExtensions();
       this.renderedFolderPath = requestedPath;
       this.restoreRenderState(container, renderState);
@@ -166,7 +170,8 @@ export class FolderNodeContentsView extends ItemView {
     const folderPath = normalizeVaultPath(folder.path);
     const currentIgnored = this.service.isIgnoredPath(folderPath);
     if (!currentIgnored && !this.service.isNodeVisible(folderPath)) {
-      container.createEl("p", { cls: "setting-item-description", text: t("hiddenNodeDetail") });
+      const hidden = this.service.hiddenState(folderPath);
+      this.renderStatus(container, folderPath, `${t("hiddenNodeDetail")}. ${t("hiddenByNode", { path: hidden.sourcePath ?? folderPath })}`, true);
       this.runRenderExtensions();
       this.renderedFolderPath = requestedPath;
       this.restoreRenderState(container, renderState);
@@ -210,9 +215,14 @@ export class FolderNodeContentsView extends ItemView {
     this.selectionPositions = new Map([...this.selectedContent.keys()].map((path, index) => [path, index]));
     this.renderBreadcrumb(container, folder);
     this.renderHeader(container, folder, this.selectableOrder.length > 0);
+    const currentIdentity = this.service.folderIdentity(folderPath);
+    if (currentIdentity === "unmanaged") this.renderStatus(container, folderPath, t("managementGuideBoundary"));
+    else if (currentIdentity === "incomplete") this.renderStatus(container, folderPath,
+      `${t("missingNodeNote")}: ${this.service.notePathForFolder(folderPath)}`);
+    else if (currentIdentity === "conflict") this.renderStatus(container, folderPath, t("nodeConflict"));
     if (this.selectionMode) this.renderSelectionToolbar(container);
     if (nodeEntries.length + album.length + ordinaryFiles.length === 0) {
-      container.createDiv({ cls: "folder-nodes-contents-empty", text: t("emptyNodeContents"), attr: { role: "status" } });
+      if (currentIdentity === "node") this.renderStatus(container, folderPath, t("emptyNodeContents"));
     } else {
       if (nodeEntries.length > 0) this.renderNodes(container, nodeEntries, folderPath);
       if (album.length > 0) this.renderAlbum(container, album);
@@ -221,6 +231,21 @@ export class FolderNodeContentsView extends ItemView {
     this.runRenderExtensions();
     this.renderedFolderPath = folderPath;
     this.restoreRenderState(container, renderState);
+  }
+
+  private renderStatus(container: HTMLElement, path: string, reason: string, hidden = false): void {
+    const actions: Array<{ id: string; label: string; run: () => void }> = [];
+    const parentPath = dirname(path);
+    if (path !== "" && this.service.getCanonicalFile(parentPath) !== null && this.service.isNodeVisible(parentPath)) {
+      actions.push({ id: "parent", label: t("openParent"), run: () => {
+        this.setFolder(parentPath);
+        this.runAction(this.service.openFolderNode(parentPath));
+      } });
+    }
+    if (hidden && this.actions.showHidden !== undefined) actions.push({ id: "hidden", label: t("showHiddenNodesThisSession"), run: () => this.actions.showHidden?.() });
+    if (this.actions.openManagement !== undefined) actions.push({ id: "rules", label: t("viewManagementRules"), run: () => this.actions.openManagement?.() });
+    if (this.actions.showHealth !== undefined) actions.push({ id: "health", label: t("health"), run: () => this.actions.showHealth?.() });
+    renderContentsStatus(container, path, reason, actions);
   }
 
   private captureRenderState(container: HTMLElement): ContentsRenderState {

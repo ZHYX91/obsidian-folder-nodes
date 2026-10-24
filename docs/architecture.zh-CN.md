@@ -27,7 +27,9 @@ NodeService 把 create、rename、move、place、merge、repair 和 trash 作为
 
 合并在预检查前固定子项路径与父目录。最终校验在异步读取两篇笔记期间监听 Vault 修改事件，再同步检查两篇笔记的对象身份、编辑器状态和来源剩余结构；检测到变化时，在调用回收站操作前终止。最终 FileManager 回收站操作的调用是提交边界，之后卸载不会取消已交给宿主的操作。临时修改监听器在成功或失败时都会释放。
 
-结构元数据 patch 在恰好一个匹配 Markdown view 时使用当前未保存编辑器，否则通过 `Vault.process` 提交；两条路径都固定原始 TFile 与 path，在 commit 前重新核对，并拒绝同期替换或内容变化。Rollback closure 保留原始对象引用，并在 mutation 前验证仍是插件拥有的内容。设置持久化使用 schema 3，并把兼容的无版本、schema 1 和 schema 2 数据统一规范化为规范 schema 3 快照。schema 2 的共享旧 `%` 时间格式会转换为独立的 Moment 前缀/后缀格式，已弃用的图谱规则数组会丢弃并报告；显式 schema 无效或更高时只读打开，未知字段绝不回写。其本地串行队列捕获不可变快照，保留最近失败的快照供“重试保存”，并在卸载时追加一份最终兼容快照，保证旧写入不能最后完成。
+结构元数据 patch 在恰好一个匹配 Markdown view 时使用当前未保存编辑器；没有匹配编辑器时才通过 `Vault.process` 提交，多个匹配 view 或文件绑定变化时拒绝写入；两条路径都固定原始 TFile 与 path，在 commit 前重新核对，并拒绝同期替换或内容变化。Rollback closure 保留原始对象引用，并在 mutation 前验证仍是插件拥有的内容。正向元数据回调及原生重命名续程在派发前重新检查服务仍处于活动状态。宿主已受理的写入先交回收据，再处理卸载取消；卸载后仍允许核对原内容的精确补偿。设置持久化使用 schema 3，并把兼容的无版本、schema 1 和 schema 2 数据统一规范化为规范 schema 3 快照。schema 2 的共享旧 `%` 时间格式会转换为独立的 Moment 前缀/后缀格式，已弃用的图谱规则数组会丢弃并报告；显式 schema 无效或更高时只读打开，未知字段绝不回写。其本地串行队列捕获不可变快照，保留最近失败的快照供“重试保存”，并在卸载时追加一份最终兼容快照，保证旧写入不能最后完成。
+
+CreatedNodeRecovery 负责创建记录与补偿顺序；NodeService 提供文件身份、原文和写入端口。清理在最后一次异步原文读取后同步复核身份，并拒绝删除已被任意 Markdown 面板打开的新建文件，包括没有保存方法的面板。复核与最终删除派发之间没有异步步骤；已派发的宿主删除无法取消。保留的产物按当前路径和失败原因报告。
 
 ## Visual 解析
 
@@ -48,6 +50,8 @@ GraphIndex 由节点图谱扩展拥有，复用 NodeService 的分类/排序、�
 ViewState 把序列化 workspace 字段与会话状态分开。每次手动设置 expansion 后先从 VisibleScene 得到可见 ID；若 focus 不在其中，就沿 topology parent 链提升到最近可见祖先，再渲染 DOM、Canvas 2D 或 Canvas 3D。搜索使用直接的临时 expansion/focus 快照路径，不经过这条手动调和，因此清空时仍精确恢复进入搜索前状态。每个范围的展开以内存中的一层基线与 expanded/collapsed 分支例外表达。
 
 VisibleScene 是 DOM、Canvas 2D 与 Canvas 3D 消费的唯一过滤模型。搜索以单次线性遍历汇总结果，view 只计算当前维度的布局。共享几何统一拥有卡片尺寸、presentation、hit test、父级/子级把手、结构锚点、链接卡片边缘锚点与链接曲线。粗指针的从上到下布局使用 72px 卡片高度，其余使用 46px；DOM 与 Canvas 呈现、视口剔除、命中区域、边线和视口拟合使用同一高度，密集 DOM 3D 圆点仍为 16px，Canvas 圆点保留既有尺寸。结构边保留明确的 parent-to-child 方向：从左到右布局连接父卡右把手到子卡左把手，从上到下布局连接父卡下把手到子卡上把手；链接边与把手及结构骨架独立。Canvas 保留所有可见结构边，只对链接边及聚焦关联链接应用限制。大 2D 保持可读的最小比例，通过空间索引查询视口候选，同时保留所需的父级边端点；大 3D 使用与命中几何一致的圆点，并仅对焦点或悬停显示完整卡片。工作区 Graph View 在自身 ItemView 生命周期内直接拥有 DOM viewport observer；独立 toolbar renderer 负责 SearchComponent 与工具栏 DOM 构建，插件层不再仅为了转接几何生命周期而增加一层继承。同范围重绘保留视口状态与仍在编辑的搜索输入，同步全部依赖模型的工具栏字段，替换视口按钮绑定，并在恢复相机后重新投影 DOM 3D 节点与边线。待保存设置重试成功后会调和最新已提交设置，但不会提交控件中尚未完成的文本。渲染状态不成为覆盖图谱的浮层；close/unload 会释放全部订阅、observer、animation frame、canvas 与 DOM。
+
+Canvas 键盘目标选择由纯函数 `graphKeyboardTarget` 负责，输入为当前 2D 或投影后的 3D 位置及稳定场景顺序；渲染器负责焦点、激活和宿主事件。方向键按屏幕方向移动且不循环，Home 和 End 保持场景顺序。
 
 ## 一致性与失败关闭
 

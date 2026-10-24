@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const zhTW: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "檢視管理規則",
+  "errorCreatedFileOpen": "已保留 {path}，因為它已在 Markdown 窗格中開啟。請先儲存並檢查筆記，再決定是否手動刪除。",
+  "errorCreatedNodeRetained": "自動清理已停止。保留的項目：{paths}。原因：{reason}",
   "helpAndSupport": "說明與支援",
   "userGuide": "使用指南",
   "reportIssue": "回報問題",

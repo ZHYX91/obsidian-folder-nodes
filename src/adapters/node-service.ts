@@ -11,6 +11,7 @@ import {
 } from "obsidian";
 
 import { VaultOperationCoordinator, type VaultEventKind } from "./vault-operation-coordinator";
+import { CreatedNodeRecovery, type FileChangeReceipt } from "./created-node-recovery";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exemptions";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type FolderIdentity } from "../core/identity";
@@ -40,13 +41,6 @@ import { assertMergeLinksKeepDestinations } from "../core/merge-link-safety";
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
 
-interface FileChangeReceipt {
-  readonly after: string;
-  readonly before: string;
-  readonly file: TFile;
-  readonly path: string;
-}
-
 interface OpenMarkdownTarget {
   readonly editor: Editor;
   readonly file: TFile;
@@ -57,14 +51,16 @@ interface OpenMarkdownTarget {
 export class NodeService {
   private readonly operations = new VaultOperationCoordinator();
   private readonly lifecycle = new AbortController();
-  private readonly createdNodes = new WeakMap<TFile, {
-    folder: TFolder;
-    folderPath: string;
-    notePath: string;
-    initialContent: string;
-    finalContent: string;
-    orderReceipts: readonly FileChangeReceipt[];
-  }>();
+  private readonly createdNodes = new CreatedNodeRecovery({
+    assertFile: (file, path) => this.assertEntryIdentity(file, path, TFile),
+    assertFolder: (folder, path) => this.assertEntryIdentity(folder, path, TFolder),
+    canonicalFile: (path) => this.getCanonicalFile(path),
+    currentEntry: (path) => this.app.vault.getAbstractFileByPath(path),
+    readCurrentSource: (file) => this.readCurrentSource(file),
+    restoreFileChange: (receipt) => this.restoreFileChange(receipt),
+    trashFile: (file, path, content) => this.trashCreatedFile(file, path, content),
+    trashFolder: (folder, path) => this.trashCreatedFolder(folder, path),
+  });
 
   public constructor(
     private readonly app: App,
@@ -215,37 +211,7 @@ export class NodeService {
   }
 
   public rollbackCreatedNode(note: TFile): Promise<void> {
-    return this.operations.run(async () => {
-      const receipt = this.createdNodes.get(note);
-      if (receipt === undefined) throw new Error("Cannot safely roll back a node without its creation receipt");
-      const { folder, folderPath, notePath, initialContent, finalContent, orderReceipts } = receipt;
-      const assertOwned = (): void => {
-        this.assertEntryIdentity(folder, folderPath, TFolder);
-        this.assertEntryIdentity(note, notePath, TFile);
-        if (note.parent !== folder || this.getCanonicalFile(folderPath) !== note
-          || folder.children.length !== 1 || folder.children[0] !== note) {
-          throw new Error(`Cannot safely roll back changed created folder: ${folderPath}`);
-        }
-      };
-      assertOwned();
-      if (await this.readCurrentSource(note) !== finalContent) {
-        throw new Error(`Cannot safely roll back concurrently modified created file: ${notePath}`);
-      }
-      for (const orderReceipt of [...orderReceipts].reverse()) {
-        this.assertEntryIdentity(orderReceipt.file, orderReceipt.path, TFile);
-        if (await this.readCurrentSource(orderReceipt.file) !== orderReceipt.after) {
-          throw new Error(`Cannot safely roll back concurrently modified file: ${orderReceipt.path}`);
-        }
-      }
-      assertOwned();
-      for (const orderReceipt of [...orderReceipts].reverse()) {
-        await this.restoreFileChange(orderReceipt);
-      }
-      assertOwned();
-      await this.trashCreatedFile(note, notePath, initialContent);
-      await this.trashCreatedFolder(folder, folderPath);
-      this.createdNodes.delete(note);
-    });
+    return this.operations.run(() => this.createdNodes.rollback(note));
   }
 
   public createMissingNodeNote(folder: TFolder): Promise<TFile> {
@@ -768,7 +734,7 @@ export class NodeService {
               await this.applyFileChange(file, change.path, (source) => {
                 if (source !== after) throw new Error(`Cannot safely roll back concurrently modified file: ${change.path}`);
                 return before;
-              });
+              }, true);
             });
           }
           onStep?.(index + 1, current.changes.length);
@@ -867,8 +833,14 @@ export class NodeService {
         if (candidates.length > 1) throw new Error(`Folder rename conflict: multiple canonical notes exist in ${entry.path}`);
         const candidate = candidates[0];
         if (candidate !== undefined && candidate.path !== canonicalPath) {
+          const folderPath = entry.path;
+          const candidatePath = candidate.path;
           await this.assertAvailable(canonicalPath, candidate);
-          this.expectEvent("rename", canonicalPath, candidate.path);
+          this.assertActive();
+          this.assertEntryIdentity(entry, folderPath, TFolder);
+          this.assertEntryIdentity(candidate, candidatePath, TFile);
+          if (candidate.parent !== entry) throw new Error(`Node Note source changed during operation: ${candidatePath}`);
+          this.expectEvent("rename", canonicalPath, candidatePath);
           await this.app.fileManager.renameFile(candidate, canonicalPath);
         }
         const canonical = this.getCanonicalFile(entry.path);
@@ -1105,6 +1077,7 @@ export class NodeService {
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
     const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
     await this.assertAvailable(nextPath);
+    this.assertActive();
     this.assertEntryIdentity(folder, sourcePath, TFolder);
     this.assertEntryIdentity(renamedNote, renamedNotePath, TFile);
     if (renamedNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${renamedNotePath}`);
@@ -1294,7 +1267,7 @@ export class NodeService {
         throw new Error(`Cannot safely roll back concurrently modified file: ${path}`);
       }
       return before;
-    });
+    }, true);
   }
 
   private async readClosedMergeNote(
@@ -1406,7 +1379,9 @@ export class NodeService {
     file: TFile,
     path: string,
     update: (current: string) => string,
+    compensating = false,
   ): Promise<{ before: string; after: string }> {
+    if (!compensating) this.assertActive();
     this.assertEntryIdentity(file, path, TFile);
     const openTarget = this.findOpenMarkdownTarget(file, path);
     if (openTarget !== null) {
@@ -1420,6 +1395,7 @@ export class NodeService {
       if (openTarget.editor.getValue() !== before) {
         throw new Error(`Markdown content changed before structural metadata update: ${path}`);
       }
+      if (!compensating) this.assertActive();
       openTarget.editor.transaction({
         changes: [{
           from: { line: 0, ch: 0 },
@@ -1437,6 +1413,7 @@ export class NodeService {
     let before: string | undefined;
     let after: string | undefined;
     const published = await this.app.vault.process(file, (current) => {
+      if (!compensating) this.assertActive();
       this.assertEntryIdentity(file, path, TFile);
       if (this.findOpenMarkdownTarget(file, path) !== null) {
         throw new Error(`Markdown editor opened before structural metadata update: ${path}`);
@@ -1507,6 +1484,15 @@ export class NodeService {
       throw new Error(`Cannot roll back concurrently modified created file: ${path}`);
     }
     this.assertEntryIdentity(file, path, TFile);
+    // The last disk read can yield while another pane opens the creation. An
+    // unchanged disk copy does not authorize deletion of its unsaved buffer.
+    // Keep any claimed creation, even if the editor currently matches disk.
+    const claimed = this.app.workspace.getLeavesOfType("markdown").some((leaf) => {
+      const view = leaf.view as typeof leaf.view & { file?: TFile | null };
+      return view.file === file || view.file?.path === path;
+    });
+    if (claimed) throw new FolderNodesError("created_file_open", { path },
+      `Cannot roll back a created file opened in a Markdown pane: ${path}`);
     this.expectEvent("delete", path);
     await this.app.fileManager.trashFile(file);
   }

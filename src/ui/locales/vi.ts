@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const vi: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "Xem quy tắc quản lý",
+  "errorCreatedFileOpen": "Đã giữ lại {path} vì ghi chú đang mở trong khung Markdown. Hãy lưu và kiểm tra ghi chú trước khi tự xóa.",
+  "errorCreatedNodeRetained": "Đã dừng dọn dẹp tự động. Tệp và thư mục còn lại: {paths}. Lý do: {reason}",
   "helpAndSupport": "Trợ giúp và hỗ trợ",
   "userGuide": "Hướng dẫn sử dụng",
   "reportIssue": "Báo cáo sự cố",

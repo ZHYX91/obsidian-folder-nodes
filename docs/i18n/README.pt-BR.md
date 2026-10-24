@@ -30,7 +30,7 @@ Você pode criar, renomear, mover, mesclar, ordenar e excluir nós completos. O 
 
 É necessário Obsidian 1.12.7 ou mais recente.
 
-O plugin funciona no computador e no Android. No Android, movimentar pastas usa menus em vez de arrastar e soltar. Aparelhos Android físicos e iOS não fazem parte da matriz de aceitação oficial do projeto.
+O plugin funciona no computador e no Android. No Android, as pastas são movidas pelos menus. A compatibilidade com iOS ainda não foi verificada.
 
 ## Instalação
 
@@ -46,6 +46,10 @@ Você também pode colocar `main.js`, `manifest.json` e `styles.css` da mesma ve
 4. Abra o Node Graph: "Global" mostra todos os nós gerenciados, "Subárvore" mostra o nó selecionado e seus descendentes, e "Local" mostra a vizinhança. Você pode alternar 2D/3D e exibir links entre notas.
 
 Ao criar um nó a partir de texto selecionado, é possível conferir nome, local e aliases. Links internos que ainda não existem também podem criar nós na área gerenciada. Seleções que atravessam várias células de uma tabela Markdown são recusadas para evitar danos à tabela.
+
+O conteúdo do nó mostra o caminho atual e explica os estados vazio, oculto, não gerenciado ou incompleto. Os botões disponíveis abrem um nó pai válido, as regras de gerenciamento ou a verificação somente leitura, ou mostram nós ocultos durante a sessão. Nos gráficos Canvas, as setas vão ao nó mais próximo naquela direção da tela; Home e End selecionam o primeiro e o último nó visível.
+
+Se a criação falhar depois de criar uma nota, a limpeza remove apenas arquivos que ainda pertencem à operação e não foram alterados. Notas abertas ou editadas são preservadas. O erro informa os caminhos restantes e o motivo: salve e confira esses arquivos antes de decidir se os exclui manualmente.
 
 ## Configurações
 
@@ -64,7 +68,7 @@ A lista de texto `folder-nodes` na nota do nó armazena apenas opções diferent
 
 ## Propriedade icon
 
-A propriedade icon da nota do nó aceita, em ordem de preferência, imagens do cofre, ícones Lucide, caracteres e emojis. color: muda a cor de caracteres e Lucide ou funciona como cor reserva. Veja uma prévia no painel de configurações antes de salvar.
+A propriedade icon da nota do nó aceita, em ordem de preferência, imagens do cofre, ícones Lucide, caracteres e emojis. color: muda a cor de caracteres e Lucide ou funciona como cor reserva. Veja uma prévia no painel de configurações.
 
 ```yaml
 icon:

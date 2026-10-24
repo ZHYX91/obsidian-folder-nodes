@@ -30,7 +30,7 @@ Vollständige Knoten lassen sich anlegen, umbenennen, verschieben, zusammenführ
 
 Obsidian 1.12.7 oder neuer ist erforderlich.
 
-Desktop und Android werden unterstützt. Auf Android erfolgt das Verschieben über Menüs statt Desktop-Drag-and-drop. Tests auf echten Android-Geräten und auf iOS gehören nicht zur verbindlichen Abnahme.
+Das Plugin unterstützt Desktop und Android. Auf Android werden Ordner über Menüs verschoben. Die Kompatibilität mit iOS ist noch nicht geprüft.
 
 ## Installation
 
@@ -46,6 +46,10 @@ Alternativ legen Sie `main.js`, `manifest.json` und `styles.css` aus derselben V
 4. Öffnen Sie den Node Graph: „Global“ zeigt alle verwalteten Knoten, „Unterbaum“ den gewählten Knoten mit Nachkommen und „Lokal“ sein Umfeld. Sie können 2D/3D und die Link-Überlagerung ein- oder ausschalten.
 
 Beim Erstellen eines Knotens aus markiertem Text können Sie Namen, Zielort und Aliase prüfen. Noch nicht angelegte interne Links können im verwalteten Bereich ebenfalls Knoten erzeugen. Eine Auswahl über mehrere Markdown-Tabellenzellen wird zum Schutz der Tabelle abgelehnt.
+
+Der Knoteninhalt zeigt den aktuellen Pfad und erklärt leere, ausgeblendete, nicht verwaltete oder unvollständige Zustände. Die angebotenen Schaltflächen öffnen einen gültigen Elternknoten, die Verwaltungsregeln, die schreibgeschützte Zustandsprüfung oder blenden versteckte Knoten für diese Sitzung ein. Im Canvas-Graphen führen Pfeiltasten zum nächstgelegenen Knoten in der jeweiligen Bildschirmrichtung; Pos1 und Ende wählen den ersten bzw. letzten sichtbaren Knoten.
+
+Scheitert das Erstellen nach dem Anlegen einer Notiz, werden nur nachweislich unveränderte Dateien dieser Aktion aufgeräumt. Geöffnete oder bearbeitete Notizen bleiben erhalten. Die Fehlermeldung nennt die verbliebenen Pfade und den Grund. Speichern und prüfen Sie diese Dateien, bevor Sie sie gegebenenfalls manuell löschen.
 
 ## Einstellungen
 
@@ -64,7 +68,7 @@ Die Textliste `folder-nodes` in einer Knotennotiz enthält nur abweichende Einst
 
 ## Eigenschaft icon
 
-Die Eigenschaft icon einer Knotennotiz akzeptiert Bilder aus dem Vault, Lucide-Symbole, einzelne Zeichen und Emojis in bevorzugter Reihenfolge. Mit color: färben Sie Zeichen oder Lucide-Symbole oder legen eine Ersatzfarbe fest. Im Einstellungsdialog können Sie die Darstellung vorher ansehen.
+Die Eigenschaft icon einer Knotennotiz akzeptiert Bilder aus dem Vault, Lucide-Symbole, einzelne Zeichen und Emojis in bevorzugter Reihenfolge. Mit color: färben Sie Zeichen oder Lucide-Symbole oder legen eine Ersatzfarbe fest. Eine Vorschau ist in den Einstellungen sichtbar.
 
 ```yaml
 icon:
