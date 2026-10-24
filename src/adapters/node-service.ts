@@ -734,7 +734,7 @@ export class NodeService {
               await this.applyFileChange(file, change.path, (source) => {
                 if (source !== after) throw new Error(`Cannot safely roll back concurrently modified file: ${change.path}`);
                 return before;
-              });
+              }, true);
             });
           }
           onStep?.(index + 1, current.changes.length);
@@ -833,8 +833,14 @@ export class NodeService {
         if (candidates.length > 1) throw new Error(`Folder rename conflict: multiple canonical notes exist in ${entry.path}`);
         const candidate = candidates[0];
         if (candidate !== undefined && candidate.path !== canonicalPath) {
+          const folderPath = entry.path;
+          const candidatePath = candidate.path;
           await this.assertAvailable(canonicalPath, candidate);
-          this.expectEvent("rename", canonicalPath, candidate.path);
+          this.assertActive();
+          this.assertEntryIdentity(entry, folderPath, TFolder);
+          this.assertEntryIdentity(candidate, candidatePath, TFile);
+          if (candidate.parent !== entry) throw new Error(`Node Note source changed during operation: ${candidatePath}`);
+          this.expectEvent("rename", canonicalPath, candidatePath);
           await this.app.fileManager.renameFile(candidate, canonicalPath);
         }
         const canonical = this.getCanonicalFile(entry.path);
@@ -1071,6 +1077,7 @@ export class NodeService {
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
     const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
     await this.assertAvailable(nextPath);
+    this.assertActive();
     this.assertEntryIdentity(folder, sourcePath, TFolder);
     this.assertEntryIdentity(renamedNote, renamedNotePath, TFile);
     if (renamedNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${renamedNotePath}`);
@@ -1260,7 +1267,7 @@ export class NodeService {
         throw new Error(`Cannot safely roll back concurrently modified file: ${path}`);
       }
       return before;
-    });
+    }, true);
   }
 
   private async readClosedMergeNote(
@@ -1372,7 +1379,9 @@ export class NodeService {
     file: TFile,
     path: string,
     update: (current: string) => string,
+    compensating = false,
   ): Promise<{ before: string; after: string }> {
+    if (!compensating) this.assertActive();
     this.assertEntryIdentity(file, path, TFile);
     const openTarget = this.findOpenMarkdownTarget(file, path);
     if (openTarget !== null) {
@@ -1386,6 +1395,7 @@ export class NodeService {
       if (openTarget.editor.getValue() !== before) {
         throw new Error(`Markdown content changed before structural metadata update: ${path}`);
       }
+      if (!compensating) this.assertActive();
       openTarget.editor.transaction({
         changes: [{
           from: { line: 0, ch: 0 },
@@ -1403,6 +1413,7 @@ export class NodeService {
     let before: string | undefined;
     let after: string | undefined;
     const published = await this.app.vault.process(file, (current) => {
+      if (!compensating) this.assertActive();
       this.assertEntryIdentity(file, path, TFile);
       if (this.findOpenMarkdownTarget(file, path) !== null) {
         throw new Error(`Markdown editor opened before structural metadata update: ${path}`);
