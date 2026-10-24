@@ -30,7 +30,7 @@ Puedes crear, renombrar, mover, fusionar, ordenar y eliminar nodos completos. Se
 
 Se necesita Obsidian 1.12.7 o posterior.
 
-Funciona en escritorio y Android. En Android, el movimiento de carpetas se realiza mediante menús en vez de arrastrar y soltar. Los dispositivos Android físicos y iOS están fuera del alcance de las pruebas de aceptación del proyecto.
+Funciona en escritorio y Android. En Android, las carpetas se mueven mediante menús. La compatibilidad con iOS aún no se ha verificado.
 
 ## Instalación
 
@@ -46,6 +46,10 @@ También puedes colocar `main.js`, `manifest.json` y `styles.css` de la misma ve
 4. Abre Node Graph. «Global» enseña todos los nodos administrados, «Subárbol» enseña un nodo y sus descendientes, y «Local» muestra su entorno. Puedes cambiar entre 2D y 3D y activar los enlaces entre notas.
 
 Al crear un nodo desde texto seleccionado, revisa su nombre, ubicación y alias. También puedes crear nodos desde enlaces internos que aún no existen en la zona administrada. Las selecciones que cruzan varias celdas de una tabla Markdown se rechazan para proteger la tabla.
+
+El contenido del nodo muestra la ruta actual y explica los estados vacío, oculto, no gestionado o incompleto. Los botones disponibles permiten abrir un padre válido, revisar las reglas, ejecutar la comprobación de solo lectura o mostrar nodos ocultos durante esta sesión. En los gráficos Canvas, las flechas van al nodo más cercano en esa dirección de la pantalla; Inicio y Fin seleccionan el primer y el último nodo visible.
+
+Si la creación falla después de crear una nota, solo se eliminan los archivos que siguen perteneciendo a esa operación y cuyo contenido no ha cambiado. Las notas abiertas o editadas se conservan. El error indica las rutas restantes y el motivo: guarda y revisa esos archivos antes de decidir si los borras manualmente.
 
 ## Ajustes
 
@@ -64,7 +68,7 @@ En la nota de cada nodo, la lista de texto `folder-nodes` guarda las opciones no
 
 ## Propiedad icon
 
-La propiedad icon de una nota de nodo admite imágenes del almacén, iconos Lucide, caracteres y emojis por orden de preferencia. color: da color a caracteres y Lucide, o actúa como color de reserva. Puedes ver el resultado en los ajustes antes de guardarlo.
+La propiedad icon de una nota de nodo admite imágenes del almacén, iconos Lucide, caracteres y emojis por orden de preferencia. color: da color a caracteres y Lucide, o actúa como color de reserva. Puedes ver el resultado en los ajustes.
 
 ```yaml
 icon:
@@ -86,7 +90,7 @@ Los nodos se identifican por la ruta actual del almacén, no por un ID permanent
 
 Mover o eliminar normalmente afecta al archivo o carpeta seleccionados. Sin embargo, renombrar la carpeta o la nota homónima de un nodo completo también sincroniza la otra parte si no hay ambigüedad. Las acciones para el «nodo contenedor» afectan explícitamente al nodo entero. La organización por lotes y la migración de propiedades muestran una vista previa; la comprobación de estado es de solo lectura. Si hay conflictos, la operación se detiene. La eliminación de nodos completos sigue la opción de eliminación de archivos elegida en Obsidian.
 
-Todo se procesa localmente: no se suben notas ni se hacen solicitudes de red. La organización y la migración muestran una vista previa y se detienen si hay conflictos. Los nodos completos se eliminan según la opción de eliminación de archivos elegida en Obsidian. Los enlaces solo se escriben en el portapapeles al pulsar Copiar; el plugin nunca lee el portapapeles. Los ajustes y las reglas de exclusión se guardan en data.json.
+Todo se procesa localmente: no se suben notas ni se hacen solicitudes de red. Los enlaces solo se escriben en el portapapeles al pulsar Copiar; el plugin nunca lee el portapapeles. Los ajustes y las reglas de exclusión se guardan en data.json.
 
 ## Desarrollo
 

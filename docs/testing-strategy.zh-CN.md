@@ -20,6 +20,8 @@ translation_status: source
 
 选区回归调用生产命令、编辑器菜单、确认弹窗或直接创建路径，以及内存 Vault 上的 NodeService。测试核对目标创建后的真实 FileManager 调用参数，将三种路径格式、两种链接语法的预设宿主输出透明传递到普通正文和表格单元格，并覆盖字面显示文本、同名笔记、aliases、来源/range/表格/编辑器变化、创建冲突、重复提交、生成/替换异常及用户编辑后的回滚拒绝。这些测试不模拟 Obsidian 的路径选择算法，也不证明实时候选缓存或 Source/Live Preview 渲染行为。
 
+创建清理回归在最后一次异步读取期间注入干净、未保存、多面板、无保存方法以及卸载中的 Markdown 面板，并模拟同路径 TFile 替换；断言内容保留和带路径、原因的本地化提示。Canvas 键盘测试覆盖两种布局方向与不循环边界。这些模拟时序不等于真实宿主编辑器或读屏器验收。
+
 ## 性能
 
 节点合并链接检查覆盖来源正文和移动的 Markdown 子笔记中的不安全行内链接、目标换行的引用式链接、
@@ -30,7 +32,7 @@ translation_status: source
 
 自动化测试必须锁定 `folder-nodes` 规范 token 的解析/写入/删除、公开旧字段读取、等价双写、冲突/无效/重复 YAML 失败关闭、源码保真显式迁移、过期预览拒绝、后代继承、Root/不完整/不管理写入拒绝、不管理与总开关优先级、合并不复制、Explorer/Contents/Graph 投影、Root 眼睛会话显示状态和图谱元数据增量失效。隔离 Vault 验收还要覆盖中英文设置、移动端无 hover、显式隐藏根使用“隐藏”文字徽标、继承后代弱化和来源提示、关闭总开关不改 YAML、会话重载复位，以及 Obsidian 搜索、快速切换、反向链接、原生图谱和直接打开不受影响。
 
-Quick 门槛验证 10,000 个、large 门槛验证 100,000 个直接 Child Nodes 的常规 reorder 计划在两秒内完成并只产生一个属性 patch。拥挤 rank 的局部 rebalance 不超过 64 个节点。反向引用 benchmark 对 quick 20,000/large 100,000 个来源建索引，并验证 1,000 个增量移除；不完整节点扫描对 quick 20,000/large 100,000 个条目验证近线性计划与完整计数。刷新调度器测试把 10,000 次请求合并为一次 batch。节点图谱 benchmark 在单一确定性串行 worker 中，用 quick 20,000/large 100,000 节点 fixture 构建真实生产 GraphIndex，然后在一次增量刷新中处理 32/128 个互不嵌套的 dirty roots。Quick 的首次构建和增量刷新门槛均为 2 秒，对应 large 门槛均为 6 秒；搜索候选聚合与一次精确查询的 quick/large 门槛分别为 1 秒和 3 秒。同一刷新后快照再经完整展开、topology、VisibleScene 与 model 聚合进入 2D layout，其 quick/large 门槛分别为 4 秒和 6 秒；纯 3D layout 加一次 1920×1080 投影的门槛分别为 2 秒和 5 秒。这些确定性计算门可以暴露线性退化，但不能证明交互式 Canvas 帧率或宿主 UI 响应速度。独立的 GraphIndex 行为测试锁定一次初始盘点、path-targeted 子树刷新、同级顺序、仅链接失效和精确扫描计数。这些计数证明范围、搜索、展开、维度与“显示链接”不重复执行全 Vault 盘点。完整展开仍保持常量 DOM、保留全部可见结构边，只对链接边应用配置上限。Contents View 的 Nodes/Album/Files 各自每批最多创建 200 项；相册图片从 resource URI 绘制一次到 canvas，普通文件不读取 binary 正文。
+Quick 门槛验证 10,000 个、large 门槛验证 100,000 个直接 Child Nodes 的常规 reorder 计划在两秒内完成并只产生一个属性 patch。rank 拥挤时会对完整同级序列重编号，并保留目标顺序；单个属性 patch 的要求只适用于存在安全 rank 空隙的情况。反向引用 benchmark 对 quick 20,000/large 100,000 个来源建索引，并验证 1,000 个增量移除；不完整节点扫描对 quick 20,000/large 100,000 个条目验证近线性计划与完整计数。刷新调度器测试把 10,000 次请求合并为一次 batch。节点图谱 benchmark 在单一确定性串行 worker 中，用 quick 20,000/large 100,000 节点 fixture 构建真实生产 GraphIndex，然后在一次增量刷新中处理 32/128 个互不嵌套的 dirty roots。Quick 的首次构建和增量刷新门槛均为 2 秒，对应 large 门槛均为 6 秒；搜索候选聚合与一次精确查询的 quick/large 门槛分别为 1 秒和 3 秒。同一刷新后快照再经完整展开、topology、VisibleScene 与 model 聚合进入 2D layout，其 quick/large 门槛分别为 4 秒和 6 秒；纯 3D layout 加一次 1920×1080 投影的门槛分别为 2 秒和 5 秒。这些确定性计算门可以暴露线性退化，但不能证明交互式 Canvas 帧率或宿主 UI 响应速度。独立的 GraphIndex 行为测试锁定一次初始盘点、path-targeted 子树刷新、同级顺序、仅链接失效和精确扫描计数。这些计数证明范围、搜索、展开、维度与“显示链接”不重复执行全 Vault 盘点。完整展开仍保持常量 DOM、保留全部可见结构边，只对链接边应用配置上限。Contents View 的 Nodes/Album/Files 各自每批最多创建 200 项；相册图片从 resource URI 绘制一次到 canvas，普通文件不读取 binary 正文。
 
 ## 隔离 Vault 主机验收
 

@@ -1,5 +1,7 @@
 export type FolderNodesErrorCode =
   | "complete_parent_required"
+  | "created_file_open"
+  | "created_node_retained"
   | "folder_unmanaged"
   | "multiple_canonical_notes"
   | "merge_note_open"
@@ -23,8 +25,9 @@ export class FolderNodesError extends Error {
     public readonly code: FolderNodesErrorCode,
     public readonly values: Readonly<Record<string, string | number>> = {},
     message: string = code,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "FolderNodesError";
   }
 }

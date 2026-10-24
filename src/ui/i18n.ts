@@ -5,6 +5,9 @@ import { isInterfaceLanguage, type AvailableInterfaceLocale } from "../core/inte
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
+  "viewManagementRules": "查看管理规则",
+  "errorCreatedFileOpen": "已保留 {path}，因为它已在 Markdown 窗格中打开。请先保存并检查笔记，再决定是否手动删除。",
+  "errorCreatedNodeRetained": "自动清理已停止。保留的产物：{paths}。原因：{reason}",
   "helpAndSupport": "帮助与支持",
   "userGuide": "使用指南",
   "reportIssue": "报告问题",
@@ -170,6 +173,9 @@ const zh = {
 };
 
 const en: typeof zh = {
+  "viewManagementRules": "View management rules",
+  "errorCreatedFileOpen": "Kept {path} because it is open in a Markdown pane. Save and review the note before removing it yourself.",
+  "errorCreatedNodeRetained": "Automatic cleanup stopped. Remaining artifacts: {paths}. Reason: {reason}",
   "helpAndSupport": "Help and support",
   "userGuide": "User guide",
   "reportIssue": "Report an issue",
@@ -371,8 +377,11 @@ export function t(key: TranslationKey, values: Record<string, string | number> =
 }
 
 export function formatError(error: unknown): string {
+  if (error instanceof AggregateError) return error.errors.map((cause: unknown) => formatError(cause)).join("\n");
   if (error instanceof FolderNodesError) {
     switch (error.code) {
+      case "created_file_open": return t("errorCreatedFileOpen", error.values);
+      case "created_node_retained": return t("errorCreatedNodeRetained", { ...error.values, reason: formatError(error.cause) });
       case "root_cannot_hide": return t("errorRootCannotHide");
       case "root_cannot_rename": return t("errorRootCannotRename");
       case "root_cannot_delete": return t("errorRootCannotDelete");

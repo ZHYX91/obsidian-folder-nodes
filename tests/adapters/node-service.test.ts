@@ -473,6 +473,49 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("A")).toBe(false);
   });
 
+  it.each(["unchanged", "dirty", "multiple", "without-save", "unloaded"])(
+    "keeps a creation claimed by a %s pane during the final rollback read", async (mode) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const nodes = service(fake);
+      const note = await nodes.createNode("", "A", { body: "initial body" });
+      const buffer = mode === "unchanged" ? "initial body" : "new unsaved input";
+      const pane = markdownEditorLeaf(note, buffer);
+      const originalRead = fake.app.vault.read;
+      fake.app.vault.read = async (file) => {
+        const disk = await originalRead(file);
+        const leaves = mode === "multiple" ? [pane.leaf, markdownEditorLeaf(note, buffer).leaf]
+          : mode === "without-save" ? [{ view: { file: note, editor: pane.leaf.view.editor } }] : [pane.leaf];
+        fake.app.workspace.getLeavesOfType = () => leaves as never;
+        if (mode === "unloaded") nodes.dispose();
+        return disk;
+      };
+
+      await expect(nodes.rollbackCreatedNode(note)).rejects.toThrow("Created artifacts retained at A/A.md, A");
+      expect(fake.requireFile("A/A.md")).toBe(note);
+      expect(pane.value()).toBe(buffer);
+      expect(fake.contents.get("A/A.md")).toBe("initial body");
+      expect(fake.trashed).toEqual([]);
+    },
+  );
+
+  it("keeps a replacement at the creation path during the final rollback read", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const nodes = service(fake);
+    const note = await nodes.createNode("", "A", { body: "initial body" });
+    const originalRead = fake.app.vault.read;
+    fake.app.vault.read = async (file) => {
+      const disk = await originalRead(file);
+      fake.remove("A/A.md");
+      fake.addFile("A/A.md", "replacement");
+      return disk;
+    };
+    await expect(nodes.rollbackCreatedNode(note)).rejects.toThrow("identity changed");
+    expect(fake.contents.get("A/A.md")).toBe("replacement");
+    expect(fake.trashed).toEqual([]);
+  });
+
   it("restores sibling ranks materialized by a compensated manual-order creation", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });

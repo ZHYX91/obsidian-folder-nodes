@@ -28,13 +28,13 @@ Browse every managed node with Global, focus on one node and its descendants wit
 
 ### Icons & appearance
 
-Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The settings page shows a preview before you save.
+Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The settings page shows a live preview.
 
 ![Folder Nodes Icons and appearance settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
 ### Create nodes from text or links
 
-Before creating a node from selected text, check its name, location, note content, and alternative names (aliases).
+Before creating a node from selected text, check its name, location, and alternative names (aliases). The selected text becomes the new note body.
 
 ![Folder Nodes Selection and naming settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
@@ -92,12 +92,16 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 
 ### More actions and safeguards
 
-1. Use **Create Folder Node from selection** to turn selected text into a child node. In managed scope, selecting an unresolved `[[a]]` or `[[a|b]]` link can also create a complete Folder Node.
+1. Use **Create Folder Node from selection** to turn selected text into a child node. In managed scope, clicking an unresolved `[[a]]` or `[[a|b]]` link can also create a complete Folder Node.
 2. Open **Node contents** to browse the current node's children, media, and files. Right-click, More, or Shift+F10/Menu opens the same actions.
 3. Open **Node Graph** to browse the hierarchy: Global covers the Vault, Subtree anchors one node, and Local adds its parent. Expand branches, search, switch between 2D/3D, or enable **Show links** to overlay references.
 4. On desktop, dropping a node into another changes its parent. Exact before/after ordering requires the parent's **Manual** child order. On Android, use native folder movement or **Move / Move up / Move down**.
 5. Native Move/Delete operates on the selected file or folder; a native rename of a complete node's folder or Node Note also synchronizes the other half when unambiguous. Commands labelled **containing node** explicitly act on the whole Folder Node. Check the target before moving or deleting.
 6. **Batch organize** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Health check** is read-only. Cancel if the proposed scope differs from your intention.
+
+Node Contents shows the current path and explains empty, hidden, unmanaged, or incomplete states. Use the available buttons to open a valid parent, review management rules, run read-only Health, or reveal hidden nodes for this session. In Canvas graphs, arrow keys move toward the nearest node in that screen direction; Home and End select the first and last visible nodes.
+
+If creation fails after a note was created, cleanup removes only files it can still prove are unchanged and owned by that operation. An opened or edited note is kept. The error lists the remaining paths and reason: save and review those files before removing anything manually.
 
 ### Before merging nodes
 

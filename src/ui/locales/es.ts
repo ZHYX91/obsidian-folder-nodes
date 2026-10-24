@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const es: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "Ver reglas de gestión",
+  "errorCreatedFileOpen": "Se ha conservado {path} porque está abierto en un panel Markdown. Guarda y revisa la nota antes de eliminarla manualmente.",
+  "errorCreatedNodeRetained": "La limpieza automática se ha detenido. Archivos y carpetas conservados: {paths}. Motivo: {reason}",
   "helpAndSupport": "Ayuda y soporte",
   "userGuide": "Guía de uso",
   "reportIssue": "Informar de un problema",

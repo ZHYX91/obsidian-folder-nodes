@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ar: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "عرض قواعد الإدارة",
+  "errorCreatedFileOpen": "تم الاحتفاظ بـ {path} لأنه مفتوح في جزء Markdown. احفظ الملاحظة وراجعها قبل حذفها يدويًا.",
+  "errorCreatedNodeRetained": "توقف التنظيف التلقائي. الملفات والمجلدات المتبقية: {paths}. السبب: {reason}",
   "helpAndSupport": "المساعدة والدعم",
   "userGuide": "دليل الاستخدام",
   "reportIssue": "الإبلاغ عن مشكلة",

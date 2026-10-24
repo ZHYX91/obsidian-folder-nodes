@@ -739,6 +739,24 @@ button.folder-nodes-current:focus-visible {
   text-align: center;
 }
 
+.folder-nodes-contents-status {
+  padding: var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  margin-block: var(--size-4-2);
+}
+
+.folder-nodes-contents-status-path {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.folder-nodes-contents-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+}
+
 .folder-nodes-entry-shell {
   position: relative;
   min-width: 0;
