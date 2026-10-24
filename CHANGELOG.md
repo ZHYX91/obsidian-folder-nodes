@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.12.0 - 2026-10-25
+
+- Keep opened, edited, moved, or replaced notes when selection-based node creation cannot finish; report retained paths and remove only changes still owned by that operation.
+- Stop new structural-property writes and paired renames after unload or when the original file or path changes, including queued callbacks; preserve compensation for already accepted changes.
+- Explain empty, hidden, unmanaged, and incomplete Node Contents states with the current path and relevant navigation, management, Health, or session-reveal actions.
+- Make Canvas graph arrow keys follow visible node positions, with Home and End selecting the first and last visible nodes.
+- Clarify selection creation, unresolved-link creation, navigation, and recovery guidance across all twelve user-guide languages.
+
 ## 0.11.2 - 2026-10-23
 
 - Refuse node merges that would change supported relative Markdown link targets, including multiline reference definitions and moved descendant notes.
