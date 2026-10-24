@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const de: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "Verwaltungsregeln ansehen",
+  "errorCreatedFileOpen": "{path} wurde beibehalten, weil die Notiz in einem Markdown-Bereich geöffnet ist. Speichern und prüfen Sie sie, bevor Sie sie selbst löschen.",
+  "errorCreatedNodeRetained": "Die automatische Bereinigung wurde angehalten. Verbliebene Dateien und Ordner: {paths}. Grund: {reason}",
   "helpAndSupport": "Hilfe und Support",
   "userGuide": "Benutzerhandbuch",
   "reportIssue": "Problem melden",

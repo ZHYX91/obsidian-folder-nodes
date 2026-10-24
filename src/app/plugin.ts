@@ -45,6 +45,7 @@ import { onLayoutReadyOnce } from "./layout-ready";
 import { DocumentEventRegistry } from "./document-event-registry";
 import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
+import { openPluginSettings } from "../adapters/plugin-settings";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
 
 const PLUGIN_STYLES = `${BASE_STYLES}\n${NODE_GRAPH_STYLES}`;
@@ -152,6 +153,12 @@ export default class FolderNodesPlugin extends Plugin {
       homepageEnabled: () => this.settings.homepageEnabled,
       refresh: () => this.refreshVisuals(),
       reportError: (error) => new Notice(formatError(error), 8000),
+      openManagement: () => {
+        if (openPluginSettings(this.app, this.manifest.id)) this.settingsTab?.showManagement();
+        else new Notice(`${t("settings")} → ${t("management")}\n${t("managementGuideBoundary")}`, 8000);
+      },
+      showHealth: () => this.showHealth(),
+      showHidden: () => this.runAction(this.toggleHiddenNodesThisSession()),
     }, Platform.isDesktopApp));
     this.settingsTab = new FolderNodesSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);

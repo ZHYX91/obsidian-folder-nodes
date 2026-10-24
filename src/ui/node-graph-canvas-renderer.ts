@@ -30,6 +30,7 @@ import {
   type NodeGraphBox,
 } from "../core/node-graph-geometry";
 import type { NodeGraphLayout } from "../core/node-graph-layout";
+import { graphKeyboardTarget } from "../core/node-graph-keyboard";
 import {
   nodeGraphLinkEdges,
   nodeGraphStructureEdges,
@@ -510,17 +511,10 @@ export class NodeGraphCanvasRenderer {
     if (["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home"].includes(event.key)) {
       const ordered = this.keyboardPaths();
       if (ordered.length === 0) return;
-      const current = this.focusPath === null ? -1 : ordered.indexOf(this.focusPath);
-      const backwards = event.key === "ArrowLeft" || event.key === "ArrowUp";
-      const nextIndex = event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? ordered.length - 1
-          : current < 0
-            ? 0
-            : (current + (backwards ? -1 : 1) + ordered.length) % ordered.length;
-      const next = ordered[nextIndex];
-      if (next === undefined) return;
+      const points = this.dimension === "2d" ? [...this.layoutPositions].map(([id, point]) => ({ id, ...point }))
+        : projectNodeGraph3D(this.data.points3D, this.camera3D, this.width, this.height);
+      const next = graphKeyboardTarget(event.key, this.focusPath, ordered, points);
+      if (next === null) return;
       event.preventDefault();
       this.selectFromCanvas(next, true);
       return;

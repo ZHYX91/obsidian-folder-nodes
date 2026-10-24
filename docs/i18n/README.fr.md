@@ -30,7 +30,7 @@ Vous pouvez créer, renommer, déplacer, fusionner, trier ou supprimer un nœud 
 
 Obsidian 1.12.7 ou une version ultérieure est nécessaire.
 
-Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements passent par des menus plutôt que par le glisser-déposer de bureau. Les appareils Android physiques et iOS ne font pas partie des essais d’acceptation officiels.
+Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements passent par les menus. La compatibilité avec iOS n’a pas été vérifiée.
 
 ## Installation
 
@@ -46,6 +46,10 @@ Vous pouvez aussi placer `main.js`, `manifest.json` et `styles.css` d’une mêm
 4. Ouvrez Node Graph. Le mode « Global » montre tous les nœuds gérés ; « Sous-arbre » montre le nœud choisi et ses descendants ; « Local » montre son entourage. Vous pouvez passer de 2D à 3D et afficher les liens entre notes.
 
 Lorsqu’un nœud est créé depuis du texte sélectionné, vous pouvez vérifier son nom, son emplacement et ses alias. Les liens internes encore inexistants peuvent aussi créer des nœuds dans la partie gérée. Une sélection qui traverse plusieurs cellules d’un tableau Markdown est refusée pour préserver ce tableau.
+
+Le contenu du nœud indique le chemin actuel et explique les états vide, masqué, non géré ou incomplet. Les boutons proposés ouvrent un parent valide, les règles de gestion ou le contrôle en lecture seule, ou révèlent les nœuds masqués pour la session. Dans un graphe Canvas, les flèches vont au nœud le plus proche dans cette direction à l’écran ; Début et Fin sélectionnent le premier et le dernier nœud visible.
+
+Si la création échoue après avoir créé une note, le nettoyage ne supprime que les fichiers dont l’origine et le contenu inchangé peuvent être vérifiés. Une note ouverte ou modifiée est conservée. Le message d’erreur donne les chemins restants et la raison : enregistrez et vérifiez ces fichiers avant de décider de les supprimer manuellement.
 
 ## Paramètres
 
@@ -64,7 +68,7 @@ La liste de textes `folder-nodes` dans la note d’un nœud contient les réglag
 
 ## Propriété icon
 
-La propriété icon de la note de nœud accepte, par ordre de priorité, des images du coffre, des icônes Lucide, des caractères et des émojis. color: colore les caractères ou les icônes Lucide, ou définit une couleur de secours. Prévisualisez l’effet dans les paramètres.
+La propriété icon de la note de nœud accepte, par ordre de priorité, des images du coffre, des icônes Lucide, des caractères et des émojis. color: colore les caractères ou les icônes Lucide, ou définit une couleur de secours. Un aperçu est disponible dans les paramètres.
 
 ```yaml
 icon:

@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ko: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "관리 규칙 보기",
+  "errorCreatedFileOpen": "{path}이(가) Markdown 창에 열려 있어 보존했습니다. 노트를 저장하고 내용을 확인한 후 필요하면 직접 삭제하세요.",
+  "errorCreatedNodeRetained": "자동 정리를 중지했습니다. 남겨 둔 파일과 폴더: {paths}. 이유: {reason}",
   "helpAndSupport": "도움말 및 지원",
   "userGuide": "사용 안내서",
   "reportIssue": "문제 보고",

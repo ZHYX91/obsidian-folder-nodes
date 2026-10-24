@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ja: Readonly<Record<TranslationKey, string>> = {
+  "viewManagementRules": "管理ルールを確認",
+  "errorCreatedFileOpen": "{path} は Markdown ペインで開かれているため残しました。ノートを保存して内容を確認してから、必要に応じて手動で削除してください。",
+  "errorCreatedNodeRetained": "自動クリーンアップを停止しました。残したファイルとフォルダー：{paths}。理由：{reason}",
   "helpAndSupport": "ヘルプとサポート",
   "userGuide": "使い方ガイド",
   "reportIssue": "問題を報告",

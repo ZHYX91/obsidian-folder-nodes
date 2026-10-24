@@ -30,7 +30,7 @@ Bạn có thể tạo, đổi tên, di chuyển, hợp nhất, sắp xếp và x
 
 Cần Obsidian 1.12.7 trở lên.
 
-Plugin hỗ trợ máy tính và Android. Trên Android, việc di chuyển thư mục dùng menu thay cho thao tác kéo thả trên máy tính. Thiết bị Android thực và iOS chưa nằm trong phạm vi nghiệm thu chính thức.
+Plugin hỗ trợ máy tính và Android. Trên Android, hãy dùng menu để di chuyển thư mục. Khả năng tương thích với iOS chưa được kiểm chứng.
 
 ## Cài đặt
 
@@ -46,6 +46,10 @@ Bạn cũng có thể đặt `main.js`, `manifest.json` và `styles.css` cùng m
 4. Mở Node Graph. “Toàn cục” hiển thị tất cả nút được quản lý, “Cây con” hiển thị nút đã chọn và các nút con, còn “Cục bộ” cho thấy khu vực lân cận. Có thể chuyển 2D/3D và bật liên kết giữa các ghi chú.
 
 Khi tạo nút từ văn bản đã chọn, hãy kiểm tra tên, nơi tạo và bí danh. Trong phạm vi quản lý, bạn cũng có thể tạo nút từ liên kết nội bộ chưa tồn tại. Vùng chọn đi qua nhiều ô trong bảng Markdown sẽ bị từ chối để tránh làm hỏng bảng.
+
+Nội dung nút hiển thị đường dẫn hiện tại và giải thích trạng thái trống, ẩn, không quản lý hoặc chưa hoàn chỉnh. Các nút có sẵn cho phép mở nút cha hợp lệ, xem quy tắc quản lý, chạy kiểm tra chỉ đọc hoặc hiện nút ẩn trong phiên này. Trong sơ đồ Canvas, phím mũi tên chọn nút gần nhất theo hướng đó trên màn hình; Home và End chọn nút hiển thị đầu tiên và cuối cùng.
+
+Nếu thao tác thất bại sau khi tạo ghi chú, plugin chỉ dọn các tệp vẫn xác định được là do thao tác đó tạo ra và chưa thay đổi. Ghi chú đã mở hoặc chỉnh sửa được giữ lại. Thông báo lỗi nêu các đường dẫn còn lại và lý do: hãy lưu và kiểm tra các tệp trước khi quyết định xóa thủ công.
 
 ## Thiết lập
 
@@ -64,7 +68,7 @@ Danh sách văn bản `folder-nodes` trong ghi chú nút lưu các thiết lập
 
 ## Thuộc tính icon
 
-Thuộc tính icon của ghi chú nút chấp nhận hình ảnh trong kho, biểu tượng Lucide, một ký tự hoặc emoji theo thứ tự ưu tiên. color: dùng để tô màu chữ/Lucide hoặc làm màu dự phòng. Hãy xem trước trong cài đặt trước khi lưu.
+Thuộc tính icon của ghi chú nút chấp nhận hình ảnh trong kho, biểu tượng Lucide, một ký tự hoặc emoji theo thứ tự ưu tiên. color: dùng để tô màu chữ/Lucide hoặc làm màu dự phòng. Bạn có thể xem trước trong cài đặt.
 
 ```yaml
 icon:
@@ -86,7 +90,7 @@ Nút được nhận dạng bằng đường dẫn hiện tại trong kho, khôn
 
 Thao tác di chuyển hoặc xóa thông thường tác động đến tệp hay thư mục được chọn. Tuy nhiên, đổi tên thư mục hoặc ghi chú cùng tên của một nút hoàn chỉnh cũng sẽ đồng bộ tên phần còn lại khi không có xung đột. Thao tác với “nút chứa ghi chú” áp dụng cho cả nút. Sắp xếp hàng loạt và chuyển đổi thuộc tính đều cho xem trước trước khi ghi, còn kiểm tra trạng thái chỉ đọc. Nếu gặp xung đột, plugin dừng thay vì tự đoán cách giải quyết. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian.
 
-Mọi xử lý đều tại máy: plugin không tải ghi chú lên mạng hay gửi yêu cầu mạng. Sắp xếp hàng loạt và chuyển đổi thuộc tính sẽ cho xem trước, dừng khi có xung đột. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian. Chỉ khi bạn chủ động sao chép, liên kết mới được ghi vào bộ nhớ tạm; plugin không bao giờ đọc bộ nhớ tạm. Thiết lập và quy tắc loại trừ được lưu trong data.json.
+Mọi xử lý đều tại máy: plugin không tải ghi chú lên mạng hay gửi yêu cầu mạng. Chỉ khi bạn chủ động sao chép, liên kết mới được ghi vào bộ nhớ tạm; plugin không bao giờ đọc bộ nhớ tạm. Thiết lập và quy tắc loại trừ được lưu trong data.json.
 
 ## Phát triển
 
