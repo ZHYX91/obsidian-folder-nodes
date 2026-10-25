@@ -324,7 +324,7 @@
     },
     {
       "id": "node-merge-link-safety",
-      "title": "Relative-link refusal and final merge lifecycle/editor revalidation",
+      "title": "Relative and removed-note link refusal with final merge lifecycle/editor revalidation",
       "surfaces": [
         "desktop",
         "android-emulator"
@@ -336,15 +336,42 @@
       "steps": [
         "Use a fresh disposable Vault with the fixture app.json: automatic internal-link updates are disabled. Confirm that host option before running Prepare merge safety fixture. Save and close all source, target and descendant editors before each merge. Use the product Merge node action on each case's Source, selecting its Deep/Target.",
         "Try Inline, Definition and Nested. Definition uses a destination on the line after [ref]:. Confirm a refusal notice and inspect the original notes, target body, child paths and attachments. The original and destination directories contain different Reference.md files.",
+        "In a fresh Inline source case, replace its body with a WikiLink resolving to its own Source Node Note. Try basename and full Vault path, display alias, heading, block reference and embed forms in separate reset cases; also place one such reference in a moved child note. Save and close editors before using Merge node. Inspect unchanged source/target bytes and child paths after each refusal.",
+        "Repeat the removed-note reference as a Text property and a List property in the source note, then in a moved child note. Confirm refusal before mutations; an unrelated property link still transfers normally. Include a list-scoped code fence followed by a real link in the next list item to confirm that the real link is checked.",
+        "Repeat the removed-note link case with the text present only inside fenced code, inline code or comments, with a valid unrelated WikiLink outside those literals. Confirm the literals do not themselves block an otherwise safe merge. Reset before the next case.",
         "Merge Safe using the product UI. Open the appended attachment link and moved child, then inspect the surviving attachment and target note. Confirm only this successful source folder is removed according to the host deletion setting.",
         "Run Arm merge editor race, then merge EditorRace/Source through the product UI. The provider opens the source editor at the final descendant read. Inspect the refusal, source editor content, restored child path and target body. Close that editor before continuing.",
         "Run Arm merge unload race, then merge UnloadRace/Source through the product UI. The provider disables the candidate at the final descendant read. Inspect source/child preservation and target rollback; re-enable Folder Nodes through the host UI. Run Save merge safety observations and record the real host environment."
       ],
       "expected": [
-        "Unsafe inline and multiline reference links in source or descendant notes refuse before any move, append or source removal.",
+        "Unsafe inline and multiline reference links in source or descendant notes refuse before any move, append or source removal. WikiLinks and embeds that resolve to the removed source Node Note also refuse before mutations, including aliases and heading/block fragments; code and comments remain literal.",
         "A supported relative attachment moving with the source retains its target after a successful merge.",
         "Both deterministic final-read races actually trigger in the live host. Unload and a reopened source editor prevent source removal, preserve user content and compensate already dispatched owned changes.",
         "Provider output records observations only; actual product actions and host state determine the scoped verdict."
+      ]
+    },
+    {
+      "id": "visual-edit-ownership",
+      "title": "Bound icon and cover editing across concurrent changes and unload",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In a fresh disposable Vault, open the Visual Picker for Geometry/Lucide. Change icon from another editor or host window while the picker remains open, then confirm the old picker. Verify the newer icon and note body remain. Reset the fixture and repeat after renaming or replacing the original Node Note or folder.",
+        "Open a fresh picker and disable Folder Nodes through the host UI while it is open. Confirm the picker closes and cannot submit after re-enable. Open a new picker, save a valid list, then remove its icon normally to verify successful writes still work.",
+        "On desktop use Tab and the move/remove buttons to reorder and delete visual candidates. Confirm keyboard focus remains on the moved candidate or an adjacent surviving row. On Android exercise the equivalent touch controls and verify the intended list order.",
+        "Open Set as visual for a Vault image, then replace or rename that image or the target Node Note before activating the retained menu where the host allows it. Verify stale actions leave the note unchanged. Use a freshly opened menu to set a valid cover and inspect the resolved image. If the host closes the menu before the concurrent change can be reproduced, record that boundary as unverified rather than claiming a pass."
+      ],
+      "expected": [
+        "Edits retain the original folder, canonical note, paths and icon value. Concurrent replacement, rename or icon changes refuse stale edits without changing newer content.",
+        "Plugin unload invalidates old pickers and prevents new writes from their callbacks. A new picker after re-enable can save and delete icons normally.",
+        "Keyboard or touch list operations remain usable, and unchanged cover actions resolve the selected Vault image.",
+        "Record desktop and Android observations separately. Adapter callback-delay tests do not prove that a particular host interleaving was observed."
       ]
     },
     {

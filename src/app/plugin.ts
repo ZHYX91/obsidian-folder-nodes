@@ -4,7 +4,7 @@ import BASE_STYLES from "../ui/styles.css";
 import NODE_GRAPH_STYLES from "../ui/node-graph.css";
 
 import { ExplorerAdapter } from "../adapters/explorer-adapter";
-import { NodeService } from "../adapters/node-service";
+import { NodeService, type VisualEditBinding } from "../adapters/node-service";
 import { ReferenceIndex } from "../core/reference-index";
 import { VisualService } from "../adapters/visual-service";
 import { refreshRibbonLabel, ribbonRegistrationTitle } from "../adapters/ribbon-host";
@@ -70,6 +70,7 @@ export default class FolderNodesPlugin extends Plugin {
   private lifecycleGeneration = 0;
   private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
   private settingsTab: FolderNodesSettingTab | null = null;
+  private readonly visualPickers = new Set<VisualPickerModal>();
   private readonly localizedCommands: Command[] = [];
   private ribbonElement: HTMLElement | null = null;
   private settingsSaveWasPending = false;
@@ -193,6 +194,8 @@ export default class FolderNodesPlugin extends Plugin {
     this.ribbonElement = null;
     this.reconciliationReady = false;
     this.service?.dispose();
+    for (const picker of this.visualPickers) picker.invalidate();
+    this.visualPickers.clear();
     this.refreshScheduler?.cancel();
     this.refreshScheduler = null;
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
@@ -367,11 +370,16 @@ export default class FolderNodesPlugin extends Plugin {
 
   public promptVisual(folder: TFolder): void {
     try {
-      new VisualPickerModal(this.app, folder, this.visuals.candidates(folder),
-        (values) => this.visuals.preview(folder, values), (values) => this.visuals.diagnostics(values), async (values) => {
-        await this.visuals.set(folder, values);
-        this.refreshVisuals();
-      }).open();
+      const generation = this.lifecycleGeneration;
+      const visuals = this.visuals;
+      const edit = visuals.beginEdit(folder);
+      const picker = new VisualPickerModal(this.app, folder, edit.values,
+        (values) => visuals.preview(folder, values), (values) => visuals.diagnostics(values), async (values) => {
+        await edit.save(values);
+        if (!this.unloaded && generation === this.lifecycleGeneration) this.refreshVisuals();
+      }, () => this.visualPickers.delete(picker));
+      this.visualPickers.add(picker);
+      picker.open();
     } catch (error) {
       new Notice(formatError(error), 8000);
     }
@@ -835,7 +843,14 @@ export default class FolderNodesPlugin extends Plugin {
         this.service.getCanonicalFile(sourceFolder.path) !== null &&
         ["avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp"].includes(entry.extension.toLocaleLowerCase())
       ) {
-        menu.addItem((item) => item.setTitle(t("setAsVisual")).setIcon("image").onClick(() => this.runAction(this.setFileAsVisual(entry, sourceFolder))));
+        const generation = this.lifecycleGeneration;
+        const binding: VisualEditBinding = {
+          ...this.service.captureVisualEdit(sourceFolder), sourceFile: { file: entry, path: entry.path },
+        };
+        const filePath = entry.path;
+        menu.addItem((item) => item.setTitle(t("setAsVisual")).setIcon("image").onClick(() => {
+          if (!this.unloaded && generation === this.lifecycleGeneration) this.runAction(this.setFileAsVisual(entry, filePath, binding));
+        }));
       }
       if (entry.extension.toLocaleLowerCase() === "md" && !this.service.isIgnoredPath(sourceFolder.path) && !this.service.isLeafNoteExempt(entry.path)) {
         menu.addItem((item) => item.setTitle(t("convertToNode")).setIcon("folder-plus").onClick(() => {
@@ -962,12 +977,15 @@ export default class FolderNodesPlugin extends Plugin {
     }
   }
 
-  private async setFileAsVisual(file: TFile, folder: TFolder): Promise<void> {
+  private async setFileAsVisual(file: TFile, filePath: string, binding: VisualEditBinding): Promise<void> {
     try {
-      const sourcePath = this.service.notePathForFolder(folder.path);
-      const linkText = this.app.metadataCache.fileToLinktext(file, sourcePath);
-      await this.visuals.set(folder, [`[[${linkText}]]`]);
-      this.refreshVisuals();
+      const generation = this.lifecycleGeneration;
+      if (file.path !== filePath || this.app.vault.getAbstractFileByPath(filePath) !== file) {
+        throw new Error(`Image file changed before icon update: ${filePath}`);
+      }
+      const linkText = this.app.metadataCache.fileToLinktext(file, binding.notePath);
+      await this.visuals.set(binding.folder, [`[[${linkText}]]`], binding);
+      if (!this.unloaded && generation === this.lifecycleGeneration) this.refreshVisuals();
     } catch (error) {
       new Notice(formatError(error), 8000);
     }

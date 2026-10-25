@@ -7,19 +7,61 @@
 export function assertMergeLinksKeepDestinations(
   source: string, oldNote: string, newNote: string,
   sourceFolder: string, targetFolder: string, retiredNote: string,
+  resolveWikiLink: (path: string, sourcePath: string) => string | null = () => null,
 ): void {
   if (oldNote === newNote) return;
-  let fence: { mark: string; width: number } | null = null;
-  let comment: "html" | "obsidian" | null = null;
-  for (const line of source.split(/\r\n|\r|\n/u)) {
+  let fence: { mark: string; width: number; quoteDepth: number; listIndent: number } | null = null;
+  let comment: LiteralBlock | null = null;
+  let previousBlank = true;
+  let indentedCode = false;
+  let listIndents: number[] = [];
+  let listQuoteDepth = 0;
+  for (const [lineIndex, line] of source.split(/\r\n|\r|\n/u).entries()) {
+    const quotePrefix = /^ {0,3}(?:>[ \t]?)+/u.exec(line)?.[0] ?? "";
+    const quoteDepth = quotePrefix.split(">").length - 1;
+    const fenceLine = line.slice(quotePrefix.length);
+    if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
     if (fence !== null) {
-      const close = new RegExp("^ {0,3}" + fence.mark + "{" + fence.width + ",}[ \\t]*$", "u");
-      if (close.test(line)) fence = null;
+      const boundPrefix = fence.quoteDepth === 0 ? "" : new RegExp(`^ {0,3}(?:>[ \\t]?){${fence.quoteDepth}}`, "u").exec(line)?.[0] ?? "";
+      const content = line.slice(boundPrefix.length).replaceAll("\t", "    ");
+      const indentation = /^[ ]*/u.exec(content)?.[0].length ?? 0;
+      if (content.trim() !== "" && indentation < fence.listIndent) fence = null;
+      else {
+        const close = new RegExp("^ {0,3}" + fence.mark + "{" + fence.width + ",}[ \\t]*$", "u");
+        if (close.test(content.slice(fence.listIndent))) fence = null;
+        continue;
+      }
+    }
+    const blank = /^\s*$/u.test(fenceLine);
+    const indentation = /^[ \t]*/u.exec(fenceLine)?.[0].replaceAll("\t", "    ").length ?? 0;
+    if (quoteDepth !== listQuoteDepth) listIndents = [];
+    listQuoteDepth = quoteDepth;
+    const listCandidate = /^([ \t]*)(?:[-+*]|(\d{1,9})[.)])[ \t]+/u.exec(fenceLine);
+    if (comment === null && listCandidate?.[2] !== undefined && listCandidate[2] !== "1"
+      && /^(?:\x60{3,}|~{3,})/u.test(fenceLine.slice(listCandidate[0].length))) {
+      throw new Error("Cannot safely merge an ambiguous numbered-list fence");
+    }
+    const list = listCandidate?.[2] !== undefined && listCandidate[2] !== "1" && !previousBlank && listIndents.length === 0
+      ? null : listCandidate;
+    if (!blank) {
+      while ((listIndents.at(-1) ?? 0) > indentation) listIndents.pop();
+      if (list !== null) listIndents.push(list[0].replaceAll("\t", "    ").length);
+    }
+    const listIndent = listIndents.at(-1) ?? 0;
+    if (comment === null && indentation >= listIndent + 4 && (previousBlank || indentedCode)) {
+      indentedCode = true;
+      previousBlank = blank;
       continue;
     }
-    const opening = comment === null ? /^ {0,3}(\x60{3,}|~{3,})(.*)$/u.exec(line) : null;
+    if (!blank) indentedCode = false;
+    previousBlank = blank;
+    const listContent = fenceLine.replaceAll("\t", "    ").slice(listIndent);
+    if (comment === null && list !== null && /^(?:(?:[-+*]|\d+[.)])[ \t]+|>[ \t]*)+(?:\x60{3,}|~{3,})/u.test(listContent)) {
+      throw new Error("Cannot safely merge a fence with mixed list and quote openers");
+    }
+    const opening = comment === null ? /^ {0,3}(\x60{3,}|~{3,})(.*)$/u.exec(listContent) : null;
     if (opening?.[1] != null && !(opening[1][0] === "\x60" && (opening[2] ?? "").includes("\x60"))) {
-      fence = { mark: opening[1][0] ?? "~", width: opening[1].length };
+      fence = { mark: opening[1][0] ?? "~", width: opening[1].length, quoteDepth, listIndent };
       continue;
     }
     const masked = maskInlineLiterals(line, comment);
@@ -53,14 +95,31 @@ export function assertMergeLinksKeepDestinations(
     if (definition?.[1] != null && !absolute(definition[1])) {
       throw new Error("Cannot safely merge a relative reference definition");
     }
-    for (const wiki of visible.matchAll(/!?\[\[([^\]\r\n]+)\]\]/gu)) {
-      const path = (wiki[1] ?? "").split(/[#|]/u, 1)[0] ?? "";
-      if (path === "." || path === ".." || path.startsWith("./") || path.startsWith("../")) {
-        throw new Error("Cannot safely merge a relative WikiLink");
-      }
-    }
+    assertMergeWikiLinksKeepDestinations(visible, oldNote, retiredNote, resolveWikiLink, `${oldNote} body line ${lineIndex + 1}`);
     if (/\b(?:href|src)\s*=\s*["']?\.{1,2}\//iu.test(visible)) {
       throw new Error("Cannot safely merge a relative HTML link");
+    }
+  }
+}
+
+/** Accepts visible prose or a parsed Text/List property value, without YAML escaping. */
+export function assertMergeWikiLinksKeepDestinations(
+  source: string, oldNote: string, retiredNote: string,
+  resolveWikiLink: (path: string, sourcePath: string) => string | null,
+  location = oldNote,
+): void {
+  for (const wiki of source.matchAll(/!?\[\[([^\]\r\n]+)\]\]/gu)) {
+    let escapes = 0;
+    const opener = wiki.index + wiki[0].indexOf("[[");
+    for (let index = opener - 1; index >= 0 && source[index] === "\\"; index -= 1) escapes += 1;
+    if (escapes % 2 !== 0) continue;
+    const path = ((wiki[1] ?? "").split(/#|\\?\|/u, 1)[0] ?? "").trim();
+    if (path === "." || path === ".." || path.startsWith("./") || path.startsWith("../")) {
+      throw new Error("Cannot safely merge a relative WikiLink");
+    }
+    const destination = path === "" ? oldNote : resolveWikiLink(path, oldNote);
+    if (destination === retiredNote || path.replace(/\.md$/iu, "") === retiredNote.replace(/\.md$/iu, "")) {
+      throw new Error(`Cannot merge a WikiLink to the removed Node Note: ${location} ${wiki[0]}`);
     }
   }
 }
@@ -81,21 +140,33 @@ function resolve(filePath: string, relative: string): string {
   return result.join("/");
 }
 
-function maskInlineLiterals(line: string, initial: "html" | "obsidian" | null) {
+type LiteralBlock = "html" | "obsidian" | "pre" | "code";
+
+function maskInlineLiterals(line: string, initial: LiteralBlock | null) {
   const chars = line.split("");
   let cursor = 0;
   let comment = initial;
   while (cursor < line.length) {
     if (comment !== null) {
-      const end = comment === "html" ? "-->" : "%%";
-      const found = line.indexOf(end, cursor);
-      const stop = found < 0 ? line.length : found + end.length;
+      const ending = comment === "html" ? /-->/u : comment === "obsidian" ? /%%/u : new RegExp(`</${comment}\\s*>`, "iu");
+      const end = ending.exec(line.slice(cursor));
+      const stop = end === null ? line.length : cursor + end.index + end[0].length;
       for (let i = cursor; i < stop; i += 1) chars[i] = " ";
-      if (found >= 0) comment = null;
+      if (end !== null) comment = null;
       cursor = stop;
       continue;
     }
-    if (line.startsWith("<!--", cursor) || line.startsWith("%%", cursor)) {
+    let escapes = 0;
+    for (let i = cursor - 1; i >= 0 && line[i] === "\\"; i -= 1) escapes += 1;
+    const escaped = escapes % 2 !== 0;
+    const rawCode = escaped ? null : /^<(pre|code)\b[^>]*>/iu.exec(line.slice(cursor));
+    if (rawCode !== null) {
+      comment = rawCode[1]!.toLowerCase() as "pre" | "code";
+      for (let i = cursor; i < cursor + rawCode[0].length; i += 1) chars[i] = " ";
+      cursor += rawCode[0].length;
+      continue;
+    }
+    if (!escaped && (line.startsWith("<!--", cursor) || line.startsWith("%%", cursor))) {
       const isHtml = line.startsWith("<!--", cursor);
       comment = isHtml ? "html" : "obsidian";
       const openingLength = isHtml ? 4 : 2;
@@ -104,9 +175,7 @@ function maskInlineLiterals(line: string, initial: "html" | "obsidian" | null) {
       continue;
     }
     if (line[cursor] === "\x60") {
-      let escaped = 0;
-      for (let i = cursor - 1; i >= 0 && line[i] === "\\"; i -= 1) escaped += 1;
-      if (escaped % 2 !== 0) { cursor += 1; continue; }
+      if (escaped) { cursor += 1; continue; }
       let width = 1;
       while (line[cursor + width] === "\x60") width += 1;
       let close = -1;

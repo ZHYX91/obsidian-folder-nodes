@@ -10,6 +10,7 @@ export class VisualPickerModal extends SubmittingModal {
   private readonly values: string[];
   private editorEl: HTMLElement | null = null;
   private previewEl: HTMLElement | null = null;
+  private invalidated = false;
 
   public constructor(
     app: App,
@@ -18,12 +19,14 @@ export class VisualPickerModal extends SubmittingModal {
     private readonly preview: (values: readonly string[]) => NodeVisual,
     private readonly diagnostics: (values: readonly string[]) => { extraColorCount: number; unknownCount: number },
     private readonly onSave: (values: readonly string[]) => Promise<void>,
+    private readonly afterClose: () => void = () => undefined,
   ) {
     super(app);
     this.values = initialValues.length === 0 ? [""] : [...initialValues];
   }
 
   public override onOpen(): void {
+    if (this.invalidated) { this.closeAfterSubmission(); return; }
     this.setTitle(`${t("editVisual")}: ${this.folder.name}`);
     this.contentEl.createEl("p", { text: t("visualValueDesc") });
 
@@ -56,7 +59,18 @@ export class VisualPickerModal extends SubmittingModal {
       .addButton((button) => button.setCta().setButtonText(t("confirm")).onClick(() => void this.submit()));
   }
 
-  private renderEditor(): void {
+  public invalidate(): void {
+    this.invalidated = true;
+    this.closeAfterSubmission();
+  }
+
+  public override onClose(): void {
+    this.invalidated = true;
+    this.afterClose();
+    this.contentEl.empty();
+  }
+
+  private renderEditor(focus?: { index: number; button?: "up" | "down" }): void {
     if (this.editorEl === null) return;
     this.editorEl.empty();
     for (const [index, value] of this.values.entries()) {
@@ -69,21 +83,26 @@ export class VisualPickerModal extends SubmittingModal {
         this.values[index] = input.value;
         this.renderPreview();
       });
-      this.addRowButton(row, "↑", t("moveCandidateUp"), index === 0, () => this.move(index, -1));
-      this.addRowButton(row, "↓", t("moveCandidateDown"), index === this.values.length - 1, () => this.move(index, 1));
+      const up = this.addRowButton(row, "↑", t("moveCandidateUp"), index === 0, () => this.move(index, -1));
+      const down = this.addRowButton(row, "↓", t("moveCandidateDown"), index === this.values.length - 1, () => this.move(index, 1));
       this.addRowButton(row, "×", t("removeCandidate"), false, () => {
         this.values.splice(index, 1);
         if (this.values.length === 0) this.values.push("");
-        this.renderEditor();
+        this.renderEditor({ index: Math.min(index, this.values.length - 1) });
       });
+      if (focus?.index === index) {
+        const button = focus.button === "up" ? up : focus.button === "down" ? down : null;
+        (button !== null && !button.disabled ? button : input).focus();
+      }
     }
     this.renderPreview();
   }
 
-  private addRowButton(row: HTMLElement, text: string, label: string, disabled: boolean, action: () => void): void {
+  private addRowButton(row: HTMLElement, text: string, label: string, disabled: boolean, action: () => void): HTMLButtonElement {
     const button = row.createEl("button", { text, attr: { "aria-label": label, title: label, type: "button" } });
     button.disabled = disabled;
     button.addEventListener("click", action);
+    return button;
   }
 
   private move(index: number, offset: -1 | 1): void {
@@ -93,7 +112,7 @@ export class VisualPickerModal extends SubmittingModal {
     if (current === undefined || other === undefined) return;
     this.values[index] = other;
     this.values[target] = current;
-    this.renderEditor();
+    this.renderEditor({ index: target, button: offset === -1 ? "up" : "down" });
   }
 
   private renderPreview(): void {
@@ -116,7 +135,7 @@ export class VisualPickerModal extends SubmittingModal {
   }
 
   private async submit(values: readonly string[] = this.values): Promise<void> {
-    if (this.submitting) return;
+    if (this.submitting || this.invalidated) return;
     this.submitting = true;
     try {
       await this.onSave(values);
