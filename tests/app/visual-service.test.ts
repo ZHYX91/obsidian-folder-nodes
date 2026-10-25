@@ -1,7 +1,9 @@
-import { TFile } from "obsidian";
+import { TFile, TFolder } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VisualService } from "../../src/adapters/visual-service";
+import { NodeService } from "../../src/adapters/node-service";
+import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { FakeObsidian } from "../helpers/fake-obsidian";
 
 beforeEach(() => {
@@ -16,6 +18,66 @@ afterEach(() => {
 });
 
 describe("Node Graph visual service boundary", () => {
+  it("keeps Root icon editing available", async () => {
+    const fixture = visualFixture();
+    const rootNote = fixture.fake.addFile("Test Vault.md", "Root body");
+    await fixture.visuals.set(fixture.fake.root, ["⭐"]);
+    expect(fixture.fake.frontmatters.get(rootNote.path)?.icon).toBe("⭐");
+    expect(fixture.fake.contents.get(rootNote.path)).toContain("Root body");
+  });
+  it.each(["note", "folder", "rename", "unload", "icon"])("rejects a stale picker after %s changes", async (change) => {
+    const fixture = visualFixture();
+    const folder = fixture.fake.requireFolder("Parent/Child");
+    const note = fixture.fake.requireFile("Parent/Child/Child.md");
+    const edit = fixture.visuals.beginEdit(folder);
+    if (change === "note") fixture.fake.files.set(note.path, Object.assign(new TFile(), note));
+    if (change === "folder") fixture.fake.files.set(folder.path, Object.assign(new TFolder(), folder));
+    if (change === "rename") await fixture.fake.app.fileManager.renameFile(folder, "Parent/Renamed");
+    if (change === "unload") fixture.service.dispose();
+    if (change === "icon") await fixture.fake.app.vault.modify(note, "---\nicon: star\n---\nOther edit");
+    const before = new Map(fixture.fake.contents);
+    await expect(edit.save(["🧠"])).rejects.toThrow();
+    expect(fixture.fake.contents).toEqual(before);
+  });
+
+  it.each(["unload", "replacement", "icon"])("rechecks %s inside a delayed mutation callback", async (change) => {
+    const fixture = visualFixture();
+    const folder = fixture.fake.requireFolder("Parent/Child");
+    const note = fixture.fake.requireFile("Parent/Child/Child.md");
+    let resume!: () => void;
+    const pending = new Promise<void>((resolve) => { resume = resolve; });
+    const original = fixture.fake.app.fileManager.processFrontMatter.bind(fixture.fake.app.fileManager);
+    const write = vi.spyOn(fixture.fake.app.fileManager, "processFrontMatter").mockImplementation(async (file, update) => {
+      await pending;
+      await original(file, update);
+    });
+    const saving = fixture.visuals.beginEdit(folder).save([]);
+    await vi.waitFor(() => expect(write).toHaveBeenCalledOnce());
+    if (change === "unload") fixture.service.dispose();
+    if (change === "replacement") fixture.fake.files.set(note.path, Object.assign(new TFile(), note));
+    if (change === "icon") await fixture.fake.app.vault.modify(note, "---\nicon: star\n---\nConcurrent body");
+    const before = new Map(fixture.fake.contents);
+    const rejection = expect(saving).rejects.toThrow();
+    resume();
+    await rejection;
+    expect(fixture.fake.contents).toEqual(before);
+  });
+
+  it("preserves unrelated property changes and lets a new service write after the old one unloads", async () => {
+    const fixture = visualFixture();
+    const folder = fixture.fake.requireFolder("Parent/Child");
+    const note = fixture.fake.requireFile("Parent/Child/Child.md");
+    const edit = fixture.visuals.beginEdit(folder);
+    await fixture.fake.app.vault.modify(note, "---\ntitle: Keep me\n---\nBody");
+    await edit.save(["🧠"]);
+    expect(fixture.fake.frontmatters.get(note.path)).toEqual({ title: "Keep me", icon: "🧠" });
+    fixture.service.dispose();
+    await expect(fixture.visuals.set(folder, ["⭐"])).rejects.toThrow("unloaded");
+    const next = new VisualService(fixture.fake.app, new NodeService(fixture.fake.app, () => structuredClone(DEFAULT_SETTINGS)), () => false);
+    await next.set(folder, ["⭐"]);
+    expect(fixture.fake.frontmatters.get(note.path)?.icon).toBe("⭐");
+    expect(fixture.fake.contents.get(note.path)).toContain("Body");
+  });
   it("resolves own, inherited, disabled-inheritance, and fallback visuals", () => {
     const fixture = visualFixture();
     fixture.fake.frontmatters.set("Parent/Parent.md", { icon: "brain" });
@@ -118,7 +180,7 @@ function visualFixture() {
     ["Parent", fake.addFile("Parent/Parent.md")],
     ["Parent/Child", fake.addFile("Parent/Child/Child.md")],
   ]);
-  const service = { getCanonicalFile: (path: string) => notes.get(path) ?? null };
+  const service = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
   const inherits = { value: true };
   const visuals = new VisualService(fake.app, service, () => inherits.value);
   return { fake, inherits, notes, service, visuals };

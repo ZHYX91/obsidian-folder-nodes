@@ -80,6 +80,8 @@ icon:
 
 ## Limitaciones
 
+La fusión mueve los elementos del directorio de origen al directorio de destino, añade el cuerpo de la nota del nodo de origen al final de la nota de destino y elimina el directorio de origen según la opción de eliminación de archivos elegida en Obsidian.
+
 **Antes de fusionar nodos:** guarda y cierra las notas de origen, destino y todas las notas Markdown que se moverán. La comprobación previa rechaza enlaces relativos admitidos como `../Reference.md` si cambiarían de destino o no se pueden comprobar con seguridad, incluidas las definiciones relativas cuyo destino está en la línea siguiente. No reescribe los enlaces automáticamente. Corrige los enlaces indicados antes de reintentar, conserva una copia recuperable de las notas importantes y revisa enlaces y adjuntos tras una fusión correcta.
 
 Los nodos se identifican por la ruta actual del almacén, no por un ID permanente. README.md, index.md y _A.md no pueden sustituir A/A.md. La fusión se detiene ante conflictos de ruta o frontmatter. No se cargan imágenes remotas ni se crean miniaturas de PDF/vídeo, vistas HEIC/HEIF o reproductores integrados. Android no ofrece arrastrar y soltar como en escritorio. Los gráficos grandes usan Canvas sin perder la jerarquía.

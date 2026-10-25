@@ -280,6 +280,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "納入管理",
   "unmanagedByRule": "此項目由名稱規則或上級資料夾設為不管理；請在設定中調整對應規則。",
   "unmanageFolderConfirm": "資料夾 {path} 及其完整子樹將不再作為節點管理。",
+  "clearIcon": "清除圖示",
   "editVisual": "設定節點圖示",
   "visualValue": "icon 屬性",
   "visualValueDesc": "按順序添加 Vault 圖片 WikiLink、Lucide、單個文字或 Emoji；color: 為文字/Lucide 著色，並在其他基礎候選都失敗時回退為色標。可排序並即時預覽；所有候選都能識別後才可儲存。",

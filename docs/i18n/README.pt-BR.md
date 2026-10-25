@@ -80,9 +80,9 @@ icon:
 
 ## Limitações
 
-**Antes de mesclar nós:** salve e feche as notas de origem, destino e todas as notas Markdown que serão movidas. A verificação recusa links relativos compatíveis como `../Reference.md` se o destino mudar ou a sintaxe não puder ser verificada com segurança, incluindo definições relativas cujo destino começa na linha seguinte. Os links não são reescritos automaticamente. Corrija os links indicados antes de tentar novamente, mantenha uma cópia recuperável das notas importantes e confira links e anexos após uma mesclagem bem-sucedida.
+A mesclagem move os itens da pasta de origem para a pasta de destino, acrescenta o corpo da nota do nó de origem ao final da nota de destino e remove a pasta de origem conforme a opção de exclusão de arquivos definida no Obsidian.
 
-O Folder Nodes não envia conteúdo do cofre nem realiza solicitações de rede. Trocar o idioma da interface não altera notas, nomes de arquivos ou propriedades.
+**Antes de mesclar nós:** salve e feche as notas de origem, destino e todas as notas Markdown que serão movidas. A verificação recusa links relativos compatíveis como `../Reference.md` se o destino mudar ou a sintaxe não puder ser verificada com segurança, incluindo definições relativas cujo destino começa na linha seguinte. Os links não são reescritos automaticamente. Corrija os links indicados antes de tentar novamente, mantenha uma cópia recuperável das notas importantes e confira links e anexos após uma mesclagem bem-sucedida.
 
 A identidade do nó é o caminho atual do cofre, não um ID permanente. README.md, index.md ou _A.md não substituem A/A.md. Uma mesclagem é interrompida quando há conflito de caminho ou frontmatter. Não há busca de imagens remotas, miniaturas PDF/vídeo, prévia HEIC/HEIF nem reprodução integrada de mídia. O Android não tem arrastar e soltar como no computador. Gráficos grandes usam Canvas sem omitir a hierarquia.
 
@@ -92,7 +92,7 @@ A identidade do nó é o caminho atual do cofre, não um ID permanente. README.m
 
 Mover ou excluir normalmente afeta o arquivo ou pasta selecionados. Já renomear a pasta ou a nota homônima de um nó completo sincroniza a outra parte quando não há ambiguidade. Ações do "nó que contém a nota" afetam explicitamente o nó inteiro. Organização em lote e migração de propriedades mostram uma prévia antes da gravação; a verificação de integridade é somente leitura. Conflitos interrompem a ação, sem tentar adivinhar a solução. A exclusão de um nó completo segue a opção de exclusão de arquivos definida no Obsidian.
 
-O processamento é local: o plugin não envia conteúdo do cofre nem faz solicitações de rede. Organização e migração exibem prévia e param em caso de conflito. A exclusão de nós completos segue a opção de exclusão de arquivos definida no Obsidian. Links só são gravados na área de transferência após uma ação explícita de copiar; o plugin nunca lê a área de transferência. Configurações e exclusões ficam em data.json.
+O processamento é local: o plugin não envia conteúdo do cofre nem faz solicitações de rede. Links só são gravados na área de transferência após uma ação explícita de copiar; o plugin nunca lê a área de transferência. Configurações e exclusões ficam em data.json.
 
 ## Desenvolvimento
 

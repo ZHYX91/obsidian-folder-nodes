@@ -36,6 +36,64 @@ function markdownEditorLeaf(file: ReturnType<FakeObsidian["requireFile"]>, initi
 }
 
 describe("NodeService structural safety", () => {
+  it.each(['related: "[[A/A]]"', 'related: ["[[A#Heading|Alias]]"]', 'related: "\\u005B\\u005BA/A\\u005D\\u005D"'])(
+    "rejects a transferred property link before any merge mutation: %s", async (property) => {
+      for (const inChild of [false, true]) {
+        const fake = new FakeObsidian();
+        const source = fake.addFolder("A");
+        const contents = `---\n${property}\n---\nsource`;
+        const sourceNote = fake.addFile("A/A.md", inChild ? "source" : contents);
+        fake.addFile("A/child.md", inChild ? contents : "child");
+        const target = fake.addFolder("B");
+        fake.addFile("B/B.md", "target");
+        fake.app.metadataCache.getFirstLinkpathDest = () => sourceNote;
+        const snapshots = new Map(fake.contents);
+        const process = vi.spyOn(fake.app.vault, "process");
+        await expect(service(fake).mergeNode(source, target)).rejects.toThrow(`removed Node Note: A/${inChild ? "child" : "A"}.md property related`);
+        expect(fake.contents).toEqual(snapshots);
+        expect(fake.renames).toEqual([]);
+        expect(fake.trashed).toEqual([]);
+        expect(process).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each(["[[A/A]]", "![[A/A.md#Heading|Alias]]", "[[A#^block]]", "| [[A/A\\|Alias]] |", "\\![[A/A]]", "- Example\n\n  ~~~\n  literal\n- Actual link\n  [[A/A]]"])(
+    "rejects a source WikiLink before any merge mutation: %s", async (link) => {
+      for (const inChild of [false, true]) {
+        const fake = new FakeObsidian();
+        const source = fake.addFolder("A");
+        const sourceNote = fake.addFile("A/A.md", inChild ? "source" : link);
+        fake.addFolder("Deep");
+        const target = fake.addFolder("Deep/B");
+        fake.addFile("Deep/B/B.md", "target");
+        if (inChild) fake.addFile("A/child.md", link);
+        fake.app.metadataCache.getFirstLinkpathDest = () => sourceNote;
+        const snapshots = new Map(fake.contents);
+        const process = vi.spyOn(fake.app.vault, "process");
+        await expect(service(fake).mergeNode(source, target)).rejects.toThrow("WikiLink to the removed Node Note");
+        expect(fake.contents).toEqual(snapshots);
+        expect(fake.renames).toEqual([]);
+        expect(fake.trashed).toEqual([]);
+        expect(process).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("merges safe WikiLinks while ignoring examples in code and comments", async () => {
+    const fake = new FakeObsidian();
+    const source = fake.addFolder("A");
+    fake.addFile("A/A.md", '---\nrelated: ["[[Other]]"]\nfolder-nodes: ["future=[[A/A]]"]\n---\n[[Other]]\n`[[A/A]]`\n<!-- ![[A/A#Heading]] -->\n~~~\n[[A/A]]\n~~~');
+    const other = fake.addFile("Other.md", "other");
+    const target = fake.addFolder("B");
+    const targetNote = fake.addFile("B/B.md", "target");
+    fake.app.metadataCache.getFirstLinkpathDest = () => other;
+    await service(fake).mergeNode(source, target);
+    expect(fake.trashed).toEqual(["A"]);
+    expect(fake.contents.get(targetNote.path)).toContain("[[Other]]");
+    expect(fake.frontmatters.get(targetNote.path)?.related).toEqual(["[[Other]]"]);
+    expect(fake.frontmatters.get(targetNote.path)).not.toHaveProperty("folder-nodes");
+  });
   it("rejects a queued metadata callback after disposal", async () => {
     const fake = new FakeObsidian();
     const folder = fake.addFolder("A");

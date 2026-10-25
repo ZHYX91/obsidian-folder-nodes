@@ -3,9 +3,12 @@ import { App, getIconIds, TFile, TFolder } from "obsidian";
 import type { NodeVisual } from "../core/types";
 import { editableVisualCandidates, fallbackVisual, parseVisualDeclaration, resolveVisualDeclaration } from "../core/visual";
 import { ICON_PROPERTY } from "../core/properties";
+import type { VisualEditBinding } from "./node-service";
 
 interface VisualNodeService {
   getCanonicalFile(folderPath: string): TFile | null;
+  captureVisualEdit(folder: TFolder): VisualEditBinding;
+  writeVisual(binding: VisualEditBinding, values: readonly string[]): Promise<void>;
 }
 
 export class VisualService {
@@ -78,19 +81,25 @@ export class VisualService {
     return { extraColorCount: declaration.extraColors.length, unknownCount: declaration.unknown.length };
   }
 
-  public async set(folder: TFolder, values: readonly string[]): Promise<void> {
-    const note = this.nodes.getCanonicalFile(folder.path);
-    if (note === null) throw new Error(`Missing node note: ${folder.path}`);
+  public beginEdit(folder: TFolder): { values: readonly string[]; save: (values: readonly string[]) => Promise<void> } {
+    const binding = this.nodes.captureVisualEdit(folder);
+    const values = editableVisualCandidates(binding.originalIcon);
+    if (values === null) throw new Error(`Unsupported icon property shape: ${binding.notePath}`);
+    return { values, save: (next) => this.save(binding, next) };
+  }
+
+  public async set(folder: TFolder, values: readonly string[], binding = this.nodes.captureVisualEdit(folder)): Promise<void> {
+    await this.save(binding, values);
+  }
+
+  private async save(binding: VisualEditBinding, values: readonly string[]): Promise<void> {
     const candidates = values.map((value) => value.trim()).filter((value) => value !== "");
     const declaration = parseVisualDeclaration(candidates, {
       iconIds: this.iconIds,
       isColor: (value) => CSS.supports("color", value),
     });
     if (declaration.unknown.length > 0) throw new Error(`Unsupported icon value: ${declaration.unknown[0] ?? "unknown"}`);
-    await this.app.fileManager.processFrontMatter(note, (frontmatter: Record<string, unknown>) => {
-      if (candidates.length === 0) delete frontmatter[ICON_PROPERTY];
-      else frontmatter[ICON_PROPERTY] = candidates.length === 1 ? candidates[0] : candidates;
-    });
+    await this.nodes.writeVisual(binding, candidates);
   }
 
   private resolveImage(linkPath: string, sourcePath: string): string | null {

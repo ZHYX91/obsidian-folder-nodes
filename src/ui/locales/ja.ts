@@ -280,6 +280,7 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "管理対象に戻す",
   "unmanagedByRule": "名前ルールまたは親フォルダーによって管理対象外になっています。設定で該当するルールを変更してください。",
   "unmanageFolderConfirm": "フォルダー {path} とその下位全体をノードとして管理しなくなります。",
+  "clearIcon": "アイコンをクリア",
   "editVisual": "ノードアイコンを設定",
   "visualValue": "icon プロパティ",
   "visualValueDesc": "Vault 内の画像リンク、Lucide アイコン、1 文字または絵文字を優先順に追加します。color: は文字や Lucide の色として使い、候補がすべて使えない場合は代わりの色印になります。順番の変更とプレビューができます。",

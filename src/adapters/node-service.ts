@@ -36,7 +36,7 @@ import type {
   PropertyMigrationScan,
 } from "../core/types";
 import { editableVisualCandidates } from "../core/visual";
-import { assertMergeLinksKeepDestinations } from "../core/merge-link-safety";
+import { assertMergeLinksKeepDestinations, assertMergeWikiLinksKeepDestinations } from "../core/merge-link-safety";
 
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
@@ -46,6 +46,16 @@ interface OpenMarkdownTarget {
   readonly file: TFile;
   readonly leaf: WorkspaceLeaf;
   readonly requestSave: () => void;
+}
+
+export interface VisualEditBinding {
+  readonly folder: TFolder;
+  readonly folderPath: string;
+  readonly note: TFile;
+  readonly notePath: string;
+  readonly originalIcon: unknown;
+  readonly iconPresent: boolean;
+  readonly sourceFile?: { readonly file: TFile; readonly path: string };
 }
 
 export class NodeService {
@@ -95,6 +105,45 @@ export class NodeService {
   public getCanonicalFile(folderPath: string): TFile | null {
     const candidates = this.nodeNoteCandidates(folderPath);
     return candidates.length === 1 ? candidates[0] ?? null : null;
+  }
+
+  public captureVisualEdit(folder: TFolder): VisualEditBinding {
+    this.assertActive();
+    this.assertEntryIdentity(folder, folder.path, TFolder);
+    const note = this.getCanonicalFile(folder.path);
+    if (note === null) throw new Error(`Missing node note: ${folder.path}`);
+    this.assertEntryIdentity(note, note.path, TFile);
+    const frontmatter = this.app.metadataCache.getFileCache(note)?.frontmatter;
+    return {
+      folder, folderPath: folder.path, note, notePath: note.path,
+      originalIcon: structuredClone(frontmatter?.[ICON_PROPERTY] as unknown),
+      iconPresent: frontmatter !== undefined && Object.prototype.hasOwnProperty.call(frontmatter, ICON_PROPERTY),
+    };
+  }
+
+  public writeVisual(binding: VisualEditBinding, values: readonly string[]): Promise<void> {
+    const candidates = [...values];
+    return this.exclusive(async () => {
+      const assertCurrent = () => {
+        this.assertActive();
+        this.assertEntryIdentity(binding.folder, binding.folderPath, TFolder);
+        this.assertEntryIdentity(binding.note, binding.notePath, TFile);
+        if (binding.sourceFile !== undefined) this.assertEntryIdentity(binding.sourceFile.file, binding.sourceFile.path, TFile);
+        if (this.getCanonicalFile(binding.folderPath) !== binding.note) {
+          throw new Error(`Node Note changed before icon update: ${binding.notePath}`);
+        }
+      };
+      assertCurrent();
+      await this.app.fileManager.processFrontMatter(binding.note, (frontmatter: Record<string, unknown>) => {
+        assertCurrent();
+        if (Object.prototype.hasOwnProperty.call(frontmatter, ICON_PROPERTY) !== binding.iconPresent
+          || !deepEqual(frontmatter[ICON_PROPERTY], binding.originalIcon)) {
+          throw new Error(`Icon changed since the editor opened: ${binding.notePath}`);
+        }
+        if (candidates.length === 0) delete frontmatter[ICON_PROPERTY];
+        else frontmatter[ICON_PROPERTY] = candidates.length === 1 ? candidates[0] : candidates;
+      });
+    });
   }
 
   public nodeNoteCandidates(folderPath: string): TFile[] {
@@ -446,13 +495,17 @@ export class NodeService {
         targetNotePath,
       );
       const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
-      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath);
+      const resolveWikiLink = (path: string, from: string) => this.app.metadataCache.getFirstLinkpathDest(path, from)?.path ?? null;
+      const targetProperties = readMergeFrontmatter(targetSnapshot, targetNotePath);
+      assertMergePropertyLinks(sourceProperties, sourceNotePath, sourceNotePath, resolveWikiLink, targetProperties);
+      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath, resolveWikiLink);
       const movingMarkdown = this.app.vault.getMarkdownFiles()
         .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
         .map((file) => ({ file, from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
       for (const entry of movingMarkdown) {
         const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
-        assertMergeLinksKeepDestinations(contents, entry.from, entry.to, sourcePath, targetPath, sourceNotePath);
+        assertMergePropertyLinks(readMergeFrontmatter(contents, entry.from), entry.from, sourceNotePath, resolveWikiLink);
+        assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourcePath, targetPath, sourceNotePath, resolveWikiLink);
       }
 
       await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
@@ -545,7 +598,8 @@ export class NodeService {
           await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
           for (const entry of movingMarkdown) {
             const contents = await this.readClosedMergeNote(entry.file, entry.to, "source");
-            assertMergeLinksKeepDestinations(contents, entry.from, entry.to, sourcePath, targetPath, sourceNotePath);
+            assertMergePropertyLinks(readMergeFrontmatter(contents, entry.to), entry.from, sourceNotePath, resolveWikiLink);
+            assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.to), entry.from, entry.to, sourcePath, targetPath, sourceNotePath, resolveWikiLink);
           }
           this.assertActive();
           this.assertEntryIdentity(target, targetPath, TFolder);
@@ -1605,6 +1659,22 @@ interface ParsedMergeFrontmatter {
 
 function readMergeFrontmatter(source: string, path: string): Record<string, unknown> {
   return parseMergeFrontmatter(source, path).frontmatter;
+}
+
+function assertMergePropertyLinks(
+  properties: Readonly<Record<string, unknown>>, sourcePath: string, retiredNote: string,
+  resolveWikiLink: (path: string, from: string) => string | null,
+  existingTarget: Readonly<Record<string, unknown>> = {},
+): void {
+  for (const [key, value] of Object.entries(properties)) {
+    if (STRUCTURAL_PROPERTIES.has(key) || Object.prototype.hasOwnProperty.call(existingTarget, key)) continue;
+    const values = Array.isArray(value) ? value as unknown[] : [value];
+    for (const entry of values) {
+      if (typeof entry === "string") {
+        assertMergeWikiLinksKeepDestinations(entry, sourcePath, retiredNote, resolveWikiLink, `${sourcePath} property ${key}`);
+      }
+    }
+  }
 }
 
 function mergeFrontmatterProperties(
