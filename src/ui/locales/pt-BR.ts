@@ -280,6 +280,7 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "Voltar a gerenciar",
   "unmanagedByRule": "Este item foi excluído por uma regra de nome ou pela pasta pai. Altere a regra correspondente nas configurações.",
   "unmanageFolderConfirm": "A pasta {path} e todos os seus descendentes deixarão de ser gerenciados como nós.",
+  "clearIcon": "Remover ícone",
   "editVisual": "Definir ícone do nó",
   "visualValue": "Propriedade icon",
   "visualValueDesc": "Adicione links de imagem do cofre, ícones Lucide, um caractere ou emoji em ordem de preferência. color: colore textos e ícones Lucide ou serve de cor reserva quando nenhum candidato puder ser exibido. Você pode reordenar e visualizar tudo.",

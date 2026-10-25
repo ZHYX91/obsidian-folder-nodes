@@ -53,7 +53,7 @@ export class VisualPickerModal extends SubmittingModal {
 
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
-      .addButton((button) => button.setButtonText(t("delete")).onClick(async () => {
+      .addButton((button) => button.setButtonText(t("clearIcon")).onClick(async () => {
         await this.submit([]);
       }))
       .addButton((button) => button.setCta().setButtonText(t("confirm")).onClick(() => void this.submit()));

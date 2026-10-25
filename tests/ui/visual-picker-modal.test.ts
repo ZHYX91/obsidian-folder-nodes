@@ -19,10 +19,10 @@ function fixture(onSave: (values: readonly string[]) => Promise<void> = vi.fn(as
 }
 
 describe("Visual Picker ownership and keyboard continuation", () => {
-  it("invalidates old confirm and delete callbacks and cannot reopen", async () => {
+  it("invalidates old confirm and clear callbacks and cannot reopen", async () => {
     const f = fixture();
     const confirm = f.buttons(t("confirm"))[0]!;
-    const remove = f.buttons(t("delete"))[0]!;
+    const remove = f.buttons(t("clearIcon"))[0]!;
     f.modal.invalidate();
     confirm.click();
     remove.click();

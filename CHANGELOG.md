@@ -6,7 +6,7 @@
 
 - Refuse merges whose source body, transferred properties or moved child notes still link or embed the source Node Note that would be removed, including aliases, headings, and block references.
 - Bind icon and cover edits to their original folder, note, path, and icon value; reject stale edits and callbacks after unload, and invalidate old pickers.
-- Preserve keyboard focus when reordering or removing visual candidates, and clarify merge consequences in translated short guides.
+- Preserve keyboard focus when reordering or removing visual candidates, label icon clearing separately from node deletion, and clarify merge consequences in translated short guides.
 - Serialize development static-asset synchronization, use unique temporary files, and report watch failures without unhandled rejections.
 
 ## 0.12.0 - 2026-10-25

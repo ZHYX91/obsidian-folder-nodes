@@ -92,7 +92,7 @@ describe("plugin visual picker ownership", () => {
     const f = fixture();
     f.plugin.promptVisual(f.folder);
     const confirm = f.buttons(t("confirm"))[0]!;
-    const remove = f.buttons(t("delete"))[0]!;
+    const remove = f.buttons(t("clearIcon"))[0]!;
     const before = f.fake.contents.get(f.note.path);
     const write = vi.spyOn(f.fake.app.fileManager, "processFrontMatter");
     f.plugin.onunload();

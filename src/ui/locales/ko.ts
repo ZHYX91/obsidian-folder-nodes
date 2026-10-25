@@ -280,6 +280,7 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "다시 관리하기",
   "unmanagedByRule": "이름 규칙이나 상위 폴더 때문에 관리 제외된 항목입니다. 설정에서 해당 규칙을 변경하세요.",
   "unmanageFolderConfirm": "폴더 {path}와 모든 하위 항목을 노드로 관리하지 않습니다.",
+  "clearIcon": "아이콘 지우기",
   "editVisual": "노드 아이콘 설정",
   "visualValue": "icon 속성",
   "visualValueDesc": "Vault 이미지 링크, Lucide 아이콘, 한 글자 또는 이모지를 우선순위대로 추가합니다. color:는 문자/Lucide에 색을 입히거나 다른 아이콘을 표시할 수 없을 때 대체 색상으로 사용합니다. 순서를 바꾸고 미리 볼 수 있습니다.",

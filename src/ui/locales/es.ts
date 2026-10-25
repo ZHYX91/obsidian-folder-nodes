@@ -280,6 +280,7 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "Volver a administrar",
   "unmanagedByRule": "Una regla de nombres o una carpeta superior excluye este elemento. Cambia la regla correspondiente en los ajustes.",
   "unmanageFolderConfirm": "La carpeta {path} y todos sus descendientes dejarán de administrarse como nodos.",
+  "clearIcon": "Quitar icono",
   "editVisual": "Elegir icono de nodo",
   "visualValue": "Propiedad icon",
   "visualValueDesc": "Añade enlaces a imágenes del almacén, iconos Lucide, caracteres o emojis en orden de preferencia. color: colorea texto/Lucide o se usa como color de reserva si no funciona ningún candidato. Puedes reordenar y ver el resultado.",

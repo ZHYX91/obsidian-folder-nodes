@@ -280,6 +280,7 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "Wieder verwalten",
   "unmanagedByRule": "Dieses Element ist aufgrund einer Namensregel oder seines übergeordneten Ordners nicht verwaltet. Ändern Sie die betreffende Regel in den Einstellungen.",
   "unmanageFolderConfirm": "Ordner {path} und sämtliche Unterordner werden nicht mehr als Knoten verwaltet.",
+  "clearIcon": "Symbol entfernen",
   "editVisual": "Knotensymbol festlegen",
   "visualValue": "icon-Eigenschaft",
   "visualValueDesc": "Fügen Sie Vault-Bildlinks, Lucide-Symbole, Einzelzeichen oder Emoji in bevorzugter Reihenfolge hinzu. color: färbt Text/Lucide oder dient als Ersatzfarbfeld, wenn kein Symbol angezeigt werden kann. Reihenfolge und Vorschau lassen sich ändern.",

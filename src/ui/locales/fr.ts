@@ -280,6 +280,7 @@ export const fr: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "Gérer à nouveau",
   "unmanagedByRule": "Cet élément est exclu par une règle de nom ou un dossier parent. Modifiez la règle correspondante dans les paramètres.",
   "unmanageFolderConfirm": "Le dossier {path} et tous ses descendants ne seront plus gérés comme des nœuds.",
+  "clearIcon": "Effacer l’icône",
   "editVisual": "Définir l’icône du nœud",
   "visualValue": "Propriété icon",
   "visualValueDesc": "Ajoutez, par ordre de préférence, un lien d’image du coffre, une icône Lucide, un caractère ou un émoji. color: colore le texte/Lucide ou sert de pastille de secours si aucun élément n’est affichable. Réordonnez et prévisualisez les candidats.",

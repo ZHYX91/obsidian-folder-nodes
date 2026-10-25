@@ -280,6 +280,7 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "manageAgain": "Quản lý trở lại",
   "unmanagedByRule": "Mục này bị loại trừ do quy tắc tên hoặc thư mục cha. Hãy đổi quy tắc tương ứng trong cài đặt.",
   "unmanageFolderConfirm": "Thư mục {path} và toàn bộ cây con sẽ không còn được quản lý như các nút.",
+  "clearIcon": "Xóa biểu tượng",
   "editVisual": "Đặt biểu tượng nút",
   "visualValue": "Thuộc tính icon",
   "visualValueDesc": "Thêm liên kết ảnh trong kho ghi chú, biểu tượng Lucide, ký tự đơn hoặc emoji theo thứ tự ưu tiên. color: tô màu chữ/Lucide hoặc làm màu dự phòng nếu không hiện được biểu tượng nào. Có thể đổi thứ tự và xem trước.",
