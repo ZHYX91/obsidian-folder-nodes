@@ -80,6 +80,8 @@ icon:
 
 ## Limites
 
+La fusion déplace les éléments du dossier source vers le dossier cible, ajoute le corps de la note du nœud source à la fin de la note cible, puis supprime le dossier source selon le mode de suppression des fichiers choisi dans Obsidian.
+
 **Avant de fusionner des nœuds :** enregistrez et fermez les notes source, cible et toutes les notes Markdown déplacées. La vérification préalable refuse les liens relatifs pris en charge comme `../Reference.md` si leur destination change ou si leur syntaxe ne peut pas être vérifiée de façon sûre, y compris les définitions relatives dont la destination commence à la ligne suivante. Les liens ne sont pas réécrits automatiquement. Corrigez les liens signalés avant de réessayer, gardez une copie récupérable des notes importantes et vérifiez les liens et les pièces jointes après une fusion réussie.
 
 L’identité d’un nœud dépend de son chemin actuel dans le coffre, pas d’un identifiant permanent. README.md, index.md ou _A.md ne remplacent pas A/A.md. Une fusion s’arrête en cas de conflit de chemin ou de frontmatter. Pas d’images distantes, de miniatures PDF/vidéo, d’aperçu HEIC/HEIF ni de lecteur multimédia intégré. Le glisser-déposer de bureau n’est pas disponible sur Android. Un grand graphe utilise Canvas sans perdre la hiérarchie.
@@ -90,7 +92,7 @@ L’identité d’un nœud dépend de son chemin actuel dans le coffre, pas d’
 
 Déplacer ou supprimer un élément agit normalement sur le fichier ou dossier sélectionné. En revanche, renommer le dossier ou la note homonyme d’un nœud complet synchronise aussi l’autre nom lorsque la correspondance est certaine. Les commandes « nœud contenant » visent explicitement tout le nœud. L’organisation par lots et la migration de propriétés montrent une prévisualisation avant écriture ; le bilan de santé reste en lecture seule. Les conflits arrêtent l’opération. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian.
 
-Le traitement reste local : le plugin ne téléverse pas vos notes et n’envoie aucune requête réseau. Les opérations groupées et les migrations montrent les modifications avant écriture et s’arrêtent en cas de conflit. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian. Le plugin écrit un lien dans le presse-papiers uniquement lorsque vous demandez une copie ; il ne lit jamais le presse-papiers. Les réglages et exclusions sont conservés dans data.json.
+Le traitement reste local : le plugin ne téléverse pas vos notes et n’envoie aucune requête réseau. Il écrit un lien dans le presse-papiers uniquement lorsque vous demandez une copie ; il ne lit jamais le presse-papiers. Les réglages et exclusions sont conservés dans data.json.
 
 ## Développement
 

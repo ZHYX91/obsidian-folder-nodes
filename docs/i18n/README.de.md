@@ -80,6 +80,8 @@ icon:
 
 ## Einschränkungen
 
+Beim Zusammenführen werden die untergeordneten Elemente des Quellordners in den Zielordner verschoben und der Text der Quell-Knotennotiz an die Zielnotiz angehängt. Anschließend wird der Quellordner gemäß der in Obsidian gewählten Dateilöschmethode entfernt.
+
 **Vor dem Zusammenführen:** Speichern und schließen Sie Quell- und Ziel-Knotennotizen sowie alle verschobenen Markdown-Notizen. Die Prüfung lehnt unterstützte relative Links wie `../Reference.md` ab, wenn sich ihr Ziel ändern würde oder die Schreibweise nicht sicher geprüft werden kann; dazu gehören relative Referenzdefinitionen mit dem Ziel in der nächsten Zeile. Links werden nicht automatisch umgeschrieben. Korrigieren Sie gemeldete Links vor einem neuen Versuch, bewahren Sie wichtige Notizen wiederherstellbar auf und prüfen Sie Links und Anhänge nach erfolgreichem Zusammenführen.
 
 Folder Nodes lädt keine Vault-Inhalte hoch und stellt keine Netzwerkanfragen. Die Spracheinstellung verändert weder Notizen noch Dateinamen oder Knoteneigenschaften.

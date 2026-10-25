@@ -23,6 +23,8 @@ Selected-text regressions invoke the production command and editor menu, the con
 
 Creation-cleanup regressions claim the new file during the final asynchronous read with clean, dirty, multiple, save-less, and unloading Markdown panes, and replace the TFile at the same path. Assertions verify retained content and localized path/reason feedback. Canvas keyboard tests cover both layout directions and no-wrap boundaries. These simulated interleavings do not establish real host editor or screen-reader acceptance.
 
+Merge regressions assert zero mutations for resolved source-note WikiLinks and embeds in source bodies and moved descendants, including parsed Text/List properties with YAML escapes, basename lookup, aliases, table-cell escaped aliases, headings, and block references; literal code/comments and unrelated links remain accepted. Visual regressions invoke the production picker and cover menu, mutate file/folder identity or the original icon, and delay the actual frontmatter callback until unload. Keyboard tests retain focus after list reorder/deletion. Static-asset tests overlap real filesystem copies, simulate editor atomic saves, and drain or report watch shutdown errors. These are automated adapter/DOM/filesystem checks, not desktop or Android acceptance.
+
 ## Performance
 
 Node merge link checks cover unsafe inline and multiline reference destinations in the source
