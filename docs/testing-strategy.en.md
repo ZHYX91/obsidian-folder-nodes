@@ -27,6 +27,8 @@ Merge regressions assert zero mutations for resolved source-note WikiLinks and e
 
 ## Performance
 
+Additional lifetime regressions resolve and reject the production reveal caller after unload/restart and retain genuine current errors. Overflow-details DOM tests cover pointer entry, keyboard focus, Escape, and clearing stale hover on viewport resize. Geometry doubles remain separate from real font layout and native scrolling evidence.
+
 Explorer reveal regressions drive the real adapter's asynchronous continuations through stop during leaf materialization, stop and restart, unload during native reveal, a newly hidden target, and stopped refresh/delayed decoration. Canvas resource regressions drive the production renderer with deterministic Canvas/Image/animation-frame doubles across 256, 257, and 513 distinct visuals, shared visuals, mixed load/error completion, panning, palette changes, and destruction, asserting no new images or frames after input settles. Tooltip regressions use production pointer events and measured-size doubles for narrow panels, all corners, long Chinese/Arabic paths, right-to-left layout, and enlarged fonts; these simulations do not establish actual host font layout, frame rate, or Android behavior.
 
 Node merge link checks cover unsafe inline and multiline reference destinations in the source

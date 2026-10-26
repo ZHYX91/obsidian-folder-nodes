@@ -403,6 +403,15 @@
   pointer-events: none;
 }
 
+.folder-nodes-node-graph-canvas-tooltip.is-scrollable {
+  pointer-events: auto;
+}
+
+.folder-nodes-node-graph-canvas-tooltip:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
 .folder-nodes-node-graph-stage {
   position: relative;
   min-width: 100%;

@@ -42,7 +42,7 @@ function fixture(count: number, options: { pages?: number; unique?: number; widt
   const cancel = vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => { frames.delete(id); });
   const surface = document.body.createDiv();
   Object.defineProperties(surface, {
-    clientWidth: { value: options.width ?? 3_840 }, clientHeight: { value: options.height ?? 2_160 },
+    clientWidth: { configurable: true, value: options.width ?? 3_840 }, clientHeight: { configurable: true, value: options.height ?? 2_160 },
   });
   const renderer = new NodeGraphCanvasRenderer(surface, { layout, model, records, points3D: layoutNodeGraph3D(model) }, "2d", false, null, {
     label: () => "Node Graph", onOpen: vi.fn(), onSelect: vi.fn(), relationSummary: () => "Structure 0 · Links 0",
@@ -164,6 +164,47 @@ describe("Canvas visual working set", () => {
 });
 
 describe("Canvas tooltip bounds", () => {
+  it("keeps overflow details enterable, focusable and dismissible, and clears hover on resize", () => {
+    const path = `${"中文العربية/".repeat(100)}note`;
+    const current = fixture(1, { width: 140, height: 240, path });
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
+    vi.spyOn(tooltip, "getBoundingClientRect").mockReturnValue({ width: 124, height: 224 } as DOMRect);
+    const show = (): void => {
+      const move = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(move, { offsetX: { value: 45 }, offsetY: { value: 23 } });
+      canvas.dispatchEvent(move);
+    };
+    try {
+      current.flush();
+      show();
+      expect(tooltip.hidden).toBe(false);
+      expect(tooltip.textContent).toContain(path);
+      expect(tooltip.classList.contains("is-scrollable")).toBe(true);
+      expect(tooltip.tabIndex).toBe(0);
+      canvas.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: tooltip }));
+      expect(tooltip.hidden).toBe(false);
+      tooltip.focus();
+      expect(document.activeElement).toBe(tooltip);
+      tooltip.dispatchEvent(new PointerEvent("pointerleave"));
+      expect(tooltip.hidden).toBe(false);
+      tooltip.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(tooltip.hidden).toBe(true);
+      expect(document.activeElement).toBe(canvas);
+      show();
+      expect(tooltip.hidden).toBe(false);
+      Object.defineProperty(current.surface, "clientHeight", { value: 140 });
+      current.renderer.resize();
+      expect(tooltip.hidden).toBe(true);
+      // The same node can produce a fresh hint after resize, instead of reusing
+      // a stale hoveredPath/position from the old viewport.
+      current.flush();
+      show();
+      expect(tooltip.hidden).toBe(false);
+    } finally { current.dispose(); }
+  });
+
   it.each(["ltr", "rtl"] as const)("keeps measured tooltips inside every corner in %s", (direction) => {
     for (const width of [140, 800]) {
       const path = `${"很长的中文目录/المجلد-العربي/".repeat(8)}note`;

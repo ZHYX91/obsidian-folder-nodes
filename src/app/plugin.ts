@@ -957,14 +957,18 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private async revealEntry(entry: TAbstractFile): Promise<void> {
+    const generation = this.lifecycleGeneration;
+    const isCurrent = (): boolean => !this.unloaded && generation === this.lifecycleGeneration;
+    if (!isCurrent()) return;
     if (!this.explorer.canReveal(entry)) {
       new Notice(t("hiddenNodeDetail"));
       return;
     }
     try {
-      if (!await this.explorer.reveal(entry)) new Notice(t("revealUnavailable"));
+      const revealed = await this.explorer.reveal(entry);
+      if (isCurrent() && !revealed) new Notice(t("revealUnavailable"));
     } catch (error) {
-      new Notice(formatError(error), 8000);
+      if (isCurrent()) new Notice(formatError(error), 8000);
     }
   }
 
