@@ -129,7 +129,8 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
     this.explorerTrace = [];
     const documents = new Set([document, ...this.app.workspace.getLeavesOfType("file-explorer").map((leaf) => leaf.view.containerEl.ownerDocument)]);
     for (const owner of documents) this.registerDomEvent(owner, "click", (event) => {
-      const menu = event.target?.closest?.(".menu-item");
+      const menu = event.target?.closest?.(".menu-item, .folder-nodes-actions-modal .folder-nodes-action");
+      if (menu?.matches(':disabled, [aria-disabled="true"], .is-disabled')) return;
       const explicitReveal = menu && /Reveal in File Explorer|在文件列表中显示/u.test(menu.textContent ?? "");
       const source = explicitReveal ? menu : event.target?.closest?.(".view-header-breadcrumb, .nav-folder-title, .folder-nodes-explorer-root-visibility");
       if (!source) return;

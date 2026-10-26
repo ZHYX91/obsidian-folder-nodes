@@ -46,7 +46,10 @@ function fixture() {
   const files = new Map<string, string>();
   const folders = new Set<string>();
   const app = {
-    workspace: { getLeavesOfType: () => [{ view: { containerEl: root, tree: {} } }] },
+    workspace: { getLeavesOfType: () => [{ view: { containerEl: root, tree: { focusedItem: {
+      file: { path: "Disclosure/Node 060/Node 060.md", basename: "Node 060", parent: { path: "Disclosure/Node 060", name: "Node 060" } },
+      selfEl: row,
+    } } } }] },
     plugins: { plugins: { "folder-nodes": {} } },
     vault: {
       getAbstractFileByPath: (path: string) => folders.has(path),
@@ -66,12 +69,79 @@ function fixture() {
   new Script(source).runInNewContext({ module, require: () => ({ Plugin, Notice: class {} }), document });
   const provider = new (module.exports as new () => Provider)();
   return { provider, row, root, scroll, files, folders, makeRow,
+    dispose: () => { for (const dispose of disposers.splice(0)) dispose(); },
     setTop: (value: number) => { top = value; },
     frame: (time: number) => { now = time; const callback = nextFrame; nextFrame = undefined; callback?.(time); },
   };
 }
 
 describe("disclosure acceptance instrumentation", () => {
+  function action(label: string, menu = false) {
+    const modal = document.body.createDiv({ cls: menu ? "menu" : "folder-nodes-actions-modal" });
+    const button = modal.createEl("button", { cls: menu ? "menu-item" : "folder-nodes-action" });
+    const icon = button.createSpan({ cls: "folder-nodes-action-icon" });
+    const graphic = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const nested = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    graphic.append(nested);
+    icon.append(graphic);
+    const text = button.createSpan({ cls: "folder-nodes-action-label", text: label });
+    return { modal, button, icon: nested, label: text };
+  }
+
+  it.each(["Reveal in File Explorer", "在文件列表中显示"].flatMap((label) =>
+    (["icon", "label"] as const).map((target) => ({ label, target }))))("records a $label modal $target click before the modal closes", ({ label, target }) => {
+    const f = fixture();
+    const control = action(label);
+    f.provider.recordExplorerTrace();
+    control.button.addEventListener("click", () => {
+      expect(f.provider.explorerTrace).toHaveLength(1);
+      control.modal.remove();
+    });
+    control[target].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    f.frame(100);
+    f.frame(800);
+    expect(f.provider.explorerTrace[0]).toMatchObject({ status: "complete", targetSource: "host-focus", middleViewportEligible: false });
+    expect(f.provider.explorerTrace[0]!.frames).toHaveLength(3);
+  });
+
+  it("preserves native Reveal menu collection", () => {
+    const f = fixture();
+    const control = action("Reveal in File Explorer", true);
+    f.provider.recordExplorerTrace();
+    control.label.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    f.frame(100);
+    f.frame(800);
+    expect(f.provider.explorerTrace[0]).toMatchObject({ status: "complete", targetSource: "host-focus" });
+  });
+
+  it.each(["other-action", "disabled", "aria-disabled", "disabled-menu"])("does not record a %s action", (kind) => {
+    const f = fixture();
+    const control = action(kind === "other-action" ? "Open node note" : "Reveal in File Explorer", kind === "disabled-menu");
+    if (kind === "disabled") control.button.disabled = true;
+    if (kind === "aria-disabled") control.button.setAttribute("aria-disabled", "true");
+    if (kind === "disabled-menu") control.button.classList.add("is-disabled");
+    f.provider.recordExplorerTrace();
+    control.icon.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    f.frame(800);
+    expect(f.provider.explorerTrace).toEqual([]);
+  });
+
+  it("removes the capture listener and cancels pending frames on disposal", () => {
+    const f = fixture();
+    const control = action("Reveal in File Explorer");
+    const remove = vi.spyOn(document, "removeEventListener");
+    f.provider.recordExplorerTrace();
+    control.icon.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(f.provider.explorerTrace[0]!.frames).toHaveLength(1);
+    f.dispose();
+    expect(window.cancelAnimationFrame).toHaveBeenCalledWith(1);
+    expect(remove).toHaveBeenCalledWith("click", expect.any(Function), { capture: true });
+    control.label.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    f.frame(800);
+    expect(f.provider.explorerTrace).toHaveLength(1);
+    expect(f.provider.explorerTrace[0]!.frames).toHaveLength(1);
+  });
+
   it("tracks the clicked row before host mutation without focusedItem, including recycled rows", () => {
     const f = fixture();
     f.provider.recordExplorerTrace();
