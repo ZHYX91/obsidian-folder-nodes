@@ -1,6 +1,7 @@
 import { layoutNodeGraph3D } from "../../src/core/node-graph-3d";
 import { buildNodeGraphModel } from "../../src/core/node-graph-model";
 import { NodeGraphCanvasRenderer } from "../../src/ui/node-graph-canvas-renderer";
+import { checkExplorerReveal } from "./explorer-reveal.fixture";
 
 // The browser owns layout/scrolling. Only Obsidian's DOM convenience methods
 // are supplied here; the renderer, Canvas and tooltip CSS are production code.
@@ -81,7 +82,8 @@ async function run(): Promise<void> {
     assert(tooltip.hidden === true, "resize must dismiss details");
     await show(1);
     assert(tooltip.scrollTop === 0 && tooltip.scrollLeft === 0, "resize/reopen must start at the content origin");
-    document.body.dataset.result = JSON.stringify({ passed: true, checks: 8, engine: navigator.userAgent });
+    const explorer = await checkExplorerReveal();
+    document.body.dataset.result = JSON.stringify({ passed: true, checks: 11, explorer, engine: navigator.userAgent });
   } finally { renderer.destroy(); surface.remove(); }
 }
 

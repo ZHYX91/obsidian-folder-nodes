@@ -323,6 +323,46 @@ describe("Explorer virtual item ordering", () => {
     fixture.root.remove();
   });
 
+  it.each([0.000019073486328125, 0.49, 0.51])("classifies a bottom toolbar with an edge gap of %s CSS px", async (gap) => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = "absolute";
+    const bottom = 692.7273139953613;
+    toolbar.getBoundingClientRect = () =>
+      ({ top: bottom - gap - 56, bottom: bottom - gap, left: 0, right: 330.1932067871094,
+        width: 330.1932067871094, height: 56 } as DOMRect);
+    fixture.scroll.getBoundingClientRect = () =>
+      ({ top: 53.45454788208008, bottom, left: 0, right: 330.1932067871094,
+        width: 330.1932067871094, height: bottom - 53.45454788208008 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () =>
+      ({ top: 652.1989135742188 - fixture.scroll.scrollTop, bottom: 688.9943695068359 - fixture.scroll.scrollTop,
+        left: 12.454545974731445, right: 313.46592903137207,
+        width: 313.46592903137207 - 12.454545974731445, height: 36.79545593261719 } as DOMRect);
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    if (gap < 0.5) expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBeCloseTo(bottom - gap - 56);
+    else expect(fixture.scroll.scrollTop).toBe(0);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each([0.000019073486328125, 0.49, 0.51])("classifies a top toolbar with an edge gap of %s CSS px", async (gap) => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = "absolute";
+    toolbar.getBoundingClientRect = () =>
+      ({ top: 80 + gap, bottom: 110 + gap, left: 0, right: 200, width: 200, height: 30 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () =>
+      ({ top: 85 - fixture.scroll.scrollTop, bottom: 105 - fixture.scroll.scrollTop,
+        left: 20, right: 140, width: 120, height: 20 } as DOMRect);
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    if (gap < 0.5) expect(fixture.b.selfEl.getBoundingClientRect().top).toBeCloseTo(110 + gap);
+    else expect(fixture.scroll.scrollTop).toBe(0);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
   it("uses the clipped drawer viewport when its scroll container extends below it", async () => {
     const fixture = revealFixture(() => undefined);
     fixture.root.style.overflowY = "hidden";

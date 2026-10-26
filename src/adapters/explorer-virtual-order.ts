@@ -2,6 +2,7 @@ import type { TAbstractFile, TFolder } from "obsidian";
 import { EXPLORER_ENTRY_TITLES_SELECTOR, EXPLORER_HOST } from "./explorer-host";
 
 const MAX_REVEAL_LAYOUT_WAIT_MS = 1_000;
+const REVEAL_GEOMETRY_EPSILON = 0.5;
 
 interface HostItem { file?: { path?: string }; }
 interface HostSorter {
@@ -250,11 +251,12 @@ function ensureRevealTargetVisible(root: HTMLElement, path: string): boolean {
   let delta = 0;
   if (rect.top < viewport.top) delta = rect.top - viewport.top;
   else if (rect.bottom > viewport.bottom) delta = rect.bottom - viewport.bottom;
-  if (Number.isFinite(delta) && Math.abs(delta) > 0.5) scroll.scrollTop += delta;
+  if (Number.isFinite(delta) && Math.abs(delta) > REVEAL_GEOMETRY_EPSILON) scroll.scrollTop += delta;
 
   const settled = target.getBoundingClientRect();
   return settled.width > 0 && settled.height > 0 &&
-    settled.top >= viewport.top - 0.5 && settled.bottom <= viewport.bottom + 0.5;
+    settled.top >= viewport.top - REVEAL_GEOMETRY_EPSILON &&
+    settled.bottom <= viewport.bottom + REVEAL_GEOMETRY_EPSILON;
 }
 
 function activeLayoutAnimations(root: HTMLElement): Animation[] {
@@ -295,8 +297,10 @@ function visibleRevealViewport(root: HTMLElement, scroll: HTMLElement, target: D
         style.display === "none" || Number.parseFloat(style.opacity) === 0) continue;
     const bounds = toolbar.getBoundingClientRect();
     if (bounds.width <= 0 || bounds.height <= 0 || bounds.left >= target.right || bounds.right <= target.left) continue;
-    if (bounds.top > top && bounds.top < bottom && bounds.bottom >= bottom) bottom = bounds.top;
-    else if (bounds.top <= top && bounds.bottom > top && bounds.bottom < bottom) top = bounds.bottom;
+    // Fractional layout can put nominally shared edges slightly apart.
+    // Use the reveal postcondition's tolerance instead of missing the whole bar.
+    if (bounds.top > top && bounds.top < bottom && bounds.bottom >= bottom - REVEAL_GEOMETRY_EPSILON) bottom = bounds.top;
+    else if (bounds.top <= top + REVEAL_GEOMETRY_EPSILON && bounds.bottom > top && bounds.bottom < bottom) top = bounds.bottom;
   }
   return { top, bottom };
 }

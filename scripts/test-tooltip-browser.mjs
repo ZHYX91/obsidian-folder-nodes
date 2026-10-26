@@ -32,7 +32,7 @@ try {
   assert.ok(endpoint && typeof endpoint !== "string");
   profile = mkdtempSync(path.join(os.tmpdir(), "folder-nodes-browser-"));
   const output = await new Promise((resolve, reject) => {
-    const child = spawn(browser, ["--headless", "--disable-gpu", "--no-first-run", "--disable-extensions", "--disable-background-networking",
+    const child = spawn(browser, ["--headless", "--window-size=1024,1000", "--disable-gpu", "--no-first-run", "--disable-extensions", "--disable-background-networking",
       `--user-data-dir=${profile}`, "--dump-dom", "--run-all-compositor-stages-before-draw", `http://127.0.0.1:${endpoint.port}/`], { windowsHide: true });
     browserClosed = false;
     let stdout = "";
