@@ -284,6 +284,84 @@ describe("Explorer virtual item ordering", () => {
     fixture.root.remove();
   });
 
+  it("keeps a reveal above an overlapping mobile toolbar", async () => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = "absolute";
+    toolbar.getBoundingClientRect = () =>
+      ({ top: 160, bottom: 190, left: 0, right: 200, width: 200, height: 30 } as DOMRect);
+    fixture.scroll.getBoundingClientRect = () =>
+      ({ top: 80, bottom: 180, left: 0, right: 200, width: 200, height: 100 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 155 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(160);
+    expect(fixture.scroll.scrollTop).toBe(15);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("uses the clipped drawer viewport when its scroll container extends below it", async () => {
+    const fixture = revealFixture(() => undefined);
+    fixture.root.style.overflowY = "hidden";
+    fixture.root.getBoundingClientRect = () =>
+      ({ top: 80, bottom: 150, width: 200, height: 70 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 145 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(150);
+    expect(fixture.scroll.scrollTop).toBe(15);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("settles a void reveal after an active drawer animation materializes its row", async () => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    const layoutAnimation = { finished: animation.promise, playState: "running",
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation;
+    fixture.root.getAnimations = () => [layoutAnimation];
+    fixture.b.el.remove();
+    fixture.scroll.scrollTop = 60;
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    await nextFrame();
+    fixture.scroll.append(fixture.b.el);
+    animation.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(20);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(80);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["input", "dispose"])("does not resume a drawer animation reveal after %s", async (cancel) => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise, playState: "running",
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    fixture.b.el.remove();
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    if (cancel === "input") fixture.scroll.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    else fixture.bridge.dispose();
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    animation.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
 
   it("keeps the plugin Root row visible when an explicit root reveal is over-scrolled", async () => {
     const fixture = setup();

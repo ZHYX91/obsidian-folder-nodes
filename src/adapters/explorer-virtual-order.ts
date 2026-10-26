@@ -115,7 +115,13 @@ export function installExplorerVirtualOrder(
     request.frame = owner.requestAnimationFrame(() => {
       if (pending !== request) return;
       request.frame = null;
-      completeReveal(request);
+      // Mobile revealLeaf() can return while the drawer is still animating.
+      // Wait for that finite layout work, rather than expiring a missing row
+      // after two frames or retaining ownership of unrelated future scrolling.
+      const animations = activeLayoutAnimations(root);
+      if (animations.length === 0) completeReveal(request);
+      else void Promise.allSettled(animations.map((animation) => animation.finished))
+        .then(() => { completeReveal(request); });
     });
   };
 
@@ -221,9 +227,9 @@ function ensureRevealTargetVisible(root: HTMLElement, path: string): boolean {
   const scroll = target.closest<HTMLElement>(EXPLORER_HOST.filesContainer) ??
     root.querySelector<HTMLElement>(EXPLORER_HOST.filesContainer);
   if (scroll === null) return false;
-  const viewport = scroll.getBoundingClientRect();
+  const viewport = visibleRevealViewport(root, scroll);
   const rect = target.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return false;
+  if (rect.width <= 0 || rect.height <= 0 || viewport.bottom <= viewport.top) return false;
 
   let delta = 0;
   if (rect.top < viewport.top) delta = rect.top - viewport.top;
@@ -233,6 +239,48 @@ function ensureRevealTargetVisible(root: HTMLElement, path: string): boolean {
   const settled = target.getBoundingClientRect();
   return settled.width > 0 && settled.height > 0 &&
     settled.top >= viewport.top - 0.5 && settled.bottom <= viewport.bottom + 0.5;
+}
+
+function activeLayoutAnimations(root: HTMLElement): Animation[] {
+  const animations = new Set<Animation>();
+  for (let element: HTMLElement | null = root; element !== null; element = element.parentElement) {
+    if (typeof element.getAnimations !== "function") continue;
+    for (const animation of element.getAnimations()) {
+      if ((animation.playState === "running" || animation.pending) &&
+          Number.isFinite(animation.effect?.getComputedTiming().endTime)) animations.add(animation);
+    }
+  }
+  return [...animations];
+}
+
+function visibleRevealViewport(root: HTMLElement, scroll: HTMLElement): { top: number; bottom: number } {
+  const viewport = scroll.getBoundingClientRect();
+  const owner = root.ownerDocument.defaultView;
+  let { top, bottom } = viewport;
+  for (let element = scroll.parentElement; element !== null; element = element.parentElement) {
+    const style = owner?.getComputedStyle(element);
+    if (!/^(auto|scroll|hidden|clip)$/u.test(style?.overflowY || style?.overflow || "")) continue;
+    const bounds = element.getBoundingClientRect();
+    if (bounds.height <= 0) continue;
+    top = Math.max(top, bounds.top);
+    bottom = Math.min(bottom, bounds.bottom);
+  }
+  const visual = owner?.visualViewport;
+  if (visual !== null && visual !== undefined && visual.height > 0) {
+    top = Math.max(top, visual.offsetTop);
+    bottom = Math.min(bottom, visual.offsetTop + visual.height);
+  }
+  // The phone drawer's bottom toolbar overlays the scroll container instead of
+  // reducing its clientHeight. A row behind it is not a successful reveal.
+  for (const toolbar of root.querySelectorAll<HTMLElement>(".nav-buttons-container")) {
+    const position = owner?.getComputedStyle(toolbar).position;
+    if (position !== "absolute" && position !== "fixed") continue;
+    const bounds = toolbar.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || bounds.left >= viewport.right || bounds.right <= viewport.left) continue;
+    if (bounds.top > top && bounds.top < bottom && bounds.bottom >= bottom) bottom = bounds.top;
+    else if (bounds.top <= top && bounds.bottom > top && bounds.bottom < bottom) top = bounds.bottom;
+  }
+  return { top, bottom };
 }
 
 function findRevealTarget(root: HTMLElement, path: string): HTMLElement | null {

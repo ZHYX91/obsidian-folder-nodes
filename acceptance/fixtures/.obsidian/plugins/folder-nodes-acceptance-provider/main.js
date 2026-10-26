@@ -129,7 +129,9 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
     this.explorerTrace = [];
     const documents = new Set([document, ...this.app.workspace.getLeavesOfType("file-explorer").map((leaf) => leaf.view.containerEl.ownerDocument)]);
     for (const owner of documents) this.registerDomEvent(owner, "click", (event) => {
-      const source = event.target?.closest?.(".view-header-breadcrumb, .nav-folder-title, .folder-nodes-explorer-root-visibility");
+      const menu = event.target?.closest?.(".menu-item");
+      const explicitReveal = menu && /Reveal in File Explorer|在文件列表中显示/u.test(menu.textContent ?? "");
+      const source = explicitReveal ? menu : event.target?.closest?.(".view-header-breadcrumb, .nav-folder-title, .folder-nodes-explorer-root-visibility");
       if (!source) return;
       const path = source.matches(".nav-folder-title") ? source.dataset.path : null;
       const surface = source.closest('.workspace-leaf-content[data-type="file-explorer"]');
@@ -145,7 +147,11 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
           if (surface && view.containerEl !== surface && !view.containerEl.contains(surface)) continue;
           const scroll = view.containerEl.querySelector(".nav-files-container");
           const target = path === null ? view.tree?.focusedItem : null;
-          const row = path === null ? target?.selfEl : Array.from(view.containerEl.querySelectorAll(".nav-folder-title[data-path]"))
+          const folderPath = target?.file?.parent?.path;
+          const canonicalRow = path === null && folderPath && target?.file?.basename === target?.file?.parent?.name
+            ? Array.from(view.containerEl.querySelectorAll(".nav-folder-title[data-path]"))
+              .find((element) => element.dataset.path === folderPath) : null;
+          const row = path === null ? canonicalRow ?? target?.selfEl : Array.from(view.containerEl.querySelectorAll(".nav-folder-title[data-path]"))
             .find((element) => element.dataset.path === path);
           if (!scroll || !row) {
             observation.frames.push({ elapsedMs, path, missing: true });
@@ -157,6 +163,15 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
           observation.frames.push({ elapsedMs, path: path ?? target.file?.path, top: rect.top, bottom: rect.bottom,
             viewportTop: viewport.top, viewportBottom: viewport.bottom, scrollTop: scroll.scrollTop,
             scrollHeight: scroll.scrollHeight, clientHeight: scroll.clientHeight, bottomSlack,
+            canonicalFolder: canonicalRow ? folderPath : null,
+            toolbars: Array.from(view.containerEl.querySelectorAll(".nav-buttons-container")).map((element) => {
+              const bounds = element.getBoundingClientRect();
+              return { top: bounds.top, bottom: bounds.bottom, left: bounds.left, right: bounds.right,
+                position: owner.defaultView.getComputedStyle(element).position };
+            }),
+            visualViewport: owner.defaultView.visualViewport ? {
+              top: owner.defaultView.visualViewport.offsetTop, height: owner.defaultView.visualViewport.height,
+            } : null,
             awayFromLimits: scroll.clientHeight > 0 && scroll.scrollTop >= scroll.clientHeight && bottomSlack >= scroll.clientHeight,
             visible: rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom,
             pluginEnabled: Boolean(this.app.plugins.plugins["folder-nodes"]) });
