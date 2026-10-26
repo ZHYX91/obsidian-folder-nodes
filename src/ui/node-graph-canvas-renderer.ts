@@ -425,15 +425,13 @@ export class NodeGraphCanvasRenderer {
   private readonly handleDoubleClick = (event: MouseEvent): void => {
     const path = this.hitTest(event.offsetX, event.offsetY);
     if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) {
-      this.hideTooltip();
-      this.callbacks.onOpen(path, event.ctrlKey || event.metaKey);
+      this.openNode(path, event.ctrlKey || event.metaKey);
     }
   };
 
   private readonly handleOverlayDoubleClick = (event: MouseEvent): void => {
     if (this.overlayPath !== null) {
-      this.hideTooltip();
-      this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+      this.openNode(this.overlayPath, event.ctrlKey || event.metaKey);
     }
   };
 
@@ -445,7 +443,7 @@ export class NodeGraphCanvasRenderer {
     if (event.repeat || this.overlayPath === null) return;
     if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
     event.preventDefault();
-    this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+    this.openNode(this.overlayPath, event.ctrlKey || event.metaKey);
   };
 
   private readonly handleOverlayToggle = (event: MouseEvent): void => {
@@ -538,8 +536,13 @@ export class NodeGraphCanvasRenderer {
       if (first !== undefined) this.selectFromCanvas(first, true);
       return;
     }
-    this.callbacks.onOpen(this.focusPath, event.ctrlKey || event.metaKey);
+    this.openNode(this.focusPath, event.ctrlKey || event.metaKey);
   };
+
+  private openNode(path: string, newLeaf: boolean): void {
+    this.hideTooltip();
+    this.callbacks.onOpen(path, newLeaf);
+  }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     this.pointers.set(event.pointerId, { pointerType: event.pointerType, x: event.clientX, y: event.clientY });
@@ -668,7 +671,10 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handleTooltipEnter = (): void => { this.cancelTooltipHide(); };
 
-  private readonly handleTooltipPointerLeave = (): void => { this.scheduleTooltipHide(); };
+  private readonly handleTooltipPointerLeave = (event: PointerEvent): void => {
+    if (containsEventTarget(this.focusOverlay, event.relatedTarget)) { this.cancelTooltipHide(); return; }
+    this.scheduleTooltipHide();
+  };
 
   private readonly handleTooltipBlur = (): void => {
     this.hideTooltip(false);
@@ -738,6 +744,8 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlayBody.addEventListener("dblclick", this.handleOverlayDoubleClick);
     this.focusOverlayBody.addEventListener("keydown", this.handleOverlayKeyDown);
     this.focusOverlay.addEventListener("contextmenu", this.handleOverlayContextMenu);
+    this.focusOverlay.addEventListener("pointerenter", this.handleTooltipEnter);
+    this.focusOverlay.addEventListener("focusin", this.handleTooltipEnter);
     this.focusOverlay.addEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.addEventListener("click", this.handleOverlayToggle);
     this.focusOverlayToggle.addEventListener("keydown", this.handleOverlayToggleKeyDown);
@@ -763,6 +771,8 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlayBody.removeEventListener("dblclick", this.handleOverlayDoubleClick);
     this.focusOverlayBody.removeEventListener("keydown", this.handleOverlayKeyDown);
     this.focusOverlay.removeEventListener("contextmenu", this.handleOverlayContextMenu);
+    this.focusOverlay.removeEventListener("pointerenter", this.handleTooltipEnter);
+    this.focusOverlay.removeEventListener("focusin", this.handleTooltipEnter);
     this.focusOverlay.removeEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.removeEventListener("click", this.handleOverlayToggle);
     this.focusOverlayToggle.removeEventListener("keydown", this.handleOverlayToggleKeyDown);

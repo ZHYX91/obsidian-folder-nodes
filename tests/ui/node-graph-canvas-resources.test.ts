@@ -275,6 +275,75 @@ describe("Canvas tooltip bounds", () => {
     } finally { current.dispose(); vi.useRealTimers(); }
   });
 
+  it.each(["pointer", "focus", "related-target"] as const)("keeps details open when returning to the node by %s", (transition) => {
+    const current = fixture(1, { width: 140, height: 240 });
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const overlay = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-focus-overlay")!;
+    const body = overlay.querySelector<HTMLButtonElement>("button")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
+    vi.spyOn(tooltip, "getBoundingClientRect").mockImplementation(() => ({
+      width: 124, height: Math.min(224, Number.parseFloat(tooltip.style.maxHeight) || 224),
+    }) as DOMRect);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      current.flush();
+      const move = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(move, { offsetX: { value: 45 }, offsetY: { value: 23 } });
+      canvas.dispatchEvent(move);
+      current.flush();
+      expect(overlay.hidden).toBe(false);
+      tooltip.dispatchEvent(new PointerEvent("pointerenter"));
+      tooltip.dispatchEvent(new PointerEvent("pointerleave"));
+      expect(vi.getTimerCount()).toBe(1);
+      vi.advanceTimersByTime(100);
+      if (transition === "pointer") overlay.dispatchEvent(new PointerEvent("pointerenter"));
+      else if (transition === "focus") body.focus();
+      else tooltip.dispatchEvent(new PointerEvent("pointerleave", { relatedTarget: body }));
+      vi.advanceTimersByTime(201);
+      expect(tooltip.hidden).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      overlay.dispatchEvent(new PointerEvent("pointerleave"));
+      vi.advanceTimersByTime(201);
+      expect(tooltip.hidden).toBe(true);
+    } finally { current.dispose(); vi.useRealTimers(); }
+  });
+
+  it.each(["canvas", "overlay"] as const)("dismisses details before %s keyboard activation", (target) => {
+    const current = fixture(1, { width: 140, height: 240 });
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const body = current.surface.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay-body")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
+    vi.spyOn(tooltip, "getBoundingClientRect").mockImplementation(() => ({
+      width: 124, height: Math.min(224, Number.parseFloat(tooltip.style.maxHeight) || 224),
+    }) as DOMRect);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      current.renderer.setFocus("N0", false);
+      current.flush();
+      current.callbacks.onOpen.mockImplementation(() => {
+        expect(tooltip.hidden).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+      });
+      for (const [key, ctrlKey, metaKey] of [["Enter", false, false], [" ", false, false], ["Spacebar", false, false], ["Enter", true, false], ["Enter", false, true]] as const) {
+        const move = new PointerEvent("pointermove", { pointerType: "mouse" });
+        Object.defineProperties(move, { offsetX: { value: 45 }, offsetY: { value: 23 } });
+        canvas.dispatchEvent(move);
+        current.flush();
+        tooltip.dispatchEvent(new PointerEvent("pointerleave"));
+        expect(tooltip.hidden).toBe(false);
+        const event = new KeyboardEvent("keydown", { key, ctrlKey, metaKey, cancelable: true });
+        (target === "canvas" ? canvas : body).dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(current.callbacks.onOpen).toHaveBeenLastCalledWith("N0", ctrlKey || metaKey);
+        vi.advanceTimersByTime(201);
+        expect(tooltip.hidden).toBe(true);
+      }
+      expect(current.callbacks.onOpen).toHaveBeenCalledTimes(5);
+    } finally { current.dispose(); vi.useRealTimers(); }
+  });
+
   it("cancels the bridge in its owning window and rejects a retained callback after destruction", () => {
     const current = fixture(1, { width: 140, height: 240 });
     const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
