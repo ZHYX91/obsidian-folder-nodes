@@ -44,15 +44,16 @@ function fixture(count: number, options: { pages?: number; unique?: number; widt
   Object.defineProperties(surface, {
     clientWidth: { configurable: true, value: options.width ?? 3_840 }, clientHeight: { configurable: true, value: options.height ?? 2_160 },
   });
-  const renderer = new NodeGraphCanvasRenderer(surface, { layout, model, records, points3D: layoutNodeGraph3D(model) }, "2d", false, null, {
-    label: () => "Node Graph", onOpen: vi.fn(), onSelect: vi.fn(), relationSummary: () => "Structure 0 · Links 0",
-  });
+  const callbacks = {
+    label: () => "Node Graph", onOpen: vi.fn(), onSelect: vi.fn(), onContextMenu: vi.fn(), relationSummary: () => "Structure 0 · Links 0",
+  };
+  const renderer = new NodeGraphCanvasRenderer(surface, { layout, model, records, points3D: layoutNodeGraph3D(model) }, "2d", false, null, callbacks);
   const move = (panX: number, panY = 0) => renderer.restoreViewportState({
     ...renderer.captureViewportState(), camera2D: { panX, panY, zoom: 1 },
   });
   move(0);
   return {
-    renderer, surface, frames, move,
+    renderer, surface, frames, move, callbacks,
     images: () => create.mock.results.flatMap((result) => result.type === "return" && result.value instanceof HTMLImageElement ? [result.value] : []),
     cache: () => (renderer as unknown as { visualImages: Map<string, HTMLImageElement> }).visualImages,
     flush: () => {
@@ -164,13 +165,160 @@ describe("Canvas visual working set", () => {
 });
 
 describe("Canvas tooltip bounds", () => {
+  it.each([23, 120, 230])("keeps overflowing details outside the trigger at y=%s so node actions retain their target", (y) => {
+    const current = fixture(1, { width: 140, height: 240, path: "long/path/".repeat(100) });
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
+    vi.spyOn(tooltip, "getBoundingClientRect").mockImplementation(() => ({
+      width: 124, height: Math.min(224, Number.parseFloat(tooltip.style.maxHeight) || 224),
+    }) as DOMRect);
+    const event = (type: string): PointerEvent => {
+      const result = new PointerEvent(type, { pointerId: 1, pointerType: "mouse", bubbles: true, clientX: 45, clientY: y });
+      Object.defineProperties(result, { offsetX: { value: 45 }, offsetY: { value: y } });
+      return result;
+    };
+    try {
+      current.move(0, y - 23);
+      current.flush();
+      const show = (): void => { canvas.dispatchEvent(event("pointermove")); };
+      show();
+      const top = Number.parseFloat(tooltip.style.top);
+      const height = tooltip.getBoundingClientRect().height;
+      expect(y < top || y > top + height).toBe(true);
+      expect(tooltip.tabIndex).toBe(0);
+      canvas.dispatchEvent(event("pointerdown"));
+      canvas.dispatchEvent(event("pointerup"));
+      expect(current.callbacks.onSelect).toHaveBeenCalledOnce();
+      expect(current.callbacks.onSelect).toHaveBeenCalledWith("long/path/".repeat(100));
+      show();
+      canvas.dispatchEvent(event("dblclick"));
+      expect(current.callbacks.onOpen).toHaveBeenCalledOnce();
+      expect(current.callbacks.onOpen).toHaveBeenCalledWith("long/path/".repeat(100), false);
+      expect(tooltip.hidden).toBe(true);
+      show();
+      canvas.dispatchEvent(event("contextmenu"));
+      expect(current.callbacks.onContextMenu).toHaveBeenCalledOnce();
+      expect(current.callbacks.onContextMenu).toHaveBeenCalledWith("long/path/".repeat(100), expect.any(PointerEvent));
+      expect(tooltip.hidden).toBe(true);
+    } finally { current.dispose(); }
+  });
+
+  it("resets both scroll axes when changing the displayed node", () => {
+    const current = fixture(2);
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    const show = (x: number): void => {
+      const event = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(event, { offsetX: { value: x }, offsetY: { value: 23 } });
+      canvas.dispatchEvent(event);
+    };
+    try {
+      current.flush();
+      show(45);
+      tooltip.scrollTop = 500;
+      tooltip.scrollLeft = 70;
+      show(185);
+      expect(tooltip.textContent).toContain("N1");
+      expect(tooltip.scrollTop).toBe(0);
+      expect(tooltip.scrollLeft).toBe(0);
+    } finally { current.dispose(); }
+  });
+
+  it("bridges empty Canvas space into details and cancels old dismissal on entry, focus, a new node and resize", () => {
+    const current = fixture(2, { width: 400, height: 240 });
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
+    vi.spyOn(tooltip, "getBoundingClientRect").mockImplementation(() => ({
+      width: 124, height: Math.min(224, Number.parseFloat(tooltip.style.maxHeight) || 224),
+    }) as DOMRect);
+    const move = (x: number): void => {
+      const event = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(event, { offsetX: { value: x }, offsetY: { value: 23 } });
+      canvas.dispatchEvent(event);
+    };
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      current.flush();
+      move(45);
+      move(100); // Gap after N0, before N1 and the note.
+      vi.advanceTimersByTime(100);
+      expect(tooltip.hidden).toBe(false);
+      tooltip.dispatchEvent(new PointerEvent("pointerenter"));
+      vi.advanceTimersByTime(201);
+      expect(tooltip.hidden).toBe(false);
+      tooltip.dispatchEvent(new PointerEvent("pointerleave"));
+      tooltip.focus();
+      vi.advanceTimersByTime(201);
+      expect(tooltip.hidden).toBe(false);
+      tooltip.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(document.activeElement).toBe(canvas);
+      move(45);
+      move(100);
+      vi.advanceTimersByTime(100);
+      move(185);
+      vi.advanceTimersByTime(201);
+      expect(tooltip.textContent).toContain("N1");
+      expect(tooltip.hidden).toBe(false);
+      move(100);
+      Object.defineProperty(current.surface, "clientHeight", { value: 140 });
+      current.renderer.resize();
+      current.flush();
+      vi.advanceTimersByTime(201);
+      expect(tooltip.hidden).toBe(true);
+      move(185);
+      expect(tooltip.hidden).toBe(false);
+      canvas.dispatchEvent(new PointerEvent("pointerleave"));
+      vi.advanceTimersByTime(201);
+      expect(tooltip.hidden).toBe(true);
+    } finally { current.dispose(); vi.useRealTimers(); }
+  });
+
+  it("cancels the bridge in its owning window and rejects a retained callback after destruction", () => {
+    const current = fixture(1, { width: 140, height: 240 });
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    const ownerWindow = current.surface.ownerDocument.defaultView!;
+    Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
+    vi.spyOn(tooltip, "getBoundingClientRect").mockImplementation(() => ({
+      width: 124, height: Math.min(224, Number.parseFloat(tooltip.style.maxHeight) || 224),
+    }) as DOMRect);
+    let callback!: () => void;
+    const schedule = vi.spyOn(ownerWindow, "setTimeout").mockImplementation((handler) => {
+      callback = handler as () => void;
+      return 913 as unknown as ReturnType<typeof ownerWindow.setTimeout>;
+    });
+    const clear = vi.spyOn(ownerWindow, "clearTimeout").mockImplementation(() => undefined);
+    const foreign = { setTimeout: vi.fn(), clearTimeout: vi.fn() };
+    try {
+      vi.stubGlobal("window", foreign);
+      current.flush();
+      const event = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(event, { offsetX: { value: 45 }, offsetY: { value: 23 } });
+      canvas.dispatchEvent(event);
+      canvas.dispatchEvent(new PointerEvent("pointerleave"));
+      expect(schedule).toHaveBeenCalledWith(expect.any(Function), 200);
+      current.renderer.destroy();
+      expect(clear).toHaveBeenCalledWith(913);
+      const hidden = vi.spyOn(tooltip, "hidden", "set");
+      callback();
+      expect(hidden).not.toHaveBeenCalled();
+      expect(current.frames.size).toBe(0);
+      expect(foreign.setTimeout).not.toHaveBeenCalled();
+      expect(foreign.clearTimeout).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); schedule.mockRestore(); clear.mockRestore(); current.dispose(); }
+  });
+
   it("keeps overflow details enterable, focusable and dismissible, and clears hover on resize", () => {
     const path = `${"中文العربية/".repeat(100)}note`;
     const current = fixture(1, { width: 140, height: 240, path });
     const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
     const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
     Object.defineProperties(tooltip, { scrollHeight: { value: 1_200 }, clientHeight: { value: 224 } });
-    vi.spyOn(tooltip, "getBoundingClientRect").mockReturnValue({ width: 124, height: 224 } as DOMRect);
+    vi.spyOn(tooltip, "getBoundingClientRect").mockImplementation(() => ({
+      width: 124, height: Math.min(224, Number.parseFloat(tooltip.style.maxHeight) || 224),
+    }) as DOMRect);
     const show = (): void => {
       const move = new PointerEvent("pointermove", { pointerType: "mouse" });
       Object.defineProperties(move, { offsetX: { value: 45 }, offsetY: { value: 23 } });

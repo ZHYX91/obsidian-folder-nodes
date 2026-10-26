@@ -155,6 +155,7 @@ export class NodeGraphCanvasRenderer {
   private readonly overviewLinkEdges: readonly NodeGraphModelEdge[];
   private readonly overviewLinkEdgeSet: ReadonlySet<NodeGraphModelEdge>;
   private readonly tooltip: HTMLElement;
+  private tooltipHideCancel: (() => void) | null = null;
   private readonly visualImages = new Map<string, HTMLImageElement>();
   private readonly layoutPositions: ReadonlyMap<string, { readonly width: number; readonly x: number; readonly y: number }>;
   private readonly layoutSpatialIndex: NodeGraphCanvasSpatialIndex;
@@ -241,6 +242,7 @@ export class NodeGraphCanvasRenderer {
   public destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.cancelTooltipHide();
     this.cancelFrame();
     this.unbindEvents();
     this.themeObserver?.disconnect();
@@ -422,11 +424,17 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handleDoubleClick = (event: MouseEvent): void => {
     const path = this.hitTest(event.offsetX, event.offsetY);
-    if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) this.callbacks.onOpen(path, event.ctrlKey || event.metaKey);
+    if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) {
+      this.hideTooltip();
+      this.callbacks.onOpen(path, event.ctrlKey || event.metaKey);
+    }
   };
 
   private readonly handleOverlayDoubleClick = (event: MouseEvent): void => {
-    if (this.overlayPath !== null) this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+    if (this.overlayPath !== null) {
+      this.hideTooltip();
+      this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+    }
   };
 
   private readonly handleOverlayClick = (): void => {
@@ -461,6 +469,7 @@ export class NodeGraphCanvasRenderer {
     const path = this.hitTest(event.offsetX, event.offsetY);
     if (path === null || this.callbacks.onContextMenu === undefined) return;
     event.preventDefault();
+    this.hideTooltip();
     if (path !== this.focusPath) this.selectFromCanvas(path, false);
     this.callbacks.onContextMenu(path, event);
   };
@@ -468,6 +477,7 @@ export class NodeGraphCanvasRenderer {
   private readonly handleOverlayContextMenu = (event: MouseEvent): void => {
     if (this.overlayPath === null || this.callbacks.onContextMenu === undefined) return;
     event.preventDefault();
+    this.hideTooltip();
     this.selectFromCanvas(this.overlayPath, false);
     this.callbacks.onContextMenu(this.overlayPath, event);
   };
@@ -506,6 +516,7 @@ export class NodeGraphCanvasRenderer {
         clientX: bounds.left + (point?.x ?? this.width / 2),
         clientY: bounds.top + (point?.y ?? this.height / 2),
       });
+      this.hideTooltip();
       this.callbacks.onContextMenu(this.focusPath, menuEvent);
       return;
     }
@@ -641,23 +652,23 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handlePointerLeave = (event: PointerEvent): void => {
     const related = event.relatedTarget;
-    if (containsEventTarget(this.focusOverlay, related) || containsEventTarget(this.tooltip, related)) return;
-    if (this.drag === null) this.hideTooltip();
-    this.scheduleDraw();
+    if (containsEventTarget(this.focusOverlay, related) || containsEventTarget(this.tooltip, related)) {
+      this.cancelTooltipHide();
+      return;
+    }
+    if (this.drag === null) this.scheduleTooltipHide();
   };
 
   private readonly handleOverlayPointerLeave = (event: PointerEvent): void => {
     const related = event.relatedTarget;
-    if (related === this.canvas || containsEventTarget(this.tooltip, related)) return;
-    this.hideTooltip();
-    this.scheduleDraw();
+    if (related === this.canvas) return;
+    if (containsEventTarget(this.tooltip, related)) { this.cancelTooltipHide(); return; }
+    this.scheduleTooltipHide();
   };
 
-  private readonly handleTooltipPointerLeave = (): void => {
-    if (this.tooltip.ownerDocument.activeElement === this.tooltip) return;
-    this.hideTooltip();
-    this.scheduleDraw();
-  };
+  private readonly handleTooltipEnter = (): void => { this.cancelTooltipHide(); };
+
+  private readonly handleTooltipPointerLeave = (): void => { this.scheduleTooltipHide(); };
 
   private readonly handleTooltipBlur = (): void => {
     this.hideTooltip(false);
@@ -708,6 +719,8 @@ export class NodeGraphCanvasRenderer {
   };
 
   private bindEvents(): void {
+    this.tooltip.addEventListener("pointerenter", this.handleTooltipEnter);
+    this.tooltip.addEventListener("focus", this.handleTooltipEnter);
     this.tooltip.addEventListener("pointerleave", this.handleTooltipPointerLeave);
     this.tooltip.addEventListener("blur", this.handleTooltipBlur);
     this.tooltip.addEventListener("keydown", this.handleTooltipKeyDown);
@@ -731,6 +744,8 @@ export class NodeGraphCanvasRenderer {
   }
 
   private unbindEvents(): void {
+    this.tooltip.removeEventListener("pointerenter", this.handleTooltipEnter);
+    this.tooltip.removeEventListener("focus", this.handleTooltipEnter);
     this.tooltip.removeEventListener("pointerleave", this.handleTooltipPointerLeave);
     this.tooltip.removeEventListener("blur", this.handleTooltipBlur);
     this.tooltip.removeEventListener("keydown", this.handleTooltipKeyDown);
@@ -1330,14 +1345,15 @@ export class NodeGraphCanvasRenderer {
   }
 
   private showTooltip(x: number, y: number): void {
+    if (this.destroyed) return;
     const path = this.hitTest(x, y);
-    if (path === this.hoveredPath) return;
-    this.hoveredPath = path;
     if (path === null) {
-      this.hideTooltip();
-      this.scheduleDraw();
+      this.scheduleTooltipHide();
       return;
     }
+    this.cancelTooltipHide();
+    if (path === this.hoveredPath) return;
+    this.hoveredPath = path;
     const record = this.data.records.get(path);
     if (record === undefined) return;
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
@@ -1351,23 +1367,55 @@ export class NodeGraphCanvasRenderer {
       ? ""
       : `\n${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
     this.tooltip.setText(`${record.label}\n${path}${boundary}${hidden}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
+    this.tooltip.scrollTop = 0;
+    this.tooltip.scrollLeft = 0;
     // Measure in a neutral position so the previous edge placement cannot shrink
     // the tooltip's available width before choosing its new side.
     this.tooltip.setCssProps({ left: "8px", top: "8px" });
+    this.tooltip.style.removeProperty("max-height");
     this.tooltip.hidden = false;
-    const bounds = this.tooltip.getBoundingClientRect();
+    let bounds = this.tooltip.getBoundingClientRect();
     const scrollable = this.tooltip.scrollHeight > this.tooltip.clientHeight + 1;
     this.tooltip.toggleClass("is-scrollable", scrollable);
     this.tooltip.tabIndex = scrollable ? 0 : -1;
+    if (scrollable) {
+      // Keep one clear side of the pointer even in a narrow, short viewport.
+      // The bridge timer lets the pointer cross the gap into the scrollable note.
+      const room = Math.floor(Math.max(y - 20, this.height - y - 20));
+      this.tooltip.style.maxHeight = `${Math.max(0, room)}px`;
+      bounds = this.tooltip.getBoundingClientRect();
+      if (bounds.height > room) { this.hideTooltip(); return; }
+    }
     const rtl = this.surface.ownerDocument.defaultView?.getComputedStyle(this.surface).direction === "rtl";
-    // Overflow details must be enterable without crossing a gap that dismisses
-    // the hover. Place them around the pointer; ordinary hints stay offset.
-    this.tooltip.style.left = `${scrollable ? detailsOffset(x, bounds.width, this.width) : tooltipOffset(x, bounds.width, this.width, rtl)}px`;
-    this.tooltip.style.top = `${scrollable ? detailsOffset(y, bounds.height, this.height) : tooltipOffset(y, bounds.height, this.height)}px`;
+    this.tooltip.style.left = `${tooltipOffset(x, bounds.width, this.width, rtl)}px`;
+    this.tooltip.style.top = `${tooltipOffset(y, bounds.height, this.height)}px`;
     this.scheduleDraw();
   }
 
+  private cancelTooltipHide(): void {
+    this.tooltipHideCancel?.();
+    this.tooltipHideCancel = null;
+  }
+
+  private scheduleTooltipHide(): void {
+    if (this.destroyed || this.tooltip.hidden || this.tooltipHideCancel !== null || this.tooltip.ownerDocument.activeElement === this.tooltip) return;
+    const ownerWindow = this.surface.ownerDocument.defaultView;
+    if (!this.tooltip.classList.contains("is-scrollable") || ownerWindow === null) {
+      this.hideTooltip();
+      this.scheduleDraw();
+      return;
+    }
+    const timer = ownerWindow.setTimeout(() => {
+      if (this.destroyed) return;
+      this.tooltipHideCancel = null;
+      this.hideTooltip();
+      this.scheduleDraw();
+    }, 200);
+    this.tooltipHideCancel = () => ownerWindow.clearTimeout(timer);
+  }
+
   private hideTooltip(restoreFocus = true): void {
+    this.cancelTooltipHide();
     if (restoreFocus && this.tooltip.ownerDocument.activeElement === this.tooltip) this.canvas.focus({ preventScroll: true });
     this.hoveredPath = null;
     this.tooltip.hidden = true;
@@ -1467,11 +1515,6 @@ function tooltipOffset(pointer: number, size: number, extent: number, before = f
   const alternate = before ? after : preceding;
   const position = preferred >= inset && preferred + size <= extent - inset ? preferred : alternate;
   return Math.max(inset, Math.min(Math.max(inset, extent - size - inset), position));
-}
-
-function detailsOffset(pointer: number, size: number, extent: number): number {
-  const inset = Math.min(8, extent / 2);
-  return Math.max(inset, Math.min(pointer - 12, Math.max(inset, extent - size - inset)));
 }
 
 function containsEventTarget(element: HTMLElement, target: EventTarget | null): boolean {
