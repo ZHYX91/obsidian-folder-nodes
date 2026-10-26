@@ -422,6 +422,28 @@ export class NodeGraphCanvasRenderer {
     (this.focusOverlayToggle.hidden ? this.canvas : this.focusOverlayToggle).focus({ preventScroll: true });
   }
 
+  public handleScopeOpen(event: KeyboardEvent): boolean {
+    if (this.destroyed || !this.surface.isConnected || event.defaultPrevented) return false;
+    const active = this.surface.ownerDocument.activeElement;
+    if (active !== this.canvas && (active !== this.focusOverlayBody || this.focusOverlay.hidden)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat || event.isComposing) return true;
+    const path = active === this.canvas ? this.focusPath : this.overlayPath;
+    if (path === null) {
+      const first = this.keyboardPaths()[0];
+      if (first !== undefined) this.selectFromCanvas(first, true);
+    } else this.openNode(path, true);
+    return true;
+  }
+
+  public handleScopeToggle(event: KeyboardEvent): boolean {
+    if (this.destroyed || !this.surface.isConnected || event.defaultPrevented || this.focusOverlay.hidden || this.focusOverlayToggle.hidden ||
+        this.surface.ownerDocument.activeElement !== this.focusOverlayToggle) return false;
+    this.handleOverlayToggleKeyDown(event);
+    return event.defaultPrevented;
+  }
+
   private readonly handleDoubleClick = (event: MouseEvent): void => {
     const path = this.hitTest(event.offsetX, event.offsetY);
     if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) {
@@ -440,7 +462,7 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleOverlayKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat || this.overlayPath === null) return;
+    if (event.defaultPrevented || event.repeat || this.overlayPath === null) return;
     if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
     event.preventDefault();
     this.openNode(this.overlayPath, event.ctrlKey || event.metaKey);
@@ -458,7 +480,7 @@ export class NodeGraphCanvasRenderer {
     if (!event.altKey || (event.key !== "Enter" && event.key !== " ") || this.overlayPath === null) return;
     event.preventDefault();
     event.stopPropagation();
-    if (event.repeat) return;
+    if (event.repeat || event.isComposing) return;
     this.selectFromCanvas(this.overlayPath, false);
     this.callbacks.onToggle?.(this.overlayPath, true);
   };
@@ -481,7 +503,7 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat) return;
+    if (event.defaultPrevented || event.repeat) return;
     if (event.key === "+" || event.key === "=") {
       event.preventDefault();
       this.zoomBy(1.2);

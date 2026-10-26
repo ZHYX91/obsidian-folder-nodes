@@ -53,6 +53,8 @@ Contents View 以活动文件的 owning folder 作为当前 Node，没有活动�
 
 ## 节点图谱
 
+ItemView 拥有以 app scope 为父级的子 `Scope`。选择性的通配处理仅在本图谱 Canvas、Canvas 节点正文或 DOM 节点正文持有焦点时接管 Ctrl/Cmd+Enter，先于宿主全局打开链接快捷键消费事件；它复用同一收起详情／打开路径，重复按键或输入法组合不会重复激活。Alt+Enter 只将已有 Canvas 或 DOM 展开把手交给原整支切换路径。其余焦点及组合键交回父级，视图关闭后自有处理失效，焦点始终取自视图所属文档。
+
 GraphIndex 由节点图谱扩展拥有，复用 NodeService 的分类/排序、属性驱动的子树可见性、Metadata Cache、ReferenceIndex 与已解析 Visual。它只记录一次全部可见受管理节点、有方向的父子结构和已解析 canonical-note 链接邻接，再消费 path-targeted RefreshBatch 失效，不存在单独的纳入/排除规则层。NodeService 顺序贯穿 topology 与两种布局；增量刷新后只根据缓存父子关系恢复与完整构建一致的深度优先顺序，不重新遍历 Vault，因此同一图谱的局部刷新和全新重建会得到相同坐标。Active-leaf、范围、搜索、展开、2D/3D 切换和链接开关都不重建 Vault 目录。重命名原子重映射以 path 为键的 view state，删除清理失效状态。这条边界只服务节点图谱，不替换 Explorer 或 Contents 的数据路径。
 
 ViewState 把序列化 workspace 字段与会话状态分开。每次手动设置 expansion 后先从 VisibleScene 得到可见 ID；若 focus 不在其中，就沿 topology parent 链提升到最近可见祖先，再渲染 DOM、Canvas 2D 或 Canvas 3D。搜索使用直接的临时 expansion/focus 快照路径，不经过这条手动调和，因此清空时仍精确恢复进入搜索前状态。每个范围的展开以内存中的一层基线与 expanded/collapsed 分支例外表达。
