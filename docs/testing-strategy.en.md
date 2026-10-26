@@ -27,6 +27,8 @@ Merge regressions assert zero mutations for resolved source-note WikiLinks and e
 
 ## Performance
 
+Explorer reveal regressions drive the real adapter's asynchronous continuations through stop during leaf materialization, stop and restart, unload during native reveal, a newly hidden target, and stopped refresh/delayed decoration. Canvas resource regressions drive the production renderer with deterministic Canvas/Image/animation-frame doubles across 256, 257, and 513 distinct visuals, shared visuals, mixed load/error completion, panning, palette changes, and destruction, asserting no new images or frames after input settles. Tooltip regressions use production pointer events and measured-size doubles for narrow panels, all corners, long Chinese/Arabic paths, right-to-left layout, and enlarged fonts; these simulations do not establish actual host font layout, frame rate, or Android behavior.
+
 Node merge link checks cover unsafe inline and multiline reference destinations in the source
 body and moved Markdown descendants, unchanged attachment targets, and literal code/comments.
 Final-read regressions inject unload, newly opened editors, file replacement, and new source

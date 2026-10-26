@@ -253,7 +253,7 @@ export class NodeGraphCanvasRenderer {
     this.neighbors.clear();
     this.focusContextPaths.clear();
     this.relationCounts.clear();
-    this.visualImages.clear();
+    this.retainVisualImages(new Set());
     this.canvas.remove();
     this.activeAnnouncement.remove();
     this.focusOverlay.remove();
@@ -357,7 +357,7 @@ export class NodeGraphCanvasRenderer {
   public refreshPalette(): void {
     if (this.destroyed) return;
     this.palette = this.readPalette();
-    this.visualImages.clear();
+    this.retainVisualImages(new Set());
     this.scheduleDraw();
   }
 
@@ -764,6 +764,17 @@ export class NodeGraphCanvasRenderer {
       projected.filter((point) => pointIsVisible(point, { width: this.width, height: this.height }, 24, this.data.layout.nodeHeight)),
     );
     const overlayPath = this.hoveredPath ?? this.focusPath;
+    // Pin the complete visible working set before drawing. A fixed cache smaller
+    // than that set evicts images that the next load-triggered frame needs again.
+    const visualKeys = new Set<string>();
+    if (this.dimension === "2d") {
+      for (const point of this.visiblePoints) {
+        if (point.id === overlayPath) continue;
+        const visual = this.data.records.get(point.id)?.visual;
+        if (visual?.kind === "image" || visual?.kind === "lucide") visualKeys.add(visualImageKey(visual));
+      }
+    }
+    this.retainVisualImages(visualKeys);
     for (const point of this.visiblePoints) if (point.id !== overlayPath) this.drawNode(point);
     this.updateFocusOverlay(this.projectedById);
   }
@@ -1091,16 +1102,18 @@ export class NodeGraphCanvasRenderer {
 
   private visualImageFor(record: NodeGraphCanvasRecord): HTMLImageElement {
     const visual = record.visual;
-    const key = `${visual.kind}\u0000${visual.value}\u0000${visual.accent ?? ""}`;
+    const key = visualImageKey(visual);
     const cached = this.visualImages.get(key);
     if (cached !== undefined) return cached;
-    if (this.visualImages.size >= 256) {
-      const oldest = this.visualImages.keys().next().value;
-      if (oldest !== undefined) this.visualImages.delete(oldest);
-    }
     const image = this.surface.ownerDocument.createElement("img");
-    image.addEventListener("load", () => this.scheduleDraw(), { once: true });
-    image.addEventListener("error", () => this.scheduleDraw(), { once: true });
+    const settled = () => {
+      image.onload = null;
+      image.onerror = null;
+      if (this.visualImages.get(key) === image) this.scheduleDraw();
+    };
+    image.onload = settled;
+    image.onerror = settled;
+    this.visualImages.set(key, image);
     if (visual.kind === "image") image.src = visual.value;
     else {
       const host = this.surface.ownerDocument.createElement("span");
@@ -1114,8 +1127,16 @@ export class NodeGraphCanvasRenderer {
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
       }
     }
-    this.visualImages.set(key, image);
     return image;
+  }
+
+  private retainVisualImages(keys: ReadonlySet<string>): void {
+    for (const [key, image] of this.visualImages) {
+      if (keys.has(key)) continue;
+      image.onload = null;
+      image.onerror = null;
+      this.visualImages.delete(key);
+    }
   }
 
   private updateFocusOverlay(projected: ReadonlyMap<string, NodeGraphCanvasPoint>): void {
@@ -1303,9 +1324,14 @@ export class NodeGraphCanvasRenderer {
       ? ""
       : `\n${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
     this.tooltip.setText(`${record.label}\n${path}${boundary}${hidden}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
-    this.tooltip.style.left = `${Math.min(this.width - 16, x + 12)}px`;
-    this.tooltip.style.top = `${Math.min(this.height - 16, y + 12)}px`;
+    // Measure in a neutral position so the previous edge placement cannot shrink
+    // the tooltip's available width before choosing its new side.
+    this.tooltip.setCssProps({ left: "8px", top: "8px" });
     this.tooltip.hidden = false;
+    const bounds = this.tooltip.getBoundingClientRect();
+    const rtl = this.surface.ownerDocument.defaultView?.getComputedStyle(this.surface).direction === "rtl";
+    this.tooltip.style.left = `${tooltipOffset(x, bounds.width, this.width, rtl)}px`;
+    this.tooltip.style.top = `${tooltipOffset(y, bounds.height, this.height)}px`;
     this.scheduleDraw();
   }
 
@@ -1393,6 +1419,20 @@ export class NodeGraphCanvasRenderer {
       });
     }
   }
+}
+
+function visualImageKey(visual: NodeVisual): string {
+  return `${visual.kind}\u0000${visual.value}\u0000${visual.accent ?? ""}`;
+}
+
+function tooltipOffset(pointer: number, size: number, extent: number, before = false): number {
+  const inset = Math.min(8, extent / 2);
+  const after = pointer + 12;
+  const preceding = pointer - size - 12;
+  const preferred = before ? preceding : after;
+  const alternate = before ? after : preceding;
+  const position = preferred >= inset && preferred + size <= extent - inset ? preferred : alternate;
+  return Math.max(inset, Math.min(Math.max(inset, extent - size - inset), position));
 }
 
 function lineMightBeVisible(

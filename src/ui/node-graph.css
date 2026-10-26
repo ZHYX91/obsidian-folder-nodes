@@ -386,8 +386,13 @@
 .folder-nodes-node-graph-canvas-tooltip {
   position: absolute;
   z-index: 14;
-  max-width: min(360px, calc(100% - 32px));
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(360px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
   padding: 6px 9px;
+  overflow: auto;
+  overflow-wrap: anywhere;
   white-space: pre-line;
   color: var(--text-normal);
   font-size: var(--font-ui-smaller);

@@ -38,6 +38,8 @@ export class ExplorerAdapter extends Component {
   private readonly surfaces = new Map<HTMLElement, ExplorerSurface>();
   private readonly noteTitleSurfaces = new Map<HTMLElement, NoteTitleSurface>();
   private readonly originalOrders = new Map<HTMLElement, Element[]>();
+  private running = false;
+  private runGeneration = 0;
   private decorateTimer: number | null = null;
   private explorerMutationQueued = false;
   private explorerMutationGeneration = 0;
@@ -70,11 +72,13 @@ export class ExplorerAdapter extends Component {
 
   public start(): void {
     this.stop();
+    this.running = true;
     this.syncSurfaces();
     this.decorate();
   }
 
   public refresh(): void {
+    if (!this.running) return;
     this.cancelExplorerMutationDecorate();
     this.cancelNoteTitleDecorate();
     this.syncSurfaces();
@@ -82,6 +86,7 @@ export class ExplorerAdapter extends Component {
   }
 
   public refreshActiveState(): void {
+    if (!this.running) return;
     this.cancelNoteTitleDecorate();
     this.syncSurfaces();
     for (const { root } of this.surfaces.values()) this.decorateRoot(root);
@@ -95,7 +100,9 @@ export class ExplorerAdapter extends Component {
   }
 
   public async reveal(entry: TAbstractFile): Promise<boolean> {
+    if (!this.running) return false;
     if (!this.canReveal(entry)) return false;
+    const generation = this.runGeneration;
     const leaves = this.app.workspace.getLeavesOfType(EXPLORER_HOST.viewType);
     const recentDocument = this.app.workspace.getMostRecentLeaf()?.view.containerEl.ownerDocument ?? null;
     const leaf = leaves.find((candidate) => candidate.view.containerEl.ownerDocument === recentDocument) ?? leaves[0];
@@ -104,15 +111,19 @@ export class ExplorerAdapter extends Component {
     // A hidden Explorer can still be backed by a DeferredView. Reveal the leaf first,
     // then read leaf.view again so the host has a chance to materialize its real view.
     await this.app.workspace.revealLeaf(leaf);
+    if (!this.isCurrentRun(generation) || !this.canReveal(entry)) return false;
     this.syncSurfaces();
     this.surfaces.get(leaf.view.containerEl)?.ordering?.refresh();
+    if (!this.isCurrentRun(generation)) return false;
     const view = leaf.view as unknown as { revealInFolder?: (file: TAbstractFile) => Promise<void> | void };
     if (typeof view.revealInFolder !== "function") return false;
     await view.revealInFolder(entry);
-    return true;
+    return this.isCurrentRun(generation);
   }
 
   public stop(): void {
+    this.running = false;
+    this.runGeneration += 1;
     if (this.decorateTimer !== null) window.clearTimeout(this.decorateTimer);
     this.decorateTimer = null;
     this.cancelExplorerMutationDecorate();
@@ -137,7 +148,13 @@ export class ExplorerAdapter extends Component {
 
   public override onunload(): void { this.stop(); }
 
+  private isCurrentRun(generation: number): boolean {
+    return this.running && generation === this.runGeneration;
+  }
+
   private syncSurfaces(): void {
+    if (!this.running) return;
+    const generation = this.runGeneration;
     const active = new Set<HTMLElement>();
     for (const leaf of this.app.workspace.getLeavesOfType(EXPLORER_HOST.viewType)) {
       const root = (leaf.view as unknown as { containerEl?: HTMLElement }).containerEl;
@@ -156,7 +173,9 @@ export class ExplorerAdapter extends Component {
       const Observer = ownerWindow?.MutationObserver ?? MutationObserver;
       const Abort = ownerWindow?.AbortController ?? AbortController;
       const abort = new Abort();
-      const observer = new Observer((records) => this.scheduleExplorerMutationDecorate(root, records));
+      const observer = new Observer((records) => {
+        if (this.isCurrentRun(generation)) this.scheduleExplorerMutationDecorate(root, records);
+      });
       observer.observe(root, { childList: true, subtree: true });
       root.addEventListener("click", (event) => this.onClick(event), { capture: true, signal: abort.signal });
       root.addEventListener("keydown", (event) => this.onKeyDown(event), { capture: true, signal: abort.signal });
@@ -199,6 +218,8 @@ export class ExplorerAdapter extends Component {
   }
 
   private syncNoteTitleSurfaces(): void {
+    if (!this.running) return;
+    const generation = this.runGeneration;
     const active = new Set<HTMLElement>();
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       if (!this.getSettings().showIconInNoteTitle) continue;
@@ -207,10 +228,11 @@ export class ExplorerAdapter extends Component {
       active.add(root);
       if (this.noteTitleSurfaces.has(root)) continue;
       const Observer = root.ownerDocument.defaultView?.MutationObserver ?? MutationObserver;
-      const observer = new Observer(() => this.scheduleNoteTitleDecorate());
+      const schedule = () => { if (this.isCurrentRun(generation)) this.scheduleNoteTitleDecorate(); };
+      const observer = new Observer(schedule);
       observer.observe(root, { childList: true, subtree: true });
       const ResizeObserverConstructor = root.ownerDocument.defaultView?.ResizeObserver;
-      const resizeObserver = ResizeObserverConstructor === undefined ? null : new ResizeObserverConstructor(() => this.scheduleNoteTitleDecorate());
+      const resizeObserver = ResizeObserverConstructor === undefined ? null : new ResizeObserverConstructor(schedule);
       resizeObserver?.observe(root);
       this.noteTitleSurfaces.set(root, { observer, resizeObserver, root });
     }
@@ -224,10 +246,13 @@ export class ExplorerAdapter extends Component {
   }
 
   private scheduleDecorate(): void {
+    if (!this.running) return;
     this.cancelExplorerMutationDecorate();
     this.cancelNoteTitleDecorate();
     if (this.decorateTimer !== null) return;
+    const generation = this.runGeneration;
     this.decorateTimer = window.setTimeout(() => {
+      if (!this.isCurrentRun(generation)) return;
       this.decorateTimer = null;
       this.syncSurfaces();
       this.decorate();
@@ -235,6 +260,7 @@ export class ExplorerAdapter extends Component {
   }
 
   private scheduleExplorerMutationDecorate(root: HTMLElement, records: readonly MutationRecord[]): void {
+    if (!this.running) return;
     if (this.decorateTimer !== null) return;
     for (const record of records) {
       const target = asElement(record.target);
@@ -249,7 +275,7 @@ export class ExplorerAdapter extends Component {
     const generation = this.explorerMutationGeneration;
     this.explorerMutationQueued = true;
     queueMicrotask(() => {
-      if (generation !== this.explorerMutationGeneration) return;
+      if (!this.running || generation !== this.explorerMutationGeneration) return;
       this.explorerMutationQueued = false;
       this.syncSurfaces();
       const pending = [...this.pendingExplorerScopes];
@@ -277,8 +303,10 @@ export class ExplorerAdapter extends Component {
   }
 
   private scheduleNoteTitleDecorate(): void {
-    if (this.decorateTimer !== null || this.noteTitleDecorateTimer !== null) return;
+    if (!this.running || this.decorateTimer !== null || this.noteTitleDecorateTimer !== null) return;
+    const generation = this.runGeneration;
     this.noteTitleDecorateTimer = window.setTimeout(() => {
+      if (!this.isCurrentRun(generation)) return;
       this.noteTitleDecorateTimer = null;
       this.syncNoteTitleSurfaces();
       this.decorateNoteTitles();

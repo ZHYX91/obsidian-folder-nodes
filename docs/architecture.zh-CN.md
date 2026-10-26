@@ -43,6 +43,8 @@ Visual 编辑在打开 Picker 或封面菜单时固定原文件夹、canonical n
 
 ## Explorer 与 Contents
 
+ExplorerAdapter 仅在 `start` 后绑定界面。异步 reveal、观察器回调与延迟装饰都绑定创建它们的运行代际；`stop` 使该代际失效，因此稍后完成的宿主调用不能重新安装界面资源，即使适配器已再次启动。每次异步 leaf 物化后也重新检查目标可见性。
+
 ExplorerAdapter 仅封装 File Explorer 宿主边界：它发现每个 `file-explorer` leaf，并只观察对应 leaf container，不观察 `document.body`。适配器隐藏 canonical note，并从真实 `TFolder.children` 减去 canonical note 和当前不可见的受管理子树，判断 Folder Node 是否为视觉叶子；视觉叶子只给现有 disclosure control 添加可清理的圆点 class 和受所有权保护的 `aria-hidden`，不写宿主展开状态。在桌面虚拟化 Explorer 中，Manual 模式只把 sibling 顺序投影到受保护的宿主 sorter，Name 模式继续使用原生顺序。普通刷新只保持当前可见 viewport anchor；显式宿主 reveal（包括原生 breadcrumb reveal）使用独立的实际 DOM viewport 后置条件，因此即使插件自己的 Root 行或隐藏行让宿主虚拟几何与实际布局不一致，也只对被请求且本应可见的目标行做最小滚动修正。canonical Node Note 的 reveal 目标投影到对应文件夹行，属性隐藏目标不会被强制显示，私有宿主能力缺失时不接管。Mutation 批刷新在可见内容出现时恢复箭头。每次显式 reveal 只拥有自身宿主调用完成及下一次渲染时的有限物化机会；旧请求完成不能结算新请求。用户输入、外部滚动、目标可见性变化或该渲染边界会取消尚未完成的校正。桌面能力开关启用 HTML5 drag listener；Android 保留同一装饰但不声明 draggable。`stop`/unload 断开观察器和监听器，移除全部自有 DOM/class，并恢复属性、顺序、sorter 与 reveal 函数。
 
 Contents View 以活动文件的 owning folder 作为当前 Node，没有活动文件时使用 Root。一次 render 只查询 direct children/files，非空 Nodes/Album/Files 各自分页；三者全空时由统一空态替代三个 disclosure。breadcrumb 在 render 时排除 current item，深路径压缩中段；current card 既表达当前节点又负责打开 Node Note。Node Graph 扩展把入口注入现有 header action 容器，不再 prepend 独立顶行。`sectionOpen` 只属于 view instance，rerender/切换节点保留，onClose 后随实例释放。桌面端保留 drag helpers；Android 不创建 drag ownership。普通文件、相册条目与未管理文件夹仍通过独立 `file-menu` source 接收第三方动作。
@@ -56,6 +58,8 @@ ViewState 把序列化 workspace 字段与会话状态分开。每次手动设�
 VisibleScene 是 DOM、Canvas 2D 与 Canvas 3D 消费的唯一过滤模型。搜索以单次线性遍历汇总结果，view 只计算当前维度的布局。共享几何统一拥有卡片尺寸、presentation、hit test、父级/子级把手、结构锚点、链接卡片边缘锚点与链接曲线。粗指针的从上到下布局使用 72px 卡片高度，其余使用 46px；DOM 与 Canvas 呈现、视口剔除、命中区域、边线和视口拟合使用同一高度，密集 DOM 3D 圆点仍为 16px，Canvas 圆点保留既有尺寸。结构边保留明确的 parent-to-child 方向：从左到右布局连接父卡右把手到子卡左把手，从上到下布局连接父卡下把手到子卡上把手；链接边与把手及结构骨架独立。Canvas 保留所有可见结构边，只对链接边及聚焦关联链接应用限制。大 2D 保持可读的最小比例，通过空间索引查询视口候选，同时保留所需的父级边端点；大 3D 使用与命中几何一致的圆点，并仅对焦点或悬停显示完整卡片。工作区 Graph View 在自身 ItemView 生命周期内直接拥有 DOM viewport observer；独立 toolbar renderer 负责 SearchComponent 与工具栏 DOM 构建，插件层不再仅为了转接几何生命周期而增加一层继承。同范围重绘保留视口状态与仍在编辑的搜索输入，同步全部依赖模型的工具栏字段，替换视口按钮绑定，并在恢复相机后重新投影 DOM 3D 节点与边线。待保存设置重试成功后会调和最新已提交设置，但不会提交控件中尚未完成的文本。渲染状态不成为覆盖图谱的浮层；close/unload 会释放全部订阅、observer、animation frame、canvas 与 DOM。
 
 Canvas 键盘目标选择由纯函数 `graphKeyboardTarget` 负责，输入为当前 2D 或投影后的 3D 位置及稳定场景顺序；渲染器负责焦点、激活和宿主事件。方向键按屏幕方向移动且不循环，Home 和 End 保持场景顺序。
+
+Canvas 的图像缓存保留当前视口实际绘制的完整视觉工作集；重复视觉共享一张图像，加载失败也保留结果，离开视口、主题变化或销毁时解除对应加载回调。可见工作集超过 256 项时不会在帧内相互逐出；加载完成最多请求合并后的重绘，旧资源完成不能唤醒已替换的视口。悬停提示先测量实际边界，再按可用空间翻转和夹边；长路径折行，右到左布局优先放在指针左侧。
 
 ## 一致性与失败关闭
 
