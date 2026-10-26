@@ -51,7 +51,7 @@ describe("Explorer virtual item ordering", () => {
     fixture.scroll.getBoundingClientRect = () => ({ top: 80, bottom: 180, width: 200, height: 100 } as DOMRect);
     fixture.b.selfEl.getBoundingClientRect = () => {
       const top = 100 - fixture.scroll.scrollTop;
-      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+      return { top, bottom: top + 20, left: 20, right: 140, width: 120, height: 20 } as DOMRect;
     };
     const host = Object.assign(fixture.host, { revealInFolder: native });
     const bridge = installExplorerVirtualOrder(host, fixture.root, () => null,
@@ -294,12 +294,31 @@ describe("Explorer virtual item ordering", () => {
       ({ top: 80, bottom: 180, left: 0, right: 200, width: 200, height: 100 } as DOMRect);
     fixture.b.selfEl.getBoundingClientRect = () => {
       const top = 155 - fixture.scroll.scrollTop;
-      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+      return { top, bottom: top + 20, left: 20, right: 140, width: 120, height: 20 } as DOMRect;
     };
     await fixture.host.revealInFolder(fixture.target);
     await nextFrame();
     expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(160);
     expect(fixture.scroll.scrollTop).toBe(15);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["outside", "hidden", "transparent", "flow"])("does not move a row for an %s toolbar", async (kind) => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = kind === "flow" ? "static" : "absolute";
+    if (kind === "hidden") toolbar.style.visibility = "hidden";
+    if (kind === "transparent") toolbar.style.opacity = "0";
+    toolbar.getBoundingClientRect = () =>
+      ({ top: 160, bottom: 190, left: 0, right: kind === "outside" ? 100 : 200,
+        width: kind === "outside" ? 100 : 200, height: 30 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () =>
+      ({ top: 155 - fixture.scroll.scrollTop, bottom: 175 - fixture.scroll.scrollTop,
+        left: 150, right: 190, width: 40, height: 20 } as DOMRect);
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(0);
     fixture.bridge.dispose();
     fixture.root.remove();
   });
@@ -359,6 +378,90 @@ describe("Explorer virtual item ordering", () => {
     await nextFrame();
     expect(fixture.scroll.scrollTop).toBe(60);
     fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["paused", "zero-speed", "infinite"])("does not wait for an initially %s ancestor animation", async (kind) => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise,
+      playState: kind === "paused" ? "paused" : "running", playbackRate: kind === "zero-speed" ? 0 : 1,
+      effect: { getComputedTiming: () => ({ endTime: kind === "infinite" ? Infinity : 200 }) } } as unknown as Animation];
+    fixture.scroll.scrollTop = 60;
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("expires an animation paused after capture and ignores its late finish", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    let paused = false;
+    fixture.root.getAnimations = () => [{ finished: animation.promise,
+      get playState() { return paused ? "paused" : "running"; }, playbackRate: 1,
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    try {
+      fixture.b.el.remove();
+      fixture.host.revealInFolder(fixture.target);
+      await nextFrame();
+      paused = true;
+      vi.advanceTimersByTime(1_001);
+      fixture.scroll.scrollTop = 60;
+      fixture.scroll.append(fixture.b.el);
+      animation.resolve();
+      await Promise.resolve();
+      await nextFrame();
+      fixture.bridge.settleReveal();
+      expect(fixture.scroll.scrollTop).toBe(60);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { fixture.bridge.dispose(); fixture.root.remove(); vi.useRealTimers(); }
+  });
+
+  it("settles when an observed animation is cancelled", async () => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise, playState: "running", playbackRate: 1,
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    fixture.b.el.remove();
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    animation.reject(new Error("transition cancelled"));
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["supersede", "restart"])("does not let an animation completion revive a request after %s", async (kind) => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise, playState: "running", playbackRate: 1,
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    fixture.b.el.remove();
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    let bridge = fixture.bridge;
+    if (kind === "restart") {
+      fixture.bridge.dispose();
+      bridge = installExplorerVirtualOrder(fixture.host, fixture.root, () => null)!;
+    }
+    fixture.root.getAnimations = () => [];
+    fixture.scroll.append(fixture.b.el);
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    await nextFrame();
+    fixture.scroll.scrollTop = 60;
+    animation.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    bridge.dispose();
     fixture.root.remove();
   });
 

@@ -1,6 +1,8 @@
 import type { TAbstractFile, TFolder } from "obsidian";
 import { EXPLORER_ENTRY_TITLES_SELECTOR, EXPLORER_HOST } from "./explorer-host";
 
+const MAX_REVEAL_LAYOUT_WAIT_MS = 1_000;
+
 interface HostItem { file?: { path?: string }; }
 interface HostSorter {
   getSortedFolderItems: (folder: TFolder) => unknown;
@@ -40,12 +42,15 @@ export function installExplorerVirtualOrder(
     path: string;
     completed: boolean;
     frame: number | null;
+    cancelLayoutWait: (() => void) | null;
   }
   let pending: RevealRequest | null = null;
   const owner = root.ownerDocument.defaultView;
   const clearReveal = (request = pending): void => {
     if (request === null || pending !== request) return;
     if (request.frame !== null) owner?.cancelAnimationFrame(request.frame);
+    request.cancelLayoutWait?.();
+    request.cancelLayoutWait = null;
     pending = null;
   };
   const userTakeover = (): void => { clearReveal(); };
@@ -120,8 +125,19 @@ export function installExplorerVirtualOrder(
       // after two frames or retaining ownership of unrelated future scrolling.
       const animations = activeLayoutAnimations(root);
       if (animations.length === 0) completeReveal(request);
-      else void Promise.allSettled(animations.map((animation) => animation.finished))
-        .then(() => { completeReveal(request); });
+      else {
+        // A finite animation can later pause or become zero-speed. Never let
+        // its unfinished promise retain reveal ownership indefinitely.
+        let waiting = true;
+        const timeout = owner.setTimeout(() => { clearReveal(request); }, MAX_REVEAL_LAYOUT_WAIT_MS);
+        request.cancelLayoutWait = () => { waiting = false; owner.clearTimeout(timeout); };
+        void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+          if (!waiting) return;
+          request.cancelLayoutWait?.();
+          request.cancelLayoutWait = null;
+          completeReveal(request);
+        });
+      }
     });
   };
 
@@ -146,7 +162,7 @@ export function installExplorerVirtualOrder(
       let path: string | null;
       try { path = revealPathFor(entry); } catch { path = null; }
       const request: RevealRequest | null = path === null ? null : {
-        entry, path, completed: false, frame: null,
+        entry, path, completed: false, frame: null, cancelLayoutWait: null,
       };
       pending = request;
       let result: Promise<void> | void;
@@ -227,8 +243,8 @@ function ensureRevealTargetVisible(root: HTMLElement, path: string): boolean {
   const scroll = target.closest<HTMLElement>(EXPLORER_HOST.filesContainer) ??
     root.querySelector<HTMLElement>(EXPLORER_HOST.filesContainer);
   if (scroll === null) return false;
-  const viewport = visibleRevealViewport(root, scroll);
   const rect = target.getBoundingClientRect();
+  const viewport = visibleRevealViewport(root, scroll, rect);
   if (rect.width <= 0 || rect.height <= 0 || viewport.bottom <= viewport.top) return false;
 
   let delta = 0;
@@ -246,14 +262,14 @@ function activeLayoutAnimations(root: HTMLElement): Animation[] {
   for (let element: HTMLElement | null = root; element !== null; element = element.parentElement) {
     if (typeof element.getAnimations !== "function") continue;
     for (const animation of element.getAnimations()) {
-      if ((animation.playState === "running" || animation.pending) &&
+      if ((animation.playState === "running" || animation.pending) && animation.playbackRate !== 0 &&
           Number.isFinite(animation.effect?.getComputedTiming().endTime)) animations.add(animation);
     }
   }
   return [...animations];
 }
 
-function visibleRevealViewport(root: HTMLElement, scroll: HTMLElement): { top: number; bottom: number } {
+function visibleRevealViewport(root: HTMLElement, scroll: HTMLElement, target: DOMRect): { top: number; bottom: number } {
   const viewport = scroll.getBoundingClientRect();
   const owner = root.ownerDocument.defaultView;
   let { top, bottom } = viewport;
@@ -273,10 +289,12 @@ function visibleRevealViewport(root: HTMLElement, scroll: HTMLElement): { top: n
   // The phone drawer's bottom toolbar overlays the scroll container instead of
   // reducing its clientHeight. A row behind it is not a successful reveal.
   for (const toolbar of root.querySelectorAll<HTMLElement>(".nav-buttons-container")) {
-    const position = owner?.getComputedStyle(toolbar).position;
-    if (position !== "absolute" && position !== "fixed") continue;
+    const style = owner?.getComputedStyle(toolbar);
+    if ((style?.position !== "absolute" && style?.position !== "fixed") ||
+        style.visibility === "hidden" || style.visibility === "collapse" ||
+        style.display === "none" || Number.parseFloat(style.opacity) === 0) continue;
     const bounds = toolbar.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || bounds.left >= viewport.right || bounds.right <= viewport.left) continue;
+    if (bounds.width <= 0 || bounds.height <= 0 || bounds.left >= target.right || bounds.right <= target.left) continue;
     if (bounds.top > top && bounds.top < bottom && bounds.bottom >= bottom) bottom = bounds.top;
     else if (bounds.top <= top && bounds.bottom > top && bounds.bottom < bottom) top = bounds.bottom;
   }
