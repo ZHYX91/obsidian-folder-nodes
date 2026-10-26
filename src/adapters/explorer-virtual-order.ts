@@ -39,24 +39,18 @@ export function installExplorerVirtualOrder(
     entry: TAbstractFile;
     path: string;
     completed: boolean;
-    scrollTop: number | undefined;
     frame: number | null;
   }
   let pending: RevealRequest | null = null;
   const owner = root.ownerDocument.defaultView;
-  const scrollContainer = () => root.querySelector<HTMLElement>(EXPLORER_HOST.filesContainer);
   const clearReveal = (request = pending): void => {
     if (request === null || pending !== request) return;
     if (request.frame !== null) owner?.cancelAnimationFrame(request.frame);
     pending = null;
   };
   const userTakeover = (): void => { clearReveal(); };
-  const scrolled = (): void => {
-    if (pending?.completed) pending.scrollTop = scrollContainer()?.scrollTop;
-  };
   const inputEvents = ["wheel", "pointerdown", "touchstart", "keydown"] as const;
   for (const event of inputEvents) root.addEventListener(event, userTakeover, true);
-  root.addEventListener("scroll", scrolled, true);
 
   const wrapped = function(this: HostSorter, folder: TFolder): unknown {
     const items = original.call(this, folder);
@@ -82,7 +76,6 @@ export function installExplorerVirtualOrder(
 
   try { host.getSortedFolderItems = wrapped; } catch {
     for (const event of inputEvents) root.removeEventListener(event, userTakeover, true);
-    root.removeEventListener("scroll", scrolled, true);
     return null;
   }
 
@@ -96,12 +89,10 @@ export function installExplorerVirtualOrder(
       return;
     }
     ensureRevealTargetVisible(root, request.path);
-    request.scrollTop = scrollContainer()?.scrollTop;
   };
   const completeReveal = (request: RevealRequest | null): void => {
     if (disposed || request === null || pending !== request) return;
     request.completed = true;
-    request.scrollTop = scrollContainer()?.scrollTop;
     settleReveal();
     if (pending !== request) return;
     // Only the next rendering opportunity belongs to this explicit reveal.
@@ -149,7 +140,7 @@ export function installExplorerVirtualOrder(
       let path: string | null;
       try { path = revealPathFor(entry); } catch { path = null; }
       const request: RevealRequest | null = path === null ? null : {
-        entry, path, completed: false, scrollTop: undefined, frame: null,
+        entry, path, completed: false, frame: null,
       };
       pending = request;
       let result: Promise<void> | void;
@@ -175,7 +166,6 @@ export function installExplorerVirtualOrder(
   }
 
   const refresh = () => {
-    scrolled();
     const scroll = root.querySelector<HTMLElement>(EXPLORER_HOST.filesContainer);
     const viewport = scroll?.getBoundingClientRect();
     const anchor = viewport === undefined ? undefined : Array.from(root.querySelectorAll(EXPLORER_ENTRY_TITLES_SELECTOR)).find((element) => {
@@ -195,7 +185,6 @@ export function installExplorerVirtualOrder(
     }
     // Sorting/anchor compensation and host programmatic scrolling inside the
     // bounded reveal window are ours; explicit user input still cancels it.
-    if (pending?.completed) pending.scrollTop = scrollContainer()?.scrollTop;
     settleReveal();
   };
 
@@ -207,7 +196,6 @@ export function installExplorerVirtualOrder(
       disposed = true;
       clearReveal();
       for (const event of inputEvents) root.removeEventListener(event, userTakeover, true);
-      root.removeEventListener("scroll", scrolled, true);
       if (host.getSortedFolderItems === wrapped) {
         if (descriptor === undefined) delete (host as Partial<HostSorter>).getSortedFolderItems;
         else Object.defineProperty(host, "getSortedFolderItems", descriptor);
