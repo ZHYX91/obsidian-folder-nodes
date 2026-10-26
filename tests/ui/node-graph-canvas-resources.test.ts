@@ -225,6 +225,41 @@ describe("Canvas tooltip bounds", () => {
     } finally { current.dispose(); }
   });
 
+  it("resets a reopened detail when hidden scroll boxes ignore offset writes", () => {
+    const current = fixture(2);
+    const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;
+    const tooltip = current.surface.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip")!;
+    let top = 0;
+    let left = 0;
+    Object.defineProperties(tooltip, {
+      scrollTop: { get: () => tooltip.hidden ? 0 : top, set: (value: number) => { if (!tooltip.hidden) top = value; } },
+      scrollLeft: { get: () => tooltip.hidden ? 0 : left, set: (value: number) => { if (!tooltip.hidden) left = value; } },
+    });
+    const show = (x: number): void => {
+      const move = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(move, { offsetX: { value: x }, offsetY: { value: 23 } });
+      canvas.dispatchEvent(move);
+    };
+    try {
+      current.flush();
+      show(45);
+      tooltip.scrollTop = 500;
+      tooltip.scrollLeft = 70;
+      tooltip.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(tooltip.hidden).toBe(true);
+      show(185);
+      expect(tooltip.textContent).toContain("N1");
+      expect(tooltip.scrollTop).toBe(0);
+      expect(tooltip.scrollLeft).toBe(0);
+      tooltip.scrollTop = 120;
+      show(185);
+      expect(tooltip.scrollTop).toBe(120);
+      tooltip.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      show(185);
+      expect(tooltip.scrollTop).toBe(0);
+    } finally { current.dispose(); }
+  });
+
   it("bridges empty Canvas space into details and cancels old dismissal on entry, focus, a new node and resize", () => {
     const current = fixture(2, { width: 400, height: 240 });
     const canvas = current.surface.querySelector<HTMLCanvasElement>("canvas")!;

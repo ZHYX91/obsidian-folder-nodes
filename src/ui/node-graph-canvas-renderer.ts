@@ -1377,8 +1377,6 @@ export class NodeGraphCanvasRenderer {
       ? ""
       : `\n${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
     this.tooltip.setText(`${record.label}\n${path}${boundary}${hidden}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
-    this.tooltip.scrollTop = 0;
-    this.tooltip.scrollLeft = 0;
     // Measure in a neutral position so the previous edge placement cannot shrink
     // the tooltip's available width before choosing its new side.
     this.tooltip.setCssProps({ left: "8px", top: "8px" });
@@ -1399,6 +1397,11 @@ export class NodeGraphCanvasRenderer {
     const rtl = this.surface.ownerDocument.defaultView?.getComputedStyle(this.surface).direction === "rtl";
     this.tooltip.style.left = `${tooltipOffset(x, bounds.width, this.width, rtl)}px`;
     this.tooltip.style.top = `${tooltipOffset(y, bounds.height, this.height)}px`;
+    // A hidden element has no scroll box: setting its offsets before showing
+    // it can leave the browser's saved position intact. Reset after the final
+    // visible layout so each new detail starts at its content origin.
+    this.tooltip.scrollTop = 0;
+    this.tooltip.scrollLeft = 0;
     this.scheduleDraw();
   }
 

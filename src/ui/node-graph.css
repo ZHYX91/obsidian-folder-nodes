@@ -392,6 +392,7 @@
   max-height: calc(100% - 16px);
   padding: 6px 9px;
   overflow: auto;
+  overflow-anchor: none;
   overflow-wrap: anywhere;
   white-space: pre-line;
   color: var(--text-normal);
