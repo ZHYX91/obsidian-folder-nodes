@@ -18,7 +18,7 @@ const source = readFileSync(path.resolve("acceptance/fixtures/.obsidian/plugins/
 const disposers: Array<() => void> = [];
 afterEach(() => { for (const dispose of disposers.splice(0)) dispose(); document.body.replaceChildren(); vi.restoreAllMocks(); });
 
-function fixture() {
+function fixture(withFocusedItem = true) {
   const root = document.createElement("div");
   root.className = "workspace-leaf-content";
   root.dataset.type = "file-explorer";
@@ -45,11 +45,12 @@ function fixture() {
   vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => { nextFrame = undefined; });
   const files = new Map<string, string>();
   const folders = new Set<string>();
+  const tree = withFocusedItem ? { focusedItem: {
+    file: { path: "Disclosure/Node 060/Node 060.md", basename: "Node 060", parent: { path: "Disclosure/Node 060", name: "Node 060" } },
+    selfEl: row,
+  } } : {};
   const app = {
-    workspace: { getLeavesOfType: () => [{ view: { containerEl: root, tree: { focusedItem: {
-      file: { path: "Disclosure/Node 060/Node 060.md", basename: "Node 060", parent: { path: "Disclosure/Node 060", name: "Node 060" } },
-      selfEl: row,
-    } } } }] },
+    workspace: { getLeavesOfType: () => [{ view: { containerEl: root, tree } }] },
     plugins: { plugins: { "folder-nodes": {} } },
     vault: {
       getAbstractFileByPath: (path: string) => folders.has(path),
@@ -68,7 +69,7 @@ function fixture() {
   const module = { exports: undefined as unknown };
   new Script(source).runInNewContext({ module, require: () => ({ Plugin, Notice: class {} }), document });
   const provider = new (module.exports as new () => Provider)();
-  return { provider, row, root, scroll, files, folders, makeRow,
+  return { provider, row, root, scroll, files, folders, makeRow, tree,
     dispose: () => { for (const dispose of disposers.splice(0)) dispose(); },
     setTop: (value: number) => { top = value; },
     frame: (time: number) => { now = time; const callback = nextFrame; nextFrame = undefined; callback?.(time); },
@@ -143,7 +144,8 @@ describe("disclosure acceptance instrumentation", () => {
   });
 
   it("tracks the clicked row before host mutation without focusedItem, including recycled rows", () => {
-    const f = fixture();
+    const f = fixture(false);
+    expect("focusedItem" in f.tree).toBe(false);
     f.provider.recordExplorerTrace();
     f.row.addEventListener("click", () => { f.setTop(312); f.row.remove(); f.makeRow(); });
     f.row.dispatchEvent(new MouseEvent("click", { bubbles: true }));

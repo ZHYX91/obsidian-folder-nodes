@@ -9,6 +9,7 @@ import {
 } from "obsidian";
 
 import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
+import { graphActivationChord, graphHandleClickAllowed } from "../core/node-graph-keyboard";
 import { refreshItemViewTitle } from "./item-view-title";
 
 import {
@@ -312,8 +313,9 @@ export class FolderNodeGraphView extends ItemView {
 
   private handleScopeKey(event: KeyboardEvent): false | undefined {
     if (!this.keyScopeActive || !this.contentEl.isConnected || event.defaultPrevented ||
-        event.key !== "Enter" || event.shiftKey) return;
-    if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        event.key !== "Enter") return;
+    const chord = graphActivationChord(event);
+    if (chord === "branch") {
       if (this.canvasRenderer?.handleScopeToggle(event)) return false;
       const handle = this.contentEl.ownerDocument.activeElement?.closest<HTMLElement>(".folder-nodes-node-graph-node-expand-handle");
       if (handle === null || handle === undefined || !this.contentEl.contains(handle)) return;
@@ -324,7 +326,7 @@ export class FolderNodeGraphView extends ItemView {
       if (!event.repeat && !event.isComposing) this.toggleExpansion(path, true);
       return false;
     }
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (chord !== "mod") return;
     if (this.canvasRenderer?.handleScopeOpen(event)) return false;
     const body = this.contentEl.ownerDocument.activeElement?.closest<HTMLElement>(".folder-nodes-node-graph-node-body");
     if (body === null || body === undefined || !this.contentEl.contains(body)) return;
@@ -1272,10 +1274,12 @@ export class FolderNodeGraphView extends ItemView {
       void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
     });
     body.addEventListener("keydown", (event) => {
-      if (event.defaultPrevented || event.key !== "Enter") return;
+      if (!this.keyScopeActive || !this.contentEl.contains(body) || event.defaultPrevented || event.key !== "Enter") return;
+      const chord = graphActivationChord(event);
+      if (chord !== "plain" && chord !== "mod") return;
       event.preventDefault();
-      if (event.repeat) return;
-      void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
+      if (event.repeat || event.isComposing) return;
+      void this.service.openFolderNode(record.path, chord === "mod");
     });
     if (expandable) {
       const action = expanded ? label("collapseChildren") : label("expandChildren");
@@ -1291,11 +1295,12 @@ export class FolderNodeGraphView extends ItemView {
       setIcon(expand.createSpan({ cls: "folder-nodes-node-graph-node-expand-icon" }), expanded ? "minus" : "plus");
       setTooltip(expand, `${childActionLabel(action, childIds.length)} · ${label("altBranchHint")}`);
       expand.addEventListener("click", (event) => {
+        if (!this.keyScopeActive || !this.contentEl.contains(expand) || !graphHandleClickAllowed(event)) return;
         event.stopPropagation();
         this.toggleExpansion(record.path, event.altKey);
       });
       expand.addEventListener("keydown", (event) => {
-        if (event.defaultPrevented || !event.altKey || (event.key !== "Enter" && event.key !== " ")) return;
+        if (!this.keyScopeActive || !this.contentEl.contains(expand) || event.defaultPrevented || graphActivationChord(event) !== "branch") return;
         event.preventDefault();
         event.stopPropagation();
         if (event.repeat || event.isComposing) return;

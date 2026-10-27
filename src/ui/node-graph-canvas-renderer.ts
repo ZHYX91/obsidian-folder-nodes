@@ -30,7 +30,7 @@ import {
   type NodeGraphBox,
 } from "../core/node-graph-geometry";
 import type { NodeGraphLayout } from "../core/node-graph-layout";
-import { graphKeyboardTarget } from "../core/node-graph-keyboard";
+import { graphActivationChord, graphHandleClickAllowed, graphKeyboardTarget } from "../core/node-graph-keyboard";
 import {
   nodeGraphLinkEdges,
   nodeGraphStructureEdges,
@@ -423,7 +423,7 @@ export class NodeGraphCanvasRenderer {
   }
 
   public handleScopeOpen(event: KeyboardEvent): boolean {
-    if (this.destroyed || !this.surface.isConnected || event.defaultPrevented) return false;
+    if (this.destroyed || !this.surface.isConnected || event.defaultPrevented || graphActivationChord(event) !== "mod") return false;
     const active = this.surface.ownerDocument.activeElement;
     if (active !== this.canvas && (active !== this.focusOverlayBody || this.focusOverlay.hidden)) return false;
     event.preventDefault();
@@ -462,14 +462,16 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleOverlayKeyDown = (event: KeyboardEvent): void => {
-    if (event.defaultPrevented || event.repeat || this.overlayPath === null) return;
-    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
+    if (this.destroyed || event.defaultPrevented || this.overlayPath === null) return;
+    const chord = graphActivationChord(event);
+    if (chord !== "plain" && chord !== "mod") return;
     event.preventDefault();
-    this.openNode(this.overlayPath, event.ctrlKey || event.metaKey);
+    if (event.repeat || event.isComposing) return;
+    this.openNode(this.overlayPath, chord === "mod");
   };
 
   private readonly handleOverlayToggle = (event: MouseEvent): void => {
-    if (this.overlayPath === null || this.callbacks.onToggle === undefined) return;
+    if (this.destroyed || this.overlayPath === null || this.callbacks.onToggle === undefined || !graphHandleClickAllowed(event)) return;
     event.preventDefault();
     event.stopPropagation();
     this.selectFromCanvas(this.overlayPath, false);
@@ -477,7 +479,7 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleOverlayToggleKeyDown = (event: KeyboardEvent): void => {
-    if (!event.altKey || (event.key !== "Enter" && event.key !== " ") || this.overlayPath === null) return;
+    if (this.destroyed || event.defaultPrevented || graphActivationChord(event) !== "branch" || this.overlayPath === null) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.repeat || event.isComposing) return;
@@ -503,7 +505,18 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.defaultPrevented || event.repeat) return;
+    if (this.destroyed || event.defaultPrevented) return;
+    const chord = graphActivationChord(event);
+    if (chord === "plain" || chord === "mod") {
+      event.preventDefault();
+      if (event.repeat || event.isComposing) return;
+      if (this.focusPath === null) {
+        const first = this.keyboardPaths()[0];
+        if (first !== undefined) this.selectFromCanvas(first, true);
+      } else this.openNode(this.focusPath, chord === "mod");
+      return;
+    }
+    if (event.repeat || event.isComposing) return;
     if (event.key === "+" || event.key === "=") {
       event.preventDefault();
       this.zoomBy(1.2);
@@ -551,14 +564,6 @@ export class NodeGraphCanvasRenderer {
       this.selectFromCanvas(next, true);
       return;
     }
-    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
-    event.preventDefault();
-    if (this.focusPath === null) {
-      const first = this.keyboardPaths()[0];
-      if (first !== undefined) this.selectFromCanvas(first, true);
-      return;
-    }
-    this.openNode(this.focusPath, event.ctrlKey || event.metaKey);
   };
 
   private openNode(path: string, newLeaf: boolean): void {
