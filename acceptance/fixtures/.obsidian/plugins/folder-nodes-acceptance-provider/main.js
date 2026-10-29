@@ -82,8 +82,8 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
         await createNode(`${root}/Source`);
         await createNode(`${root}/Deep`);
         await createNode(`${root}/Deep/Target`, "Target body.\n");
-        await this.app.vault.create(`${root}/Reference.md`, "Original reference.\n");
-        await this.app.vault.create(`${root}/Deep/Reference.md`, "Different new-context reference.\n");
+        await this.app.vault.create(`${root}/Reference.md`, "# Heading\nOriginal reference. ^block\n");
+        await this.app.vault.create(`${root}/Deep/Reference.md`, "# Heading\nDifferent new-context reference. ^block\n");
         const link = name === "WikiSafe" ? `[[${root}/Reference#Heading|Alias]]` : name === "WikiUnresolved" ? "[[Missing]]" : name === "WikiMoving" ? `[[${root}/Source/Moving]]` : "[[Reference#Heading|Alias]]";
         const source = name === "WikiText" ? `---\nrelated: ${JSON.stringify(link)}\n---\n` : name === "WikiList" ? `---\nrelated: ${JSON.stringify([link])}\n---\n` : name === "WikiChild" ? "Source body.\n" : `${link}\n`;
         await this.app.vault.modify(this.app.vault.getAbstractFileByPath(`${root}/Source/Source.md`), source);

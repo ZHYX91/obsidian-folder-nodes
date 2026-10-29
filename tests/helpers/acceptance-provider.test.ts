@@ -56,6 +56,7 @@ it("prepares contextual WikiLink, rank batch and content ownership cases without
   expect(fake.frontmatters.get("OwnershipSafety/WikiList/Source/Source.md")?.related).toEqual(["[[Reference#Heading|Alias]]"]);
   expect(fake.contents.get("OwnershipSafety/WikiChild/Source/child.md")).toContain("[[Reference#Heading|Alias]]");
   expect(fake.contents.get("OwnershipSafety/WikiSafe/Source/Source.md")).toContain("[[OwnershipSafety/WikiSafe/Reference#Heading|Alias]]");
+  expect(fake.contents.get("OwnershipSafety/WikiSafe/Reference.md")).toContain("# Heading\nOriginal reference. ^block");
   expect(fake.requireFile("OwnershipSafety/WikiMoving/Source/Moving.md")).toBeDefined();
   expect(fake.requireFile("OwnershipSafety/WikiCompetitor/Source/Reference.md")).toBeDefined();
   expect(fake.frontmatters.get("OwnershipSafety/Ranks/Source/First/First.md")?.["folder-nodes"]).toEqual(["rank=4096"]);
