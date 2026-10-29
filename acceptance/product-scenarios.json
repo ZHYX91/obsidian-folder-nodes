@@ -367,12 +367,14 @@
         "Try WikiUnresolved, WikiMoving and WikiCompetitor. Inspect the missing target, target to be relocated, and potential best-match competitor. Require conservative refusal with original source/target bytes and child paths retained.",
         "Merge WikiSafe/Source into its Deep/Target. Open the preserved explicit Reference link and inspect its alias and heading spelling. On a fresh child case also exercise a heading-only or block-only self-link in the moving child.",
         "Merge Ranks/Source into Ranks/Target. Before merging, source order is First then Second with ranks 4096 and 8192, and target Existing has rank 1024. After metadata settles, inspect persisted child rank tokens, Contents order and the reloaded order; perform an ordinary reorder afterward to confirm manual ordering still works.",
+        "In fresh reset cases, first move Ranks/Prior into Target or reorder Source children through product actions, then immediately merge. Inspect actual source bytes, metadata and persisted target sequence; if host cache has already caught up, record that limitation rather than claiming a cache-lag observation. Separately leave the existing target child open, edit its body and merge with the source and target Node Notes closed. Preserve its edits, including a normal save completing during the merge; an editor replacement or different external source must refuse with compensation.",
         "Run Save merge and content ownership observations. Record actual host versions, original/new target identities and final persisted ordering. Provider output is preparation and observations only."
       ],
       "expected": [
         "Context-changing or unproved WikiLink targets refuse before the first move or write, including transferred Text/List properties and descendant bodies. No link is automatically rewritten.",
         "Explicit stationary targets remain correct after a successful merge; child self-subpaths remain self-links, while source Node Note self-links refuse.",
         "The target's persisted sequence is Existing, First, Second after metadata refresh and reload, independent of cache timing. The source is removed only after the successful merge.",
+        "Preceding placement, reorder and mode changes are reflected from current source rather than stale metadata. A supported open existing-child editor retains user content and normal exact saves; unknown or changed editor/source/child identities cannot report silent success.",
         "The real resolver and metadata timing are recorded as observed; automated substitutes do not establish host behavior."
       ]
     },

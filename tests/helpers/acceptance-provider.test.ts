@@ -62,6 +62,7 @@ it("prepares contextual WikiLink, rank batch and content ownership cases without
   expect(fake.frontmatters.get("OwnershipSafety/Ranks/Source/First/First.md")?.["folder-nodes"]).toEqual(["rank=4096"]);
   expect(fake.frontmatters.get("OwnershipSafety/Ranks/Source/Second/Second.md")?.["folder-nodes"]).toEqual(["rank=8192"]);
   expect(fake.frontmatters.get("OwnershipSafety/Ranks/Target/Existing/Existing.md")?.["folder-nodes"]).toEqual(["rank=1024"]);
+  expect(fake.frontmatters.get("OwnershipSafety/Ranks/Prior/Prior.md")?.["folder-nodes"]).toEqual(["rank=1"]);
   expect(fake.requireFile("OwnershipSafety/Drag/document.txt")).toBeDefined();
   expect(fake.requireFile("OwnershipSafety/Drag/clip.mp4")).toBeDefined();
   expect(notices.at(-1)).toContain("Preparation assigns no verdict");

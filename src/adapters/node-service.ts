@@ -48,6 +48,14 @@ interface OpenMarkdownTarget {
   readonly requestSave: () => void;
 }
 
+interface MergeRankBinding {
+  readonly file: TFile;
+  readonly before: string;
+  readonly after: string;
+  readonly folder: string;
+  readonly editor: OpenMarkdownTarget | null;
+}
+
 export interface VisualEditBinding {
   readonly folder: TFolder;
   readonly folderPath: string;
@@ -494,6 +502,7 @@ export class NodeService {
       const sourceNotePath = sourceNote.path;
       const targetNotePath = targetNote.path;
       const initialSourceChildren = [...source.children];
+      const initialTargetChildren = [...target.children];
       const movable = initialSourceChildren.filter((entry) => entry !== sourceNote).map((entry) => ({
         entry, path: entry.path, name: entry.name, parent: entry.parent,
       }));
@@ -533,19 +542,49 @@ export class NodeService {
         );
       }
 
+      const rankSources = new Map(movingSources);
+      const rankBindings: MergeRankBinding[] = [];
+      let mergeOrder: ReturnType<typeof planAppendChildren> | null = null;
+      if (mergeOrderingProperties(targetSnapshot, targetNotePath, "order").order === "manual") {
+        const sourceChildren = this.childRecords(sourcePath).map((child) => {
+          const note = this.getCanonicalFile(child.childPath);
+          const contents = note === null ? undefined : movingSources.get(note);
+          if (note === null || contents === undefined) throw new Error(`Merge rank source changed: ${child.childPath}`);
+          rankBindings.push({ file: note, before: note.path, after: targetPath + note.path.slice(sourcePath.length), folder: normalizePath(`${targetPath}/${basename(child.childPath)}`), editor: null });
+          return { ...child, order: mergeOrderingProperties(contents, note.path, "rank").rank };
+        });
+        const sourceOrder = mergeOrderingProperties(sourceSnapshot, sourceNotePath, "order").order === "manual"
+          ? sourceChildren.sort(compareChildren) : naturalOrder(sourceChildren);
+        const targetChildren: ChildOrderRecord[] = [];
+        for (const child of this.childRecords(targetPath).filter(({ childPath }) => childPath !== sourcePath)) {
+          const note = this.getCanonicalFile(child.childPath);
+          if (note === null) throw new Error(`Merge rank source changed: ${child.childPath}`);
+          const path = note.path;
+          const snapshot = await this.readMergeRankSource(note, path);
+          const contents = snapshot.source;
+          rankSources.set(note, contents);
+          rankBindings.push({ file: note, before: path, after: path, folder: child.childPath, editor: snapshot.editor });
+          targetChildren.push({ ...child, order: mergeOrderingProperties(contents, path, "rank").rank });
+        }
+        mergeOrder = planAppendChildren(targetChildren, sourceOrder.map((child) => ({
+          ...child, childPath: normalizePath(`${targetPath}/${basename(child.childPath)}`), order: null,
+        })));
+        const patchedFolders = new Set(mergeOrder.patches.map(({ childPath }) => childPath));
+        for (const binding of rankBindings) {
+          if (binding.editor !== null && patchedFolders.has(binding.folder)) this.assertMergeNoteClosed(binding.file, binding.before, "target");
+        }
+      }
+
+      for (const binding of rankBindings) {
+        await this.assertMergeRankSnapshot(binding, binding.before, rankSources.get(binding.file)!);
+      }
       for (const entry of movingMarkdown) {
         await this.assertClosedMergeNoteSnapshot(entry.file, entry.from, "source", movingSources.get(entry.file)!);
       }
       await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
       await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
       this.assertMergeStructure(source, sourcePath, initialSourceChildren);
-      this.assertEntryIdentity(target, targetPath, TFolder);
-
-      const movedNodeOrder = this.children(sourcePath);
-      const mergeOrder = this.sortMode(targetPath) === "manual" ? planAppendChildren(
-        this.childRecords(targetPath),
-        movedNodeOrder.map((child) => ({ ...child, childPath: normalizePath(`${targetPath}/${basename(child.childPath)}`) })),
-      ) : null;
+      this.assertMergeStructure(target, targetPath, initialTargetChildren);
       for (const check of mergeLinkChecks) check();
       const undos: Undo[] = [];
       let latestTarget = targetSnapshot;
@@ -571,7 +610,7 @@ export class NodeService {
           });
         }
 
-        if (mergeOrder !== null) await this.applyOrderPatches(mergeOrder.patches, null, undos);
+        if (mergeOrder !== null) await this.applyOrderPatches(mergeOrder.patches, null, undos, undefined, rankSources);
 
         await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
         await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
@@ -617,14 +656,20 @@ export class NodeService {
         // Observe all checked notes across the final asynchronous reads. Finish
         // every await before the synchronous checks at the trash commit point.
         let notesChanged = false;
-        const checkedNotes = new Set<TAbstractFile>([sourceNote, targetNote, ...movingMarkdown.map(({ file }) => file)]);
+        const checkedNotes = new Set<TAbstractFile>([sourceNote, targetNote, ...movingMarkdown.map(({ file }) => file), ...rankBindings.map(({ file }) => file)]);
+        const openRankBindings = new Map(rankBindings.filter(({ editor }) => editor !== null).map((binding) => [binding.file, binding]));
+        const openRankChanges = new Map<TFile, number>();
         const modification = this.app.vault.on("modify", (file) => {
-          if (checkedNotes.has(file)) notesChanged = true;
+          if (file instanceof TFile && openRankBindings.has(file)) openRankChanges.set(file, (openRankChanges.get(file) ?? 0) + 1);
+          else if (checkedNotes.has(file)) notesChanged = true;
         });
         try {
           this.assertEntryIdentity(target, targetPath, TFolder);
           await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
           await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
+          for (const binding of rankBindings) {
+            await this.assertMergeRankSnapshot(binding, binding.after, rankSources.get(binding.file)!);
+          }
           for (const entry of movingMarkdown) {
             const contents = await this.readClosedMergeNote(entry.file, entry.to, "source");
             const original = movingSources.get(entry.file)!;
@@ -635,6 +680,7 @@ export class NodeService {
               throw new Error(`source Markdown changed during merge: ${entry.to}`);
             }
           }
+          const verifiedRankSaves = await this.assertMergeRankSaves(openRankBindings, openRankChanges, rankSources);
           this.assertActive();
           this.assertEntryIdentity(target, targetPath, TFolder);
           this.assertEntryIdentity(targetNote, targetNotePath, TFile);
@@ -642,11 +688,19 @@ export class NodeService {
           this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
           this.assertMergeNoteClosed(sourceNote, sourceNotePath, "source");
           this.assertMergeStructure(source, sourcePath, [sourceNote]);
+          this.assertMergeStructure(target, targetPath, [...initialTargetChildren, ...movable.map(({ entry }) => entry)]);
+          for (const binding of rankBindings) {
+            this.assertMergeRankBinding(binding, binding.after, rankSources.get(binding.file)!);
+            if (this.getCanonicalFile(binding.folder) !== binding.file) throw new Error(`Merge rank source changed: ${binding.folder}`);
+          }
           for (const entry of movingMarkdown) {
             this.assertEntryIdentity(entry.file, entry.to, TFile);
             this.assertMergeNoteClosed(entry.file, entry.to, "source");
           }
           for (const check of mergeLinkChecks) check();
+          if ([...openRankChanges].some(([file, version]) => verifiedRankSaves.get(file) !== version)) {
+            throw new Error("Merge rank save changed after final validation");
+          }
           if (notesChanged) throw new Error("Node Note changed during final merge validation");
           this.expectEvent("delete", sourcePath, null, true);
           await this.app.fileManager.trashFile(source);
@@ -1190,6 +1244,7 @@ export class NodeService {
     movedFolder: TFolder | null,
     undos: Undo[],
     receipts?: FileChangeReceipt[],
+    expectedSources?: Map<TFile, string>,
   ): Promise<void> {
     const movedPath = movedFolder === null ? null : normalizeVaultPath(movedFolder.path);
     for (const patch of patches) {
@@ -1197,7 +1252,9 @@ export class NodeService {
       const note = movedPath !== null && patch.childPath === movedPath
         ? this.requireCanonicalNote(movedFolder!)
         : this.getCanonicalFile(patch.childPath);
-      const receipt = await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos);
+      if (expectedSources !== undefined && (note === null || !expectedSources.has(note))) throw new Error(`Merge rank source changed: ${patch.childPath}`);
+      const receipt = await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos, note === null ? undefined : expectedSources?.get(note));
+      if (receipt !== null) expectedSources?.set(receipt.file, receipt.after);
       if (receipt !== null) receipts?.push(receipt);
     }
   }
@@ -1333,6 +1390,7 @@ export class NodeService {
     file: TFile | null,
     patch: FolderNodesFrontmatterPatch,
     undos: Undo[],
+    expectedSource?: string,
   ): Promise<FileChangeReceipt | null> {
     this.assertActive();
     if (file === null) throw new Error(`Cannot update missing Node Note: ${FOLDER_NODES_PROPERTY}`);
@@ -1340,12 +1398,19 @@ export class NodeService {
     const result = await this.applyFileChange(
       file,
       path,
-      (current) => patchFolderNodesFrontmatter(current, patch),
+      (current) => {
+        if (expectedSource !== undefined) {
+          this.assertMergeNoteClosed(file, path, "target");
+          if (current !== expectedSource) throw new Error(`Merge rank source changed: ${path}`);
+        }
+        return patchFolderNodesFrontmatter(current, patch);
+      },
     );
     const { after, before } = result;
     if (after === before) return null;
     const receipt = { after, before, file, path };
-    undos.push(() => this.restoreFileChange(receipt));
+    if (expectedSource !== undefined) this.pushExactMergeUndo(undos, file, path, receipt);
+    else undos.push(() => this.restoreFileChange(receipt));
     return receipt;
   }
 
@@ -1357,6 +1422,52 @@ export class NodeService {
       }
       return before;
     }, true);
+  }
+
+  private async readMergeRankSource(file: TFile, path: string): Promise<{ source: string; editor: OpenMarkdownTarget | null }> {
+    this.assertEntryIdentity(file, path, TFile);
+    const editor = this.findOpenMarkdownTarget(file, path);
+    if (editor !== null) return { source: editor.editor.getValue(), editor };
+    return { source: await this.readClosedMergeNote(file, path, "target"), editor: null };
+  }
+
+  private assertMergeRankBinding(binding: MergeRankBinding, path: string, expected: string): void {
+    this.assertEntryIdentity(binding.file, path, TFile);
+    if (this.getCanonicalFile(dirname(path)) !== binding.file) throw new Error(`Merge rank source changed: ${path}`);
+    if (binding.editor === null) this.assertMergeNoteClosed(binding.file, path, "target");
+    else {
+      const editors = this.app.workspace.getLeavesOfType("markdown").filter((leaf) => {
+        const view = leaf.view as typeof leaf.view & { file?: TFile | null; editor?: Editor };
+        return view.file?.path === path && view.editor !== undefined;
+      });
+      if (editors.length !== 1 || editors[0] !== binding.editor.leaf
+        || !this.isSameOpenMarkdownTarget(binding.editor, binding.file, path) || binding.editor.editor.getValue() !== expected) {
+        throw new Error(`Merge rank editor changed: ${path}`);
+      }
+    }
+  }
+
+  private async assertMergeRankSaves(
+    bindings: ReadonlyMap<TFile, MergeRankBinding>, changes: ReadonlyMap<TFile, number>, expected: ReadonlyMap<TFile, string>,
+  ): Promise<ReadonlyMap<TFile, number>> {
+    const verified = new Map<TFile, number>();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      for (const [file, version] of changes) {
+        if (verified.get(file) === version) continue;
+        const binding = bindings.get(file)!;
+        const source = await this.app.vault.read(file);
+        this.assertMergeRankBinding(binding, binding.after, expected.get(file)!);
+        if (source !== expected.get(file)) throw new Error(`Merge rank save changed: ${binding.after}`);
+        verified.set(file, version);
+      }
+      if ([...changes].every(([file, version]) => verified.get(file) === version)) return new Map(verified);
+    }
+    throw new Error("Merge rank saves did not settle during final validation");
+  }
+
+  private async assertMergeRankSnapshot(binding: MergeRankBinding, path: string, expected: string): Promise<void> {
+    this.assertMergeRankBinding(binding, path, expected);
+    if (binding.editor === null) await this.assertClosedMergeNoteSnapshot(binding.file, path, "target", expected);
   }
 
   private async readClosedMergeNote(
@@ -1690,6 +1801,16 @@ interface ParsedMergeFrontmatter {
   readonly frontmatter: Record<string, unknown>;
   readonly hasFrontmatter: boolean;
   readonly lines: string[];
+}
+
+function mergeOrderingProperties(source: string, path: string, field: "order" | "rank"): ReturnType<typeof resolveFolderNodesProperties> {
+  const analysis = analyzeFolderNodesSource(source);
+  const frontmatter = readMergeFrontmatter(source, path);
+  const structural = Object.keys(frontmatter).some((key) => STRUCTURAL_PROPERTIES.has(key));
+  const properties = resolveFolderNodesProperties(frontmatter, structural ? analysis.issues : []);
+  const issue = properties.issues.find((entry) => entry.field === "all" || entry.field === field);
+  if (issue !== undefined) throw new Error(`Cannot prove merge ordering for ${path}: ${issue.message}`);
+  return properties;
 }
 
 function readMergeFrontmatter(source: string, path: string): Record<string, unknown> {

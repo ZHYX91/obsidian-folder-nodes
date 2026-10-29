@@ -28,6 +28,14 @@ is safe but does not prove that a drop reached the service. **Save merge and con
 observations** records fixture files and replacement events without assigning a verdict. The
 `clip.mp4` file is an inert Album-tile placeholder, not a playable media sample.
 
+The Ranks fixture also includes Prior with rank 1 for a preceding product Move action. In reset
+cases, follow that move or a source reorder immediately with Merge, and record whether the real
+host cache still lagged; do not infer the timing from preparation. Existing target children may
+remain open in one supported editor and retain unsaved text. Normal saves of the exact expected
+source are accepted; changed text or editor identity refuses with compensation.
+If an existing target child's rank actually needs renumbering, close that particular open note and
+retry. Notes with valid ranks needing no rewrite and unrelated open notes remain supported.
+
 The disposable fixture disables Obsidian's automatic internal-link updates. Keep that host option
 off for the successful merge and final-read races so native rename processing does not rewrite
 the source first. Separately, allowing native link updates can change a checked note during a

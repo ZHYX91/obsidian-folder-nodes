@@ -37,6 +37,12 @@ CreatedNodeRecovery 负责创建记录与补偿顺序；NodeService 提供文件
 
 手动目标父级的合并排序从一次目标序列和来源子节点序列快照规划。所有迁入项依次更新事务内 rank，完整规划后才写净 patch；后续分配不读取较早写入是否已出现在 Metadata Cache。原始 rank 与源路径仍由同一逆序补偿栈恢复。普通文件移动在排队前固定来源 TFile、来源路径、目标 TFolder 和目标路径，队列开始及最后异步冲突检查后复核全部绑定。
 
+合并的排序模式和 rank 来自当前原文，而非可能落后于前序队列操作的 Metadata Cache。来源复用已读取的移动笔记；目标只读取直接子节点的 canonical note，固定目录、文件及原文身份。迁入项在新父级视作未分配 rank，旧缓存碰巧等于新值也不会省略写入意图，实际源码相同仍按 no-op 处理。已有目标子笔记的单一受支持编辑器可含未保存内容：固定 leaf/editor 并读取同步值，写回前比较快照，所有异步步骤后再同步复核；未保存编辑不依赖 Vault modify 事件。关闭笔记用精确 Vault 读取和修改监听，最终以原文或本次 receipt.after 校验全部 rank 依赖。多编辑器、无法绑定的编辑器、内容变化或子项结构变化拒绝并补偿，不扫描或写入全库。
+
+目标子编辑器的正常 requestSave 可在最终校验期间完成。只对这些 open rank 依赖记录局部修改版本；精确读取保存结果与 expected 原文相同、编辑器绑定和值仍相同且版本稳定后才接受，最多核对三轮，不用固定等待。其他被检查笔记的修改、不同磁盘内容或持续变化都拒绝。全部异步校验结束后再同步核对编辑器与独立版本快照，不能把正常保存误判为外部冲突。
+
+若重编号需要改写某篇已有目标子笔记的 rank，而该笔记仍打开，则在首次副作用前要求关闭这一篇；有效 rank 无需改写时，单一受支持的 open/dirty 编辑器继续可用，不限制无关笔记。此限制避免合并及其补偿的 requestSave 覆盖编辑器尚未反映的外部磁盘改动。受合并 rank 写入或补偿影响的笔记在实际回调也必须保持关闭，发生变化就拒绝；无法精确补偿时保留内容并报告恢复失败。
+
 ## Visual 解析
 
 Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示前景强调色或回退色。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选。解析到文字或 Lucide 时，颜色直接作用于前景；解析到 Emoji 或图片时保留原始像素，不增加圆点或容器装饰；所有基础候选都失败时，颜色才成为居中的圆形色标。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用所选本机彩色字体或系统字体栈，来自属性的 Explorer/标题图标进入固定且无边框的图标位。Imperative 设置页只通过本地 `FontFace` source 探测固定候选，不枚举全部系统字体；RuntimeStyles 将通过校验的所选字体栈注入每个 workspace document 的自有样式表，字体缺失时继续回退系统栈。标题图标位仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量继续提供覆盖能力。

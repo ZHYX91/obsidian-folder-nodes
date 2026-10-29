@@ -28,6 +28,8 @@ translation_status: source
 
 ## 性能
 
+初始缓存滞后回归通过真实 NodeService 队列先执行来源 reorder、目标 placeNode 或 setChildOrderMode，再合并并刷新延迟元数据，断言持久化顺序和唯一 rank。另覆盖来源缓存恰等于新 rank 但实际原文不同、有效 rank 的目标未保存编辑器读取、需要重编号的打开笔记精确拒绝、最终读取后无 Vault 事件的编辑或 leaf/editor 替换、延迟的精确保存及最后 await 间隙的磁盘变更、外部正文变更、target 新增子项和精确补偿。只复用缓存的规划器预期不能充当这些行为的 oracle。
+
 `npm run test:browser` 直接打包生产 Canvas 渲染器和提示框 CSS，仅补 Obsidian 的 DOM 便捷方法，通过已安装 Chrome／Chromium／Edge 或 `CHROME_BIN` 运行真实 Chromium 排版。它验证隐藏后切换节点、可见时切换节点、同节点滚动保留、Escape 后重开、双轴归零及 resize 后重开。浏览器使用全新临时 profile，退出后再清理该 profile。此检查补充模拟 DOM 回归，不代表原生 Obsidian 交互通过。
 
 同一浏览器检查还将生产 Explorer reveal 适配器用于含裁切抽屉、可滚动文件树和绝对定位工具栏的真实布局，共覆盖十一组排版检查。工具栏与视口的浮点边缘差在 reveal 容差内时，被遮挡的行必须滚到工具栏上方；超出容差的间隙不得裁减视口。单测另保留精确浮点矩形及顶部边缘的镜像用例。

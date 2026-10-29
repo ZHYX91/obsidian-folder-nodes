@@ -29,6 +29,8 @@ Merge-target regressions use an independent resolver that returns different obje
 
 ## Performance
 
+Initial-cache-lag regressions call the real NodeService queue to reorder a source, placeNode into a target, or setChildOrderMode before merging, then flush delayed metadata and assert persisted order and unique ranks. They also cover a cached source rank that equals the new rank despite different source bytes, reading a dirty target editor with a valid rank, refusing only an open note requiring renumbering, edits or leaf/editor replacement after final reads without Vault events, delayed exact saves and disk changes in the last await gap, external body changes, a new target child, and exact compensation. Planner expectations that merely reuse cached values cannot serve as the oracle for these behaviors.
+
 `npm run test:browser` bundles the production Canvas renderer and tooltip CSS with only Obsidian DOM convenience helpers, then runs real Chromium layout using installed Chrome/Chromium/Edge or `CHROME_BIN`. It verifies hidden-to-new-node and visible-to-new-node scroll reset, same-node scroll retention, Escape/reopen, both scroll axes and resize/reopen. The browser uses a fresh temporary profile and closes before that profile is removed. This check complements the simulated DOM tests and does not certify native Obsidian interaction.
 
 The same browser check runs the production Explorer reveal adapter against a clipped drawer with a scrolling file tree and an absolute toolbar, for eleven layout groups in total. Real fractional toolbar edges within the reveal tolerance must move the obscured row above the toolbar; a gap beyond that tolerance must not trim the viewport. Unit tests also preserve exact fractional rectangles and mirrored top-edge cases.

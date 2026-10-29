@@ -97,6 +97,7 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
       await createNode("OwnershipSafety/Ranks/Source/Second", "Second body.\n", ["rank=8192"]);
       await createNode("OwnershipSafety/Ranks/Target", "Target body.\n", ["order=manual"]);
       await createNode("OwnershipSafety/Ranks/Target/Existing", "Existing body.\n", ["rank=1024"]);
+      await createNode("OwnershipSafety/Ranks/Prior", "Prior placement body.\n", ["rank=1"]);
       await createNode("OwnershipSafety/Drag");
       await createNode("OwnershipSafety/Drag/Target");
       await this.app.vault.create("OwnershipSafety/Drag/document.txt", "Original drag file.\n");
