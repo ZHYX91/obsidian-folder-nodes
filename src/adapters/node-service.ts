@@ -17,7 +17,7 @@ import { FolderNodesError } from "../core/folder-nodes-error";
 import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type FolderIdentity } from "../core/identity";
 import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
 import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
-import { compareChildren, materializeManualOrder, naturalOrder, planInsert } from "../core/ordering";
+import { compareChildren, materializeManualOrder, naturalOrder, planAppendChildren, planInsert } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import {
@@ -36,7 +36,7 @@ import type {
   PropertyMigrationScan,
 } from "../core/types";
 import { editableVisualCandidates } from "../core/visual";
-import { assertMergeLinksKeepDestinations, assertMergeWikiLinksKeepDestinations } from "../core/merge-link-safety";
+import { assertMergeLinksKeepDestinations, assertMergeWikiLinksKeepDestinations, type MergeFileRelocation, type MergeLinkCheck, type MergeWikiLinkResolver } from "../core/merge-link-safety";
 
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
@@ -56,6 +56,12 @@ export interface VisualEditBinding {
   readonly originalIcon: unknown;
   readonly iconPresent: boolean;
   readonly sourceFile?: { readonly file: TFile; readonly path: string };
+}
+
+export interface FileMoveBinding {
+  readonly sourcePath: string;
+  readonly target: TFolder;
+  readonly targetPath: string;
 }
 
 export class NodeService {
@@ -429,18 +435,25 @@ export class NodeService {
     });
   }
 
-  public moveFile(file: TFile, targetFolderPath: string): Promise<void> {
+  public moveFile(file: TFile, targetFolderPath: string, binding?: FileMoveBinding): Promise<void> {
+    const sourcePath = binding?.sourcePath ?? file.path;
+    const normalizedTarget = normalizeVaultPath(targetFolderPath);
+    const target = binding?.target ?? this.getFolder(normalizedTarget);
+    const targetPath = binding?.targetPath ?? target?.path;
+    const assertTarget = () => {
+      if (target === null || targetPath === undefined) throw new Error(`Unknown target folder: ${targetFolderPath}`);
+      if (target.path !== targetPath || normalizeVaultPath(targetPath) !== normalizedTarget || this.getFolder(normalizedTarget) !== target) {
+        throw new Error(`Vault entry identity changed during operation: ${targetFolderPath}`);
+      }
+    };
     return this.exclusive(async () => {
-      const sourcePath = file.path;
-      targetFolderPath = normalizeVaultPath(targetFolderPath);
-      const target = targetFolderPath === "" ? this.app.vault.getRoot() : this.getFolder(targetFolderPath);
-      if (target === null) throw new Error(`Unknown target folder: ${targetFolderPath}`);
-      const normalizedTarget = normalizeVaultPath(target.path);
+      this.assertEntryIdentity(file, sourcePath, TFile);
+      assertTarget();
       const nextPath = normalizePath(normalizedTarget === "" ? file.name : `${normalizedTarget}/${file.name}`);
       if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
       this.assertEntryIdentity(file, sourcePath, TFile);
-      if (normalizedTarget !== "") this.assertEntryIdentity(target, normalizedTarget, TFolder);
+      assertTarget();
       this.assertActive();
       this.expectEvent("rename", nextPath, sourcePath);
       await this.app.fileManager.renameFile(file, nextPath);
@@ -495,25 +508,45 @@ export class NodeService {
         targetNotePath,
       );
       const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
-      const resolveWikiLink = (path: string, from: string) => this.app.metadataCache.getFirstLinkpathDest(path, from)?.path ?? null;
+      const resolveWikiLink: MergeWikiLinkResolver = (path, from) => {
+        const file = this.app.metadataCache.getFirstLinkpathDest(path, from);
+        return file == null || this.getFile(file.path) !== file ? null : { path: file.path, identity: file };
+      };
+      const movingFiles = this.app.vault.getAllLoadedFiles()
+        .filter((file): file is TFile => file instanceof TFile && file !== sourceNote && file.path.startsWith(sourcePath + "/"))
+        .map((file) => ({ from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
       const targetProperties = readMergeFrontmatter(targetSnapshot, targetNotePath);
-      assertMergePropertyLinks(sourceProperties, sourceNotePath, sourceNotePath, resolveWikiLink, targetProperties);
-      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath, resolveWikiLink);
+      const mergeLinkChecks = [
+        assertMergePropertyLinks(sourceProperties, sourceNotePath, targetNotePath, sourceNotePath, resolveWikiLink, movingFiles, targetProperties),
+        assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath, resolveWikiLink, movingFiles),
+      ];
       const movingMarkdown = this.app.vault.getMarkdownFiles()
         .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
         .map((file) => ({ file, from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
+      const movingSources = new Map<TFile, string>();
       for (const entry of movingMarkdown) {
         const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
-        assertMergePropertyLinks(readMergeFrontmatter(contents, entry.from), entry.from, sourceNotePath, resolveWikiLink);
-        assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourcePath, targetPath, sourceNotePath, resolveWikiLink);
+        movingSources.set(entry.file, contents);
+        mergeLinkChecks.push(
+          assertMergePropertyLinks(readMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourceNotePath, resolveWikiLink, movingFiles),
+          assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourcePath, targetPath, sourceNotePath, resolveWikiLink, movingFiles),
+        );
       }
 
+      for (const entry of movingMarkdown) {
+        await this.assertClosedMergeNoteSnapshot(entry.file, entry.from, "source", movingSources.get(entry.file)!);
+      }
       await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
       await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
       this.assertMergeStructure(source, sourcePath, initialSourceChildren);
       this.assertEntryIdentity(target, targetPath, TFolder);
 
       const movedNodeOrder = this.children(sourcePath);
+      const mergeOrder = this.sortMode(targetPath) === "manual" ? planAppendChildren(
+        this.childRecords(targetPath),
+        movedNodeOrder.map((child) => ({ ...child, childPath: normalizePath(`${targetPath}/${basename(child.childPath)}`) })),
+      ) : null;
+      for (const check of mergeLinkChecks) check();
       const undos: Undo[] = [];
       let latestTarget = targetSnapshot;
       try {
@@ -538,11 +571,7 @@ export class NodeService {
           });
         }
 
-        for (const child of movedNodeOrder) {
-          const destination = normalizePath(`${targetPath}/${basename(child.childPath)}`);
-          const note = this.getCanonicalFile(destination);
-          if (note !== null) await this.appendRankIfManual(targetPath, note, undos);
-        }
+        if (mergeOrder !== null) await this.applyOrderPatches(mergeOrder.patches, null, undos);
 
         await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
         await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
@@ -598,8 +627,13 @@ export class NodeService {
           await this.assertClosedMergeNoteSnapshot(sourceNote, sourceNotePath, "source", sourceSnapshot);
           for (const entry of movingMarkdown) {
             const contents = await this.readClosedMergeNote(entry.file, entry.to, "source");
-            assertMergePropertyLinks(readMergeFrontmatter(contents, entry.to), entry.from, sourceNotePath, resolveWikiLink);
-            assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.to), entry.from, entry.to, sourcePath, targetPath, sourceNotePath, resolveWikiLink);
+            const original = movingSources.get(entry.file)!;
+            const properties = (source: string) => Object.fromEntries(Object.entries(readMergeFrontmatter(source, entry.to))
+              .filter(([key]) => !STRUCTURAL_PROPERTIES.has(key)));
+            if (stripMergeFrontmatter(contents, entry.to) !== stripMergeFrontmatter(original, entry.from)
+              || !deepEqual(properties(contents), properties(original))) {
+              throw new Error(`source Markdown changed during merge: ${entry.to}`);
+            }
           }
           this.assertActive();
           this.assertEntryIdentity(target, targetPath, TFolder);
@@ -612,6 +646,7 @@ export class NodeService {
             this.assertEntryIdentity(entry.file, entry.to, TFile);
             this.assertMergeNoteClosed(entry.file, entry.to, "source");
           }
+          for (const check of mergeLinkChecks) check();
           if (notesChanged) throw new Error("Node Note changed during final merge validation");
           this.expectEvent("delete", sourcePath, null, true);
           await this.app.fileManager.trashFile(source);
@@ -1662,19 +1697,22 @@ function readMergeFrontmatter(source: string, path: string): Record<string, unkn
 }
 
 function assertMergePropertyLinks(
-  properties: Readonly<Record<string, unknown>>, sourcePath: string, retiredNote: string,
-  resolveWikiLink: (path: string, from: string) => string | null,
+  properties: Readonly<Record<string, unknown>>, sourcePath: string, targetPath: string, retiredNote: string,
+  resolveWikiLink: MergeWikiLinkResolver,
+  movingFiles: readonly MergeFileRelocation[],
   existingTarget: Readonly<Record<string, unknown>> = {},
-): void {
+): MergeLinkCheck {
+  const checks: MergeLinkCheck[] = [];
   for (const [key, value] of Object.entries(properties)) {
     if (STRUCTURAL_PROPERTIES.has(key) || Object.prototype.hasOwnProperty.call(existingTarget, key)) continue;
     const values = Array.isArray(value) ? value as unknown[] : [value];
     for (const entry of values) {
       if (typeof entry === "string") {
-        assertMergeWikiLinksKeepDestinations(entry, sourcePath, retiredNote, resolveWikiLink, `${sourcePath} property ${key}`);
+        checks.push(assertMergeWikiLinksKeepDestinations(entry, sourcePath, targetPath, retiredNote, resolveWikiLink, movingFiles, `${sourcePath} property ${key}`));
       }
     }
   }
+  return () => { for (const check of checks) check(); };
 }
 
 function mergeFrontmatterProperties(

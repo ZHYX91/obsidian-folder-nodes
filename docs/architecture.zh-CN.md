@@ -33,6 +33,10 @@ CreatedNodeRecovery 负责创建记录与补偿顺序；NodeService 提供文件
 
 合并链接预检查通过 Metadata Cache 从每篇原始笔记解析 WikiLink 和嵌入，覆盖 alias、标题/块片段、迁入的 Text/List 属性以及要移动的 Markdown 子笔记。解析到即将删除的来源 Node Note 时，在第一次移动或写入前停止合并。围栏/缩进代码、行内代码和注释保持字面量。此检查拒绝不安全链接，不自动重写链接。无法可靠判定的编号列表围栏开头，以及同一行组合列表/引用的围栏开头，按失败关闭处理，不假设它们隐藏了后续链接。
 
+非空 WikiLink 选择器必须在原、新来源上下文中解析到同一个现存文件对象和路径。未解析目标、会移动的目标，以及移动前后路径后缀可能参与同一选择器最佳匹配的文件，都在首次副作用前保守拒绝；不能用两次解析的路径映射代替对宿主移动后解析的证明。移动子笔记的空路径标题/块自指保持自指，来源 Node Note 的自指仍拒绝。预检查保留原目标身份，最终提交只用新上下文复核，不在已改变的目录结构中重新解析旧来源。后代正文或非结构属性变化同样阻止提交。
+
+手动目标父级的合并排序从一次目标序列和来源子节点序列快照规划。所有迁入项依次更新事务内 rank，完整规划后才写净 patch；后续分配不读取较早写入是否已出现在 Metadata Cache。原始 rank 与源路径仍由同一逆序补偿栈恢复。普通文件移动在排队前固定来源 TFile、来源路径、目标 TFolder 和目标路径，队列开始及最后异步冲突检查后复核全部绑定。
+
 ## Visual 解析
 
 Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示前景强调色或回退色。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选。解析到文字或 Lucide 时，颜色直接作用于前景；解析到 Emoji 或图片时保留原始像素，不增加圆点或容器装饰；所有基础候选都失败时，颜色才成为居中的圆形色标。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用所选本机彩色字体或系统字体栈，来自属性的 Explorer/标题图标进入固定且无边框的图标位。Imperative 设置页只通过本地 `FontFace` source 探测固定候选，不枚举全部系统字体；RuntimeStyles 将通过校验的所选字体栈注入每个 workspace document 的自有样式表，字体缺失时继续回退系统栈。标题图标位仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量继续提供覆盖能力。

@@ -1,3 +1,16 @@
+export interface MergeWikiLinkTarget {
+  readonly path: string;
+  readonly identity: unknown;
+}
+
+export interface MergeFileRelocation {
+  readonly from: string;
+  readonly to: string;
+}
+
+export type MergeWikiLinkResolver = (path: string, sourcePath: string) => MergeWikiLinkTarget | null;
+export type MergeLinkCheck = () => void;
+
 /**
  * Reject location-sensitive link syntax before a Node merge moves any files.
  * A relative link is safe unchanged only if its referenced child moves with
@@ -7,9 +20,11 @@
 export function assertMergeLinksKeepDestinations(
   source: string, oldNote: string, newNote: string,
   sourceFolder: string, targetFolder: string, retiredNote: string,
-  resolveWikiLink: (path: string, sourcePath: string) => string | null = () => null,
-): void {
-  if (oldNote === newNote) return;
+  resolveWikiLink: MergeWikiLinkResolver = () => null,
+  movingFiles: readonly MergeFileRelocation[] = [],
+): MergeLinkCheck {
+  if (oldNote === newNote) return () => undefined;
+  const wikiChecks: MergeLinkCheck[] = [];
   let fence: { mark: string; width: number; quoteDepth: number; listIndent: number } | null = null;
   let comment: LiteralBlock | null = null;
   let previousBlank = true;
@@ -95,19 +110,22 @@ export function assertMergeLinksKeepDestinations(
     if (definition?.[1] != null && !absolute(definition[1])) {
       throw new Error("Cannot safely merge a relative reference definition");
     }
-    assertMergeWikiLinksKeepDestinations(visible, oldNote, retiredNote, resolveWikiLink, `${oldNote} body line ${lineIndex + 1}`);
+    wikiChecks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveWikiLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
     if (/\b(?:href|src)\s*=\s*["']?\.{1,2}\//iu.test(visible)) {
       throw new Error("Cannot safely merge a relative HTML link");
     }
   }
+  return () => { for (const check of wikiChecks) check(); };
 }
 
 /** Accepts visible prose or a parsed Text/List property value, without YAML escaping. */
 export function assertMergeWikiLinksKeepDestinations(
-  source: string, oldNote: string, retiredNote: string,
-  resolveWikiLink: (path: string, sourcePath: string) => string | null,
+  source: string, oldNote: string, newNote: string, retiredNote: string,
+  resolveWikiLink: MergeWikiLinkResolver,
+  movingFiles: readonly MergeFileRelocation[] = [],
   location = oldNote,
-): void {
+): MergeLinkCheck {
+  const checks: MergeLinkCheck[] = [];
   for (const wiki of source.matchAll(/!?\[\[([^\]\r\n]+)\]\]/gu)) {
     let escapes = 0;
     const opener = wiki.index + wiki[0].indexOf("[[");
@@ -117,11 +135,38 @@ export function assertMergeWikiLinksKeepDestinations(
     if (path === "." || path === ".." || path.startsWith("./") || path.startsWith("../")) {
       throw new Error("Cannot safely merge a relative WikiLink");
     }
-    const destination = path === "" ? oldNote : resolveWikiLink(path, oldNote);
-    if (destination === retiredNote || path.replace(/\.md$/iu, "") === retiredNote.replace(/\.md$/iu, "")) {
+    const destination = path === "" ? { path: oldNote, identity: null } : resolveWikiLink(path, oldNote);
+    if (destination?.path === retiredNote || path.replace(/\.md$/iu, "") === retiredNote.replace(/\.md$/iu, "")) {
       throw new Error(`Cannot merge a WikiLink to the removed Node Note: ${location} ${wiki[0]}`);
     }
+    // A subpath-only link in a moving child remains that child's self-link.
+    // Nonempty selectors are host best-match queries. Do not pretend the
+    // pre-move resolver can prove how a relocated competitor will resolve.
+    if (path === "") {
+      if (!(wiki[1] ?? "").trim().startsWith("#")) throw new Error(`Cannot prove a WikiLink target survives merge: ${location} ${wiki[0]}`);
+      continue;
+    }
+    if (destination === null || /[%\\]|\/{2,}|\/$|(?:^|\/)\.{1,2}(?:\/|$)/u.test(path)
+      || movingFiles.some(({ from, to }) => destination.path === from || wikiSelectorMatches(path, from) || wikiSelectorMatches(path, to))) {
+      throw new Error(`Cannot prove a WikiLink target survives merge: ${location} ${wiki[0]}`);
+    }
+    const check = () => {
+      const next = resolveWikiLink(path, newNote);
+      if (next === null || next.path !== destination.path || next.identity !== destination.identity) {
+        throw new Error(`Merge would change a WikiLink target: ${location} ${wiki[0]}`);
+      }
+    };
+    check();
+    checks.push(check);
   }
+  // Retain original identities; never re-resolve old contexts after moving.
+  return () => { for (const check of checks) check(); };
+}
+
+function wikiSelectorMatches(selector: string, path: string): boolean {
+  const key = selector.replace(/^\/+|\.md$/giu, "").normalize("NFC").toLocaleLowerCase();
+  const candidate = path.replace(/\.md$/iu, "").normalize("NFC").toLocaleLowerCase();
+  return candidate === key || candidate.endsWith("/" + key);
 }
 
 function absolute(path: string): boolean {

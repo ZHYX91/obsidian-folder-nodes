@@ -351,6 +351,54 @@
       ]
     },
     {
+      "id": "merge-context-and-batch-order",
+      "title": "Context-bound WikiLink targets and one-snapshot merge ordering",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In a fresh disposable Vault, run Prepare merge and content ownership fixture. Keep automatic internal-link updates disabled as declared in app.json, save and close affected editors, and use only Folder Nodes product merge actions.",
+        "For WikiBody, WikiText, WikiList and WikiChild, record the host resolver's actual Reference target from the source note or child and from its proposed new context before merging. Merge Source into Deep/Target. If the two contexts select different objects, require refusal before writes; do not infer the actual host resolution from file names alone.",
+        "Try WikiUnresolved, WikiMoving and WikiCompetitor. Inspect the missing target, target to be relocated, and potential best-match competitor. Require conservative refusal with original source/target bytes and child paths retained.",
+        "Merge WikiSafe/Source into its Deep/Target. Open the preserved explicit Reference link and inspect its alias and heading spelling. On a fresh child case also exercise a heading-only or block-only self-link in the moving child.",
+        "Merge Ranks/Source into Ranks/Target. Before merging, source order is First then Second with ranks 4096 and 8192, and target Existing has rank 1024. After metadata settles, inspect persisted child rank tokens, Contents order and the reloaded order; perform an ordinary reorder afterward to confirm manual ordering still works.",
+        "Run Save merge and content ownership observations. Record actual host versions, original/new target identities and final persisted ordering. Provider output is preparation and observations only."
+      ],
+      "expected": [
+        "Context-changing or unproved WikiLink targets refuse before the first move or write, including transferred Text/List properties and descendant bodies. No link is automatically rewritten.",
+        "Explicit stationary targets remain correct after a successful merge; child self-subpaths remain self-links, while source Node Note self-links refuse.",
+        "The target's persisted sequence is Existing, First, Second after metadata refresh and reload, independent of cache timing. The source is removed only after the successful merge.",
+        "The real resolver and metadata timing are recorded as observed; automated substitutes do not establish host behavior."
+      ]
+    },
+    {
+      "id": "content-drag-ownership",
+      "title": "Original single-file and Album identities across delayed drop",
+      "surfaces": [
+        "desktop"
+      ],
+      "requiredCapabilities": {
+        "desktop": []
+      },
+      "steps": [
+        "Run Prepare merge and content ownership fixture in a fresh disposable Vault and open Node Contents for OwnershipSafety/Drag. The clip.mp4 is an inert placeholder for an Album tile; do not play it.",
+        "In reset cases, drag document.txt and the Album tile into Target normally. Confirm each original object moves once. Repeat with multiple selected items and confirm link copying without a partial internal move; cancel separate drags with Escape and dragend.",
+        "In a fresh fixture, run Arm content source replacement on next drag. Start a single-item drag and keep it active until the provider reports that it renamed the original and created a different file at the old path. Drop onto the original target. Repeat separately for the ordinary file and Album tile.",
+        "In another fresh fixture, run Arm content target replacement on next drag, start a single-item drag and wait for the target folder replacement notice before dropping on the old card. Confirm the renamed original target and same-path replacement are retained without receiving the old drag.",
+        "Inspect actual source/replacement/target paths and bytes. A host refresh that cancels the drag is a safe cancellation, not evidence that a drop reached the service. Run Save merge and content ownership observations and record which event path was observed."
+      ],
+      "expected": [
+        "Normal single-item moves retain original identity, and multi-selection remains link copy only. Escape, dragend and view close remove drag and target markers.",
+        "A renamed or replaced source or target invalidates the old request. The stale drop either refuses or is cancelled by refresh, and performs zero product move of the replacement or renamed original.",
+        "Provider mutations are isolated fixture preparation, never a product pass. Android does not register HTML5 content dragging and remains covered by its existing ordinary-file Move menu scenario."
+      ]
+    },
+    {
       "id": "visual-edit-ownership",
       "title": "Bound icon and cover editing across concurrent changes and unload",
       "surfaces": [

@@ -38,6 +38,8 @@ On desktop, the top 25% of a Node card is a before line, the middle 50% is an in
 
 Empty and problem states show the current path, explain the state, and offer only available actions: open a valid visible parent, review management rules, run read-only Health, or reveal hidden nodes for the session. Unmanaged content remains accessible. Existing missing-note creation stays in the header; status buttons never repair or delete files implicitly.
 
+A single ordinary-file or Album drag binds its original TFile and path plus the original target folder identity. Source renames, same-path replacements, target renames, or target replacements during queueing or asynchronous checks reject the stale request instead of following a new path or moving a replacement object. Multi-selection still copies links only; Escape, dragend, refresh, and close release drag ownership.
+
 ## Node Graph
 
 Node Graph is a Folder Nodes workspace view, never an alteration of Obsidian's native Graph View. Its first toolbar row contains title, native search, **Show links**, 2D/3D, and Fit. The second names the current scope root separately from View subtree, View local graph, Return to global, and the Expand range menu; narrow windows wrap these two rows without covering the graph. Structure is always the hierarchy. **Show links** is off for a new graph and independently overlays purple dashed resolved canonical-note links, an inline legend, and the visible-link count; an enabled scope with no links shows a lightweight inline message. With the switch off, only the structure skeleton remains. The stable 2D hierarchy defaults to left to right, while settings can use top to bottom; all handle and edge geometry rotates with that direction.

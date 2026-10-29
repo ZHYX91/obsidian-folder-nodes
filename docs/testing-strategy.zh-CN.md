@@ -24,6 +24,8 @@ translation_status: source
 
 合并回归对来源正文和移动子笔记中解析到来源 Node Note 的 WikiLink/嵌入断言零 mutation，覆盖解析后的 Text/List 属性和 YAML 转义、basename 查找、alias、表格转义 alias、标题和块引用；代码/注释字面量及其他目标仍可通过。Visual 回归调用生产 Picker 和封面菜单，注入文件/文件夹身份或原始 icon 变化，并把实际 frontmatter 回调延迟到卸载后。键盘回归核对列表排序/删除后的焦点。静态资源回归重叠真实文件复制、模拟编辑器原子保存，并验证 watch 关闭时等待完成或报告错误。这些是 adapter/DOM/文件系统自动检查，不是桌面或 Android 验收。
 
+合并目标回归用独立的、依来源上下文返回不同对象的 resolver，覆盖正文、Text/List 属性、移动子笔记、alias/标题/块引用、未解析目标、移动目标和可能抢占最佳匹配的移动文件。最终校验替换原目标对象，断言精确补偿且不删除来源。批量 rank 回归分别模拟即时、延迟和部分 Metadata Cache 刷新，并覆盖缺失/重复 rank、完整重编号和写入后失败回滚；断言持久化后重新读取的顺序。Contents 事件回归覆盖普通文件/Album 单项正常移动、来源 rename/delete 后同路径替换、目标替换、多选只复制及 Escape/dragend/close 清理；排队回归固定请求入口的身份并检查拒绝后零额外 rename。这些仍是自动化替身，不是宿主通过证据。
+
 ## 性能
 
 `npm run test:browser` 直接打包生产 Canvas 渲染器和提示框 CSS，仅补 Obsidian 的 DOM 便捷方法，通过已安装 Chrome／Chromium／Edge 或 `CHROME_BIN` 运行真实 Chromium 排版。它验证隐藏后切换节点、可见时切换节点、同节点滚动保留、Escape 后重开、双轴归零及 resize 后重开。浏览器使用全新临时 profile，退出后再清理该 profile。此检查补充模拟 DOM 回归，不代表原生 Obsidian 交互通过。
