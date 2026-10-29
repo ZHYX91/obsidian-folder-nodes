@@ -52,6 +52,26 @@ export function planInsert(
   return allocateRanks(ordered, moved.childPath);
 }
 
+/** Append one batch using transaction-local ranks, never a host cache refresh. */
+export function planAppendChildren(
+  children: readonly ChildOrderRecord[], moved: readonly ChildOrderRecord[],
+): ReorderPlan {
+  assertValidChildren([...children, ...moved]);
+  const target = [...children].sort(compareChildren);
+  const ordered = [...target, ...moved];
+  const lastRank = target.at(-1)?.order ?? 0;
+  if (moved.length > 0 && (!strictlyRanked(target) || moved.length > Math.floor((Number.MAX_SAFE_INTEGER - lastRank) / ORDER_GAP))) {
+    return materializeManualOrder(ordered);
+  }
+  return {
+    orderedPaths: ordered.map((child) => child.childPath),
+    patches: moved.flatMap((child, index) => {
+      const nextOrder = lastRank + (index + 1) * ORDER_GAP;
+      return child.order === nextOrder ? [] : [{ childPath: child.childPath, previousOrder: child.order, nextOrder }];
+    }),
+  };
+}
+
 export function planReorder(
   children: readonly ChildOrderRecord[],
   movedPath: string,

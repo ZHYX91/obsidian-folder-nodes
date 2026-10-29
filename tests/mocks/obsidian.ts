@@ -129,8 +129,38 @@ export class Setting {
   public setDesc(value: string): this { this.descEl.textContent = value; return this; }
   public setName(value: string): this { this.nameEl.textContent = value; return this; }
 }
+export class Scope {
+  public readonly handlers: Array<{ modifiers: string[] | null; key: string | null;
+    callback: (event: KeyboardEvent) => unknown }> = [];
+  public constructor(public readonly parent?: Scope) {}
+  public register(modifiers: string[] | null, key: string | null, callback: (event: KeyboardEvent) => unknown) {
+    const handler = { modifiers, key, callback };
+    this.handlers.push(handler);
+    return handler;
+  }
+  public unregister(handler: typeof this.handlers[number]): void {
+    const index = this.handlers.indexOf(handler);
+    if (index >= 0) this.handlers.splice(index, 1);
+  }
+  public handleKey(event: KeyboardEvent): unknown {
+    for (const handler of this.handlers) {
+      if (handler.key !== null && handler.key !== event.key) continue;
+      if (handler.modifiers !== null) {
+        const modifiers = handler.modifiers;
+        const primary = modifiers.includes("Mod") ? event.ctrlKey || event.metaKey
+          : event.ctrlKey === modifiers.includes("Ctrl") && event.metaKey === modifiers.includes("Meta");
+        if (!primary || event.altKey !== modifiers.includes("Alt") || event.shiftKey !== modifiers.includes("Shift")) continue;
+      }
+      const result = handler.callback(event);
+      if (handler.key !== null || handler.modifiers !== null || result !== undefined) return result;
+    }
+    return this.parent?.handleKey(event);
+  }
+}
+
 export class ItemView {
   public readonly app: unknown;
+  public scope: Scope | null = null;
   public readonly containerEl = document.createElement("div");
   public readonly contentEl = this.containerEl.createDiv();
   private readonly cleanups: Array<() => void> = [];

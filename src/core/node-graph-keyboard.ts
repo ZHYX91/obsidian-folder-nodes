@@ -1,5 +1,26 @@
 export interface GraphKeyboardPoint { readonly id: string; readonly x: number; readonly y: number }
 
+interface GraphKeyModifiers {
+  readonly altKey: boolean; readonly ctrlKey: boolean; readonly metaKey: boolean; readonly shiftKey: boolean;
+}
+
+/** Unsupported combinations must not become plain activation after host fallthrough. */
+export function graphActivationChord(event: GraphKeyModifiers & { readonly key: string }): "plain" | "mod" | "branch" | null {
+  if (event.shiftKey || !["Enter", " ", "Spacebar"].includes(event.key)) return null;
+  if (!event.altKey && !event.ctrlKey && !event.metaKey) return "plain";
+  if (event.key === "Enter" && !event.altKey && event.ctrlKey !== event.metaKey) return "mod";
+  if (event.altKey && !event.ctrlKey && !event.metaKey && event.key !== "Spacebar") return "branch";
+  return null;
+}
+
+/** Native keyboard/assistive clicks have detail=0; physical mouse modifiers keep their own contract. */
+export function graphHandleClickAllowed(event: GraphKeyModifiers & { readonly detail: number }): boolean {
+  if (event.detail !== 0) return true;
+  const chord = graphActivationChord({ key: "Enter", altKey: event.altKey, ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey, shiftKey: event.shiftKey });
+  return chord === "plain" || chord === "branch";
+}
+
 /** Arrow keys follow the displayed geometry; Home/End retain stable model order. */
 export function graphKeyboardTarget(
   key: string,

@@ -16,9 +16,10 @@ import { VisualService } from "../../src/adapters/visual-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { setLanguage, t } from "../../src/ui/i18n";
 import { FakeObsidian } from "../helpers/fake-obsidian";
-import { Menu } from "../mocks/obsidian";
+import { Menu, Notice } from "../mocks/obsidian";
 
 beforeEach(() => {
+  Notice.messages.length = 0;
   setLanguage("en");
   vi.stubGlobal("CSS", { supports: () => false });
 });
@@ -39,6 +40,32 @@ function fixture() {
     .filter((button) => button.textContent === label);
   return { fake, folder, note, nodes, plugin, buttons };
 }
+
+describe("reveal notification lifetime", () => {
+  it.each([false, true])("suppresses an obsolete reveal %s after unload and restart", async (reject) => {
+    const f = fixture();
+    let resolve!: (value: boolean) => void;
+    let fail!: (error: Error) => void;
+    const gate = new Promise<boolean>((done, error) => { resolve = done; fail = error; });
+    Reflect.set(f.plugin, "explorer", { canReveal: () => true, reveal: () => gate, stop: vi.fn() });
+    const pending = Reflect.get(f.plugin, "revealEntry").call(f.plugin, f.folder) as Promise<void>;
+    f.plugin.onunload();
+    Reflect.set(f.plugin, "unloaded", false);
+    if (reject) fail(new Error("old reveal"));
+    else resolve(false);
+    await pending;
+    expect(Notice.messages).toEqual([]);
+    f.plugin.onunload();
+  });
+
+  it("still reports a current unavailable reveal", async () => {
+    const f = fixture();
+    Reflect.set(f.plugin, "explorer", { canReveal: () => true, reveal: async () => false, stop: vi.fn() });
+    await Reflect.get(f.plugin, "revealEntry").call(f.plugin, f.folder);
+    expect(Notice.messages).toEqual([t("revealUnavailable")]);
+    f.plugin.onunload();
+  });
+});
 
 describe("plugin visual picker ownership", () => {
   it("rechecks the cover source identity inside the delayed frontmatter callback", async () => {

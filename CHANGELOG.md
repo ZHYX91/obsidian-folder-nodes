@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep stopped Explorer adapters inactive when an earlier reveal or delayed decoration finishes, including after a restart.
+- Retain the complete visible Canvas icon working set so large graphs settle after image loads or failures, and release callbacks when the viewport changes or closes.
+- Keep Canvas hover tooltips inside the graph bounds, wrap long paths, and respect right-to-left placement.
+
 ## 0.12.1 - 2026-10-25
 
 - Refuse merges whose source body, transferred properties or moved child notes still link or embed the source Node Note that would be removed, including aliases, headings, and block references.

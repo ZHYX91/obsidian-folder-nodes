@@ -1890,8 +1890,8 @@ describe("NodeService structural safety", () => {
       "Target/Second",
     ]);
     expect(fake.frontmatters.get("Target/Existing/Existing.md")?.["folder-nodes"]).toEqual(["rank=1024"]);
-    expect(fake.frontmatters.get("Target/First/First.md")?.["folder-nodes"]).toEqual(["rank=3072"]);
-    expect(fake.frontmatters.get("Target/Second/Second.md")?.["folder-nodes"]).toEqual(["rank=4096"]);
+    expect(fake.frontmatters.get("Target/First/First.md")?.["folder-nodes"]).toEqual(["rank=2048"]);
+    expect(fake.frontmatters.get("Target/Second/Second.md")?.["folder-nodes"]).toEqual(["rank=3072"]);
   });
 
   it("assigns a fresh target-parent rank after a native cross-parent node move", async () => {

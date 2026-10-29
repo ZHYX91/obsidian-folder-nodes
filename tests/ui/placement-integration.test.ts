@@ -18,12 +18,128 @@ function addNode(fake: FakeObsidian, path: string, tokens: string[] = []) {
   fake.addFile(`${path}/${folder.name}.md`, source, tokens.length ? { "folder-nodes": tokens } : {});
   return folder;
 }
-function makeView(fake: FakeObsidian, nodes: NodeService) {
-  const actions = { createChild: vi.fn(), createMissingNote: vi.fn(), editVisual: vi.fn(), entryMenu: vi.fn(), homepageEnabled: () => false, nodeMenu: vi.fn(), openHomepage: vi.fn(), problemMenu: vi.fn(), refresh: vi.fn(), reportError: vi.fn() };
+function makeView(fake: FakeObsidian, nodes: NodeService, reportError = vi.fn()) {
+  fake.app.fileManager.generateMarkdownLink = vi.fn((file) => `[[${file.path}]]`);
+  const actions = { createChild: vi.fn(), createMissingNote: vi.fn(), editVisual: vi.fn(), entryMenu: vi.fn(), homepageEnabled: () => false, nodeMenu: vi.fn(), openHomepage: vi.fn(), problemMenu: vi.fn(), refresh: vi.fn(), reportError };
   return new FolderNodeContentsView({ app: fake.app } as never, nodes, visual, { isReferenced: () => false } as never, actions, true);
 }
 
 describe("Placement and identity integration", () => {
+  it.each(["", "/"])("moves a single file to the original Root with raw path %j", async (rootPath) => {
+    const fake = new FakeObsidian();
+    fake.root.path = rootPath;
+    fake.addFile("Vault.md");
+    addNode(fake, "Source");
+    const file = fake.addFile("Source/file.txt", "original");
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const view = makeView(fake, nodes);
+    view.setFolder("Source");
+    try {
+      view.contentEl.querySelector<HTMLElement>("[data-folder-nodes-focus-key='file:Source/file.txt']")!.dispatchEvent(dragEvent("dragstart"));
+      view.contentEl.querySelector<HTMLElement>("[data-folder-nodes-focus-key='breadcrumb:']")!.dispatchEvent(dragEvent("drop"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(file.path).toBe("file.txt");
+      expect(fake.requireFile("file.txt")).toBe(file);
+      expect(fake.renames).toEqual([{ from: "Source/file.txt", to: "file.txt" }]);
+    } finally { await view.onClose(); }
+  });
+  it.each(["file", "media"])("moves the original single %s item into a bound target", async (kind) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    addNode(fake, "Target");
+    const file = fake.addFile(kind === "file" ? "file.txt" : "video.mp4", "original");
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const view = makeView(fake, nodes);
+    await view.onOpen();
+    try {
+      const source = view.contentEl.querySelector<HTMLElement>(`[data-folder-nodes-focus-key='${kind === "file" ? "file" : "media"}:${file.path}']`)!;
+      const target = view.contentEl.querySelector<HTMLElement>("[data-node-path='Target'] .folder-nodes-node-card")!;
+      source.dispatchEvent(dragEvent("dragstart"));
+      target.dispatchEvent(dragEvent("dragover"));
+      target.dispatchEvent(dragEvent("drop"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(file.path).toBe(`Target/${kind === "file" ? "file.txt" : "video.mp4"}`);
+      expect(fake.requireFile(file.path)).toBe(file);
+      expect(fake.renames).toHaveLength(1);
+    } finally { await view.onClose(); }
+  });
+
+  it.each(["rename-replace", "delete-replace", "target-replace", "target-rename"])("refuses stale Contents content drag: %s", async (change) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const target = addNode(fake, "Target");
+    const file = fake.addFile("file.txt", "original");
+    const errors = vi.fn();
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const move = vi.spyOn(nodes, "moveFile");
+    const view = makeView(fake, nodes, errors);
+    await view.onOpen();
+    try {
+      const source = view.contentEl.querySelector<HTMLElement>("[data-folder-nodes-focus-key='file:file.txt']")!;
+      const destination = view.contentEl.querySelector<HTMLElement>("[data-node-path='Target'] .folder-nodes-node-card")!;
+      source.dispatchEvent(dragEvent("dragstart"));
+      destination.dispatchEvent(dragEvent("dragover"));
+      if (change === "rename-replace") { await fake.rename(file, "renamed.txt"); fake.addFile("file.txt", "replacement"); }
+      if (change === "delete-replace") { fake.remove("file.txt"); fake.addFile("file.txt", "replacement"); }
+      if (change === "target-replace") { fake.remove("Target"); addNode(fake, "Target"); }
+      if (change === "target-rename") await fake.rename(target, "RenamedTarget");
+      const count = fake.renames.length;
+      destination.dispatchEvent(dragEvent("drop"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(move).not.toHaveBeenCalled();
+      expect(errors).toHaveBeenCalledOnce();
+      expect(fake.renames).toHaveLength(count);
+      expect(destination.classList.contains("folder-nodes-content-drop-into")).toBe(false);
+    } finally { await view.onClose(); }
+  });
+
+  it.each(["Escape", "dragend", "close"])("clears content drag ownership on %s", async (cancel) => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    addNode(fake, "Target");
+    fake.addFile("file.txt");
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const view = makeView(fake, nodes);
+    await view.onOpen();
+    try {
+      const source = view.contentEl.querySelector<HTMLElement>("[data-folder-nodes-focus-key='file:file.txt']")!;
+      const target = view.contentEl.querySelector<HTMLElement>("[data-node-path='Target'] .folder-nodes-node-card")!;
+      source.dispatchEvent(dragEvent("dragstart"));
+      target.dispatchEvent(dragEvent("dragover"));
+      if (cancel === "Escape") view.containerEl.ownerDocument.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      if (cancel === "dragend") source.dispatchEvent(dragEvent("dragend"));
+      if (cancel === "close") await view.onClose();
+      target.dispatchEvent(dragEvent("drop"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(fake.renames).toEqual([]);
+      expect(source.classList.contains("folder-nodes-is-dragging")).toBe(false);
+      expect(target.classList.contains("folder-nodes-content-drop-into")).toBe(false);
+    } finally { await view.onClose(); }
+  });
+  it("keeps a multi-selection drag as link copy without moving any item", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    addNode(fake, "Target");
+    fake.addFile("first.txt");
+    fake.addFile("second.txt");
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const view = makeView(fake, nodes);
+    await view.onOpen();
+    try {
+      view.contentEl.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='header:selection']")!.click();
+      for (const path of ["first.txt", "second.txt"]) {
+        view.contentEl.querySelector<HTMLButtonElement>(`[data-folder-nodes-focus-key='file:${path}']`)!.click();
+      }
+      const source = view.contentEl.querySelector<HTMLElement>("[data-folder-nodes-focus-key='file:first.txt']")!;
+      const start = dragEvent("dragstart");
+      source.dispatchEvent(start);
+      expect((start as unknown as DragEvent).dataTransfer?.effectAllowed).toBe("copy");
+      const target = view.contentEl.querySelector<HTMLElement>("[data-node-path='Target'] .folder-nodes-node-card")!;
+      target.dispatchEvent(dragEvent("drop"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(fake.renames).toEqual([]);
+    } finally { await view.onClose(); }
+  });
   it("keeps the same-named Markdown visible inside an unmanaged folder", () => {
     const fake = new FakeObsidian();
     addNode(fake, "Unmanaged");
