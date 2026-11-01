@@ -116,8 +116,12 @@ export function assertMergeLinksKeepDestinations(
       throw new Error("Cannot safely merge a relative reference definition");
     }
     wikiChecks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveWikiLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
-    if (/\b(?:href|src)\s*=\s*["']?\.{1,2}\//iu.test(visible)) {
-      throw new Error("Cannot safely merge a relative HTML link");
+    for (const attribute of visible.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*))/giu)) {
+      const raw = attribute[1] ?? attribute[2] ?? attribute[3] ?? "";
+      // HTML decodes references (including some without a semicolon) and
+      // resolves local paths from the containing note. Only explicit absolute
+      // destinations are proven stable here; never rewrite authored bytes.
+      if (!absolute(raw)) throw new Error("Cannot safely merge a relative HTML link");
     }
   }
   return () => { for (const check of wikiChecks) check(); };

@@ -1709,12 +1709,21 @@ describe("NodeService structural safety", () => {
     ["source", "inline"], ["child", "inline"],
     ["source", "reference"], ["child", "reference"],
     ["source", "entity"], ["child", "entity"],
+    ["source", "html-decimal"], ["child", "html-decimal"],
+    ["source", "html-named"], ["child", "html-named"],
+    ["source", "html-image"], ["child", "html-image"],
   ])("refuses %s %s links that would change meaning before moving anything", async (which, syntax) => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("Reference.md", "the original reference");
     const source = fake.addFolder("Source");
-    const link = (path: string) => syntax === "entity" ? `[ref](${path.replaceAll(".", "&#46;")})` : syntax === "inline" ? `[ref](${path})` : `[ref]\n\n[ref]:\n  ${path}`;
+    const link = (path: string) => {
+      if (syntax === "entity") return `[ref](${path.replaceAll(".", "&#46;")})`;
+      if (syntax === "html-decimal") return `<a href="${path.replaceAll(".", "&#46;")}">ref</a>`;
+      if (syntax === "html-named") return `<a href="${path.replaceAll("/", "&sol;")}">ref</a>`;
+      if (syntax === "html-image") return `<img src="${path.replaceAll(".", "&#x2e")}">`;
+      return syntax === "inline" ? `[ref](${path})` : `[ref]\n\n[ref]:\n  ${path}`;
+    };
     const sourceText = which === "source" ? link("../Reference.md") : "source body";
     fake.addFile("Source/Source.md", sourceText);
     fake.addFolder("Source/Sub");
@@ -1723,7 +1732,7 @@ describe("NodeService structural safety", () => {
     fake.addFolder("Deep");
     const target = fake.addFolder("Deep/B");
     fake.addFile("Deep/B/B.md", "target body");
-    await expect(service(fake).mergeNode(source, target)).rejects.toThrow(syntax === "entity" ? "entity-encoded" : syntax === "inline" ? "change a relative link target" : "reference definition");
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow(syntax.startsWith("html-") ? "relative HTML link" : syntax === "entity" ? "entity-encoded" : syntax === "inline" ? "change a relative link target" : "reference definition");
     expect(fake.renames).toEqual([]);
     expect(fake.trashed).toEqual([]);
     expect(fake.contents.get("Source/Source.md")).toBe(sourceText);

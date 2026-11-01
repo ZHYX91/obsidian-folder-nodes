@@ -106,6 +106,17 @@ describe("Node merge link preflight", () => {
       "[sibling](../other.md)", "A/sub/page.md", "Deep/B/sub/page.md", "A", "Deep/B", "A/A.md",
     )).not.toThrow();
   });
+  it.each(["../Reference.md", "&#46;&#46;/Reference.md", "&#x2e&#x2e/Reference.md", "..&sol;Reference.md", "child.md", "#section"])(
+    "refuses unproved relative HTML destinations: %s", (destination) => {
+      for (const token of [`<a href="${destination}">ref</a>`, `<img src='${destination}'>`, `<img src=${destination}>`]) {
+        expect(() => assertSafe(token)).toThrow("relative HTML link");
+        expect(() => assertSafe("`" + token + "`")).not.toThrow();
+        expect(() => assertSafe("~~~html\n" + token + "\n~~~")).not.toThrow();
+      }
+      expect(() => assertSafe(`<a href="https://example.com/${destination}">ref</a>`)).not.toThrow();
+      expect(() => assertSafe('<img src="/fixed/image.png">')).not.toThrow();
+    },
+  );
   it("does not mistake fenced, inline code, or comments for references", () => {
     const quote = String.fromCharCode(96);
     expect(() => assertSafe([

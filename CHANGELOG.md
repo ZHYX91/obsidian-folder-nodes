@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refuse entity-encoded relative Markdown targets and unproved relative HTML destinations before a node merge moves or removes any files.
 - Keep stopped Explorer adapters inactive when an earlier reveal or delayed decoration finishes, including after a restart.
 - Retain the complete visible Canvas icon working set so large graphs settle after image loads or failures, and release callbacks when the viewport changes or closes.
 - Keep Canvas hover tooltips inside the graph bounds, wrap long paths, and respect right-to-left placement.
