@@ -22,18 +22,19 @@ describe("Explorer reveal window affinity", () => {
       revealInFolder: nativeReveal,
     };
     const leaf = { view };
-    const app = { workspace: {
+    const app = { vault: { getRoot: () => null }, workspace: {
       getLeavesOfType: (type: string) => type === "file-explorer" ? [leaf] : [],
-      getMostRecentLeaf: () => leaf, revealLeaf: async () => undefined,
+      getMostRecentLeaf: () => leaf, getActiveFile: () => null, revealLeaf: async () => undefined,
     } } as unknown as App;
     const adapter = new ExplorerAdapter(app, {
-      isNodeVisible: () => true, sortMode: () => "manual",
+      isNodeVisible: () => true, sortMode: () => "manual", nodeNoteCandidates: () => [],
       children: () => [{ childPath: "Parent/B" }, { childPath: "Parent/A" }],
     } as unknown as NodeService, {} as VisualService, () => structuredClone(DEFAULT_SETTINGS),
     () => ({ createNode: "", incompleteNode: "", missingNodeFolder: "", missingNodeNote: "",
       node: "", nodeConflict: "", root: "", unmanaged: "" }),
     () => undefined, () => undefined, () => undefined, () => undefined);
     try {
+      adapter.start();
       expect(await adapter.reveal(Object.assign(new TFile(), { path: "Parent/B/B.md" }))).toBe(true);
       expect(nativeReveal).toHaveBeenCalledOnce();
       adapter.stop();
@@ -79,6 +80,7 @@ describe("Explorer reveal window affinity", () => {
     );
     const file = Object.assign(new TFile(), { path: "A.md" });
 
+    adapter.start();
     expect(await adapter.reveal(file)).toBe(true);
     expect(firstReveal).not.toHaveBeenCalled();
     expect(revealLeaf).toHaveBeenCalledWith(secondLeaf);
@@ -120,6 +122,7 @@ describe("Explorer reveal window affinity", () => {
     );
     const file = Object.assign(new TFile(), { path: "Deferred.md" });
 
+    adapter.start();
     expect(await adapter.reveal(file)).toBe(true);
     expect(revealLeaf).toHaveBeenCalledWith(leaf);
     expect(revealInFolder).toHaveBeenCalledWith(file);
@@ -151,6 +154,7 @@ describe("Explorer reveal window affinity", () => {
       () => undefined,
     );
 
+    adapter.start();
     expect(await adapter.reveal(Object.assign(new TFile(), { path: "A.md" }))).toBe(false);
     expect(revealLeaf).toHaveBeenCalledWith(leaf);
   });

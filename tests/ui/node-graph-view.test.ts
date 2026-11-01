@@ -9,6 +9,9 @@ import type { NodeGraphSettings, NodeVisual } from "../../src/core/types";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../../src/shared/settings";
 import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
 import { setLanguage, t } from "../../src/ui/i18n";
+import { Scope as MockScope } from "../mocks/obsidian";
+import type { NodeGraphCanvasRenderer } from "../../src/ui/node-graph-canvas-renderer";
+import { Window } from "happy-dom";
 
 const FALLBACK: NodeVisual = { accent: null, inheritedFrom: null, kind: "fallback", value: "folder" };
 const openViews: FolderNodeGraphView[] = [];
@@ -1125,6 +1128,362 @@ describe("Node Graph progressive view", () => {
   });
 });
 
+describe("Node Graph host key scope", () => {
+  async function keyFixture(kind: "canvas" | "overlay" | "dom" | "dom-handle" | "overlay-handle") {
+    const context = Object.fromEntries(["arc", "beginPath", "bezierCurveTo", "clearRect", "clip", "roundRect", "fill", "fillRect", "fillText", "drawImage",
+      "lineTo", "moveTo", "restore", "save", "setLineDash", "setTransform", "stroke", "strokeRect"].map((name) => [name, vi.fn()]));
+    context.measureText = vi.fn(() => ({ width: 20 }));
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const imageSource = vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(() => undefined);
+    const fixture = await graphViewFixture(true, { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: kind.startsWith("dom") ? 500 : 1 });
+    document.body.append(fixture.view.containerEl);
+    fixture.view.setFocus("Work");
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    const target = kind === "dom" ? nodeBody(fixture.view, "Work") : kind === "dom-handle" ? expandHandle(fixture.view, "Work")
+      : fixture.view.contentEl.querySelector<HTMLElement>(kind === "canvas" ? "canvas" : kind === "overlay"
+        ? ".folder-nodes-node-graph-focus-overlay-body" : ".folder-nodes-node-graph-focus-overlay-toggle");
+    if (target === null) throw new Error("Missing graph key target");
+    target.focus();
+    const scope = fixture.view.scope as unknown as MockScope;
+    return { ...fixture, target, scope, dispose: async () => {
+      await fixture.view.onClose(); fixture.view.containerEl.remove(); getContext.mockRestore(); imageSource.mockRestore();
+    } };
+  }
+
+  function dispatchScopeKey(scope: MockScope, target: HTMLElement, init: KeyboardEventInit) {
+    const owner = target.ownerDocument.defaultView!;
+    const capture = (event: KeyboardEvent): void => {
+      if (scope.handleKey(event) === false) { event.preventDefault(); event.stopPropagation(); }
+    };
+    owner.addEventListener("keydown", capture, true);
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+    try { target.dispatchEvent(event); } finally { owner.removeEventListener("keydown", capture, true); }
+    return event;
+  }
+
+  it.each((["canvas", "overlay", "dom"] as const).flatMap((kind) =>
+    (["handled", "declined", "unbound"] as const).map((parent) => ({ kind, parent }))))("leaves unsupported $kind chords untouched through a $parent parent and target", async ({ kind, parent }) => {
+    const f = await keyFixture(kind);
+    const parentKey = vi.fn(() => parent === "handled" ? false : undefined);
+    if (parent !== "unbound") f.app.scope.register(null, null, parentKey);
+    const targetKey = vi.fn();
+    f.target.addEventListener("keydown", targetKey);
+    try {
+      const chords: KeyboardEventInit[] = [
+        { key: "Enter", altKey: true }, { key: "Enter", shiftKey: true },
+        { key: "Enter", ctrlKey: true, metaKey: true }, { key: "Enter", ctrlKey: true, altKey: true },
+        { key: "Enter", ctrlKey: true, shiftKey: true }, { key: "Enter", metaKey: true, shiftKey: true },
+        { key: "Enter", altKey: true, shiftKey: true }, { key: " ", ctrlKey: true },
+        { key: " ", metaKey: true }, { key: " ", altKey: true },
+      ];
+      for (const chord of chords) {
+        parentKey.mockClear(); targetKey.mockClear();
+        const event = dispatchScopeKey(f.scope, f.target, chord);
+        expect(parentKey).toHaveBeenCalledTimes(parent === "unbound" ? 0 : 1);
+        expect(targetKey).toHaveBeenCalledTimes(parent === "handled" ? 0 : 1);
+        expect(event.defaultPrevented).toBe(parent === "handled");
+        expect(f.openFolderNode).not.toHaveBeenCalled();
+      }
+    } finally { await f.dispose(); }
+  });
+
+  it.each(["canvas", "overlay", "dom"] as const)("keeps plain activation and exact Mod activation for %s", async (kind) => {
+    const f = await keyFixture(kind);
+    const parentKey = vi.fn(() => undefined);
+    f.app.scope.register(null, null, parentKey);
+    try {
+      for (const chord of [{ key: "Enter" }, { key: " " }, { key: "Enter", ctrlKey: true }, { key: "Enter", metaKey: true }]) {
+        parentKey.mockClear(); f.openFolderNode.mockClear();
+        const event = dispatchScopeKey(f.scope, f.target, chord);
+        const spaceOnDom = chord.key === " " && kind === "dom";
+        const newLeaf = "ctrlKey" in chord || "metaKey" in chord;
+        if (spaceOnDom) expect(f.openFolderNode).not.toHaveBeenCalled();
+        else expect(f.openFolderNode).toHaveBeenCalledExactlyOnceWith("Work", newLeaf);
+        expect(event.defaultPrevented).toBe(!spaceOnDom);
+        expect(parentKey).toHaveBeenCalledTimes(newLeaf ? 0 : 1);
+      }
+    } finally { await f.dispose(); }
+  });
+
+  it.each(["canvas", "overlay", "dom"] as const)("refuses repeat and composition during plain %s activation", async (kind) => {
+    const f = await keyFixture(kind);
+    try {
+      for (const flags of [{ repeat: true }, { isComposing: true }]) {
+        const event = dispatchScopeKey(f.scope, f.target, { key: "Enter", ...flags });
+        expect(event.defaultPrevented).toBe(true);
+        expect(f.openFolderNode).not.toHaveBeenCalled();
+      }
+    } finally { await f.dispose(); }
+  });
+
+  it.each(["dom-handle", "overlay-handle"] as const)("does not reinterpret modified chords on a %s after parent decline", async (kind) => {
+    const f = await keyFixture(kind);
+    const parentKey = vi.fn(() => undefined);
+    f.app.scope.register(null, null, parentKey);
+    try {
+      for (const chord of [{ key: "Enter", altKey: true, shiftKey: true }, { key: " ", altKey: true, ctrlKey: true },
+        { key: "Enter", ctrlKey: true, metaKey: true }]) {
+        parentKey.mockClear();
+        const event = dispatchScopeKey(f.scope, f.target, chord);
+        expect(parentKey).toHaveBeenCalledOnce();
+        expect(event.defaultPrevented).toBe(false);
+        expect(f.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']")).toBeNull();
+        expect(f.openFolderNode).not.toHaveBeenCalled();
+      }
+    } finally { await f.dispose(); }
+  });
+
+  it("leaves retained DOM targets inert after close and after replacement", async () => {
+    const f = await keyFixture("dom");
+    try {
+      const old = f.target;
+      await f.view.onClose();
+      dispatchScopeKey(f.scope, old, { key: "Enter" });
+      expect(f.openFolderNode).not.toHaveBeenCalled();
+      await f.view.onOpen();
+      nodeBody(f.view, "Work").focus();
+      dispatchScopeKey(f.scope, old, { key: "Enter" });
+      expect(f.openFolderNode).not.toHaveBeenCalled();
+      dispatchScopeKey(f.scope, nodeBody(f.view, "Work"), { key: "Enter" });
+      expect(f.openFolderNode).toHaveBeenCalledExactlyOnceWith("Work", false);
+    } finally { await f.dispose(); }
+  });
+
+  it.each(["dom-handle", "overlay-handle"] as const)("preserves pure Alt+Space and rejects unsupported keyboard clicks on %s", async (kind) => {
+    const f = await keyFixture(kind);
+    const handle = () => kind === "dom-handle" ? expandHandle(f.view, "Work")
+      : f.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay-toggle")!;
+    try {
+      const before = handle().getAttribute("aria-expanded");
+      for (const modifiers of [{ shiftKey: true }, { ctrlKey: true }, { ctrlKey: true, metaKey: true }, { altKey: true, shiftKey: true }]) {
+        handle().dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0, ...modifiers }));
+        expect(handle().getAttribute("aria-expanded")).toBe(before);
+      }
+      dispatchScopeKey(f.scope, handle(), { key: " ", altKey: true });
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      const renderer = (f.view as unknown as { canvasRenderer: { data: { records: ReadonlyMap<string, unknown> } } | null }).canvasRenderer;
+      expect(renderer === null ? f.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']") !== null
+        : renderer.data.records.has("Work/A/One/Deep")).toBe(true);
+      const expanded = handle().getAttribute("aria-expanded");
+      handle().dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1, shiftKey: true }));
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      expect(handle().getAttribute("aria-expanded")).not.toBe(expanded);
+      handle().dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      expect(handle().getAttribute("aria-expanded")).toBe(expanded);
+    } finally { await f.dispose(); }
+  });
+
+  it("keeps unsupported Canvas chords from selecting the first node", async () => {
+    const f = await keyFixture("canvas");
+    try {
+      f.view.setFocus(null);
+      for (const chord of [{ key: "Enter", altKey: true }, { key: "Enter", ctrlKey: true, metaKey: true }]) {
+        dispatchScopeKey(f.scope, f.target, chord);
+        expect(f.view.getState().focus).toBeNull();
+        expect(f.openFolderNode).not.toHaveBeenCalled();
+      }
+    } finally { await f.dispose(); }
+  });
+
+  it("routes the full event chain in an adopted owning document", async () => {
+    const f = await keyFixture("dom");
+    const popup = new Window();
+    const owner = popup.document as unknown as Document;
+    owner.body.append(owner.adoptNode(f.view.containerEl));
+    const unrelated = document.body.createEl("input");
+    unrelated.focus(); f.target.focus();
+    try {
+      expect(document.activeElement).toBe(unrelated);
+      dispatchScopeKey(f.scope, f.target, { key: "Enter", shiftKey: true });
+      expect(f.openFolderNode).not.toHaveBeenCalled();
+      dispatchScopeKey(f.scope, f.target, { key: "Enter", metaKey: true });
+      expect(f.openFolderNode).toHaveBeenCalledExactlyOnceWith("Work", true);
+    } finally { unrelated.remove(); await f.dispose(); await popup.happyDOM.close(); }
+  });
+
+  it.each(["canvas", "overlay", "dom"] as const)("routes Mod+Enter before the global hotkey for %s focus", async (kind) => {
+    const context = Object.fromEntries(["arc", "beginPath", "bezierCurveTo", "clearRect", "clip", "roundRect", "fill", "fillRect", "fillText", "drawImage",
+      "lineTo", "moveTo", "restore", "save", "setLineDash", "setTransform", "stroke", "strokeRect"].map((name) => [name, vi.fn()]));
+    context.measureText = vi.fn(() => ({ width: 20 }));
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const imageSource = vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(() => undefined);
+    const fixture = await graphViewFixture(true, { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: kind === "dom" ? 500 : 1 });
+    document.body.append(fixture.view.containerEl);
+    fixture.view.setFocus("Work");
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    const renderer = (fixture.view as unknown as { canvasRenderer: NodeGraphCanvasRenderer | null }).canvasRenderer;
+    const canvas = fixture.view.contentEl.querySelector<HTMLCanvasElement>("canvas");
+    const tooltip = fixture.view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-canvas-tooltip");
+    if (renderer !== null && canvas !== null) {
+      const point = renderer.nodeScreenPosition("Work")!;
+      const move = new PointerEvent("pointermove", { pointerType: "mouse" });
+      Object.defineProperties(move, { offsetX: { value: point.x }, offsetY: { value: point.y } });
+      canvas.dispatchEvent(move);
+      expect(tooltip?.hidden).toBe(false);
+    }
+    const target = kind === "dom" ? nodeBody(fixture.view, "Work") : kind === "canvas" ? canvas
+      : fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay-body");
+    if (target === null) throw new Error("Missing graph key target");
+    target.focus();
+    const globalOpen = vi.fn(() => false);
+    fixture.app.scope.register(["Mod"], "Enter", globalOpen);
+    fixture.openFolderNode.mockImplementation(async () => { if (tooltip !== null) expect(tooltip.hidden).toBe(true); });
+    const capture = (event: KeyboardEvent): void => {
+      const scope = (fixture.view.scope ?? fixture.app.scope) as unknown as MockScope;
+      if (scope.handleKey(event) === false) { event.preventDefault(); event.stopPropagation(); }
+    };
+    window.addEventListener("keydown", capture, true);
+    const event = new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true, cancelable: true });
+    try {
+      target.dispatchEvent(event);
+      expect(fixture.openFolderNode).toHaveBeenCalledExactlyOnceWith("Work", true);
+      expect(globalOpen).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(true);
+    } finally { window.removeEventListener("keydown", capture, true); fixture.view.containerEl.remove(); getContext.mockRestore(); imageSource.mockRestore(); }
+  });
+
+  it.each(["search", "toolbar", "expand", "icon", "details", "other-view"])("preserves parent Mod+Enter for %s focus", async (kind) => {
+    const fixture = await graphViewFixture();
+    document.body.append(fixture.view.containerEl);
+    const target = kind === "search" ? fixture.view.contentEl.querySelector<HTMLInputElement>("input[type='search']")
+      : kind === "toolbar" ? fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']")
+      : kind === "expand" ? expandHandle(fixture.view, "Work")
+      : kind === "icon" ? graphNode(fixture.view, "Work").querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-icon-handle")
+      : (kind === "other-view" ? document.body : fixture.view.contentEl).createEl("button");
+    if (target === null) throw new Error("Missing non-open key target");
+    const globalOpen = vi.fn(() => false);
+    fixture.app.scope.register(["Mod"], "Enter", globalOpen);
+    try {
+      target.focus();
+      const scope = fixture.view.scope as unknown as MockScope;
+      expect(scope.handlers[0]).toMatchObject({ modifiers: null, key: null });
+      scope.handleKey(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, cancelable: true }));
+      expect(globalOpen).toHaveBeenCalledOnce();
+      expect(fixture.openFolderNode).not.toHaveBeenCalled();
+    } finally { if (kind === "other-view") target.remove(); fixture.view.containerEl.remove(); }
+  });
+
+  it.each(["repeat", "composition"])("consumes a graph chord without opening during %s", async (kind) => {
+    const fixture = await graphViewFixture();
+    document.body.append(fixture.view.containerEl);
+    nodeBody(fixture.view, "Work").focus();
+    const globalOpen = vi.fn(() => false);
+    fixture.app.scope.register(["Mod"], "Enter", globalOpen);
+    try {
+      const scope = fixture.view.scope as unknown as MockScope;
+      expect(scope.handleKey(new KeyboardEvent("keydown", { key: "Enter", metaKey: true,
+        repeat: kind === "repeat", isComposing: kind === "composition", cancelable: true }))).toBe(false);
+      expect(fixture.openFolderNode).not.toHaveBeenCalled();
+      expect(globalOpen).not.toHaveBeenCalled();
+    } finally { fixture.view.containerEl.remove(); }
+  });
+
+  it("keeps one scoped handler across close and reopen and leaves closed views inert", async () => {
+    const fixture = await graphViewFixture();
+    document.body.append(fixture.view.containerEl);
+    const scope = fixture.view.scope as unknown as MockScope;
+    const globalOpen = vi.fn(() => false);
+    fixture.app.scope.register(["Mod"], "Enter", globalOpen);
+    await fixture.view.onClose();
+    try {
+      scope.handleKey(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, cancelable: true }));
+      expect(globalOpen).toHaveBeenCalledOnce();
+      expect(fixture.openFolderNode).not.toHaveBeenCalled();
+      await fixture.view.onOpen();
+      nodeBody(fixture.view, "Work").focus();
+      scope.handleKey(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, cancelable: true }));
+      expect(fixture.openFolderNode).toHaveBeenCalledExactlyOnceWith("Work", true);
+      expect(scope.handlers).toHaveLength(1);
+    } finally { fixture.view.containerEl.remove(); }
+  });
+
+  it("uses the focused element in the view's owning document", async () => {
+    const fixture = await graphViewFixture();
+    const popup = new Window();
+    const owner = popup.document as unknown as Document;
+    owner.body.append(owner.adoptNode(fixture.view.containerEl));
+    const unrelated = document.body.createEl("input");
+    unrelated.focus();
+    try {
+      nodeBody(fixture.view, "Work").focus();
+      expect(document.activeElement).toBe(unrelated);
+      const scope = fixture.view.scope as unknown as MockScope;
+      scope.handleKey(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, cancelable: true }));
+      expect(fixture.openFolderNode).toHaveBeenCalledExactlyOnceWith("Work", true);
+    } finally { unrelated.remove(); fixture.view.containerEl.remove(); await popup.happyDOM.close(); }
+  });
+
+  it.each(["overlay", "dom"] as const)("routes Alt+Enter only for the existing %s expansion handle", async (kind) => {
+    const context = Object.fromEntries(["arc", "beginPath", "bezierCurveTo", "clearRect", "clip", "roundRect", "fill", "fillRect", "fillText", "drawImage",
+      "lineTo", "moveTo", "restore", "save", "setLineDash", "setTransform", "stroke", "strokeRect"].map((name) => [name, vi.fn()]));
+    context.measureText = vi.fn(() => ({ width: 20 }));
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as never);
+    const imageSource = vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(() => undefined);
+    const fixture = await graphViewFixture(true, { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: kind === "dom" ? 500 : 1 });
+    document.body.append(fixture.view.containerEl);
+    const renderer = () => (fixture.view as unknown as { canvasRenderer: NodeGraphCanvasRenderer | null }).canvasRenderer;
+    const deepVisible = () => kind === "dom" ? fixture.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']") !== null
+      : (renderer() as unknown as { data: { records: ReadonlyMap<string, unknown> } }).data.records.has("Work/A/One/Deep");
+    const globalFollow = vi.fn(() => false);
+    fixture.app.scope.register(["Alt"], "Enter", globalFollow);
+    fixture.view.setFocus("Work");
+    try {
+      expect(deepVisible()).toBe(false);
+      for (const expanded of [true, false]) {
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+        if (kind === "overlay") renderer()!.focusToggle();
+        const target = kind === "dom" ? expandHandle(fixture.view, "Work")
+          : fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay-toggle")!;
+        target.focus();
+        const capture = (event: KeyboardEvent): void => {
+          const scope = (fixture.view.scope ?? fixture.app.scope) as unknown as MockScope;
+          if (scope.handleKey(event) === false) { event.preventDefault(); event.stopPropagation(); }
+        };
+        window.addEventListener("keydown", capture, true);
+        try { target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", altKey: true, bubbles: true, cancelable: true })); }
+        finally { window.removeEventListener("keydown", capture, true); }
+        expect(deepVisible()).toBe(expanded);
+      }
+      expect(globalFollow).not.toHaveBeenCalled();
+      expect(fixture.openFolderNode).not.toHaveBeenCalled();
+    } finally { fixture.view.containerEl.remove(); getContext.mockRestore(); imageSource.mockRestore(); }
+  });
+
+  it.each(["body", "canvas", "search", "toolbar", "icon"])("keeps Alt+Enter in the parent scope for %s focus", async (kind) => {
+    const fixture = await graphViewFixture(true, { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: kind === "canvas" ? 1 : 500 });
+    document.body.append(fixture.view.containerEl);
+    const target = kind === "canvas" ? fixture.view.contentEl.querySelector<HTMLCanvasElement>("canvas")
+      : kind === "body" ? nodeBody(fixture.view, "Work")
+      : kind === "search" ? fixture.view.contentEl.querySelector<HTMLInputElement>("input[type='search']")
+      : kind === "toolbar" ? fixture.view.contentEl.querySelector<HTMLButtonElement>("[data-node-graph-action='zoom-in']")
+      : graphNode(fixture.view, "Work").querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-icon-handle");
+    const globalFollow = vi.fn(() => false);
+    fixture.app.scope.register(["Alt"], "Enter", globalFollow);
+    try {
+      if (target === null) throw new Error("Missing Alt fallthrough target");
+      target.focus();
+      const scope = fixture.view.scope as unknown as MockScope;
+      scope.handleKey(new KeyboardEvent("keydown", { key: "Enter", altKey: true, cancelable: true }));
+      expect(globalFollow).toHaveBeenCalledOnce();
+      expect(fixture.openFolderNode).not.toHaveBeenCalled();
+    } finally { fixture.view.containerEl.remove(); }
+  });
+
+  it.each(["repeat", "composition"])("blocks native Alt+Space activation during %s on a DOM handle", async (kind) => {
+    const fixture = await graphViewFixture();
+    document.body.append(fixture.view.containerEl);
+    const event = new KeyboardEvent("keydown", { key: " ", altKey: true, repeat: kind === "repeat",
+      isComposing: kind === "composition", bubbles: true, cancelable: true });
+    try {
+      expandHandle(fixture.view, "Work").dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(fixture.view.contentEl.querySelector("[data-node-path='Work/A/One/Deep']")).toBeNull();
+      expect(fixture.openFolderNode).not.toHaveBeenCalled();
+    } finally { fixture.view.containerEl.remove(); }
+  });
+});
+
 interface MutableNodeGraphIndexSnapshot extends NodeGraphIndexSnapshot {
   readonly links: Map<string, Set<string>>;
   readonly records: Map<string, NodeGraphIndexRecord>;
@@ -1158,7 +1517,7 @@ function graphViewDependencies(snapshot = nodeGraphSnapshot(), settings = struct
   const onNodeMenu = vi.fn();
   const getIndexSnapshot = vi.fn(() => snapshot);
   const requestSaveLayout = vi.fn();
-  const app = { vault: { getName: () => "Test Vault" }, workspace: { requestSaveLayout } };
+  const app = { scope: new MockScope(), vault: { getName: () => "Test Vault" }, workspace: { requestSaveLayout } };
   const service = { openFolderNode };
   const options = { getIndexSnapshot, getSettings: () => settings, onNodeMenu };
   return { app, getIndexSnapshot, onNodeMenu, openFolderNode, options, requestSaveLayout, service, settings, snapshot };

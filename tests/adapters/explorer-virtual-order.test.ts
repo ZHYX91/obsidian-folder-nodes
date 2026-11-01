@@ -51,7 +51,7 @@ describe("Explorer virtual item ordering", () => {
     fixture.scroll.getBoundingClientRect = () => ({ top: 80, bottom: 180, width: 200, height: 100 } as DOMRect);
     fixture.b.selfEl.getBoundingClientRect = () => {
       const top = 100 - fixture.scroll.scrollTop;
-      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+      return { top, bottom: top + 20, left: 20, right: 140, width: 120, height: 20 } as DOMRect;
     };
     const host = Object.assign(fixture.host, { revealInFolder: native });
     const bridge = installExplorerVirtualOrder(host, fixture.root, () => null,
@@ -280,6 +280,227 @@ describe("Explorer virtual item ordering", () => {
 
     expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(viewport.bottom);
     expect(fixture.scroll.scrollTop).toBe(65);
+    bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("keeps a reveal above an overlapping mobile toolbar", async () => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = "absolute";
+    toolbar.getBoundingClientRect = () =>
+      ({ top: 160, bottom: 190, left: 0, right: 200, width: 200, height: 30 } as DOMRect);
+    fixture.scroll.getBoundingClientRect = () =>
+      ({ top: 80, bottom: 180, left: 0, right: 200, width: 200, height: 100 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 155 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, left: 20, right: 140, width: 120, height: 20 } as DOMRect;
+    };
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(160);
+    expect(fixture.scroll.scrollTop).toBe(15);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["outside", "hidden", "transparent", "flow"])("does not move a row for an %s toolbar", async (kind) => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = kind === "flow" ? "static" : "absolute";
+    if (kind === "hidden") toolbar.style.visibility = "hidden";
+    if (kind === "transparent") toolbar.style.opacity = "0";
+    toolbar.getBoundingClientRect = () =>
+      ({ top: 160, bottom: 190, left: 0, right: kind === "outside" ? 100 : 200,
+        width: kind === "outside" ? 100 : 200, height: 30 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () =>
+      ({ top: 155 - fixture.scroll.scrollTop, bottom: 175 - fixture.scroll.scrollTop,
+        left: 150, right: 190, width: 40, height: 20 } as DOMRect);
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(0);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each([0.000019073486328125, 0.49, 0.51])("classifies a bottom toolbar with an edge gap of %s CSS px", async (gap) => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = "absolute";
+    const bottom = 692.7273139953613;
+    toolbar.getBoundingClientRect = () =>
+      ({ top: bottom - gap - 56, bottom: bottom - gap, left: 0, right: 330.1932067871094,
+        width: 330.1932067871094, height: 56 } as DOMRect);
+    fixture.scroll.getBoundingClientRect = () =>
+      ({ top: 53.45454788208008, bottom, left: 0, right: 330.1932067871094,
+        width: 330.1932067871094, height: bottom - 53.45454788208008 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () =>
+      ({ top: 652.1989135742188 - fixture.scroll.scrollTop, bottom: 688.9943695068359 - fixture.scroll.scrollTop,
+        left: 12.454545974731445, right: 313.46592903137207,
+        width: 313.46592903137207 - 12.454545974731445, height: 36.79545593261719 } as DOMRect);
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    if (gap < 0.5) expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBeCloseTo(bottom - gap - 56);
+    else expect(fixture.scroll.scrollTop).toBe(0);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each([0.000019073486328125, 0.49, 0.51])("classifies a top toolbar with an edge gap of %s CSS px", async (gap) => {
+    const fixture = revealFixture(() => undefined);
+    const toolbar = fixture.root.createDiv({ cls: "nav-buttons-container" });
+    toolbar.style.position = "absolute";
+    toolbar.getBoundingClientRect = () =>
+      ({ top: 80 + gap, bottom: 110 + gap, left: 0, right: 200, width: 200, height: 30 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () =>
+      ({ top: 85 - fixture.scroll.scrollTop, bottom: 105 - fixture.scroll.scrollTop,
+        left: 20, right: 140, width: 120, height: 20 } as DOMRect);
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    if (gap < 0.5) expect(fixture.b.selfEl.getBoundingClientRect().top).toBeCloseTo(110 + gap);
+    else expect(fixture.scroll.scrollTop).toBe(0);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("uses the clipped drawer viewport when its scroll container extends below it", async () => {
+    const fixture = revealFixture(() => undefined);
+    fixture.root.style.overflowY = "hidden";
+    fixture.root.getBoundingClientRect = () =>
+      ({ top: 80, bottom: 150, width: 200, height: 70 } as DOMRect);
+    fixture.b.selfEl.getBoundingClientRect = () => {
+      const top = 145 - fixture.scroll.scrollTop;
+      return { top, bottom: top + 20, width: 120, height: 20 } as DOMRect;
+    };
+    await fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.b.selfEl.getBoundingClientRect().bottom).toBe(150);
+    expect(fixture.scroll.scrollTop).toBe(15);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("settles a void reveal after an active drawer animation materializes its row", async () => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    const layoutAnimation = { finished: animation.promise, playState: "running",
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation;
+    fixture.root.getAnimations = () => [layoutAnimation];
+    fixture.b.el.remove();
+    fixture.scroll.scrollTop = 60;
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    await nextFrame();
+    fixture.scroll.append(fixture.b.el);
+    animation.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(20);
+    expect(fixture.b.selfEl.getBoundingClientRect().top).toBe(80);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["input", "dispose"])("does not resume a drawer animation reveal after %s", async (cancel) => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise, playState: "running",
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    fixture.b.el.remove();
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    if (cancel === "input") fixture.scroll.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    else fixture.bridge.dispose();
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    animation.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(60);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["paused", "zero-speed", "infinite"])("does not wait for an initially %s ancestor animation", async (kind) => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise,
+      playState: kind === "paused" ? "paused" : "running", playbackRate: kind === "zero-speed" ? 0 : 1,
+      effect: { getComputedTiming: () => ({ endTime: kind === "infinite" ? Infinity : 200 }) } } as unknown as Animation];
+    fixture.scroll.scrollTop = 60;
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it("expires an animation paused after capture and ignores its late finish", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    let paused = false;
+    fixture.root.getAnimations = () => [{ finished: animation.promise,
+      get playState() { return paused ? "paused" : "running"; }, playbackRate: 1,
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    try {
+      fixture.b.el.remove();
+      fixture.host.revealInFolder(fixture.target);
+      await nextFrame();
+      paused = true;
+      vi.advanceTimersByTime(1_001);
+      fixture.scroll.scrollTop = 60;
+      fixture.scroll.append(fixture.b.el);
+      animation.resolve();
+      await Promise.resolve();
+      await nextFrame();
+      fixture.bridge.settleReveal();
+      expect(fixture.scroll.scrollTop).toBe(60);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { fixture.bridge.dispose(); fixture.root.remove(); vi.useRealTimers(); }
+  });
+
+  it("settles when an observed animation is cancelled", async () => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise, playState: "running", playbackRate: 1,
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    fixture.b.el.remove();
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    fixture.scroll.scrollTop = 60;
+    fixture.scroll.append(fixture.b.el);
+    animation.reject(new Error("transition cancelled"));
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(20);
+    fixture.bridge.dispose();
+    fixture.root.remove();
+  });
+
+  it.each(["supersede", "restart"])("does not let an animation completion revive a request after %s", async (kind) => {
+    const fixture = revealFixture(() => undefined);
+    const animation = deferred();
+    fixture.root.getAnimations = () => [{ finished: animation.promise, playState: "running", playbackRate: 1,
+      effect: { getComputedTiming: () => ({ endTime: 200 }) } } as unknown as Animation];
+    fixture.b.el.remove();
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    let bridge = fixture.bridge;
+    if (kind === "restart") {
+      fixture.bridge.dispose();
+      bridge = installExplorerVirtualOrder(fixture.host, fixture.root, () => null)!;
+    }
+    fixture.root.getAnimations = () => [];
+    fixture.scroll.append(fixture.b.el);
+    fixture.host.revealInFolder(fixture.target);
+    await nextFrame();
+    await nextFrame();
+    fixture.scroll.scrollTop = 60;
+    animation.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    expect(fixture.scroll.scrollTop).toBe(60);
     bridge.dispose();
     fixture.root.remove();
   });

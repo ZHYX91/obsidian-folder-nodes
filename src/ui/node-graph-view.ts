@@ -1,6 +1,7 @@
 import {
   ItemView,
   Menu,
+  Scope,
   setIcon,
   setTooltip,
   WorkspaceLeaf,
@@ -8,6 +9,7 @@ import {
 } from "obsidian";
 
 import type { NodeGraphIndexSnapshot } from "../core/node-graph-index-snapshot";
+import { graphActivationChord, graphHandleClickAllowed } from "../core/node-graph-keyboard";
 import { refreshItemViewTitle } from "./item-view-title";
 
 import {
@@ -170,6 +172,7 @@ export class FolderNodeGraphView extends ItemView {
   private threeDSvg: SVGSVGElement | null = null;
   private threeDViewport: { width: number; height: number } | null = null;
   private canvasRenderer: NodeGraphCanvasRenderer | null = null;
+  private keyScopeActive = false;
   private displayGraphData: GraphData | null = null;
   private indexSnapshot: NodeGraphIndexSnapshot | null = null;
   private topology: NodeGraphTopology | null = null;
@@ -200,6 +203,10 @@ export class FolderNodeGraphView extends ItemView {
     private readonly options: NodeGraphViewOptions,
   ) {
     super(leaf);
+    this.scope = new Scope(this.app?.scope);
+    // A catch-all handler can decline to the parent scope. A specific matching
+    // key binding would swallow the host shortcut even when its callback declines.
+    this.scope.register(null, null, (event) => this.handleScopeKey(event));
     const settings = this.settings();
     this.dimension = settings.defaultDimension;
   }
@@ -208,6 +215,7 @@ export class FolderNodeGraphView extends ItemView {
   public override getDisplayText(): string { return label("nodeGraph"); }
   public override getIcon(): string { return "git-fork"; }
   public override async onOpen(): Promise<void> {
+    this.keyScopeActive = true;
     this.disconnectDomViewport?.();
     this.disconnectDomViewport = observeNodeGraphDomViewport(this.contentEl);
     this.render();
@@ -243,6 +251,7 @@ export class FolderNodeGraphView extends ItemView {
     this.resize3DViewport();
   }
   public override async onClose(): Promise<void> {
+    this.keyScopeActive = false;
     this.disconnectDomViewport?.();
     this.disconnectDomViewport = null;
     this.disconnectViewportButtons?.();
@@ -300,6 +309,33 @@ export class FolderNodeGraphView extends ItemView {
     else this.applyFocus(true);
     this.applyNeighborhood();
     this.updateScopeControls();
+  }
+
+  private handleScopeKey(event: KeyboardEvent): false | undefined {
+    if (!this.keyScopeActive || !this.contentEl.isConnected || event.defaultPrevented ||
+        event.key !== "Enter") return;
+    const chord = graphActivationChord(event);
+    if (chord === "branch") {
+      if (this.canvasRenderer?.handleScopeToggle(event)) return false;
+      const handle = this.contentEl.ownerDocument.activeElement?.closest<HTMLElement>(".folder-nodes-node-graph-node-expand-handle");
+      if (handle === null || handle === undefined || !this.contentEl.contains(handle)) return;
+      const path = handle.closest<HTMLElement>("[data-node-path]")?.dataset.nodePath;
+      if (path === undefined || !this.displayGraphData?.records.has(path)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat && !event.isComposing) this.toggleExpansion(path, true);
+      return false;
+    }
+    if (chord !== "mod") return;
+    if (this.canvasRenderer?.handleScopeOpen(event)) return false;
+    const body = this.contentEl.ownerDocument.activeElement?.closest<HTMLElement>(".folder-nodes-node-graph-node-body");
+    if (body === null || body === undefined || !this.contentEl.contains(body)) return;
+    const path = body.closest<HTMLElement>("[data-node-path]")?.dataset.nodePath;
+    if (path === undefined || !this.displayGraphData?.records.has(path)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat && !event.isComposing) void this.service.openFolderNode(path, true);
+    return false;
   }
 
   public setGraphScope(scope: NodeGraphScope): void {
@@ -1238,10 +1274,12 @@ export class FolderNodeGraphView extends ItemView {
       void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
     });
     body.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
+      if (!this.keyScopeActive || !this.contentEl.contains(body) || event.defaultPrevented || event.key !== "Enter") return;
+      const chord = graphActivationChord(event);
+      if (chord !== "plain" && chord !== "mod") return;
       event.preventDefault();
-      if (event.repeat) return;
-      void this.service.openFolderNode(record.path, event.ctrlKey || event.metaKey);
+      if (event.repeat || event.isComposing) return;
+      void this.service.openFolderNode(record.path, chord === "mod");
     });
     if (expandable) {
       const action = expanded ? label("collapseChildren") : label("expandChildren");
@@ -1257,13 +1295,15 @@ export class FolderNodeGraphView extends ItemView {
       setIcon(expand.createSpan({ cls: "folder-nodes-node-graph-node-expand-icon" }), expanded ? "minus" : "plus");
       setTooltip(expand, `${childActionLabel(action, childIds.length)} · ${label("altBranchHint")}`);
       expand.addEventListener("click", (event) => {
+        if (!this.keyScopeActive || !this.contentEl.contains(expand) || !graphHandleClickAllowed(event)) return;
         event.stopPropagation();
         this.toggleExpansion(record.path, event.altKey);
       });
       expand.addEventListener("keydown", (event) => {
-        if (!event.altKey || (event.key !== "Enter" && event.key !== " ")) return;
+        if (!this.keyScopeActive || !this.contentEl.contains(expand) || event.defaultPrevented || graphActivationChord(event) !== "branch") return;
         event.preventDefault();
         event.stopPropagation();
+        if (event.repeat || event.isComposing) return;
         this.toggleExpansion(record.path, true);
       });
     }

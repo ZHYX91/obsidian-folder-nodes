@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "Organize folders as same-named nodes with visual navigation and scalable ordering.",
   "type": "module",
   "main": "dist/main.js",
@@ -13,6 +13,8 @@
     "lint": "eslint main.ts src tests benchmarks scripts esbuild.config.mjs eslint.config.mjs vitest.config.mts vitest.coverage-inventory.config.mts vitest.performance.config.mts --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:browser": "node scripts/test-tooltip-browser.mjs",
+    "test:browser:keys": "node scripts/test-graph-keyboard-browser.mjs",
     "test:coverage": "vitest run --coverage",
     "check:readme-i18n": "node scripts/check-readme-i18n.mjs",
     "check:docs-i18n": "node scripts/check-docs-i18n.mjs",

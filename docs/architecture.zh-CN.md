@@ -33,6 +33,16 @@ CreatedNodeRecovery 负责创建记录与补偿顺序；NodeService 提供文件
 
 合并链接预检查通过 Metadata Cache 从每篇原始笔记解析 WikiLink 和嵌入，覆盖 alias、标题/块片段、迁入的 Text/List 属性以及要移动的 Markdown 子笔记。解析到即将删除的来源 Node Note 时，在第一次移动或写入前停止合并。围栏/缩进代码、行内代码和注释保持字面量。此检查拒绝不安全链接，不自动重写链接。无法可靠判定的编号列表围栏开头，以及同一行组合列表/引用的围栏开头，按失败关闭处理，不假设它们隐藏了后续链接。
 
+非空 WikiLink 选择器必须在原、新来源上下文中解析到同一个现存文件对象和路径。未解析目标、会移动的目标，以及移动前后路径后缀可能参与同一选择器最佳匹配的文件，都在首次副作用前保守拒绝；不能用两次解析的路径映射代替对宿主移动后解析的证明。移动子笔记的空路径标题/块自指保持自指，来源 Node Note 的自指仍拒绝。预检查保留原目标身份，最终提交只用新上下文复核，不在已改变的目录结构中重新解析旧来源。后代正文或非结构属性变化同样阻止提交。
+
+手动目标父级的合并排序从一次目标序列和来源子节点序列快照规划。所有迁入项依次更新事务内 rank，完整规划后才写净 patch；后续分配不读取较早写入是否已出现在 Metadata Cache。原始 rank 与源路径仍由同一逆序补偿栈恢复。普通文件移动在排队前固定来源 TFile、来源路径、目标 TFolder 和目标路径，队列开始及最后异步冲突检查后复核全部绑定。
+
+合并的排序模式和 rank 来自当前原文，而非可能落后于前序队列操作的 Metadata Cache。来源复用已读取的移动笔记；目标只读取直接子节点的 canonical note，固定目录、文件及原文身份。迁入项在新父级视作未分配 rank，旧缓存碰巧等于新值也不会省略写入意图，实际源码相同仍按 no-op 处理。已有目标子笔记的单一受支持编辑器可含未保存内容：固定 leaf/editor 并读取同步值，写回前比较快照，所有异步步骤后再同步复核；未保存编辑不依赖 Vault modify 事件。关闭笔记用精确 Vault 读取和修改监听，最终以原文或本次 receipt.after 校验全部 rank 依赖。多编辑器、无法绑定的编辑器、内容变化或子项结构变化拒绝并补偿，不扫描或写入全库。
+
+目标子编辑器的正常 requestSave 可在最终校验期间完成。只对这些 open rank 依赖记录局部修改版本；精确读取保存结果与 expected 原文相同、编辑器绑定和值仍相同且版本稳定后才接受，最多核对三轮，不用固定等待。其他被检查笔记的修改、不同磁盘内容或持续变化都拒绝。全部异步校验结束后再同步核对编辑器与独立版本快照，不能把正常保存误判为外部冲突。
+
+若重编号需要改写某篇已有目标子笔记的 rank，而该笔记仍打开，则在首次副作用前要求关闭这一篇；有效 rank 无需改写时，单一受支持的 open/dirty 编辑器继续可用，不限制无关笔记。此限制避免合并及其补偿的 requestSave 覆盖编辑器尚未反映的外部磁盘改动。受合并 rank 写入或补偿影响的笔记在实际回调也必须保持关闭，发生变化就拒绝；无法精确补偿时保留内容并报告恢复失败。
+
 ## Visual 解析
 
 Visual Core 只接受 scalar string 或 flat string list。它把每项分为基础候选、颜色修饰或未知项：基础候选是 Vault image wikilink、Obsidian registry 中的 Lucide，或恰好一个可见 extended grapheme cluster；`lucide:` 显式消歧，`color:` 表示前景强调色或回退色。解析保留顺序供诊断和解析，首个合法颜色生效。VisualService 逐个解析 Metadata Cache 与 Vault resource URI，图片无法解析时继续本地下一基础候选。解析到文字或 Lucide 时，颜色直接作用于前景；解析到 Emoji 或图片时保留原始像素，不增加圆点或容器装饰；所有基础候选都失败时，颜色才成为居中的圆形色标。只有本地声明完全耗尽后才查找最近祖先，并且不跨层组合基础候选与颜色。Picker 写入拒绝未知或多字素值。渲染器增加 kind/script class：文字使用 Obsidian 界面字体，Emoji 使用所选本机彩色字体或系统字体栈，来自属性的 Explorer/标题图标进入固定且无边框的图标位。Imperative 设置页只通过本地 `FontFace` source 探测固定候选，不枚举全部系统字体；RuntimeStyles 将通过校验的所选字体栈注入每个 workspace document 的自有样式表，字体缺失时继续回退系统栈。标题图标位仍位于可编辑文字之外，通过测量标题首行的 block/inline offset 并在 resize 后重新计算。高级 CSS 变量继续提供覆盖能力。
@@ -43,11 +53,21 @@ Visual 编辑在打开 Picker 或封面菜单时固定原文件夹、canonical n
 
 ## Explorer 与 Contents
 
-ExplorerAdapter 仅封装 File Explorer 宿主边界：它发现每个 `file-explorer` leaf，并只观察对应 leaf container，不观察 `document.body`。适配器隐藏 canonical note，并从真实 `TFolder.children` 减去 canonical note 和当前不可见的受管理子树，判断 Folder Node 是否为视觉叶子；视觉叶子只给现有 disclosure control 添加可清理的圆点 class 和受所有权保护的 `aria-hidden`，不写宿主展开状态。在桌面虚拟化 Explorer 中，Manual 模式只把 sibling 顺序投影到受保护的宿主 sorter，Name 模式继续使用原生顺序。普通刷新只保持当前可见 viewport anchor；显式宿主 reveal（包括原生 breadcrumb reveal）使用独立的实际 DOM viewport 后置条件，因此即使插件自己的 Root 行或隐藏行让宿主虚拟几何与实际布局不一致，也只对被请求且本应可见的目标行做最小滚动修正。canonical Node Note 的 reveal 目标投影到对应文件夹行，属性隐藏目标不会被强制显示，私有宿主能力缺失时不接管。Mutation 批刷新在可见内容出现时恢复箭头。每次显式 reveal 只拥有自身宿主调用完成及下一次渲染时的有限物化机会；旧请求完成不能结算新请求。用户输入、外部滚动、目标可见性变化或该渲染边界会取消尚未完成的校正。桌面能力开关启用 HTML5 drag listener；Android 保留同一装饰但不声明 draggable。`stop`/unload 断开观察器和监听器，移除全部自有 DOM/class，并恢复属性、顺序、sorter 与 reveal 函数。
+ExplorerAdapter 仅在 `start` 后绑定界面。异步 reveal、观察器回调与延迟装饰都绑定创建它们的运行代际；`stop` 使该代际失效，因此稍后完成的宿主调用不能重新安装界面资源，即使适配器已再次启动。每次异步 leaf 物化后也重新检查目标可见性。
+
+动画结算有请求自有的一秒安全上限。动画在采样后停滞或暂停时，超时只丢弃请求而不滚动；用户接管及销毁会取消计时器，迟到完成不能使请求复活。不可见工具栏或不覆盖目标行水平范围的工具栏不缩减其视口。
+
+工具栏与视口的边缘沿用 reveal 后置条件的半像素容差，避免共同边缘的浮点舍入让整条覆盖工具栏漏出有效视口计算。
+
+ExplorerAdapter 仅封装 File Explorer 宿主边界：它发现每个 `file-explorer` leaf，并只观察对应 leaf container，不观察 `document.body`。适配器隐藏 canonical note，并从真实 `TFolder.children` 减去 canonical note 和当前不可见的受管理子树，判断 Folder Node 是否为视觉叶子；视觉叶子只给现有 disclosure control 添加可清理的圆点 class 和受所有权保护的 `aria-hidden`，不写宿主展开状态。在虚拟化 Explorer 中，Manual 模式只把 sibling 顺序投影到受保护的宿主 sorter，Name 模式继续使用原生顺序。普通刷新只保持当前可见 viewport anchor；显式宿主 reveal（包括原生 breadcrumb reveal）使用独立的实际 DOM viewport 后置条件，因此即使插件自己的 Root 行或隐藏行让宿主虚拟几何与实际布局不一致，也只对被请求且本应可见的目标行做最小滚动修正。有效视口与祖先裁剪区及 visual viewport 相交，并排除覆盖内容的移动工具栏。canonical Node Note 的 reveal 目标投影到对应文件夹行，属性隐藏目标不会被强制显示，私有宿主能力缺失时不接管。Mutation 批刷新在可见内容出现时恢复箭头。每次显式 reveal 只拥有自身宿主调用完成及下一次渲染时的有限物化机会；若抽屉仍有有限的布局动画，先等待其结束，旧请求完成不能结算新请求。用户输入、目标可见性变化、销毁或该渲染边界会取消尚未完成的校正。桌面能力开关启用 HTML5 drag listener；Android 保留同一装饰但不声明 draggable。`stop`/unload 断开观察器和监听器，移除全部自有 DOM/class，并恢复属性、顺序、sorter 与 reveal 函数。
 
 Contents View 以活动文件的 owning folder 作为当前 Node，没有活动文件时使用 Root。一次 render 只查询 direct children/files，非空 Nodes/Album/Files 各自分页；三者全空时由统一空态替代三个 disclosure。breadcrumb 在 render 时排除 current item，深路径压缩中段；current card 既表达当前节点又负责打开 Node Note。Node Graph 扩展把入口注入现有 header action 容器，不再 prepend 独立顶行。`sectionOpen` 只属于 view instance，rerender/切换节点保留，onClose 后随实例释放。桌面端保留 drag helpers；Android 不创建 drag ownership。普通文件、相册条目与未管理文件夹仍通过独立 `file-menu` source 接收第三方动作。
 
 ## 节点图谱
+
+ItemView 拥有以 app scope 为父级的子 `Scope`。选择性的通配处理仅在本图谱 Canvas、Canvas 节点正文或 DOM 节点正文持有焦点时接管 Ctrl/Cmd+Enter，先于宿主全局打开链接快捷键消费事件；它复用同一收起详情／打开路径，重复按键或输入法组合不会重复激活。Alt+Enter 只将已有 Canvas 或 DOM 展开把手交给原整支切换路径。其余焦点及组合键交回父级，视图关闭后自有处理失效，焦点始终取自视图所属文档。
+
+Scope 与目标处理器共用纯函数 `graphActivationChord`，区分普通激活、Enter 加单一 Ctrl／Cmd，以及 Enter／空格加纯 Alt；各表面保留自身原有激活键。未支持的组合在父级回退后不会变成打开或切换，`graphHandleClickAllowed` 还拒绝其浏览器默认生成的把手点击，同时保留普通辅助技术点击与真实鼠标修饰键。原生主体按钮点击仍执行选择，包括未支持按键生成的点击。键盘打开／整支处理器拒绝已关闭视图及替换后脱离容器的旧目标。
 
 GraphIndex 由节点图谱扩展拥有，复用 NodeService 的分类/排序、属性驱动的子树可见性、Metadata Cache、ReferenceIndex 与已解析 Visual。它只记录一次全部可见受管理节点、有方向的父子结构和已解析 canonical-note 链接邻接，再消费 path-targeted RefreshBatch 失效，不存在单独的纳入/排除规则层。NodeService 顺序贯穿 topology 与两种布局；增量刷新后只根据缓存父子关系恢复与完整构建一致的深度优先顺序，不重新遍历 Vault，因此同一图谱的局部刷新和全新重建会得到相同坐标。Active-leaf、范围、搜索、展开、2D/3D 切换和链接开关都不重建 Vault 目录。重命名原子重映射以 path 为键的 view state，删除清理失效状态。这条边界只服务节点图谱，不替换 Explorer 或 Contents 的数据路径。
 
@@ -56,6 +76,10 @@ ViewState 把序列化 workspace 字段与会话状态分开。每次手动设�
 VisibleScene 是 DOM、Canvas 2D 与 Canvas 3D 消费的唯一过滤模型。搜索以单次线性遍历汇总结果，view 只计算当前维度的布局。共享几何统一拥有卡片尺寸、presentation、hit test、父级/子级把手、结构锚点、链接卡片边缘锚点与链接曲线。粗指针的从上到下布局使用 72px 卡片高度，其余使用 46px；DOM 与 Canvas 呈现、视口剔除、命中区域、边线和视口拟合使用同一高度，密集 DOM 3D 圆点仍为 16px，Canvas 圆点保留既有尺寸。结构边保留明确的 parent-to-child 方向：从左到右布局连接父卡右把手到子卡左把手，从上到下布局连接父卡下把手到子卡上把手；链接边与把手及结构骨架独立。Canvas 保留所有可见结构边，只对链接边及聚焦关联链接应用限制。大 2D 保持可读的最小比例，通过空间索引查询视口候选，同时保留所需的父级边端点；大 3D 使用与命中几何一致的圆点，并仅对焦点或悬停显示完整卡片。工作区 Graph View 在自身 ItemView 生命周期内直接拥有 DOM viewport observer；独立 toolbar renderer 负责 SearchComponent 与工具栏 DOM 构建，插件层不再仅为了转接几何生命周期而增加一层继承。同范围重绘保留视口状态与仍在编辑的搜索输入，同步全部依赖模型的工具栏字段，替换视口按钮绑定，并在恢复相机后重新投影 DOM 3D 节点与边线。待保存设置重试成功后会调和最新已提交设置，但不会提交控件中尚未完成的文本。渲染状态不成为覆盖图谱的浮层；close/unload 会释放全部订阅、observer、animation frame、canvas 与 DOM。
 
 Canvas 键盘目标选择由纯函数 `graphKeyboardTarget` 负责，输入为当前 2D 或投影后的 3D 位置及稳定场景顺序；渲染器负责焦点、激活和宿主事件。方向键按屏幕方向移动且不循环，Home 和 End 保持场景顺序。
+
+Canvas 的图像缓存保留当前视口实际绘制的完整视觉工作集；重复视觉共享一张图像，加载失败也保留结果，离开视口、主题变化或销毁时解除对应加载回调。可见工作集超过 256 项时不会在帧内相互逐出；加载完成最多请求合并后的重绘，旧资源完成不能唤醒已替换的视口。悬停提示先测量实际边界，再按可用空间翻转和夹边；长路径折行，右到左布局优先放在指针左侧。
+
+视口尺寸改变时先清除旧悬停，再按新尺寸绘制。详情超过可用高度时，会在指针旁成为可聚焦、可滚动的说明区域；按指针上/下较大可用空间限制高度，让触发点仍可点击。200 ms 隐藏延迟允许指针跨过详情与节点浮层之间的空隙，进入或聚焦任一区域均取消隐藏；新节点重置双轴滚动，Escape 将焦点交回 Canvas。所有指针和键盘打开操作均先收起详情并取消计时器，再调用宿主。计时器属于表面所在文档的窗口，隐藏、resize 和销毁均取消它，已销毁渲染器拒绝保留的回调。插件卸载或重启也使等待中的 reveal 通知失效，取消不会再产生迟到的不可用或错误提示。
 
 ## 一致性与失败关闭
 

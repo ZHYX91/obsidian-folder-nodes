@@ -22,21 +22,23 @@ function createAdapter(visible: () => boolean) {
   const service = {
     isNodeVisible: () => visible(),
   } as unknown as NodeService;
+  const adapter = new ExplorerAdapter(
+    app,
+    service,
+    {} as VisualService,
+    () => structuredClone(DEFAULT_SETTINGS),
+    () => ({
+      createNode: "", incompleteNode: "", missingNodeFolder: "", missingNodeNote: "",
+      node: "", nodeConflict: "", root: "", unmanaged: "",
+    }),
+    () => undefined,
+    () => undefined,
+    () => undefined,
+    () => undefined,
+  );
+  adapter.start();
   return {
-    adapter: new ExplorerAdapter(
-      app,
-      service,
-      {} as VisualService,
-      () => structuredClone(DEFAULT_SETTINGS),
-      () => ({
-        createNode: "", incompleteNode: "", missingNodeFolder: "", missingNodeNote: "",
-        node: "", nodeConflict: "", root: "", unmanaged: "",
-      }),
-      () => undefined,
-      () => undefined,
-      () => undefined,
-      () => undefined,
-    ),
+    adapter,
     revealInFolder,
     revealLeaf,
   };

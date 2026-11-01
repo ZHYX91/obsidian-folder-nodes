@@ -30,7 +30,7 @@ import {
   type NodeGraphBox,
 } from "../core/node-graph-geometry";
 import type { NodeGraphLayout } from "../core/node-graph-layout";
-import { graphKeyboardTarget } from "../core/node-graph-keyboard";
+import { graphActivationChord, graphHandleClickAllowed, graphKeyboardTarget } from "../core/node-graph-keyboard";
 import {
   nodeGraphLinkEdges,
   nodeGraphStructureEdges,
@@ -155,6 +155,7 @@ export class NodeGraphCanvasRenderer {
   private readonly overviewLinkEdges: readonly NodeGraphModelEdge[];
   private readonly overviewLinkEdgeSet: ReadonlySet<NodeGraphModelEdge>;
   private readonly tooltip: HTMLElement;
+  private tooltipHideCancel: (() => void) | null = null;
   private readonly visualImages = new Map<string, HTMLImageElement>();
   private readonly layoutPositions: ReadonlyMap<string, { readonly width: number; readonly x: number; readonly y: number }>;
   private readonly layoutSpatialIndex: NodeGraphCanvasSpatialIndex;
@@ -227,7 +228,7 @@ export class NodeGraphCanvasRenderer {
       cls: "folder-nodes-node-graph-focus-overlay-toggle",
       attr: { type: "button" },
     });
-    this.tooltip = surface.createDiv({ cls: "folder-nodes-node-graph-canvas-tooltip" });
+    this.tooltip = surface.createDiv({ cls: "folder-nodes-node-graph-canvas-tooltip", attr: { role: "note", tabindex: "-1" } });
     this.tooltip.hidden = true;
     this.focusOverlay.hidden = true;
     this.palette = this.readPalette();
@@ -241,6 +242,7 @@ export class NodeGraphCanvasRenderer {
   public destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.cancelTooltipHide();
     this.cancelFrame();
     this.unbindEvents();
     this.themeObserver?.disconnect();
@@ -253,7 +255,7 @@ export class NodeGraphCanvasRenderer {
     this.neighbors.clear();
     this.focusContextPaths.clear();
     this.relationCounts.clear();
-    this.visualImages.clear();
+    this.retainVisualImages(new Set());
     this.canvas.remove();
     this.activeAnnouncement.remove();
     this.focusOverlay.remove();
@@ -341,6 +343,7 @@ export class NodeGraphCanvasRenderer {
     const width = Math.max(1, Math.round(this.surface.clientWidth || bounds.width || 800));
     const height = Math.max(1, Math.round(this.surface.clientHeight || bounds.height || 600));
     if (width === this.width && height === this.height && !fit) return;
+    this.hideTooltip();
     this.width = width;
     this.height = height;
     const ratio = Math.min(2, Math.max(1, this.surface.ownerDocument.defaultView?.devicePixelRatio ?? 1));
@@ -357,7 +360,7 @@ export class NodeGraphCanvasRenderer {
   public refreshPalette(): void {
     if (this.destroyed) return;
     this.palette = this.readPalette();
-    this.visualImages.clear();
+    this.retainVisualImages(new Set());
     this.scheduleDraw();
   }
 
@@ -419,13 +422,39 @@ export class NodeGraphCanvasRenderer {
     (this.focusOverlayToggle.hidden ? this.canvas : this.focusOverlayToggle).focus({ preventScroll: true });
   }
 
+  public handleScopeOpen(event: KeyboardEvent): boolean {
+    if (this.destroyed || !this.surface.isConnected || event.defaultPrevented || graphActivationChord(event) !== "mod") return false;
+    const active = this.surface.ownerDocument.activeElement;
+    if (active !== this.canvas && (active !== this.focusOverlayBody || this.focusOverlay.hidden)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat || event.isComposing) return true;
+    const path = active === this.canvas ? this.focusPath : this.overlayPath;
+    if (path === null) {
+      const first = this.keyboardPaths()[0];
+      if (first !== undefined) this.selectFromCanvas(first, true);
+    } else this.openNode(path, true);
+    return true;
+  }
+
+  public handleScopeToggle(event: KeyboardEvent): boolean {
+    if (this.destroyed || !this.surface.isConnected || event.defaultPrevented || this.focusOverlay.hidden || this.focusOverlayToggle.hidden ||
+        this.surface.ownerDocument.activeElement !== this.focusOverlayToggle) return false;
+    this.handleOverlayToggleKeyDown(event);
+    return event.defaultPrevented;
+  }
+
   private readonly handleDoubleClick = (event: MouseEvent): void => {
     const path = this.hitTest(event.offsetX, event.offsetY);
-    if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) this.callbacks.onOpen(path, event.ctrlKey || event.metaKey);
+    if (path !== null && !this.isToggleHit(path, event.offsetX, event.offsetY)) {
+      this.openNode(path, event.ctrlKey || event.metaKey);
+    }
   };
 
   private readonly handleOverlayDoubleClick = (event: MouseEvent): void => {
-    if (this.overlayPath !== null) this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+    if (this.overlayPath !== null) {
+      this.openNode(this.overlayPath, event.ctrlKey || event.metaKey);
+    }
   };
 
   private readonly handleOverlayClick = (): void => {
@@ -433,14 +462,16 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleOverlayKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat || this.overlayPath === null) return;
-    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
+    if (this.destroyed || event.defaultPrevented || this.overlayPath === null) return;
+    const chord = graphActivationChord(event);
+    if (chord !== "plain" && chord !== "mod") return;
     event.preventDefault();
-    this.callbacks.onOpen(this.overlayPath, event.ctrlKey || event.metaKey);
+    if (event.repeat || event.isComposing) return;
+    this.openNode(this.overlayPath, chord === "mod");
   };
 
   private readonly handleOverlayToggle = (event: MouseEvent): void => {
-    if (this.overlayPath === null || this.callbacks.onToggle === undefined) return;
+    if (this.destroyed || this.overlayPath === null || this.callbacks.onToggle === undefined || !graphHandleClickAllowed(event)) return;
     event.preventDefault();
     event.stopPropagation();
     this.selectFromCanvas(this.overlayPath, false);
@@ -448,10 +479,10 @@ export class NodeGraphCanvasRenderer {
   };
 
   private readonly handleOverlayToggleKeyDown = (event: KeyboardEvent): void => {
-    if (!event.altKey || (event.key !== "Enter" && event.key !== " ") || this.overlayPath === null) return;
+    if (this.destroyed || event.defaultPrevented || graphActivationChord(event) !== "branch" || this.overlayPath === null) return;
     event.preventDefault();
     event.stopPropagation();
-    if (event.repeat) return;
+    if (event.repeat || event.isComposing) return;
     this.selectFromCanvas(this.overlayPath, false);
     this.callbacks.onToggle?.(this.overlayPath, true);
   };
@@ -460,6 +491,7 @@ export class NodeGraphCanvasRenderer {
     const path = this.hitTest(event.offsetX, event.offsetY);
     if (path === null || this.callbacks.onContextMenu === undefined) return;
     event.preventDefault();
+    this.hideTooltip();
     if (path !== this.focusPath) this.selectFromCanvas(path, false);
     this.callbacks.onContextMenu(path, event);
   };
@@ -467,12 +499,24 @@ export class NodeGraphCanvasRenderer {
   private readonly handleOverlayContextMenu = (event: MouseEvent): void => {
     if (this.overlayPath === null || this.callbacks.onContextMenu === undefined) return;
     event.preventDefault();
+    this.hideTooltip();
     this.selectFromCanvas(this.overlayPath, false);
     this.callbacks.onContextMenu(this.overlayPath, event);
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat) return;
+    if (this.destroyed || event.defaultPrevented) return;
+    const chord = graphActivationChord(event);
+    if (chord === "plain" || chord === "mod") {
+      event.preventDefault();
+      if (event.repeat || event.isComposing) return;
+      if (this.focusPath === null) {
+        const first = this.keyboardPaths()[0];
+        if (first !== undefined) this.selectFromCanvas(first, true);
+      } else this.openNode(this.focusPath, chord === "mod");
+      return;
+    }
+    if (event.repeat || event.isComposing) return;
     if (event.key === "+" || event.key === "=") {
       event.preventDefault();
       this.zoomBy(1.2);
@@ -505,6 +549,7 @@ export class NodeGraphCanvasRenderer {
         clientX: bounds.left + (point?.x ?? this.width / 2),
         clientY: bounds.top + (point?.y ?? this.height / 2),
       });
+      this.hideTooltip();
       this.callbacks.onContextMenu(this.focusPath, menuEvent);
       return;
     }
@@ -519,15 +564,12 @@ export class NodeGraphCanvasRenderer {
       this.selectFromCanvas(next, true);
       return;
     }
-    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
-    event.preventDefault();
-    if (this.focusPath === null) {
-      const first = this.keyboardPaths()[0];
-      if (first !== undefined) this.selectFromCanvas(first, true);
-      return;
-    }
-    this.callbacks.onOpen(this.focusPath, event.ctrlKey || event.metaKey);
   };
+
+  private openNode(path: string, newLeaf: boolean): void {
+    this.hideTooltip();
+    this.callbacks.onOpen(path, newLeaf);
+  }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     this.pointers.set(event.pointerId, { pointerType: event.pointerType, x: event.clientX, y: event.clientY });
@@ -640,15 +682,38 @@ export class NodeGraphCanvasRenderer {
 
   private readonly handlePointerLeave = (event: PointerEvent): void => {
     const related = event.relatedTarget;
-    if (related instanceof Node && this.focusOverlay.contains(related)) return;
-    if (this.drag === null) this.hideTooltip();
-    this.scheduleDraw();
+    if (containsEventTarget(this.focusOverlay, related) || containsEventTarget(this.tooltip, related)) {
+      this.cancelTooltipHide();
+      return;
+    }
+    if (this.drag === null) this.scheduleTooltipHide();
   };
 
   private readonly handleOverlayPointerLeave = (event: PointerEvent): void => {
     const related = event.relatedTarget;
     if (related === this.canvas) return;
+    if (containsEventTarget(this.tooltip, related)) { this.cancelTooltipHide(); return; }
+    this.scheduleTooltipHide();
+  };
+
+  private readonly handleTooltipEnter = (): void => { this.cancelTooltipHide(); };
+
+  private readonly handleTooltipPointerLeave = (event: PointerEvent): void => {
+    if (containsEventTarget(this.focusOverlay, event.relatedTarget)) { this.cancelTooltipHide(); return; }
+    this.scheduleTooltipHide();
+  };
+
+  private readonly handleTooltipBlur = (): void => {
+    this.hideTooltip(false);
+    this.scheduleDraw();
+  };
+
+  private readonly handleTooltipKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
     this.hideTooltip();
+    this.canvas.focus({ preventScroll: true });
     this.scheduleDraw();
   };
 
@@ -687,6 +752,11 @@ export class NodeGraphCanvasRenderer {
   };
 
   private bindEvents(): void {
+    this.tooltip.addEventListener("pointerenter", this.handleTooltipEnter);
+    this.tooltip.addEventListener("focus", this.handleTooltipEnter);
+    this.tooltip.addEventListener("pointerleave", this.handleTooltipPointerLeave);
+    this.tooltip.addEventListener("blur", this.handleTooltipBlur);
+    this.tooltip.addEventListener("keydown", this.handleTooltipKeyDown);
     this.canvas.addEventListener("contextmenu", this.handleContextMenu);
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
     this.canvas.addEventListener("keydown", this.handleKeyDown);
@@ -701,12 +771,19 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlayBody.addEventListener("dblclick", this.handleOverlayDoubleClick);
     this.focusOverlayBody.addEventListener("keydown", this.handleOverlayKeyDown);
     this.focusOverlay.addEventListener("contextmenu", this.handleOverlayContextMenu);
+    this.focusOverlay.addEventListener("pointerenter", this.handleTooltipEnter);
+    this.focusOverlay.addEventListener("focusin", this.handleTooltipEnter);
     this.focusOverlay.addEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.addEventListener("click", this.handleOverlayToggle);
     this.focusOverlayToggle.addEventListener("keydown", this.handleOverlayToggleKeyDown);
   }
 
   private unbindEvents(): void {
+    this.tooltip.removeEventListener("pointerenter", this.handleTooltipEnter);
+    this.tooltip.removeEventListener("focus", this.handleTooltipEnter);
+    this.tooltip.removeEventListener("pointerleave", this.handleTooltipPointerLeave);
+    this.tooltip.removeEventListener("blur", this.handleTooltipBlur);
+    this.tooltip.removeEventListener("keydown", this.handleTooltipKeyDown);
     this.canvas.removeEventListener("contextmenu", this.handleContextMenu);
     this.canvas.removeEventListener("dblclick", this.handleDoubleClick);
     this.canvas.removeEventListener("keydown", this.handleKeyDown);
@@ -721,6 +798,8 @@ export class NodeGraphCanvasRenderer {
     this.focusOverlayBody.removeEventListener("dblclick", this.handleOverlayDoubleClick);
     this.focusOverlayBody.removeEventListener("keydown", this.handleOverlayKeyDown);
     this.focusOverlay.removeEventListener("contextmenu", this.handleOverlayContextMenu);
+    this.focusOverlay.removeEventListener("pointerenter", this.handleTooltipEnter);
+    this.focusOverlay.removeEventListener("focusin", this.handleTooltipEnter);
     this.focusOverlay.removeEventListener("pointerleave", this.handleOverlayPointerLeave);
     this.focusOverlayToggle.removeEventListener("click", this.handleOverlayToggle);
     this.focusOverlayToggle.removeEventListener("keydown", this.handleOverlayToggleKeyDown);
@@ -764,6 +843,17 @@ export class NodeGraphCanvasRenderer {
       projected.filter((point) => pointIsVisible(point, { width: this.width, height: this.height }, 24, this.data.layout.nodeHeight)),
     );
     const overlayPath = this.hoveredPath ?? this.focusPath;
+    // Pin the complete visible working set before drawing. A fixed cache smaller
+    // than that set evicts images that the next load-triggered frame needs again.
+    const visualKeys = new Set<string>();
+    if (this.dimension === "2d") {
+      for (const point of this.visiblePoints) {
+        if (point.id === overlayPath) continue;
+        const visual = this.data.records.get(point.id)?.visual;
+        if (visual?.kind === "image" || visual?.kind === "lucide") visualKeys.add(visualImageKey(visual));
+      }
+    }
+    this.retainVisualImages(visualKeys);
     for (const point of this.visiblePoints) if (point.id !== overlayPath) this.drawNode(point);
     this.updateFocusOverlay(this.projectedById);
   }
@@ -1091,16 +1181,18 @@ export class NodeGraphCanvasRenderer {
 
   private visualImageFor(record: NodeGraphCanvasRecord): HTMLImageElement {
     const visual = record.visual;
-    const key = `${visual.kind}\u0000${visual.value}\u0000${visual.accent ?? ""}`;
+    const key = visualImageKey(visual);
     const cached = this.visualImages.get(key);
     if (cached !== undefined) return cached;
-    if (this.visualImages.size >= 256) {
-      const oldest = this.visualImages.keys().next().value;
-      if (oldest !== undefined) this.visualImages.delete(oldest);
-    }
     const image = this.surface.ownerDocument.createElement("img");
-    image.addEventListener("load", () => this.scheduleDraw(), { once: true });
-    image.addEventListener("error", () => this.scheduleDraw(), { once: true });
+    const settled = () => {
+      image.onload = null;
+      image.onerror = null;
+      if (this.visualImages.get(key) === image) this.scheduleDraw();
+    };
+    image.onload = settled;
+    image.onerror = settled;
+    this.visualImages.set(key, image);
     if (visual.kind === "image") image.src = visual.value;
     else {
       const host = this.surface.ownerDocument.createElement("span");
@@ -1114,8 +1206,16 @@ export class NodeGraphCanvasRenderer {
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
       }
     }
-    this.visualImages.set(key, image);
     return image;
+  }
+
+  private retainVisualImages(keys: ReadonlySet<string>): void {
+    for (const [key, image] of this.visualImages) {
+      if (keys.has(key)) continue;
+      image.onload = null;
+      image.onerror = null;
+      this.visualImages.delete(key);
+    }
   }
 
   private updateFocusOverlay(projected: ReadonlyMap<string, NodeGraphCanvasPoint>): void {
@@ -1282,14 +1382,15 @@ export class NodeGraphCanvasRenderer {
   }
 
   private showTooltip(x: number, y: number): void {
+    if (this.destroyed) return;
     const path = this.hitTest(x, y);
-    if (path === this.hoveredPath) return;
-    this.hoveredPath = path;
     if (path === null) {
-      this.hideTooltip();
-      this.scheduleDraw();
+      this.scheduleTooltipHide();
       return;
     }
+    this.cancelTooltipHide();
+    if (path === this.hoveredPath) return;
+    this.hoveredPath = path;
     const record = this.data.records.get(path);
     if (record === undefined) return;
     const counts = this.relationCounts.get(path) ?? { links: 0, structure: 0 };
@@ -1303,15 +1404,62 @@ export class NodeGraphCanvasRenderer {
       ? ""
       : `\n${this.callbacks.hiddenLabel?.(record.hiddenSourcePath, record.hiddenExplicit === true) ?? record.hiddenSourcePath}`;
     this.tooltip.setText(`${record.label}\n${path}${boundary}${hidden}\n${this.callbacks.relationSummary(counts.structure, counts.links)}${toggleHint}`);
-    this.tooltip.style.left = `${Math.min(this.width - 16, x + 12)}px`;
-    this.tooltip.style.top = `${Math.min(this.height - 16, y + 12)}px`;
+    // Measure in a neutral position so the previous edge placement cannot shrink
+    // the tooltip's available width before choosing its new side.
+    this.tooltip.setCssProps({ left: "8px", top: "8px" });
+    this.tooltip.style.removeProperty("max-height");
     this.tooltip.hidden = false;
+    let bounds = this.tooltip.getBoundingClientRect();
+    const scrollable = this.tooltip.scrollHeight > this.tooltip.clientHeight + 1;
+    this.tooltip.toggleClass("is-scrollable", scrollable);
+    this.tooltip.tabIndex = scrollable ? 0 : -1;
+    if (scrollable) {
+      // Keep one clear side of the pointer even in a narrow, short viewport.
+      // The bridge timer lets the pointer cross the gap into the scrollable note.
+      const room = Math.floor(Math.max(y - 20, this.height - y - 20));
+      this.tooltip.style.maxHeight = `${Math.max(0, room)}px`;
+      bounds = this.tooltip.getBoundingClientRect();
+      if (bounds.height > room) { this.hideTooltip(); return; }
+    }
+    const rtl = this.surface.ownerDocument.defaultView?.getComputedStyle(this.surface).direction === "rtl";
+    this.tooltip.style.left = `${tooltipOffset(x, bounds.width, this.width, rtl)}px`;
+    this.tooltip.style.top = `${tooltipOffset(y, bounds.height, this.height)}px`;
+    // A hidden element has no scroll box: setting its offsets before showing
+    // it can leave the browser's saved position intact. Reset after the final
+    // visible layout so each new detail starts at its content origin.
+    this.tooltip.scrollTop = 0;
+    this.tooltip.scrollLeft = 0;
     this.scheduleDraw();
   }
 
-  private hideTooltip(): void {
+  private cancelTooltipHide(): void {
+    this.tooltipHideCancel?.();
+    this.tooltipHideCancel = null;
+  }
+
+  private scheduleTooltipHide(): void {
+    if (this.destroyed || this.tooltip.hidden || this.tooltipHideCancel !== null || this.tooltip.ownerDocument.activeElement === this.tooltip) return;
+    const ownerWindow = this.surface.ownerDocument.defaultView;
+    if (!this.tooltip.classList.contains("is-scrollable") || ownerWindow === null) {
+      this.hideTooltip();
+      this.scheduleDraw();
+      return;
+    }
+    const timer = ownerWindow.setTimeout(() => {
+      if (this.destroyed) return;
+      this.tooltipHideCancel = null;
+      this.hideTooltip();
+      this.scheduleDraw();
+    }, 200);
+    this.tooltipHideCancel = () => ownerWindow.clearTimeout(timer);
+  }
+
+  private hideTooltip(restoreFocus = true): void {
+    this.cancelTooltipHide();
+    if (restoreFocus && this.tooltip.ownerDocument.activeElement === this.tooltip) this.canvas.focus({ preventScroll: true });
     this.hoveredPath = null;
     this.tooltip.hidden = true;
+    this.tooltip.tabIndex = -1;
   }
 
   private announceFocus(): void {
@@ -1393,6 +1541,25 @@ export class NodeGraphCanvasRenderer {
       });
     }
   }
+}
+
+function visualImageKey(visual: NodeVisual): string {
+  return `${visual.kind}\u0000${visual.value}\u0000${visual.accent ?? ""}`;
+}
+
+function tooltipOffset(pointer: number, size: number, extent: number, before = false): number {
+  const inset = Math.min(8, extent / 2);
+  const after = pointer + 12;
+  const preceding = pointer - size - 12;
+  const preferred = before ? preceding : after;
+  const alternate = before ? after : preceding;
+  const position = preferred >= inset && preferred + size <= extent - inset ? preferred : alternate;
+  return Math.max(inset, Math.min(Math.max(inset, extent - size - inset), position));
+}
+
+function containsEventTarget(element: HTMLElement, target: EventTarget | null): boolean {
+  const NodeConstructor = element.ownerDocument.defaultView?.Node;
+  return NodeConstructor !== undefined && target instanceof NodeConstructor && element.contains(target);
 }
 
 function lineMightBeVisible(

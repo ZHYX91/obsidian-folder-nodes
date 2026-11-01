@@ -52,7 +52,7 @@ interface ContentsService {
   openFolderNode(path: string, newLeaf?: boolean): Promise<void>;
   previewPlacement(sourcePath: string, intent: PlacementIntent): PlacementPreview;
   placeNode(folder: TFolder, intent: PlacementIntent): Promise<TFolder>;
-  moveFile(file: TFile, targetFolderPath: string): Promise<void>;
+  moveFile(file: TFile, targetFolderPath: string, binding?: { readonly sourcePath: string; readonly target: TFolder; readonly targetPath: string }): Promise<void>;
 }
 
 interface ContentsVisuals { resolve(folder: TFolder): NodeVisual; }
@@ -96,7 +96,7 @@ export class FolderNodeContentsView extends ItemView {
   private selectionPositions = new Map<string, number>();
   private lastEditor: { editor: Editor; file: TFile } | null = null;
   private draggedNodePath: string | null = null;
-  private draggedContentPath: string | null = null;
+  private draggedContent: { readonly file: TFile; readonly path: string } | null = null;
   private draggedSource: HTMLElement | null = null;
   private dropTarget: HTMLElement | null = null;
   private contentDropTarget: HTMLElement | null = null;
@@ -811,7 +811,7 @@ export class FolderNodeContentsView extends ItemView {
       event.dataTransfer.setData("text/plain", text);
       const policy = contentDragPolicy(selected.length);
       if (policy.internalMove) {
-        this.draggedContentPath = file.path;
+        this.draggedContent = { file, path: file.path };
         event.dataTransfer.setData("application/x-folder-nodes-file", file.path);
       }
       event.dataTransfer.effectAllowed = policy.effectAllowed;
@@ -822,8 +822,10 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private bindContentDropTarget(element: HTMLElement, targetFolderPath: string): void {
+    const target = this.service.getFolder(targetFolderPath);
+    const targetPath = target?.path;
     element.addEventListener("dragover", (event) => {
-      if (this.draggedContentPath === null) return;
+      if (this.draggedContent === null) return;
       event.preventDefault();
       event.stopPropagation();
       if (this.contentDropTarget !== element) this.clearContentDropTarget();
@@ -837,13 +839,18 @@ export class FolderNodeContentsView extends ItemView {
       if (this.contentDropTarget === element) this.clearContentDropTarget();
     });
     element.addEventListener("drop", (event) => {
-      const sourcePath = this.draggedContentPath;
-      if (sourcePath === null) return;
+      const source = this.draggedContent;
+      if (source === null) return;
       event.preventDefault();
       event.stopPropagation();
-      const source = this.service.getFile(sourcePath);
       this.clearContentDrag();
-      if (source !== null) this.finishDrop(this.service.moveFile(source, targetFolderPath));
+      if (source.file.path !== source.path || this.service.getFile(source.path) !== source.file
+        || target === null || targetPath === undefined || target.path !== targetPath
+        || normalizeVaultPath(target.path) !== normalizeVaultPath(targetFolderPath) || this.service.getFolder(targetFolderPath) !== target) {
+        this.actions.reportError(new Error(t("errorStalePlacement")));
+        return;
+      }
+      this.finishDrop(this.service.moveFile(source.file, targetFolderPath, { sourcePath: source.path, target, targetPath }));
     });
   }
 
@@ -897,7 +904,7 @@ export class FolderNodeContentsView extends ItemView {
     this.clearContentDropTarget();
     this.draggedSource?.removeClass("folder-nodes-is-dragging");
     this.draggedSource = null;
-    this.draggedContentPath = null;
+    this.draggedContent = null;
   }
 
   private clearAllDrag(): void {
