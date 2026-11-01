@@ -92,6 +92,14 @@ describe("Node merge link preflight", () => {
     expect(() => assertSafe("[reference](../Reference.md)")).toThrow("change a relative link target");
     expect(() => assertSafe("![image](../Image.png)")).toThrow("change a relative link target");
   });
+  it.each(["&#46;&#46;/Reference.md", "&#x2e;&#x2e;/Reference.md", "..&sol;Reference.md", "&#35;section"])(
+    "fails closed on entity-encoded relative destinations: %s", (destination) => {
+      expect(() => assertSafe(`[reference](${destination})`)).toThrow("entity-encoded");
+      expect(() => assertSafe(`![image](<${destination}>)`)).toThrow("entity-encoded");
+      expect(() => assertSafe("`[reference](" + destination + ")`")).not.toThrow();
+      expect(() => assertSafe(`[reference](https://example.com/${destination})`)).not.toThrow();
+    },
+  );
   it("allows references to child files moved to equivalent relative paths", () => {
     expect(() => assertSafe("[asset](asset.bin) ![image](sub/pic.png)")).not.toThrow();
     expect(() => assertMergeLinksKeepDestinations(

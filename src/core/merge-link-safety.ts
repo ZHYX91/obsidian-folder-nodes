@@ -90,6 +90,11 @@ export function assertMergeLinksKeepDestinations(
       const content = link[1].trim();
       const raw = content.startsWith("<") && content.endsWith(">") ? content.slice(1, -1) : content;
       if (raw === "" || absolute(raw)) continue;
+      // Markdown decodes character references in destinations before resolving
+      // them. Do not prove relocation safety against the undecoded spelling.
+      if (/&(?:#[xX][0-9A-Fa-f]+|#[0-9]+|[A-Za-z][A-Za-z0-9]+);/u.test(raw)) {
+        throw new Error("Cannot safely merge an entity-encoded relative Markdown link");
+      }
       if (/[%\\()\s]/u.test(raw)) throw new Error("Cannot safely merge an ambiguous relative Markdown link");
       if (raw.startsWith("#") || raw.includes("?")) throw new Error("Cannot safely merge a relative anchor or query");
       const path = raw.split("#", 1)[0] ?? "";
