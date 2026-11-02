@@ -18,7 +18,7 @@ import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type F
 import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
 import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planAppendChildren, planInsert } from "../core/ordering";
-import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
+import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
 import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import {
   FOLDER_NODES_PROPERTY,
@@ -337,8 +337,8 @@ export class NodeService {
       if (noteCandidates.length > 1) throw new FolderNodesError("multiple_canonical_notes", { path: sourcePath }, `Multiple canonical Node Notes: ${sourcePath}`);
       const note = noteCandidates[0] ?? null;
       const sourceNotePath = note?.path ?? null;
-      const name = sanitizeNodeName(rawName);
       const oldName = folder.name;
+      const name = sanitizeNodeName(rawName) === oldName ? oldName : sanitizeNewNodeName(rawName);
       if (name === oldName) return folder;
       const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
       const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
@@ -433,8 +433,10 @@ export class NodeService {
     });
   }
 
-  public deleteNode(folder: TFolder): Promise<void> {
+  public async deleteNode(folder: TFolder, sourcePath = folder.path): Promise<void> {
+    this.assertEntryIdentity(folder, sourcePath, TFolder);
     return this.exclusive(async () => {
+      this.assertEntryIdentity(folder, sourcePath, TFolder);
       if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
       if (normalizeVaultPath(folder.path) === "") throw new FolderNodesError("root_cannot_delete", {}, "The Root Node cannot be deleted");
       this.assertActive();
@@ -483,8 +485,10 @@ export class NodeService {
     });
   }
 
-  public deleteFile(file: TFile): Promise<void> {
+  public async deleteFile(file: TFile, sourcePath = file.path): Promise<void> {
+    this.assertEntryIdentity(file, sourcePath, TFile);
     return this.exclusive(async () => {
+      this.assertEntryIdentity(file, sourcePath, TFile);
       this.assertActive();
       this.expectEvent("delete", file.path);
       await this.app.fileManager.trashFile(file);
@@ -1143,7 +1147,7 @@ export class NodeService {
     const normalizedParent = normalizeVaultPath(parentPath);
     if (this.isIgnoredPath(normalizedParent)) throw new FolderNodesError("folder_unmanaged", { path: normalizedParent }, `Folder is unmanaged: ${normalizedParent}`);
     if (normalizedParent !== "" && this.getFolder(normalizedParent) === null) throw new Error(`Unknown parent folder: ${normalizedParent}`);
-    const name = sanitizeNodeName(rawName);
+    const name = sanitizeNewNodeName(rawName);
     const folderPath = normalizePath(normalizedParent === "" ? name : `${normalizedParent}/${name}`);
     const notePath = `${folderPath}/${name}.md`;
     await this.assertAvailable(folderPath);

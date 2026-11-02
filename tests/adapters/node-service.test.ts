@@ -753,6 +753,30 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("x/a")).toBe(false);
   });
 
+  it("preserves existing long Root names and native renames while bounding explicitly new node names", async () => {
+    const longName = "汉".repeat(100);
+    const fake = new FakeObsidian(longName);
+    const rootNote = fake.addFile(`${longName}.md`, "root body");
+    const folder = fake.addFolder("A");
+    const note = fake.addFile("A/A.md", "keep body");
+    const nodes = service(fake);
+    expect(nodes.rootNotePath()).toBe(`${longName}.md`);
+    expect(nodes.getCanonicalFile("")).toBe(rootNote);
+    await fake.rename(note, `A/${longName}.md`);
+    await nodes.reconcileRenamed(note, "A/A.md");
+    expect(folder.path).toBe(longName);
+    expect(note.path).toBe(`${longName}/${longName}.md`);
+    expect(nodes.getCanonicalFile(longName)).toBe(note);
+    const renames = [...fake.renames];
+    await nodes.renameNode(folder, longName);
+    expect(fake.renames).toEqual(renames);
+    const created = await nodes.createNode("", "文".repeat(100));
+    const bounded = "文".repeat(84);
+    expect(created.path).toBe(`${bounded}/${bounded}.md`);
+    expect(fake.contents.get(note.path)).toBe("keep body");
+    expect(fake.contents.get(rootNote.path)).toBe("root body");
+  });
+
   it("keeps a deleted Root Node Note deleted", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "root body");
@@ -1641,6 +1665,31 @@ describe("NodeService structural safety", () => {
       .rejects.toThrow("rollback was incomplete");
     expect(fake.contents.get("Parent/Child/Child.md")).toBe("# Replacement child");
     expect(fake.files.has("Child")).toBe(false);
+  });
+
+  it.each(["file", "folder"] as const)("rejects a stale %s deletion after confirmation or while queued", async (kind) => {
+    for (const timing of ["confirmed", "queued"] as const) {
+      for (const change of ["rename", "replace", "remove"] as const) {
+        const fake = new FakeObsidian();
+        const entry = kind === "file" ? fake.addFile("A.md", "keep") : fake.addFolder("A");
+        const originalPath = entry.path;
+        const nodes = service(fake);
+        const remove = () => kind === "file"
+          ? nodes.deleteFile(fake.requireFile(entry.path), originalPath)
+          : nodes.deleteNode(fake.requireFolder(entry.path), originalPath);
+        // Bind the original object independently of the live registry.
+        const boundRemove = () => kind === "file"
+          ? nodes.deleteFile(entry as ReturnType<FakeObsidian["requireFile"]>, originalPath)
+          : nodes.deleteNode(entry as ReturnType<FakeObsidian["requireFolder"]>, originalPath);
+        const pending = timing === "queued" ? remove() : null;
+        if (change === "rename") await fake.rename(entry, kind === "file" ? "B.md" : "B");
+        if (change === "replace") fake.files.set(originalPath, Object.assign(Object.create(Object.getPrototypeOf(entry)), entry));
+        if (change === "remove") fake.files.delete(originalPath);
+        await expect(pending ?? boundRemove()).rejects.toThrow("identity changed");
+        expect(fake.trashed).toEqual([]);
+        nodes.dispose();
+      }
+    }
   });
 
   it("moves and deletes a Node Note without deleting its containing folder", async () => {

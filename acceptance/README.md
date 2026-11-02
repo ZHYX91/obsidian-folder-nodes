@@ -11,6 +11,13 @@ fixture** creates `Viewport/` for large-graph checks. Each command refuses to re
 folder; if generation is interrupted, start with a fresh disposable Vault. The provider is a fixture
 and is excluded from release assets.
 
+**Prepare portable node name fixture** creates `PortableNameAcceptance/` on demand with a
+parent note and `Selection.md`. Its single long line contains a complete family emoji and
+125 Chinese characters. The command refuses an existing root and leaves other fixture bytes
+unchanged. Use the product's selection, editable preview and subtree-delete actions for
+`portable-name-and-delete-review`; preparation assigns no verdict. Start another baseline
+scenario in a fresh disposable Vault.
+
 **Prepare merge safety fixture** creates independent unsafe-link, safe-attachment, and final-read
 race cases under `MergeSafety/`. The two **Arm merge ... race** commands only arrange a deterministic
 editor-open or plugin-unload condition; invoke the actual merge through Folder Nodes. **Save merge

@@ -13,6 +13,29 @@
   },
   "scenarios": [
     {
+      "id": "portable-name-and-delete-review",
+      "title": "Portable node names and explicit subtree deletion",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In a fresh disposable fixture Vault explicitly run the acceptance provider command prepare-portable-name-fixture; it refuses an existing PortableNameAcceptance folder. Enable selection confirmation and selection aliases, with no naming prefix or suffix. Open PortableNameAcceptance/Selection.md in Source mode, select the complete single line excluding its final newline, copy it for the name-editing check and invoke Create Folder Node from selection.",
+        "Inspect the editable name and final-name preview. Shorten the name and verify that the preview updates, then restore the original selection as the name and create the node. Record the created folder/note name and inspect the source link, new note body and alias.",
+        "Create a short-named child inside the new node. Open the new long-named node's subtree-delete action, record the confirmation's path, subtree scope and reference to Obsidian's deletion setting, then Cancel and verify both notes remain.",
+        "In the temporary host profile select Move to Obsidian trash, reopen the same delete action and confirm. Verify only that created subtree is removed from the Vault and present in its trash; preserve Selection.md and the PortableNameAcceptance parent note. Use a fresh disposable Vault before another baseline scenario."
+      ],
+      "expected": [
+        "The final UTF-8 note filename including .md fits 255 bytes and the basename fits 180 UTF-16 units without splitting graphemes. The actual folder/note names match the preview, and the original selected text remains complete in body and alias.",
+        "Name editing updates the final preview. The source link opens the created note and retains the original selection as its visible label.",
+        "The deletion confirmation identifies the exact parent path and all descendants and accurately states that the host deletion setting controls disposal. Cancel changes nothing; confirmation removes only the reviewed subtree using the selected trash setting."
+      ]
+    },
+    {
       "id": "explorer-disclosure-anchor",
       "title": "Long-list disclosure anchor with measured scroll-boundary headroom",
       "surfaces": [

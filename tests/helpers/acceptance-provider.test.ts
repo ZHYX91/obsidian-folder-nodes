@@ -5,6 +5,51 @@ import { expect, it, vi } from "vitest";
 
 import { FakeObsidian } from "./fake-obsidian";
 
+it("prepares the portable-name input only on request without changing baseline notes", async () => {
+  const fake = new FakeObsidian();
+  fake.addFolder("Existing");
+  fake.addFile("Existing/Existing.md", "Existing baseline\n");
+  fake.addFile("Loose.md", "Loose baseline\n");
+  const baseline = new Map(fake.contents);
+  const notices: string[] = [];
+  const commands: Array<{ id: string; callback: () => Promise<void> }> = [];
+  const module = { exports: undefined as unknown };
+  const source = readFileSync(path.resolve("acceptance/fixtures/.obsidian/plugins/folder-nodes-acceptance-provider/main.js"), "utf8");
+  runInNewContext(source, {
+    module,
+    require: (id: string) => {
+      if (id !== "obsidian") throw new Error(`Unexpected fixture dependency: ${id}`);
+      return {
+        Plugin: class { public addCommand(command: typeof commands[number]) { commands.push(command); } },
+        Notice: class { public constructor(message: string) { notices.push(message); } },
+      };
+    },
+  });
+  const Provider = module.exports as new () => {
+    app: typeof fake.app; onload(): void; preparePortableNameFixture(): Promise<void>;
+  };
+  const provider = new Provider();
+  provider.app = fake.app;
+  provider.onload();
+  expect(fake.contents).toEqual(baseline);
+  await commands.find(({ id }) => id === "prepare-portable-name-fixture")!.callback();
+  const root = "PortableNameAcceptance";
+  const expected = "👩‍👩‍👧‍👦" + "长名称回归".repeat(25) + "\n";
+  expect(fake.contents.get(`${root}/Selection.md`)).toBe(expected);
+  expect(new TextEncoder().encode(expected.trim()).length).toBeGreaterThan(255);
+  expect(fake.contents.get(`${root}/${root}.md`)).toBe("# Portable name acceptance\n");
+  expect(new Map([...fake.contents].filter(([file]) => !file.startsWith(`${root}/`)))).toEqual(baseline);
+  expect(fake.opened).toEqual([`${root}/Selection.md`]);
+  expect(notices.at(-1)).toContain("no verdict is assigned");
+  fake.contents.set(`${root}/Selection.md`, "Foreign edit\n");
+  const before = new Map(fake.contents); const count = fake.files.size;
+  await expect(provider.preparePortableNameFixture()).rejects.toThrow("already exists");
+  expect(fake.contents).toEqual(before); expect(fake.files.size).toBe(count);
+  fake.files.delete("Loose.md");
+  await expect(provider.preparePortableNameFixture()).rejects.toThrow("disposable acceptance fixture");
+  expect(fake.contents).toEqual(before); expect(fake.files.size).toBe(count - 1);
+});
+
 it("prepares every merge case without canonical-note or reference-file collisions", async () => {
   const fake = new FakeObsidian();
   const notices: string[] = [];

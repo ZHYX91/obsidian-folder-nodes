@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ko: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "최종 노드 이름",
+  "deleteFileConfirm": "Obsidian의 삭제 설정에 따라 파일 “{path}”을(를) 삭제합니다. 영구 삭제로 설정되어 있으면 휴지통에서 복원할 수 없습니다.",
+  "deleteNodeConfirm": "Obsidian의 삭제 설정에 따라 노드 폴더 “{path}” 전체를 삭제합니다. 노드 노트, 모든 하위 폴더와 파일이 포함됩니다. 영구 삭제로 설정되어 있으면 휴지통에서 복원할 수 없습니다.",
   "viewManagementRules": "관리 규칙 보기",
   "errorCreatedFileOpen": "{path}이(가) Markdown 창에 열려 있어 보존했습니다. 노트를 저장하고 내용을 확인한 후 필요하면 직접 삭제하세요.",
   "errorCreatedNodeRetained": "자동 정리를 중지했습니다. 남겨 둔 파일과 폴더: {paths}. 이유: {reason}",

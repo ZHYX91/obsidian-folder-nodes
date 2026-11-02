@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "Organize folders as same-named nodes with visual navigation and scalable ordering.",
   "type": "module",
   "main": "dist/main.js",
@@ -32,7 +32,9 @@
     "clean:deps": "node scripts/clean.mjs --deps",
     "check": "npm run check:runtime && npm run lint && npm run format:check && npm run check:readme-i18n && npm run check:docs-i18n && npm run typecheck && npm run test:coverage && npm run test:coverage:inventory && npm run build:bundle && npm run check:production && npm run release:validate",
     "release:check": "npm run check && npm run bench:ordering && npm run bench:ordering:large && npm run release:validate-tag",
-    "test:coverage:inventory": "vitest run --coverage --config vitest.coverage-inventory.config.mts"
+    "test:coverage:inventory": "vitest run --coverage --config vitest.coverage-inventory.config.mts",
+    "postinstall": "node scripts/prepare-lint-dependencies.mjs",
+    "prelint": "node scripts/prepare-lint-dependencies.mjs && node scripts/check-lint-dependencies.mjs"
   },
   "keywords": [
     "obsidian",
@@ -64,6 +66,30 @@
     "esbuild": true
   },
   "overrides": {
-    "moment": "2.31.0"
+    "moment": "2.31.0",
+    "@eslint/config-array": {
+      "minimatch": "11.0.4"
+    },
+    "@eslint/eslintrc": {
+      "minimatch": "11.0.4"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.4"
+    },
+    "eslint": {
+      "minimatch": "11.0.4"
+    },
+    "eslint-plugin-json-schema-validator": {
+      "minimatch": "11.0.4"
+    },
+    "eslint-plugin-n": {
+      "minimatch": "11.0.4"
+    },
+    "eslint-plugin-import": {
+      "minimatch": "11.0.4"
+    },
+    "eslint-plugin-react": {
+      "minimatch": "11.0.4"
+    }
   }
 }

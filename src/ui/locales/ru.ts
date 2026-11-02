@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ru: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "Итоговое имя узла",
+  "deleteFileConfirm": "Удалить файл «{path}» согласно настройке удаления Obsidian. При безвозвратном удалении восстановить его из корзины нельзя.",
+  "deleteNodeConfirm": "Удалить всю папку узла «{path}», включая заметку узла, все подпапки и файлы, согласно настройке удаления Obsidian. При безвозвратном удалении восстановить их из корзины нельзя.",
   "viewManagementRules": "Правила управления",
   "errorCreatedFileOpen": "Файл {path} сохранён, поскольку он открыт в панели Markdown. Сохраните и проверьте заметку, прежде чем удалять её вручную.",
   "errorCreatedNodeRetained": "Автоматическая очистка остановлена. Сохранённые файлы и папки: {paths}. Причина: {reason}",

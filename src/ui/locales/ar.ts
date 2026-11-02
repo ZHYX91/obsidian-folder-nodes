@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ar: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "اسم العقدة النهائي",
+  "deleteFileConfirm": "حذف الملف «{path}» وفق إعداد الحذف في Obsidian. إذا كان مضبوطًا على الحذف النهائي، فلن يمكن استعادته من سلة المحذوفات.",
+  "deleteNodeConfirm": "حذف مجلد العقدة «{path}» بالكامل، بما في ذلك ملاحظة العقدة وجميع المجلدات الفرعية والملفات، وفق إعداد الحذف في Obsidian. إذا كان مضبوطًا على الحذف النهائي، فلن يمكن استعادتها من سلة المحذوفات.",
   "viewManagementRules": "عرض قواعد الإدارة",
   "errorCreatedFileOpen": "تم الاحتفاظ بـ {path} لأنه مفتوح في جزء Markdown. احفظ الملاحظة وراجعها قبل حذفها يدويًا.",
   "errorCreatedNodeRetained": "توقف التنظيف التلقائي. الملفات والمجلدات المتبقية: {paths}. السبب: {reason}",
