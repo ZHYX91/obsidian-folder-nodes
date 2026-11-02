@@ -6,7 +6,7 @@ Diese Kurzfassung behandelt die wichtigsten Abläufe und Risiken. Ausführliche 
 
 ## Screenshots
 
-Die Bilder zeigen Knoteninhalte, den gewohnten Dateiexplorer, den Node Graph, Symboleinstellungen und das Erstellen eines Knotens aus markiertem Text.
+Die Bilder zeigen Knoteninhalte, den Datei-Explorer, den Node Graph sowie die Einstellungen für Symbole, Auswahl und Namen.
 
 ![Knoteninhalte mit Kindern, Medien und Dateien](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@ Die Bilder zeigen Knoteninhalte, den gewohnten Dateiexplorer, den Node Graph, Sy
 
 ![Einstellungen für Knotensymbole und Darstellung](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Knotenerstellung aus markiertem Text](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**Beispiel für Auswahl- und Namenseinstellungen**
+
+Dieses Beispiel zeigt die Einstellungen für Namen und Aliase. Die aktuelle Seite enthält außerdem **Vor dem Erstellen bestätigen**, das standardmäßig aktiviert ist. Beim Erstellen aus markiertem Text öffnet sich eine separate Vorschau von Knotenname, Ziel und Aliasen. Der markierte Text wird zum Inhalt der neuen Notiz.
+
+![Beispiel für Auswahl- und Namenseinstellungen](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Funktionen
 

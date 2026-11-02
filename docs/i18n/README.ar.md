@@ -6,7 +6,7 @@
 
 ## صور الواجهة
 
-توضح الصور محتويات العقد ومستكشف الملفات الأصلي وNode Graph وإعدادات الأيقونات وإنشاء العقد من نص محدد.
+تعرض الصور محتوى العقد ومستكشف الملفات وNode Graph وإعدادات الأيقونات والتحديد والتسمية.
 
 ![الشريط الجانبي لمحتويات العقد والملفات والوسائط](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@
 
 ![إعدادات أيقونات العقد والمظهر](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![إنشاء عقدة من النص المحدد](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**مثال لإعدادات التحديد والتسمية**
+
+يعرض هذا المثال إعدادات الأسماء والأسماء البديلة. تتضمن الصفحة الحالية أيضًا **طلب التأكيد قبل الإنشاء**، وهو مفعّل افتراضيًا. عند الإنشاء من نص محدد، تُفتح معاينة مستقلة لاسم العقدة وموقعها وأسمائها البديلة. يصبح النص المحدد محتوى الملاحظة الجديدة.
+
+![مثال لإعدادات التحديد والتسمية](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## الميزات
 

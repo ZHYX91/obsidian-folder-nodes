@@ -6,7 +6,7 @@
 
 ## 畫面預覽
 
-這些畫面分別展示節點內容、Obsidian 檔案列表、節點圖譜、圖示設定，以及從選取文字建立節點。
+圖片展示節點內容、檔案總管、節點圖譜、圖示設定，以及選取與命名設定。
 
 ![節點內容側欄顯示子節點、媒體及檔案](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@
 
 ![節點圖示與外觀設定](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![從選取文字建立節點](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**選取與命名設定範例**
+
+此範例展示命名和別名設定。目前頁面還包含預設開啟的**建立前確認**；從選取文字建立節點時，會開啟獨立預覽，供檢查節點名稱、存放位置和別名。選取文字會成為新筆記的內文。
+
+![選取與命名設定範例](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 功能
 

@@ -6,7 +6,7 @@ Este guia curto explica as tarefas mais comuns e os cuidados necessários. As in
 
 ## Capturas de tela
 
-As imagens mostram o conteúdo dos nós, o Explorador de Arquivos, o Node Graph, os ícones e a criação de nós a partir de texto selecionado.
+As imagens mostram o conteúdo dos nós, o explorador de arquivos, o Node Graph e as configurações de ícones, seleção e nomes.
 
 ![Painel com nós filhos, mídia e arquivos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@ As imagens mostram o conteúdo dos nós, o Explorador de Arquivos, o Node Graph,
 
 ![Configurações de ícones e aparência dos nós](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Criação de nó a partir do texto selecionado](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**Exemplo de configurações de seleção e nomes**
+
+Este exemplo mostra as configurações de nomes e aliases. A página atual também inclui **Confirmar antes de criar**, ativado por padrão. Ao criar a partir de texto selecionado, uma prévia separada mostra o nome, o destino e os aliases do nó. O texto selecionado se torna o conteúdo da nova nota.
+
+![Exemplo de configurações de seleção e nomes](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Recursos
 

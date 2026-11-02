@@ -6,7 +6,7 @@
 
 ## Ảnh minh họa
 
-Ảnh minh họa cho thấy nội dung nút, trình duyệt tệp, Node Graph, phần chỉnh biểu tượng và cách tạo nút từ văn bản đã chọn.
+Các hình minh họa nội dung nút, trình duyệt tệp, Node Graph và cài đặt biểu tượng, phần chọn và đặt tên.
 
 ![Thanh bên nội dung nút gồm nút con, ảnh và tệp](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@
 
 ![Thiết lập biểu tượng và giao diện nút](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Tạo nút từ phần văn bản được chọn](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**Ví dụ cài đặt phần chọn và đặt tên**
+
+Ví dụ này minh họa cài đặt tên và bí danh. Trang hiện tại còn có **Xác nhận trước khi tạo**, được bật mặc định. Khi tạo từ văn bản đã chọn, một bản xem trước riêng hiển thị tên nút, nơi lưu và bí danh. Văn bản đã chọn trở thành nội dung của ghi chú mới.
+
+![Ví dụ cài đặt phần chọn và đặt tên](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Tính năng
 

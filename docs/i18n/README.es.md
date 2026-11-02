@@ -6,7 +6,7 @@ Esta es una guía breve de uso y precauciones. Los casos avanzados se explican e
 
 ## Capturas de pantalla
 
-Las imágenes muestran el contenido de un nodo, el explorador habitual, Node Graph, los iconos y la creación a partir de texto seleccionado.
+Las imágenes muestran el contenido de los nodos, el explorador de archivos, Node Graph y los ajustes de iconos, selección y nombres.
 
 ![Panel de contenido con nodos hijos y archivos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@ Las imágenes muestran el contenido de un nodo, el explorador habitual, Node Gra
 
 ![Opciones de iconos y apariencia de los nodos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Creación de nodos a partir del texto seleccionado](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**Ejemplo de ajustes de selección y nombres**
+
+Este ejemplo muestra los ajustes de nombres y alias. La página actual también incluye **Confirmar antes de crear**, activado de forma predeterminada. Al crear desde texto seleccionado, se abre una vista previa independiente del nombre, el destino y los alias del nodo. El texto seleccionado pasa a ser el contenido de la nota nueva.
+
+![Ejemplo de ajustes de selección y nombres](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Funciones
 

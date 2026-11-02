@@ -6,7 +6,7 @@ Ce guide abrégé présente les opérations courantes et les précautions essent
 
 ## Captures d’écran
 
-Les images présentent le contenu des nœuds, l’explorateur de fichiers, le Node Graph, les réglages des icônes et la création depuis une sélection.
+Les images présentent le contenu des nœuds, l’explorateur de fichiers, le Node Graph ainsi que les réglages des icônes, de la sélection et du nommage.
 
 ![Volet des nœuds enfants, médias et fichiers](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@ Les images présentent le contenu des nœuds, l’explorateur de fichiers, le No
 
 ![Paramètres des icônes et de l'apparence des nœuds](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Création de nœud à partir d'un texte sélectionné](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**Exemple de paramètres de sélection et de nommage**
+
+Cet exemple montre les réglages des noms et des alias. La page actuelle comprend aussi **Confirmer avant de créer**, activé par défaut. La création depuis une sélection ouvre un aperçu distinct du nom du nœud, de son emplacement et de ses alias. Le texte sélectionné devient le contenu de la nouvelle note.
+
+![Exemple de paramètres de sélection et de nommage](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Fonctionnalités
 

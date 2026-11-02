@@ -6,7 +6,7 @@
 
 ## 画面例
 
-ノードの内容、標準ファイルエクスプローラー、Node Graph、アイコン設定、選択テキストからの作成画面を紹介します。
+画像はノードの内容、ファイルエクスプローラー、Node Graph、アイコン設定、選択と命名の設定を示しています。
 
 ![子ノードとメディアを表示するノード内容のサイドバー](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@
 
 ![ノードアイコンと外観の設定](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![選択テキストからノードを作成](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**選択と命名の設定例**
+
+この例は名前と別名の設定を示しています。現在のページには、既定で有効な**作成前に確認**もあります。選択テキストから作成するときは、ノード名、保存先、別名を確認する別のプレビューが開きます。選択テキストは新しいノートの本文になります。
+
+![選択と命名の設定例](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 機能
 
