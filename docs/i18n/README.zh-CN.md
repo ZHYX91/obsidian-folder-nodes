@@ -32,11 +32,11 @@
 
 ![Folder Nodes 图标与外观设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-### 从文字或链接创建节点
+### 选区与命名设置示例
 
-从选中文字创建节点前，可先检查节点名称、存放位置和别名（aliases）；选中文字会成为新笔记的正文。
+此示例展示命名和别名设置。当前页面还包含默认开启的**创建前确认**；从选中文字创建节点时，会打开独立的预览，供检查节点名称、存放位置和别名。选中文字会成为新笔记的正文。
 
-![Folder Nodes 选区与命名设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![选区与命名设置示例](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 功能特性
 

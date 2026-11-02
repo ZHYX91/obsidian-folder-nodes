@@ -6,7 +6,7 @@
 
 ## 화면 예시
 
-노드 콘텐츠, 기본 파일 탐색기, Node Graph, 아이콘 설정, 선택한 문구로 노드를 만드는 화면을 보여 줍니다.
+이미지는 노드 내용, 파일 탐색기, Node Graph, 아이콘 설정, 선택 및 이름 지정 설정을 보여 줍니다.
 
 ![하위 노드와 미디어가 보이는 노드 콘텐츠 사이드바](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@
 
 ![노드 아이콘 및 모양 설정](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![선택한 텍스트에서 노드 만들기](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**선택 및 이름 지정 설정 예시**
+
+이 예시는 이름과 별칭 설정을 보여 줍니다. 현재 페이지에는 기본으로 켜져 있는 **만들기 전 확인**도 있습니다. 선택한 텍스트에서 노드를 만들 때 이름, 저장 위치, 별칭을 확인하는 별도 미리보기가 열립니다. 선택한 텍스트는 새 노트의 본문이 됩니다.
+
+![선택 및 이름 지정 설정 예시](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## 주요 기능
 

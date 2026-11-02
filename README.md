@@ -32,11 +32,11 @@ Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The se
 
 ![Folder Nodes Icons and appearance settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-### Create nodes from text or links
+### Selection & naming settings example
 
-Before creating a node from selected text, check its name, location, and alternative names (aliases). The selected text becomes the new note body.
+This example shows naming and alias settings. The current page also includes **Confirm before creating**, enabled by default. For creation from selected text, it opens a separate preview of the node name, destination, and aliases. The selected text becomes the new note body.
 
-![Folder Nodes Selection and naming settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+![Selection & naming settings example](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Features
 

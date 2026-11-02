@@ -6,7 +6,7 @@
 
 ## Снимки экрана
 
-На снимках показаны содержимое узлов, обычный проводник, Node Graph, настройки значков и создание узлов из выделенного текста.
+На изображениях показаны содержимое узлов, проводник файлов, Node Graph и настройки значков, выделения и именования.
 
 ![Панель дочерних узлов, медиа и файлов](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
@@ -16,7 +16,11 @@
 
 ![Настройки значков и внешнего вида узлов](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
-![Создание узла из выделенного текста](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+**Пример настроек выделения и именования**
+
+В примере показаны настройки имён и псевдонимов. На текущей странице также есть включённый по умолчанию параметр **Подтверждать перед созданием**. При создании из выделенного текста открывается отдельный предварительный просмотр имени узла, места сохранения и псевдонимов. Выделенный текст становится содержимым новой заметки.
+
+![Пример настроек выделения и именования](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
 
 ## Возможности
 
