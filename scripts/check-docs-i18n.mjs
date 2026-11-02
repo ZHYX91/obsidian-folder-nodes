@@ -33,9 +33,9 @@ const SEMANTIC_ANCHORS = Object.freeze({
 });
 
 const LEGACY_DOCUMENTS = Object.freeze([
-  "docs/product.en.md",
+  "docs/product.md",
   "docs/product.zh-CN.md",
-  "docs/ux.en.md",
+  "docs/ux.md",
   "docs/ux.zh-CN.md",
 ]);
 
@@ -79,7 +79,7 @@ export async function checkDocsI18n(projectRoot = process.cwd()) {
 
   for (const document of DOCUMENTS) {
     const sourcePath = `docs/${document}.zh-CN.md`;
-    const translationPath = `docs/${document}.en.md`;
+    const translationPath = `docs/${document}.md`;
     const [source, translation] = await Promise.all([
       readFile(path.join(projectRoot, sourcePath), "utf8"),
       readFile(path.join(projectRoot, translationPath), "utf8"),
