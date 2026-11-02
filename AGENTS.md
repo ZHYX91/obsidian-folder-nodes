@@ -1,60 +1,28 @@
-# Folder Nodes repository guidance
+# Folder Nodes maintenance rules
 
-This repository is an independently cloneable public Obsidian plugin. Do not add dependencies on
-local sibling repositories, personal Vaults, user profiles, or private acceptance evidence.
+Read the [documentation index](docs/README.md) and the relevant product contracts before changing behavior. Keep the repository independently buildable and preserve unrelated local changes.
 
-The structural identity of a node is `A/A.md` at its current normalized Vault path. Folder Nodes
-must never write `_pkwf.id`, another stable node ID, a PKWF manifest, or a parent-owned complete
-children list. Natural sorting writes no order metadata. The only current structural property is a
-flat `folder-nodes` Text List containing non-default `order=manual`, positive `rank=N`, and
-`hidden=true` tokens. Defaults are omitted and an empty property is removed. Published legacy
-`folderNodeChildrenSort`, `folderNodeSiblingRank`, and `folderNodeHidden` fields remain
-compatibility-readable; migration is explicit, preview-first, source-preserving, and fail-closed.
-Never migrate note properties at startup or silently discard unknown future tokens.
+## Product boundaries
 
-Declarative settings are intentionally disabled because Obsidian 1.13 bypasses `display()` for
-non-empty definitions, which removes Folder Nodes' five-tab settings layout and degrades the user
-experience. Preserve the imperative `PluginSettingTab.display()` surface and keep
-`getSettingDefinitions()` empty. Dormant declarative builders and tests may remain, but must not be
-activated accidentally. Do not flag the `display()` deprecation, empty definitions, the disabled
-feature switch, or missing settings search, and do not propose a declarative migration unless the
-user explicitly asks to revisit this decision. Documentation that presents declarative settings as
-the active surface is stale and must not override this policy.
+- A node is identified by `A/A.md` at its normalized Vault path. Do not introduce stable IDs, manifests or parent-owned complete child lists.
+- Natural sorting writes no order metadata. The `folder-nodes` Text List stores only non-default manual order, positive rank and hidden tokens; omit defaults and remove an empty property.
+- Preserve compatibility reads for legacy properties. Migration is explicit, preview-first and source-preserving; retain unknown future tokens and never migrate silently at startup.
+- Keep pure rules independent from Obsidian and verify ordering and migration boundaries when they change.
+- Keep the plugin-rendered top-tab settings surface. Declarative definitions must remain empty or absent unless an explicit product decision changes the layout.
 
-## Manual installation release policy
+## Changes and verification
 
-The versioned `folder-nodes-<version>.zip` is an intentional required public release asset for
-users who install without the Obsidian Community marketplace. Community ignores it during plugin
-ingestion, so the automated-review `extra unsupported files` recommendation is expected and must
-not be treated as a defect or a reason to remove the archive. The deterministic ZIP contains one
-`folder-nodes/` directory with `main.js`, `manifest.json`, and `styles.css`, byte-identical to the
-three loose release assets. Release checks must preserve and verify all four public assets.
+- Follow the existing TypeScript style and dependency boundaries. Prefer focused changes over new generic abstractions.
+- Run checks appropriate to the change. Documentation moves require `check:docs-i18n`, `check:readme-i18n` and affected checker tests; follow [CONTRIBUTING.md](CONTRIBUTING.md) for source and release gates.
+- Use isolated disposable Vaults for fixtures. Production deployment requires authorization for the exact target; preserve plugin `data.json` unless reset is explicitly authorized.
+- Source tests, packaged artifacts, real-host behavior and publication are distinct facts. Record only observed acceptance and keep missing coverage explicit.
+- Preserve the release contract's three loose plugin assets and versioned manual-install ZIP. Verify candidate identity and do not overwrite immutable release assets.
+- Keep credentials, private Vault contents, local paths, generated dependencies and runtime evidence out of commits. Use Conventional Commit subjects when a commit is authorized.
 
-## Release acceptance scope
+## Documentation
 
-Select representative acceptance by change impact on the exact candidate. Changes to desktop
-interaction, settings, editor integration or lifecycle require affected real-host scenarios.
-Changes to mobile interaction or shared mobile-runtime behavior require affected Android emulator
-scenarios when the plugin supports mobile. Documentation-only or host-independent logic changes
-may omit hosts with a recorded reason. Cover the original reported case and a relevant boundary;
-use one suitable environment for equivalent coverage and expand only for distinct risks.
-Run the selected checks when the environment is available; claim acceptance only for observed
-passing scope. Confirmed serious product defects block the affected release. Missing host/tool
-evidence is assessed by risk and recorded as unverified, without an automatic publication block
-or separate approval step. Record failures and follow-up honestly. Full host closure is not required
-for a scoped release, and the CI publication workflow does not automatically enforce host coverage.
-Source/build checks, version identity, asset integrity and build provenance remain required. Android physical devices and iOS are out of scope. Keep source,
-packaged-candidate, real-host, emulator, publication, and production-Vault claims separate.
-
-Migration is preview-first. Destructive or ambiguous changes fail closed. Tests and fixtures must
-use an isolated disposable Vault. A production deployment is separate from build, commit, push,
-tag, and GitHub Release actions; preserve existing plugin `data.json` unless explicitly authorized.
-
-`CHANGELOG.md` is the only public document that records release history. README and user help
-describe the product as it works now: compatibility, installation, usage, settings, limitations,
-privacy, and support. Do not add version banners, dated acceptance evidence, release-status
-narratives, or superseded plans outside the changelog. Keep migration or deprecation guidance only
-when users still need to act, and state the required action directly. Engineering documents describe
-the current contract and repeatable process rather than past executions.
-
-Run `npm run check` before committing and `npm run release:check` before tagging.
+- Standard entry points belong at the root; detailed product guidance belongs in `docs/`, indexed by `docs/README.md`. Ordinary names use lowercase words separated by hyphens.
+- Stable English documents use `name.md`; Chinese sources use `name.zh-CN.md`. Update both together or explicitly mark an incomplete translation outdated. README translations use `docs/i18n/README.<locale>.md`.
+- Root README repository links use canonical GitHub URLs for the Obsidian catalog. Translated READMEs use relative links; retain the checked language-navigation order.
+- Maintain one authoritative text for each rule. Keep architecture decisions and repeatable development, test and release instructions with the product; local plans and execution evidence belong to the maintainer workspace.
+- Describe current behavior and useful compatibility guidance. Release history belongs in `CHANGELOG.md`; candidate state, progress and historical acceptance do not belong in this file.

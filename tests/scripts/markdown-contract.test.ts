@@ -10,7 +10,7 @@ describe("bilingual Markdown contracts", () => {
   });
 
   it("accepts translated prose with equivalent technical content", () => {
-    expect(() => assertTechnicalParity("- 中文 `rank=N` 1024 [说明](guide.zh-CN.md)", "- English `rank=N` 1024 [Help](guide.en.md)", "pair")).not.toThrow();
+    expect(() => assertTechnicalParity("- 中文 `rank=N` 1024 [说明](guide.zh-CN.md)", "- English `rank=N` 1024 [Help](guide.md)", "pair")).not.toThrow();
   });
 
   it.each([

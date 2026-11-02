@@ -184,10 +184,10 @@ npm run release:check
 
 Project documents:
 
-- [Product requirements](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/product-requirements.en.md)
-- [UX specification](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/ux-spec.en.md)
-- [Architecture](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/architecture.en.md)
-- [Testing strategy](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/testing-strategy.en.md)
+- [Product requirements](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/product-requirements.md)
+- [UX specification](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/ux-spec.md)
+- [Architecture](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/architecture.md)
+- [Testing strategy](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/testing-strategy.md)
 - [Changelog](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/CHANGELOG.md)
 - [Contributing](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/CONTRIBUTING.md)
 
