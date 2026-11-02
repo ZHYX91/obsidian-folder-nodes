@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ptBR: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "Nome final do nó",
+  "deleteFileConfirm": "Excluir o arquivo “{path}” conforme a configuração de exclusão do Obsidian. Se a exclusão for permanente, não será possível restaurá-lo da lixeira.",
+  "deleteNodeConfirm": "Excluir toda a pasta do nó “{path}”, incluindo a nota do nó, todas as subpastas e arquivos, conforme a configuração de exclusão do Obsidian. Se a exclusão for permanente, não será possível restaurá-los da lixeira.",
   "viewManagementRules": "Ver regras de gerenciamento",
   "errorCreatedFileOpen": "{path} foi mantido porque está aberto em um painel Markdown. Salve e revise a nota antes de excluí-la manualmente.",
   "errorCreatedNodeRetained": "A limpeza automática foi interrompida. Arquivos e pastas mantidos: {paths}. Motivo: {reason}",

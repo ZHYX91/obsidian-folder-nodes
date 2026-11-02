@@ -3,6 +3,11 @@ const { Notice, Plugin } = require("obsidian");
 module.exports = class FolderNodesAcceptanceProvider extends Plugin {
   onload() {
     this.addCommand({
+      id: "prepare-portable-name-fixture",
+      name: "Prepare portable node name fixture (disposable Vault only)",
+      callback: () => this.preparePortableNameFixture().catch((error) => new Notice(String(error))),
+    });
+    this.addCommand({
       id: "record-explorer-trace",
       name: "Record Explorer navigation frames (disposable Vault only)",
       callback: () => this.recordExplorerTrace(),
@@ -61,6 +66,25 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
       name: "Save merge and content ownership observations (disposable Vault only)",
       callback: () => this.saveOwnershipSafety().catch((error) => new Notice(String(error))),
     });
+  }
+
+  async preparePortableNameFixture() {
+    const vault = this.app.vault;
+    const root = "PortableNameAcceptance";
+    if (!vault.getAbstractFileByPath("Existing/Existing.md") || !vault.getAbstractFileByPath("Loose.md")) {
+      throw new Error("The product's disposable acceptance fixture is required.");
+    }
+    if (this.creating || vault.getAbstractFileByPath(root)) {
+      throw new Error("Portable name fixture already exists or is being created; use a fresh disposable Vault.");
+    }
+    this.creating = true;
+    try {
+      await vault.createFolder(root);
+      await vault.create(`${root}/${root}.md`, "# Portable name acceptance\n");
+      const file = await vault.create(`${root}/Selection.md`, "👩‍👩‍👧‍👦" + "长名称回归".repeat(25) + "\n");
+      new Notice("Portable name input prepared. Use product actions and inspect the results; no verdict is assigned.");
+      await this.app.workspace.getLeaf(false).openFile(file);
+    } finally { this.creating = false; }
   }
 
   async prepareOwnershipSafety() {

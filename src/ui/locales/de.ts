@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const de: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "Endgültiger Knotenname",
+  "deleteFileConfirm": "Die Datei „{path}“ wird gemäß der Löscheinstellung von Obsidian gelöscht. Bei dauerhaftem Löschen ist eine Wiederherstellung aus dem Papierkorb nicht möglich.",
+  "deleteNodeConfirm": "Der gesamte Knotenordner „{path}“ einschließlich Knotennotiz, aller Unterordner und Dateien wird gemäß der Löscheinstellung von Obsidian gelöscht. Bei dauerhaftem Löschen ist eine Wiederherstellung aus dem Papierkorb nicht möglich.",
   "viewManagementRules": "Verwaltungsregeln ansehen",
   "errorCreatedFileOpen": "{path} wurde beibehalten, weil die Notiz in einem Markdown-Bereich geöffnet ist. Speichern und prüfen Sie sie, bevor Sie sie selbst löschen.",
   "errorCreatedNodeRetained": "Die automatische Bereinigung wurde angehalten. Verbliebene Dateien und Ordner: {paths}. Grund: {reason}",

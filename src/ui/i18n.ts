@@ -5,6 +5,9 @@ import { isInterfaceLanguage, type AvailableInterfaceLocale } from "../core/inte
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
+  finalNodeName: "最终节点名称",
+  deleteFileConfirm: "按 Obsidian 的删除设置删除文件“{path}”。若设置为永久删除，将无法从回收站恢复。",
+  deleteNodeConfirm: "按 Obsidian 的删除设置删除节点“{path}”的整个文件夹，包括节点笔记、全部子文件夹和文件。若设置为永久删除，将无法从回收站恢复。",
   "viewManagementRules": "查看管理规则",
   "errorCreatedFileOpen": "已保留 {path}，因为它已在 Markdown 窗格中打开。请先保存并检查笔记，再决定是否手动删除。",
   "errorCreatedNodeRetained": "自动清理已停止。保留的产物：{paths}。原因：{reason}",
@@ -173,6 +176,9 @@ const zh = {
 };
 
 const en: typeof zh = {
+  finalNodeName: "Final node name",
+  deleteFileConfirm: "Delete the file “{path}” using Obsidian’s deletion setting. If set to permanently delete, it cannot be restored from the trash.",
+  deleteNodeConfirm: "Delete the entire node folder “{path}”, including its Node Note, all subfolders and files, using Obsidian’s deletion setting. If set to permanently delete, it cannot be restored from the trash.",
   "viewManagementRules": "View management rules",
   "errorCreatedFileOpen": "Kept {path} because it is open in a Markdown pane. Save and review the note before removing it yourself.",
   "errorCreatedNodeRetained": "Automatic cleanup stopped. Remaining artifacts: {paths}. Reason: {reason}",

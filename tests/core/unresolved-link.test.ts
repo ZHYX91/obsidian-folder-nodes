@@ -24,6 +24,9 @@ describe("unresolved link node creation", () => {
     expect(planUnresolvedNode("../a", "")).toBeNull();
     expect(planUnresolvedNode("a?.md", "")).toBeNull();
     expect(planUnresolvedNode("image.png", "")).toBeNull();
+    expect(planUnresolvedNode("汉".repeat(85), "")).toBeNull();
+    expect(planUnresolvedNode("汉".repeat(85) + "/Child", "")).toBeNull();
+    expect(planUnresolvedNode("Child", "汉".repeat(100))?.nodePath).toBe("汉".repeat(100) + "/Child");
   });
 
   it("uses only an explicit display text as the creation alias", () => {

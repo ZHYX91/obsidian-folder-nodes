@@ -41,6 +41,25 @@ function fixture() {
   return { fake, folder, note, nodes, plugin, buttons };
 }
 
+describe("deletion confirmation ownership", () => {
+  it.each(["file", "folder"] as const)("explains deletion preferences and rejects a moved %s after confirmation", async (kind) => {
+    const f = fixture();
+    const entry = kind === "file" ? f.note : f.folder;
+    const method = kind === "file" ? "confirmDeleteFile" : "confirmDelete";
+    Reflect.get(f.plugin, method).call(f.plugin, entry);
+    const text = document.body.textContent!;
+    expect(text).toContain("Obsidian’s deletion setting");
+    expect(text).toContain("permanently delete");
+    if (kind === "folder") expect(text).toContain("all subfolders and files");
+    const confirm = f.buttons(t(kind === "file" ? "deleteFile" : "delete"))[0]!;
+    await f.fake.rename(entry, kind === "file" ? "A/Renamed.md" : "Renamed");
+    confirm.click();
+    await vi.waitFor(() => expect(Notice.messages.at(-1)).toContain("identity changed"));
+    expect(f.fake.trashed).toEqual([]);
+    f.plugin.onunload();
+  });
+});
+
 describe("reveal notification lifetime", () => {
   it.each([false, true])("suppresses an obsolete reveal %s after unload and restart", async (reject) => {
     const f = fixture();

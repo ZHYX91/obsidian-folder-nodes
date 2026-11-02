@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.12.3 - 2026-11-02
+
+- Update the development-only minimatch dependencies to 11.0.4 with reviewed legacy lint-call adaptations and installed-caller regression checks.
+
+- Bound generated node names by complete graphemes, UTF-16 length and the UTF-8 filename budget including `.md`; let selection previews edit the name and show its final value before creation.
+- Explain file and whole-subtree deletion using Obsidian's deletion setting, and refuse stale confirmations or queued deletions after the original target is moved, removed or replaced.
 
 ## 0.12.2 - 2026-11-01
 

@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const fr: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "Nom final du nœud",
+  "deleteFileConfirm": "Supprimer le fichier « {path} » selon le réglage de suppression d’Obsidian. Si la suppression définitive est activée, il ne pourra pas être restauré depuis la corbeille.",
+  "deleteNodeConfirm": "Supprimer tout le dossier du nœud « {path} », y compris sa note, tous ses sous-dossiers et fichiers, selon le réglage de suppression d’Obsidian. Si la suppression définitive est activée, ils ne pourront pas être restaurés depuis la corbeille.",
   "viewManagementRules": "Voir les règles de gestion",
   "errorCreatedFileOpen": "{path} a été conservé car il est ouvert dans un volet Markdown. Enregistrez et vérifiez la note avant de la supprimer vous-même.",
   "errorCreatedNodeRetained": "Le nettoyage automatique a été interrompu. Fichiers et dossiers conservés : {paths}. Motif : {reason}",

@@ -1,5 +1,5 @@
 import type { NamingPart } from "./types";
-import { sanitizeNodeName } from "./paths";
+import { sanitizeNewNodeName } from "./paths";
 
 export interface NamingContext {
   selection: string;
@@ -69,7 +69,7 @@ export function buildNodeName(
   const before = resolvePart(prefix, context, formatter).trim();
   const selected = context.selection.trim();
   const after = resolvePart(suffix, context, formatter).trim();
-  return sanitizeNodeName([
+  return sanitizeNewNodeName([
     before === "" ? "" : `${before}${prefix.separator}`,
     selected,
     after === "" ? "" : `${suffix.separator}${after}`,

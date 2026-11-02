@@ -114,6 +114,22 @@ describe("selection creation through the plugin", () => {
     });
   }
 
+  it("uses the edited final name for creation while preserving the entire selected body and alias", async () => {
+    const original = "汉".repeat(100);
+    const f = fixture({ label: original });
+    f.trigger();
+    const input = host.modals.at(-1)!.contentEl.querySelector<HTMLInputElement>("input")!;
+    expect(input.value).toBe("汉".repeat(84));
+    input.value = "Shorter name";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    f.submit();
+    await vi.waitFor(() => expect(f.fake.opened).toEqual(["Parent/Shorter name/Shorter name.md"]));
+    const note = f.fake.requireFile("Parent/Shorter name/Shorter name.md");
+    expect(f.fake.contents.get(note.path)).toContain(original);
+    expect(f.fake.frontmatters.get(note.path)?.aliases).toEqual([original]);
+    expect(f.generate).toHaveBeenCalledExactlyOnceWith(note, f.file.path, undefined, original);
+  });
+
   // The boundary returns prescribed host strings: this fake does not choose paths or syntax.
   const formats = [
     ["shortest wiki", "[[Selected text|Selected text]]"],

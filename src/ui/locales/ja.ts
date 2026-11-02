@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const ja: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "最終ノード名",
+  "deleteFileConfirm": "Obsidian の削除設定に従ってファイル「{path}」を削除します。完全に削除する設定の場合、ゴミ箱から復元できません。",
+  "deleteNodeConfirm": "Obsidian の削除設定に従ってノードフォルダー「{path}」全体を削除します。ノードノート、すべてのサブフォルダーとファイルが含まれます。完全に削除する設定の場合、ゴミ箱から復元できません。",
   "viewManagementRules": "管理ルールを確認",
   "errorCreatedFileOpen": "{path} は Markdown ペインで開かれているため残しました。ノートを保存して内容を確認してから、必要に応じて手動で削除してください。",
   "errorCreatedNodeRetained": "自動クリーンアップを停止しました。残したファイルとフォルダー：{paths}。理由：{reason}",

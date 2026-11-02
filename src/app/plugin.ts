@@ -1010,8 +1010,9 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private confirmDeleteFile(file: TFile): void {
-    new ConfirmModal(this.app, t("deleteFile"), `${t("moveToTrash")}: ${file.path}`, t("moveToTrash"), true, async () => {
-      await this.service.deleteFile(file);
+    const sourcePath = file.path;
+    new ConfirmModal(this.app, t("deleteFile"), t("deleteFileConfirm", { path: sourcePath }), t("deleteFile"), true, async () => {
+      await this.service.deleteFile(file, sourcePath);
       this.refreshVisuals();
     }).open();
   }
@@ -1050,7 +1051,7 @@ export default class FolderNodesPlugin extends Plugin {
     const parentPath = normalizeVaultPath(folder.path);
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
     const label = selection.trim().replace(/\s+/gu, " ");
-    const create = async (): Promise<void> => {
+    const create = async (nodeName = name): Promise<void> => {
       const assertSelectionCurrent = (): void => {
         if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
         if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
@@ -1064,7 +1065,7 @@ export default class FolderNodesPlugin extends Plugin {
       };
       assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };
-      const note = await this.service.createNode(parentPath, name, options);
+      const note = await this.service.createNode(parentPath, nodeName, options);
       try {
         const link = prepareSelectionLink(this.app.fileManager.generateMarkdownLink(note, sourcePath, undefined, label), label, tableContext);
         assertSelectionCurrent();
@@ -1115,8 +1116,9 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private confirmDelete(folder: TFolder): void {
-    new ConfirmModal(this.app, t("delete"), `${t("moveToTrash")}: ${folder.path}`, t("moveToTrash"), true, async () => {
-      await this.service.deleteNode(folder);
+    const sourcePath = folder.path;
+    new ConfirmModal(this.app, t("deleteNodeSubtree"), t("deleteNodeConfirm", { path: sourcePath }), t("delete"), true, async () => {
+      await this.service.deleteNode(folder, sourcePath);
       this.refreshVisuals();
     }).open();
   }

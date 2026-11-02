@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const zhTW: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "最終節點名稱",
+  "deleteFileConfirm": "依 Obsidian 的刪除設定刪除檔案「{path}」。若設定為永久刪除，將無法從垃圾桶還原。",
+  "deleteNodeConfirm": "依 Obsidian 的刪除設定刪除節點「{path}」的整個資料夾，包括節點筆記、所有子資料夾與檔案。若設定為永久刪除，將無法從垃圾桶還原。",
   "viewManagementRules": "檢視管理規則",
   "errorCreatedFileOpen": "已保留 {path}，因為它已在 Markdown 窗格中開啟。請先儲存並檢查筆記，再決定是否手動刪除。",
   "errorCreatedNodeRetained": "自動清理已停止。保留的項目：{paths}。原因：{reason}",

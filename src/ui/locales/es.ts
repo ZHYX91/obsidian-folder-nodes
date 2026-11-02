@@ -2,6 +2,9 @@
 import type { TranslationKey } from "../i18n";
 
 export const es: Readonly<Record<TranslationKey, string>> = {
+  "finalNodeName": "Nombre final del nodo",
+  "deleteFileConfirm": "Eliminar el archivo «{path}» según la configuración de eliminación de Obsidian. Si se elimina permanentemente, no se podrá restaurar desde la papelera.",
+  "deleteNodeConfirm": "Eliminar toda la carpeta del nodo «{path}», incluida su nota, todas las subcarpetas y archivos, según la configuración de eliminación de Obsidian. Si se eliminan permanentemente, no se podrán restaurar desde la papelera.",
   "viewManagementRules": "Ver reglas de gestión",
   "errorCreatedFileOpen": "Se ha conservado {path} porque está abierto en un panel Markdown. Guarda y revisa la nota antes de eliminarla manualmente.",
   "errorCreatedNodeRetained": "La limpieza automática se ha detenido. Archivos y carpetas conservados: {paths}. Motivo: {reason}",

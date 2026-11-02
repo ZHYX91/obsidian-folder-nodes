@@ -3,6 +3,8 @@ const TRAILING_DOTS_OR_SPACES = /[. ]+$/u;
 const MULTIPLE_SPACES = /\s+/gu;
 const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const UTF8 = new TextEncoder();
+const NODE_NAME_BYTE_LIMIT = 255 - UTF8.encode(".md").length;
 
 export function normalizeVaultPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
@@ -42,6 +44,14 @@ export function isSameVaultPath(left: string, right: string): boolean {
 }
 
 export function sanitizeNodeName(input: string): string {
+  return sanitizeName(input, Number.POSITIVE_INFINITY);
+}
+
+export function sanitizeNewNodeName(input: string): string {
+  return sanitizeName(input, NODE_NAME_BYTE_LIMIT);
+}
+
+function sanitizeName(input: string, byteLimit: number): string {
   let value = input
     .normalize("NFC")
     .replace(WINDOWS_FORBIDDEN, "-")
@@ -51,11 +61,14 @@ export function sanitizeNodeName(input: string): string {
   if (value === "") value = "Untitled";
   if (WINDOWS_RESERVED.test(value)) value = `_${value}`;
   let length = 0;
+  let bytes = 0;
   let truncated = "";
   for (const { segment } of GRAPHEMES.segment(value)) {
-    if (length + segment.length > 180) break;
+    const segmentBytes = UTF8.encode(segment).length;
+    if (length + segment.length > 180 || bytes + segmentBytes > byteLimit) break;
     truncated += segment;
     length += segment.length;
+    bytes += segmentBytes;
   }
   return truncated.replace(TRAILING_DOTS_OR_SPACES, "") || "Untitled";
 }
