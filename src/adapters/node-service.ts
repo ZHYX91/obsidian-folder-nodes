@@ -36,7 +36,7 @@ import type {
   PropertyMigrationScan,
 } from "../core/types";
 import { editableVisualCandidates } from "../core/visual";
-import { assertMergeLinksKeepDestinations, assertMergeWikiLinksKeepDestinations, type MergeFileRelocation, type MergeLinkCheck, type MergeWikiLinkResolver } from "../core/merge-link-safety";
+import { assertMergeLinksKeepDestinations, assertMergeWikiLinksKeepDestinations, type MergeFileRelocation, type MergeLinkCheck, type MergeLinkResolver } from "../core/merge-link-safety";
 
 const STRUCTURAL_PROPERTIES = new Set([FOLDER_NODES_PROPERTY, ...LEGACY_FOLDER_NODES_PROPERTIES]);
 type Undo = () => Promise<void>;
@@ -521,7 +521,7 @@ export class NodeService {
         targetNotePath,
       );
       const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
-      const resolveWikiLink: MergeWikiLinkResolver = (path, from) => {
+      const resolveLink: MergeLinkResolver = (path, from) => {
         const file = this.app.metadataCache.getFirstLinkpathDest(path, from);
         return file == null || this.getFile(file.path) !== file ? null : { path: file.path, identity: file };
       };
@@ -530,8 +530,8 @@ export class NodeService {
         .map((file) => ({ from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
       const targetProperties = readMergeFrontmatter(targetSnapshot, targetNotePath);
       const mergeLinkChecks = [
-        assertMergePropertyLinks(sourceProperties, sourceNotePath, targetNotePath, sourceNotePath, resolveWikiLink, movingFiles, targetProperties),
-        assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourcePath, targetPath, sourceNotePath, resolveWikiLink, movingFiles),
+        assertMergePropertyLinks(sourceProperties, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetProperties),
+        assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles),
       ];
       const movingMarkdown = this.app.vault.getMarkdownFiles()
         .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
@@ -541,8 +541,8 @@ export class NodeService {
         const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
         movingSources.set(entry.file, contents);
         mergeLinkChecks.push(
-          assertMergePropertyLinks(readMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourceNotePath, resolveWikiLink, movingFiles),
-          assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourcePath, targetPath, sourceNotePath, resolveWikiLink, movingFiles),
+          assertMergePropertyLinks(readMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourceNotePath, resolveLink, movingFiles),
+          assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourceNotePath, resolveLink, movingFiles),
         );
       }
 
@@ -589,7 +589,7 @@ export class NodeService {
       await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
       this.assertMergeStructure(source, sourcePath, initialSourceChildren);
       this.assertMergeStructure(target, targetPath, initialTargetChildren);
-      for (const check of mergeLinkChecks) check();
+      for (const check of mergeLinkChecks) check("before");
       const undos: Undo[] = [];
       let latestTarget = targetSnapshot;
       try {
@@ -701,7 +701,7 @@ export class NodeService {
             this.assertEntryIdentity(entry.file, entry.to, TFile);
             this.assertMergeNoteClosed(entry.file, entry.to, "source");
           }
-          for (const check of mergeLinkChecks) check();
+          for (const check of mergeLinkChecks) check("after");
           if ([...openRankChanges].some(([file, version]) => verifiedRankSaves.get(file) !== version)) {
             throw new Error("Merge rank save changed after final validation");
           }
@@ -1823,7 +1823,7 @@ function readMergeFrontmatter(source: string, path: string): Record<string, unkn
 
 function assertMergePropertyLinks(
   properties: Readonly<Record<string, unknown>>, sourcePath: string, targetPath: string, retiredNote: string,
-  resolveWikiLink: MergeWikiLinkResolver,
+  resolveLink: MergeLinkResolver,
   movingFiles: readonly MergeFileRelocation[],
   existingTarget: Readonly<Record<string, unknown>> = {},
 ): MergeLinkCheck {
@@ -1833,11 +1833,11 @@ function assertMergePropertyLinks(
     const values = Array.isArray(value) ? value as unknown[] : [value];
     for (const entry of values) {
       if (typeof entry === "string") {
-        checks.push(assertMergeWikiLinksKeepDestinations(entry, sourcePath, targetPath, retiredNote, resolveWikiLink, movingFiles, `${sourcePath} property ${key}`));
+        checks.push(assertMergeWikiLinksKeepDestinations(entry, sourcePath, targetPath, retiredNote, resolveLink, movingFiles, `${sourcePath} property ${key}`));
       }
     }
   }
-  return () => { for (const check of checks) check(); };
+  return (phase) => { for (const check of checks) check(phase); };
 }
 
 function mergeFrontmatterProperties(

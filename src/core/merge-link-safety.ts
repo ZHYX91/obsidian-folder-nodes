@@ -1,4 +1,4 @@
-export interface MergeWikiLinkTarget {
+export interface MergeLinkTarget {
   readonly path: string;
   readonly identity: unknown;
 }
@@ -8,23 +8,24 @@ export interface MergeFileRelocation {
   readonly to: string;
 }
 
-export type MergeWikiLinkResolver = (path: string, sourcePath: string) => MergeWikiLinkTarget | null;
-export type MergeLinkCheck = () => void;
+export type MergeLinkResolver = (path: string, sourcePath: string) => MergeLinkTarget | null;
+export type MergeLinkCheck = (phase: "before" | "after") => void;
 
 /**
  * Reject location-sensitive link syntax before a Node merge moves any files.
- * A relative link is safe unchanged only if its referenced child moves with
- * the source folder to the exact path it will resolve to from the new note.
+ * Bind Markdown and WikiLinks to their actual host-resolved file identities.
+ * A moving Markdown target also needs an exact relative relocation and a
+ * second host resolution after the files have moved.
  * This is intentionally a fail-closed guard, not an unproved Markdown rewrite.
  */
 export function assertMergeLinksKeepDestinations(
   source: string, oldNote: string, newNote: string,
-  sourceFolder: string, targetFolder: string, retiredNote: string,
-  resolveWikiLink: MergeWikiLinkResolver = () => null,
+  retiredNote: string,
+  resolveLink: MergeLinkResolver = () => null,
   movingFiles: readonly MergeFileRelocation[] = [],
 ): MergeLinkCheck {
   if (oldNote === newNote) return () => undefined;
-  const wikiChecks: MergeLinkCheck[] = [];
+  const checks: MergeLinkCheck[] = [];
   let fence: { mark: string; width: number; quoteDepth: number; listIndent: number } | null = null;
   let comment: LiteralBlock | null = null;
   let previousBlank = true;
@@ -89,22 +90,17 @@ export function assertMergeLinksKeepDestinations(
       covered.add(link.index + link[0].indexOf("]("));
       const content = link[1].trim();
       const raw = content.startsWith("<") && content.endsWith(">") ? content.slice(1, -1) : content;
-      if (raw === "" || absolute(raw)) continue;
+      if (external(raw)) continue;
       // Markdown decodes character references in destinations before resolving
       // them. Do not prove relocation safety against the undecoded spelling.
       if (/&(?:#[xX][0-9A-Fa-f]+|#[0-9]+|[A-Za-z][A-Za-z0-9]+);/u.test(raw)) {
         throw new Error("Cannot safely merge an entity-encoded relative Markdown link");
       }
       if (/[%\\()\s]/u.test(raw)) throw new Error("Cannot safely merge an ambiguous relative Markdown link");
-      if (raw.startsWith("#") || raw.includes("?")) throw new Error("Cannot safely merge a relative anchor or query");
+      if (raw.includes("?")) throw new Error("Cannot safely merge a relative query");
       const path = raw.split("#", 1)[0] ?? "";
-      const before = resolve(oldNote, path);
-      if (before === retiredNote) throw new Error("Cannot merge a link to the removed Node Note");
-      const moved = before.startsWith(sourceFolder + "/")
-        ? targetFolder + before.slice(sourceFolder.length) : before;
-      if (moved !== resolve(newNote, path)) {
-        throw new Error("Merge would change a relative link target: " + raw);
-      }
+      checks.push(assertMergeLinkTarget(path, oldNote, newNote, retiredNote, resolveLink, movingFiles,
+        `${oldNote} body line ${lineIndex + 1} ${link[0]}`, "Markdown link"));
     }
     for (let index = visible.indexOf("]("); index >= 0; index = visible.indexOf("](", index + 2)) {
       if (!covered.has(index)) throw new Error("Cannot safely merge an unsupported Markdown link");
@@ -112,10 +108,10 @@ export function assertMergeLinksKeepDestinations(
     // An empty first line can continue its destination on the next line.
     // Refuse that unsupported form at the opener, before any merge effects.
     const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S*)/u.exec(visible);
-    if (definition?.[1] != null && !absolute(definition[1])) {
+    if (definition?.[1] != null && !external(definition[1])) {
       throw new Error("Cannot safely merge a relative reference definition");
     }
-    wikiChecks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveWikiLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
+    checks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
     for (const attribute of visible.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*))/giu)) {
       const raw = attribute[1] ?? attribute[2] ?? attribute[3] ?? "";
       // HTML decodes references (including some without a semicolon) and
@@ -124,13 +120,13 @@ export function assertMergeLinksKeepDestinations(
       if (!absolute(raw)) throw new Error("Cannot safely merge a relative HTML link");
     }
   }
-  return () => { for (const check of wikiChecks) check(); };
+  return (phase) => { for (const check of checks) check(phase); };
 }
 
 /** Accepts visible prose or a parsed Text/List property value, without YAML escaping. */
 export function assertMergeWikiLinksKeepDestinations(
   source: string, oldNote: string, newNote: string, retiredNote: string,
-  resolveWikiLink: MergeWikiLinkResolver,
+  resolveLink: MergeLinkResolver,
   movingFiles: readonly MergeFileRelocation[] = [],
   location = oldNote,
 ): MergeLinkCheck {
@@ -144,46 +140,67 @@ export function assertMergeWikiLinksKeepDestinations(
     if (path === "." || path === ".." || path.startsWith("./") || path.startsWith("../")) {
       throw new Error("Cannot safely merge a relative WikiLink");
     }
-    const destination = path === "" ? { path: oldNote, identity: null } : resolveWikiLink(path, oldNote);
-    if (destination?.path === retiredNote || path.replace(/\.md$/iu, "") === retiredNote.replace(/\.md$/iu, "")) {
-      throw new Error(`Cannot merge a WikiLink to the removed Node Note: ${location} ${wiki[0]}`);
-    }
-    // A subpath-only link in a moving child remains that child's self-link.
-    // Nonempty selectors are host best-match queries. Do not pretend the
-    // pre-move resolver can prove how a relocated competitor will resolve.
-    if (path === "") {
-      if (!(wiki[1] ?? "").trim().startsWith("#")) throw new Error(`Cannot prove a WikiLink target survives merge: ${location} ${wiki[0]}`);
-      continue;
-    }
-    if (destination === null || /[%\\]|\/{2,}|\/$|(?:^|\/)\.{1,2}(?:\/|$)/u.test(path)
-      || movingFiles.some(({ from, to }) => destination.path === from || wikiSelectorMatches(path, from) || wikiSelectorMatches(path, to))) {
+    if ((path === "" && !(wiki[1] ?? "").trim().startsWith("#"))
+      || /[%\\]|\/{2,}|\/$|(?:^|\/)\.{1,2}(?:\/|$)/u.test(path)) {
       throw new Error(`Cannot prove a WikiLink target survives merge: ${location} ${wiki[0]}`);
     }
-    const check = () => {
-      const next = resolveWikiLink(path, newNote);
-      if (next === null || next.path !== destination.path || next.identity !== destination.identity) {
-        throw new Error(`Merge would change a WikiLink target: ${location} ${wiki[0]}`);
-      }
-    };
-    check();
-    checks.push(check);
+    checks.push(assertMergeLinkTarget(path, oldNote, newNote, retiredNote, resolveLink, movingFiles,
+      `${location} ${wiki[0]}`, "WikiLink"));
   }
   // Retain original identities; never re-resolve old contexts after moving.
-  return () => { for (const check of checks) check(); };
+  return (phase) => { for (const check of checks) check(phase); };
 }
 
-function wikiSelectorMatches(selector: string, path: string): boolean {
+function assertMergeLinkTarget(
+  path: string, oldNote: string, newNote: string, retiredNote: string,
+  resolveLink: MergeLinkResolver, movingFiles: readonly MergeFileRelocation[],
+  location: string, kind: "Markdown link" | "WikiLink",
+): MergeLinkCheck {
+  const destination = path === "" ? { path: oldNote, identity: null } : resolveLink(path, oldNote);
+  if (destination?.path === retiredNote || path.replace(/^\/+|\.md$/giu, "") === retiredNote.replace(/\.md$/iu, "")) {
+    throw new Error(`Cannot merge a ${kind} to the removed Node Note: ${location}`);
+  }
+  // A child self-subpath moves with that child. The retired note's self-link
+  // has already been rejected above, including Markdown's empty destination.
+  if (path === "") return () => undefined;
+  if (destination === null) throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+  const relocation = movingFiles.find(({ from }) => from === destination.path);
+  if (relocation !== undefined) {
+    // Lexical paths only prove the relocation of a bound real target. They
+    // never substitute for host resolution of vault-root or best-match links.
+    if (kind !== "Markdown link" || resolve(oldNote, path) !== destination.path || resolve(newNote, path) !== relocation.to) {
+      throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+    }
+  } else if (movingFiles.some(({ from, to }) => selectorMatches(path, from) || selectorMatches(path, to))) {
+    throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+  }
+  const check: MergeLinkCheck = (phase) => {
+    const next = resolveLink(path, relocation !== undefined && phase === "before" ? oldNote : newNote);
+    const expectedPath = relocation !== undefined && phase === "after" ? relocation.to : destination.path;
+    if (next === null || next.path !== expectedPath || next.identity !== destination.identity) {
+      throw new Error(`Merge would change a ${kind} target: ${location}`);
+    }
+  };
+  check("before");
+  return check;
+}
+
+function selectorMatches(selector: string, path: string): boolean {
   const key = selector.replace(/^\/+|\.md$/giu, "").normalize("NFC").toLocaleLowerCase();
   const candidate = path.replace(/\.md$/iu, "").normalize("NFC").toLocaleLowerCase();
   return candidate === key || candidate.endsWith("/" + key);
 }
 
 function absolute(path: string): boolean {
-  return path.startsWith("/") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(path);
+  return path.startsWith("/") || external(path);
+}
+
+function external(path: string): boolean {
+  return path.startsWith("//") || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(path);
 }
 
 function resolve(filePath: string, relative: string): string {
-  const result = filePath.split("/").slice(0, -1);
+  const result = relative.startsWith("/") ? [] : filePath.split("/").slice(0, -1);
   for (const part of relative.split("/")) {
     if (part === "" || part === ".") continue;
     if (part === "..") {
