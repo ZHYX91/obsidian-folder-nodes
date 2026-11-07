@@ -1648,9 +1648,9 @@ describe("NodeService structural safety", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFolder("Parent");
-    fake.addFile("Parent/Parent.md", "", { folderNodeChildrenSort: "manual" });
+    fake.addFile("Parent/Parent.md", "---\nfolderNodeChildrenSort: manual\n---\n");
     const child = fake.addFolder("Child");
-    fake.addFile("Child/Child.md", "# Original child", { folderNodeSiblingRank: 1024 });
+    fake.addFile("Child/Child.md", "---\nfolderNodeSiblingRank: 1024\n---\n# Original child");
     const originalRename = fake.app.fileManager.renameFile.bind(fake.app.fileManager);
     fake.app.fileManager.renameFile = async (entry, nextPath) => {
       await originalRename(entry, nextPath);
@@ -1963,11 +1963,11 @@ describe("NodeService structural safety", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFolder("Parent");
-    fake.addFile("Parent/Parent.md", "", { folderNodeChildrenSort: "manual" });
+    fake.addFile("Parent/Parent.md", "---\nfolderNodeChildrenSort: manual\n---\n");
     fake.addFolder("Parent/Existing");
-    fake.addFile("Parent/Existing/Existing.md", "", { folderNodeSiblingRank: 4096 });
+    fake.addFile("Parent/Existing/Existing.md", "---\nfolderNodeSiblingRank: 4096\n---\n");
     const child = fake.addFolder("Child");
-    fake.addFile("Child/Child.md", "", { folderNodeSiblingRank: 4096 });
+    fake.addFile("Child/Child.md", "---\nfolderNodeSiblingRank: 4096\n---\n");
     await fake.rename(child, "Parent/Child");
 
     await service(fake).reconcileRenamed(fake.requireFolder("Parent/Child"), "Child");

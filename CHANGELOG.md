@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Plan repeated sorting, ordering-mode changes, placements and child appends from current note or editor state, preserving queued actions while Metadata Cache lags.
+
 - Bind Markdown and WikiLink merge checks to the actual target file, reject vault-root links to the removed note, and recheck moved attachment identities before source removal.
 
 ## 0.12.3 - 2026-11-02

@@ -56,6 +56,28 @@ interface MergeRankBinding {
   readonly editor: OpenMarkdownTarget | null;
 }
 
+interface ChildOrderState {
+  readonly mode: "natural" | "manual";
+  readonly children: ChildOrderRecord[];
+}
+
+interface OrderSourceBinding {
+  readonly file: TFile;
+  path: string;
+  readonly editor: OpenMarkdownTarget | null;
+  readonly field: "order" | "rank";
+}
+
+interface CurrentOrderState extends ChildOrderState {
+  readonly parent: TFolder;
+  readonly parentPath: string;
+  readonly parentNote: TFile | null;
+  readonly expectedChildren: TAbstractFile[];
+  readonly sources: Map<TFile, string>;
+  readonly bindings: OrderSourceBinding[];
+  readonly versions: ReadonlyMap<TFile, number>;
+}
+
 export interface VisualEditBinding {
   readonly folder: TFolder;
   readonly folderPath: string;
@@ -401,7 +423,8 @@ export class NodeService {
     const source = this.getFolder(sourcePath);
     if (source === null) return { kind: "blocked", reason: `Unknown source node: ${sourcePath}` };
     try {
-      const resolved = this.resolvePlacement(source, intent);
+      const parentPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
+      const resolved = this.resolvePlacement(source, intent, { mode: this.sortMode(parentPath), children: this.children(parentPath) });
       return resolved === null ? { kind: "noop" } : { kind: "ready", intent: resolved.intent };
     } catch (error) {
       return { kind: "blocked", reason: error instanceof Error ? error.message : String(error) };
@@ -415,18 +438,18 @@ export class NodeService {
   public setChildOrderMode(parentPath: string, mode: "natural" | "manual"): Promise<void> {
     return this.exclusive(async () => {
       parentPath = normalizeVaultPath(parentPath);
-      if (this.sortMode(parentPath) === mode) return;
-      const parentNote = this.getCanonicalFile(parentPath);
-      if (parentNote === null) throw new FolderNodesError("complete_parent_required", {}, "A complete parent Node is required to change child ordering");
       const undos: Undo[] = [];
       try {
-        if (mode === "natural") {
-          await this.patchFolderNodesTransactional(parentNote, { order: null }, undos);
-          return;
-        }
-        const ordered = naturalOrder(this.childRecords(parentPath));
-        await this.patchFolderNodesTransactional(parentNote, { order: "manual" }, undos);
-        await this.applyOrderPatches(materializeManualOrder(ordered).patches, null, undos);
+        await this.withCurrentOrder(parentPath, [], async (state) => {
+          if (state.mode === mode) return;
+          const parentNote = state.parentNote;
+          if (parentNote === null) throw new FolderNodesError("complete_parent_required", {}, "A complete parent Node is required to change child ordering");
+          const receipt = await this.patchFolderNodesTransactional(parentNote, { order: mode === "manual" ? "manual" : null }, undos, state.sources.get(parentNote), true);
+          if (receipt !== null) state.sources.set(parentNote, receipt.after);
+          if (mode === "manual") {
+            await this.applyOrderPatches(materializeManualOrder(naturalOrder(state.children)).patches, null, undos, undefined, state.sources, true);
+          }
+        }, mode === "manual" ? "always" : "none");
       } catch (error) {
         await this.rollback(undos, error);
       }
@@ -549,26 +572,26 @@ export class NodeService {
       const rankSources = new Map(movingSources);
       const rankBindings: MergeRankBinding[] = [];
       let mergeOrder: ReturnType<typeof planAppendChildren> | null = null;
-      if (mergeOrderingProperties(targetSnapshot, targetNotePath, "order").order === "manual") {
+      if (readOrderingProperties(targetSnapshot, targetNotePath, "order", "merge").order === "manual") {
         const sourceChildren = this.childRecords(sourcePath).map((child) => {
           const note = this.getCanonicalFile(child.childPath);
           const contents = note === null ? undefined : movingSources.get(note);
           if (note === null || contents === undefined) throw new Error(`Merge rank source changed: ${child.childPath}`);
           rankBindings.push({ file: note, before: note.path, after: targetPath + note.path.slice(sourcePath.length), folder: normalizePath(`${targetPath}/${basename(child.childPath)}`), editor: null });
-          return { ...child, order: mergeOrderingProperties(contents, note.path, "rank").rank };
+          return { ...child, order: readOrderingProperties(contents, note.path, "rank", "merge").rank };
         });
-        const sourceOrder = mergeOrderingProperties(sourceSnapshot, sourceNotePath, "order").order === "manual"
+        const sourceOrder = readOrderingProperties(sourceSnapshot, sourceNotePath, "order", "merge").order === "manual"
           ? sourceChildren.sort(compareChildren) : naturalOrder(sourceChildren);
         const targetChildren: ChildOrderRecord[] = [];
         for (const child of this.childRecords(targetPath).filter(({ childPath }) => childPath !== sourcePath)) {
           const note = this.getCanonicalFile(child.childPath);
           if (note === null) throw new Error(`Merge rank source changed: ${child.childPath}`);
           const path = note.path;
-          const snapshot = await this.readMergeRankSource(note, path);
+          const snapshot = await this.readCurrentOrderingSource(note, path, "merge");
           const contents = snapshot.source;
           rankSources.set(note, contents);
           rankBindings.push({ file: note, before: path, after: path, folder: child.childPath, editor: snapshot.editor });
-          targetChildren.push({ ...child, order: mergeOrderingProperties(contents, path, "rank").rank });
+          targetChildren.push({ ...child, order: readOrderingProperties(contents, path, "rank", "merge").rank });
         }
         mergeOrder = planAppendChildren(targetChildren, sourceOrder.map((child) => ({
           ...child, childPath: normalizePath(`${targetPath}/${basename(child.childPath)}`), order: null,
@@ -922,25 +945,30 @@ export class NodeService {
 
   public reorder(folder: TFolder, delta: -1 | 1): Promise<void> {
     return this.exclusive(async () => {
+      const sourcePath = folder.path;
       const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
-      if (this.sortMode(parentPath) !== "manual") throw new Error("Enable manual child ordering before reordering nodes");
-      if (!this.isNodeVisible(folder.path)) return;
-      const children = this.children(parentPath);
-      const index = children.findIndex(({ childPath }) => childPath === folder.path);
-      const target = index + delta;
-      const adjacent = children[target];
-      if (index < 0 || target < 0 || target >= children.length
-        || adjacent === undefined || !this.isNodeVisible(adjacent.childPath)) return;
-      const siblings = children.filter(({ childPath }) => childPath !== folder.path);
-      const intent: PlacementIntent = {
-        kind: "insert",
-        gap: {
-          parentPath,
-          previousSiblingPath: siblings[target - 1]?.childPath ?? null,
-          nextSiblingPath: siblings[target]?.childPath ?? null,
-        },
-      };
-      await this.placeNodeUnlocked(folder, intent);
+      const undos: Undo[] = [];
+      try {
+        await this.withCurrentOrder(parentPath, [], async (state) => {
+          this.assertEntryIdentity(folder, sourcePath, TFolder);
+          if (state.mode !== "manual") throw new Error("Enable manual child ordering before reordering nodes");
+          if (!this.isNodeVisible(folder.path)) return;
+          const index = state.children.findIndex(({ childPath }) => childPath === folder.path);
+          const target = index + delta;
+          const adjacent = state.children[target];
+          if (index < 0 || target < 0 || target >= state.children.length
+            || adjacent === undefined || !this.isNodeVisible(adjacent.childPath)) return;
+          const siblings = state.children.filter(({ childPath }) => childPath !== folder.path);
+          await this.placeNodeWithOrder(folder, {
+            kind: "insert",
+            gap: {
+              parentPath,
+              previousSiblingPath: siblings[target - 1]?.childPath ?? null,
+              nextSiblingPath: siblings[target]?.childPath ?? null,
+            },
+          }, state, undos);
+        });
+      } catch (error) { await this.rollback(undos, error); }
     });
   }
 
@@ -1008,7 +1036,7 @@ export class NodeService {
     });
   }
 
-  private resolvePlacement(folder: TFolder, intent: PlacementIntent): {
+  private resolvePlacement(folder: TFolder, intent: PlacementIntent, state: ChildOrderState): {
     intent: PlacementIntent;
     parentPath: string;
     targetIndex: number | null;
@@ -1037,12 +1065,12 @@ export class NodeService {
       }
     }
 
-    const siblings = this.children(parentPath).filter(({ childPath }) => childPath !== sourcePath);
+    const siblings = state.children.filter(({ childPath }) => childPath !== sourcePath);
     if (intent.kind === "move-into") {
-      return { intent: { kind: "move-into", parentPath }, parentPath, targetIndex: this.sortMode(parentPath) === "manual" ? siblings.length : null, siblings };
+      return { intent: { kind: "move-into", parentPath }, parentPath, targetIndex: state.mode === "manual" ? siblings.length : null, siblings };
     }
 
-    if (this.sortMode(parentPath) !== "manual") throw new Error("Enable manual child ordering before placing a node at an exact position");
+    if (state.mode !== "manual") throw new Error("Enable manual child ordering before placing a node at an exact position");
     const gap = {
       parentPath,
       previousSiblingPath: intent.gap.previousSiblingPath === null ? null : normalizeVaultPath(intent.gap.previousSiblingPath),
@@ -1051,14 +1079,29 @@ export class NodeService {
     const targetIndex = insertionIndex(siblings.map(({ childPath }) => childPath), gap);
     if (targetIndex === null) throw new Error("The insertion position is stale; retry the drag");
     if (oldParentPath === parentPath) {
-      const current = this.children(parentPath).findIndex(({ childPath }) => childPath === sourcePath);
+      const current = state.children.findIndex(({ childPath }) => childPath === sourcePath);
       if (current === targetIndex) return null;
     }
     return { intent: { kind: "insert", gap }, parentPath, targetIndex, siblings };
   }
 
   private async placeNodeUnlocked(folder: TFolder, intent: PlacementIntent): Promise<TFolder> {
-    const resolved = this.resolvePlacement(folder, intent);
+    const parentPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
+    const sourcePath = folder.path;
+    const note = this.requireCanonicalNote(folder);
+    const sourceNotePath = note.path;
+    const undos: Undo[] = [];
+    try {
+      return await this.withCurrentOrder(parentPath, [note], (state) => {
+        this.assertEntryIdentity(folder, sourcePath, TFolder);
+        this.assertEntryIdentity(note, sourceNotePath, TFile);
+        return this.placeNodeWithOrder(folder, intent, state, undos);
+      });
+    } catch (error) { return this.rollback(undos, error); }
+  }
+
+  private async placeNodeWithOrder(folder: TFolder, intent: PlacementIntent, state: CurrentOrderState, undos: Undo[]): Promise<TFolder> {
+    const resolved = this.resolvePlacement(folder, intent, state);
     if (resolved === null) return folder;
     const { parentPath, siblings, targetIndex } = resolved;
     const sourcePath = normalizeVaultPath(folder.path);
@@ -1073,35 +1116,37 @@ export class NodeService {
     this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
     if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
     if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
+    await this.assertCurrentOrderState(state);
 
-    const undos: Undo[] = [];
-    try {
-      if (this.sortMode(parentPath) === "manual") {
-        this.assertActive();
-        const note = this.requireCanonicalNote(folder);
-        const moved: ChildOrderRecord = { basename: folder.name, childPath: sourcePath, order: this.readRank(note) };
-        const plan = planInsert(siblings, moved, targetIndex ?? siblings.length);
-        await this.applyOrderPatches(plan.patches, folder, undos);
-      }
-      this.assertEntryIdentity(folder, sourcePath, TFolder);
-      this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
-      if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
-      if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
-      if (oldParentPath === parentPath) return folder;
+    if (state.mode === "manual") {
       this.assertActive();
-      this.expectEvent("rename", nextPath, sourcePath, true);
-      await this.app.fileManager.renameFile(folder, nextPath);
-      undos.push(async () => {
-        this.assertEntryIdentity(folder, nextPath, TFolder);
-        this.expectEvent("rename", sourcePath, nextPath, true);
-        await this.app.fileManager.renameFile(folder, sourcePath);
-      });
-      this.assertEntryIdentity(folder, nextPath, TFolder);
-      if (this.getCanonicalFile(nextPath) === null) throw new Error("Moved node failed structural validation");
-      return folder;
-    } catch (error) {
-      return this.rollback(undos, error);
+      const note = this.requireCanonicalNote(folder);
+      const current = state.sources.get(note);
+      if (current === undefined) throw new Error(`Ordering source changed: ${sourceNotePath}`);
+      const moved: ChildOrderRecord = { basename: folder.name, childPath: sourcePath, order: readOrderingProperties(current, sourceNotePath, "rank", "node").rank };
+      const plan = planInsert(siblings, moved, targetIndex ?? siblings.length);
+      await this.applyOrderPatches(plan.patches, folder, undos, undefined, state.sources, true);
     }
+    this.assertEntryIdentity(folder, sourcePath, TFolder);
+    this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
+    if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
+    if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
+    if (oldParentPath === parentPath) return folder;
+    this.assertActive();
+    this.expectEvent("rename", nextPath, sourcePath, true);
+    await this.app.fileManager.renameFile(folder, nextPath);
+    undos.push(async () => {
+      this.assertEntryIdentity(folder, nextPath, TFolder);
+      this.expectEvent("rename", sourcePath, nextPath, true);
+      await this.app.fileManager.renameFile(folder, sourcePath);
+    });
+    this.assertEntryIdentity(folder, nextPath, TFolder);
+    if (this.getCanonicalFile(nextPath) === null) throw new Error("Moved node failed structural validation");
+    state.expectedChildren.push(folder);
+    for (const binding of state.bindings) {
+      if (binding.file === sourceNote) binding.path = sourceNote.path;
+    }
+    return folder;
   }
 
   private async createNodeUnlocked(parentPath: string, rawName: string, options: { alias?: string; body?: string }): Promise<TFile> {
@@ -1249,6 +1294,7 @@ export class NodeService {
     undos: Undo[],
     receipts?: FileChangeReceipt[],
     expectedSources?: Map<TFile, string>,
+    allowOpen = false,
   ): Promise<void> {
     const movedPath = movedFolder === null ? null : normalizeVaultPath(movedFolder.path);
     for (const patch of patches) {
@@ -1257,10 +1303,112 @@ export class NodeService {
         ? this.requireCanonicalNote(movedFolder!)
         : this.getCanonicalFile(patch.childPath);
       if (expectedSources !== undefined && (note === null || !expectedSources.has(note))) throw new Error(`Merge rank source changed: ${patch.childPath}`);
-      const receipt = await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos, note === null ? undefined : expectedSources?.get(note));
+      const receipt = await this.patchFolderNodesTransactional(note, { rank: patch.nextOrder }, undos, note === null ? undefined : expectedSources?.get(note), allowOpen);
       if (receipt !== null) expectedSources?.set(receipt.file, receipt.after);
       if (receipt !== null) receipts?.push(receipt);
     }
+  }
+
+  private async withCurrentOrder<T>(
+    parentPath: string,
+    extraNotes: readonly TFile[],
+    operation: (state: CurrentOrderState) => Promise<T>,
+    ranks: "manual" | "always" | "none" = "manual",
+  ): Promise<T> {
+    const parent = parentPath === "" ? this.app.vault.getRoot() : this.getFolder(parentPath);
+    if (parent === null) throw new FolderNodesError("target_folder_unknown", { path: parentPath }, `Unknown target folder: ${parentPath}`);
+    const parentNote = this.getCanonicalFile(parentPath);
+    const expectedChildren = [...parent.children];
+    const children = this.childRecords(parentPath);
+    const childNotes = children.map((child) => ({ child, note: this.getCanonicalFile(child.childPath) }));
+    const sources = new Map<TFile, string>();
+    const bindings: OrderSourceBinding[] = [];
+    const versions = new Map<TFile, number>();
+    const paths = new Map<TFile, string>();
+    for (const note of [parentNote, ...childNotes.map(({ note }) => note), ...extraNotes]) {
+      if (note !== null) {
+        versions.set(note, 0);
+        paths.set(note, note.path);
+      }
+    }
+    const modification = this.app.vault.on("modify", (file) => {
+      if (file instanceof TFile && versions.has(file)) versions.set(file, versions.get(file)! + 1);
+    });
+    try {
+      const read = async (file: TFile, field: "order" | "rank") => {
+        if (sources.has(file)) return;
+        const path = paths.get(file)!;
+        const snapshot = await this.readCurrentOrderingSource(file, path);
+        sources.set(file, snapshot.source);
+        bindings.push({ file, path, editor: snapshot.editor, field });
+      };
+      if (parentNote !== null) await read(parentNote, "order");
+      const mode = parentNote !== null && readOrderingProperties(sources.get(parentNote)!, parentNote.path, "order", "node").order === "manual" ? "manual" : "natural";
+      if (ranks === "always" || ranks === "manual" && mode === "manual") {
+        for (const { child, note } of childNotes) {
+          if (note === null) throw new Error(`Ordering source changed: ${child.childPath}`);
+          await read(note, "rank");
+          child.order = readOrderingProperties(sources.get(note)!, note.path, "rank", "node").rank;
+        }
+        for (const note of extraNotes) await read(note, "rank");
+      }
+      const state: CurrentOrderState = {
+        parent, parentPath, parentNote, expectedChildren, sources, bindings, versions, mode,
+        children: mode === "manual" ? children.sort(compareChildren) : naturalOrder(children),
+      };
+      await this.assertCurrentOrderState(state);
+      const result = await operation(state);
+      await this.assertCurrentOrderState(state);
+      return result;
+    } finally {
+      this.app.vault.offref(modification);
+    }
+  }
+
+  private assertOrderBinding(binding: OrderSourceBinding, expected: string): void {
+    this.assertEntryIdentity(binding.file, binding.path, TFile);
+    if (this.getCanonicalFile(dirname(binding.path)) !== binding.file) throw new Error(`Ordering source changed: ${binding.path}`);
+    if (binding.editor === null) this.assertOrderingNoteClosed(binding.path);
+    else {
+      if (!this.isSameOpenMarkdownTarget(binding.editor, binding.file, binding.path)) throw new Error(`Ordering editor changed: ${binding.path}`);
+      this.assertOrderSource(binding, binding.editor.editor.getValue(), expected);
+    }
+  }
+
+  private assertOrderSource(binding: OrderSourceBinding, current: string, expected: string): void {
+    if (current === expected) return;
+    const { path, field } = binding;
+    if (readOrderingProperties(current, path, field, "node")[field] !== readOrderingProperties(expected, path, field, "node")[field]) {
+      throw new Error(`Ordering source changed: ${path}`);
+    }
+  }
+
+  private async assertCurrentOrderState(state: CurrentOrderState): Promise<void> {
+    const { versions } = state;
+    const checked = new Map<TFile, number>();
+    // Recheck current ordering fields, including earlier dependencies changed
+    // during a later read. Prose edits and host link rewrites remain intact.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      for (const binding of state.bindings) {
+        const expected = state.sources.get(binding.file)!;
+        this.assertOrderBinding(binding, expected);
+        const version = versions.get(binding.file)!;
+        const current = binding.editor?.editor.getValue() ?? await this.app.vault.read(binding.file);
+        this.assertOrderSource(binding, current, expected);
+        state.sources.set(binding.file, current);
+        checked.set(binding.file, version);
+      }
+      this.assertActive();
+      this.assertEntryIdentity(state.parent, state.parentPath, TFolder);
+      if (this.getCanonicalFile(state.parentPath) !== state.parentNote
+        || state.parent.children.length !== state.expectedChildren.length
+        || state.expectedChildren.some((child) => !state.parent.children.includes(child))) {
+        throw new Error(`Ordering structure changed: ${state.parentPath}`);
+      }
+      for (const binding of state.bindings) this.assertOrderBinding(binding, state.sources.get(binding.file)!);
+      if (state.bindings.every(({ file }) => versions.get(file) === checked.get(file))) return;
+    }
+    throw new Error("Ordering changes did not settle during validation");
   }
 
   private childRecords(parentPath: string): ChildOrderRecord[] {
@@ -1283,13 +1431,16 @@ export class NodeService {
     undos: Undo[],
     receipts?: FileChangeReceipt[],
   ): Promise<number | null> {
-    if (this.sortMode(parentPath) !== "manual") return null;
-    const movedPath = normalizeVaultPath(note.parent?.path ?? "");
-    const siblings = this.childRecords(parentPath).filter(({ childPath }) => childPath !== movedPath);
-    const moved: ChildOrderRecord = { basename: note.parent?.name ?? note.basename, childPath: movedPath, order: this.readRank(note) };
-    const plan = planInsert(siblings, moved, siblings.length);
-    await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos, receipts);
-    return plan.patches.find(({ childPath }) => childPath === movedPath)?.nextOrder ?? null;
+    return this.withCurrentOrder(parentPath, [note], async (state) => {
+      if (state.mode !== "manual") return null;
+      const movedPath = normalizeVaultPath(note.parent?.path ?? "");
+      const siblings = state.children.filter(({ childPath }) => childPath !== movedPath);
+      const moved: ChildOrderRecord = { basename: note.parent?.name ?? note.basename, childPath: movedPath,
+        order: readOrderingProperties(state.sources.get(note)!, note.path, "rank", "node").rank };
+      const plan = planInsert(siblings, moved, siblings.length);
+      await this.applyOrderPatches(plan.patches, note.parent instanceof TFolder ? note.parent : null, undos, receipts, state.sources, true);
+      return plan.patches.find(({ childPath }) => childPath === movedPath)?.nextOrder ?? null;
+    });
   }
 
   private async migrateUnlocked(
@@ -1395,6 +1546,7 @@ export class NodeService {
     patch: FolderNodesFrontmatterPatch,
     undos: Undo[],
     expectedSource?: string,
+    allowOpen = false,
   ): Promise<FileChangeReceipt | null> {
     this.assertActive();
     if (file === null) throw new Error(`Cannot update missing Node Note: ${FOLDER_NODES_PROPERTY}`);
@@ -1404,8 +1556,18 @@ export class NodeService {
       path,
       (current) => {
         if (expectedSource !== undefined) {
-          this.assertMergeNoteClosed(file, path, "target");
-          if (current !== expectedSource) throw new Error(`Merge rank source changed: ${path}`);
+          if (!allowOpen) this.assertMergeNoteClosed(file, path, "target");
+          if (current !== expectedSource) {
+            if (!allowOpen) throw new Error(`Merge rank source changed: ${path}`);
+            // Ordinary metadata edits may retain concurrent prose or unrelated
+            // properties, but a changed ordering dependency invalidates the plan.
+            for (const field of ["order", "rank"] as const) {
+              if (patch[field] !== undefined && readOrderingProperties(current, path, field, "node")[field]
+                !== readOrderingProperties(expectedSource, path, field, "node")[field]) {
+                throw new Error(`Ordering source changed: ${path}`);
+              }
+            }
+          }
         }
         return patchFolderNodesFrontmatter(current, patch);
       },
@@ -1413,7 +1575,7 @@ export class NodeService {
     const { after, before } = result;
     if (after === before) return null;
     const receipt = { after, before, file, path };
-    if (expectedSource !== undefined) this.pushExactMergeUndo(undos, file, path, receipt);
+    if (expectedSource !== undefined && !allowOpen) this.pushExactMergeUndo(undos, file, path, receipt);
     else undos.push(() => this.restoreFileChange(receipt));
     return receipt;
   }
@@ -1428,11 +1590,23 @@ export class NodeService {
     }, true);
   }
 
-  private async readMergeRankSource(file: TFile, path: string): Promise<{ source: string; editor: OpenMarkdownTarget | null }> {
+  private async readCurrentOrderingSource(file: TFile, path: string, operation: "ordering" | "merge" = "ordering"): Promise<{ source: string; editor: OpenMarkdownTarget | null }> {
     this.assertEntryIdentity(file, path, TFile);
     const editor = this.findOpenMarkdownTarget(file, path);
     if (editor !== null) return { source: editor.editor.getValue(), editor };
-    return { source: await this.readClosedMergeNote(file, path, "target"), editor: null };
+    const assertClosed = operation === "merge" ? () => this.assertMergeNoteClosed(file, path, "target") : () => this.assertOrderingNoteClosed(path);
+    assertClosed();
+    const source = await this.app.vault.read(file);
+    this.assertEntryIdentity(file, path, TFile);
+    assertClosed();
+    return { source, editor: null };
+  }
+
+  private assertOrderingNoteClosed(path: string): void {
+    if (this.app.workspace.getLeavesOfType("markdown").some((leaf) => {
+      const view = leaf.view as typeof leaf.view & { file?: TFile | null; editor?: Editor };
+      return view.file?.path === path && view.editor !== undefined;
+    })) throw new Error(`Cannot read current ordering while the note is open without a supported editor: ${path}`);
   }
 
   private assertMergeRankBinding(binding: MergeRankBinding, path: string, expected: string): void {
@@ -1807,13 +1981,13 @@ interface ParsedMergeFrontmatter {
   readonly lines: string[];
 }
 
-function mergeOrderingProperties(source: string, path: string, field: "order" | "rank"): ReturnType<typeof resolveFolderNodesProperties> {
+function readOrderingProperties(source: string, path: string, field: "order" | "rank", operation: "merge" | "node"): ReturnType<typeof resolveFolderNodesProperties> {
   const analysis = analyzeFolderNodesSource(source);
   const frontmatter = readMergeFrontmatter(source, path);
   const structural = Object.keys(frontmatter).some((key) => STRUCTURAL_PROPERTIES.has(key));
   const properties = resolveFolderNodesProperties(frontmatter, structural ? analysis.issues : []);
   const issue = properties.issues.find((entry) => entry.field === "all" || entry.field === field);
-  if (issue !== undefined) throw new Error(`Cannot prove merge ordering for ${path}: ${issue.message}`);
+  if (issue !== undefined) throw new Error(`Cannot prove ${operation} ordering for ${path}: ${issue.message}`);
   return properties;
 }
 
