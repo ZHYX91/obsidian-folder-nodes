@@ -1282,7 +1282,9 @@ export class NodeService {
         this.expectEvent("rename", sourcePath, nextPath, true);
         await this.app.fileManager.renameFile(folder, sourcePath);
       });
-      if (this.getFile(`${nextPath}/${name}.md`) === null) throw new Error("Renamed node failed structural validation");
+      this.assertEntryIdentity(folder, nextPath, TFolder);
+      this.assertEntryIdentity(renamedNote, nextPath + renamedNotePath.slice(sourcePath.length), TFile);
+      if (this.getCanonicalFile(nextPath) !== renamedNote) throw new Error("Renamed node failed structural validation");
     } catch (error) {
       await this.rollback(undos, error);
     }
