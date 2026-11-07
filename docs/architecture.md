@@ -24,6 +24,8 @@ Natural mode uses Unicode-normalized, numeric-aware basename order and writes no
 
 ## Node operations
 
+Bulk organization uses one cancellable asynchronous planner for previews, pre-commit rescans and post-commit validation. Root Node augmentation also has one owner in the asynchronous NodeService entry. Core scenario tests and scale benchmarks call that production planner and assert explicit expected plans instead of maintaining a second synchronous algorithm as a test substitute.
+
 Generated names and explicitly new names use a separate portable filename budget. Existing-path normalization, Root Node Note lookup, native rename synchronization and migration recognition keep their prior name interpretation, without renaming existing long names because of the new byte limit. Confirming an unchanged name does not shorten it; unresolved links that cannot retain their exact new name within the budget keep Obsidian's native behavior.
 
 Deletion confirmations bind the original file or folder object and path. Identity is checked before queueing and again when the serialized operation runs; moves, removal or same-path replacements reject the old request. The confirmation explains Obsidian's deletion setting and identifies whole-node deletion as including its Node Note and every subfolder and file. It does not promise trash recovery for permanent deletion.

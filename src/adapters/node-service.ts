@@ -16,7 +16,7 @@ import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exempt
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type FolderIdentity } from "../core/identity";
 import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
-import { scanMigration, scanMigrationAsync, type VaultInventory } from "../core/migration";
+import { scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planAppendChildren, planInsert } from "../core/ordering";
 import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
 import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
@@ -753,26 +753,6 @@ export class NodeService {
       }
     }
     return { files, folders, markdown };
-  }
-
-  public scan(): MigrationScan {
-    const result = scanMigration(this.inventory(), {
-      folders: this.getSettings().ignoredFolders,
-      folderPrefixes: this.getSettings().ignoredFolderPrefixes,
-      leafMarkdown: this.getSettings().leafNoteExemptions,
-      leafMarkdownPrefixes: this.getSettings().leafNotePrefixes,
-    });
-    const rootCandidates = this.canonicalFiles("");
-    if (rootCandidates.length > 1) {
-      return {
-        ...result,
-        conflicts: [{ path: "", reason: `Multiple Root Node Notes: ${rootCandidates.map(({ path }) => path).join(", ")}` }, ...result.conflicts],
-      };
-    }
-    if (rootCandidates.length === 0) {
-      return { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] };
-    }
-    return result;
   }
 
   public async scanAsync(onProgress?: (completed: number, total: number) => void, externalSignal?: AbortSignal): Promise<MigrationScan> {

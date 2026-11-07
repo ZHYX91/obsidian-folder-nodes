@@ -820,7 +820,7 @@ describe("NodeService structural safety", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     const nodes = service(fake);
-    const preview = nodes.scan();
+    const preview = await nodes.scanAsync();
     fake.addFile("Late.md", "late");
 
     await expect(nodes.migrate(preview)).rejects.toThrow("changed after preview");
@@ -866,20 +866,38 @@ describe("NodeService structural safety", () => {
     expect(fake.requireFile("B/B.md")).toBeDefined();
   });
 
-  it("keeps structure scans read-only", () => {
+  it("keeps structure scans read-only", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFolder("A");
     fake.addFolder("A/C");
     fake.addFile("A/Leaf.md", "leaf");
 
-    const scan = service(fake).scan();
+    const scan = await service(fake).scanAsync();
 
     expect(fake.files.has("A/A.md")).toBe(false);
     expect(fake.files.has("A/C/C.md")).toBe(false);
     expect(fake.requireFile("A/Leaf.md")).toBeDefined();
     expect(scan.missingNodeNotes).toEqual(["A", "A/C"]);
     expect(scan.leafMarkdown).toEqual(["A/Leaf.md"]);
+  });
+
+  it.each(["user", "unload"])("cancels a %s preview without changing the Vault", async (reason) => {
+    const fake = new FakeObsidian();
+    for (let index = 0; index < 600; index += 1) fake.addFolder(`Folder-${index}`);
+    fake.addFile("Loose.md", "keep this note");
+    const nodes = service(fake);
+    const before = [...fake.files.keys()];
+    const controller = new AbortController();
+    const preview = nodes.scanAsync(() => {
+      if (reason === "unload") nodes.dispose();
+      else controller.abort(new Error("preview cancelled"));
+    }, controller.signal);
+    await expect(preview).rejects.toThrow(reason === "unload" ? "service unloaded" : "preview cancelled");
+    expect([...fake.files.keys()]).toEqual(before);
+    expect(fake.contents.get("Loose.md")).toBe("keep this note");
+    expect(fake.renames).toEqual([]);
+    expect(fake.files.has("Vault.md")).toBe(false);
   });
 
   it("treats native folder and note creation as valid managed Vault state", async () => {
@@ -894,8 +912,8 @@ describe("NodeService structural safety", () => {
 
     expect(fake.files.has("FolderOnly/FolderOnly.md")).toBe(false);
     expect(fake.requireFile("Loose.md")).toBeDefined();
-    expect(nodes.scan().missingNodeNotes).toEqual(["FolderOnly"]);
-    expect(nodes.scan().leafMarkdown).toEqual(["Loose.md"]);
+    expect((await nodes.scanAsync()).missingNodeNotes).toEqual(["FolderOnly"]);
+    expect((await nodes.scanAsync()).leafMarkdown).toEqual(["Loose.md"]);
   });
 
   it("rejects queued structural writes and rolls back an in-flight create after dispose", async () => {
@@ -974,7 +992,7 @@ describe("NodeService structural safety", () => {
     fake.addFile("Vault.md");
     fake.addFile("Leaf.md", "leaf");
     const nodes = service(fake);
-    const preview = nodes.scan();
+    const preview = await nodes.scanAsync();
 
     nodes.dispose();
 
@@ -984,13 +1002,13 @@ describe("NodeService structural safety", () => {
     expect(fake.renames).toEqual([]);
   });
 
-  it("keeps bulk organization previews read-only", () => {
+  it("keeps bulk organization previews read-only", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("First.md", "first");
     fake.addFile("Second.md", "second");
     const nodes = service(fake);
-    const scan = nodes.scan();
+    const scan = await nodes.scanAsync();
     expect(fake.requireFile("First.md")).toBeDefined();
     expect(fake.requireFile("Second.md")).toBeDefined();
     expect(fake.files.has("First")).toBe(false);
@@ -1390,20 +1408,20 @@ describe("NodeService structural safety", () => {
     expect(fake.modifyListeners.size).toBe(0);
   });
 
-  it("reports a non-Markdown file occupying a migration target folder path", () => {
+  it("reports a non-Markdown file occupying a migration target folder path", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("Leaf", "binary");
     fake.addFile("Leaf.md", "leaf");
 
-    expect(service(fake).scan().conflicts[0]?.reason).toContain("occupied by a file");
+    expect((await service(fake).scanAsync()).conflicts[0]?.reason).toContain("occupied by a file");
   });
 
-  it("reports ambiguous case-only Root Node Notes instead of choosing one", () => {
+  it("reports ambiguous case-only Root Node Notes instead of choosing one", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("vault.md");
-    expect(service(fake).scan().conflicts[0]?.reason).toContain("Multiple Root Node Notes");
+    expect((await service(fake).scanAsync()).conflicts[0]?.reason).toContain("Multiple Root Node Notes");
   });
 
   it("serializes competing creates and leaves exactly one complete node", async () => {
@@ -1910,7 +1928,7 @@ describe("NodeService structural safety", () => {
     fake.addFolder("Folder");
     fake.addFile("Leaf.md", "leaf");
     const nodes = service(fake);
-    const preview = nodes.scan();
+    const preview = await nodes.scanAsync();
     const progress: number[] = [];
     await nodes.migrate(preview, (completed) => progress.push(completed));
     expect(fake.requireFile("Vault.md")).toBeDefined();
