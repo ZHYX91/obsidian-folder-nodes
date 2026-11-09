@@ -10,6 +10,8 @@
 
 - Bind Markdown and WikiLink merge checks to the actual target file, reject vault-root links to the removed note, and recheck moved attachment identities before source removal.
 
+- Keep large bulk-organization previews responsive while reducing unnecessary waits between progress checkpoints.
+
 ## 0.12.3 - 2026-11-02
 
 - Update the development-only minimatch dependencies to 11.0.4 with reviewed legacy lint-call adaptations and installed-caller regression checks.

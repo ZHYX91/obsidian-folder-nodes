@@ -2,6 +2,8 @@ import type { MigrationConflict, MigrationScan } from "./types";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "./exemptions";
 import { basename, dirname, isSameVaultName, normalizeVaultPath, sanitizeNodeName } from "./paths";
 
+const SCAN_SLICE_MS = 8;
+
 export interface VaultInventory {
   folders: readonly string[];
   markdown: readonly string[];
@@ -28,12 +30,17 @@ export async function scanMigrationAsync(
   const files = inventory.files ?? inventory.markdown;
   const total = inventory.folders.length * 3 + inventory.markdown.length * 3 + files.length;
   let completed = 0;
+  let nextYieldAt = 0;
   const checkpoint = async (): Promise<void> => {
     completed += 1;
     if (completed % 512 !== 0 && completed !== total) return;
     throwIfScanAborted(signal);
     onProgress?.(completed, Math.max(1, total));
+    // Keep progress checkpoints frequent without paying for a host timer at every checkpoint.
+    if (performance.now() < nextYieldAt) return;
     await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    throwIfScanAborted(signal);
+    nextYieldAt = performance.now() + SCAN_SLICE_MS;
   };
   const allFolders = new Set<string>();
   const allMarkdown = new Set<string>();
