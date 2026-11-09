@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scanMigrationAsync } from "../../src/core/migration";
 
 describe("migration scan", () => {
@@ -19,6 +19,34 @@ describe("migration scan", () => {
     await expect(scanMigrationAsync({ folders, markdown: [] }, {}, () => {
       controller.abort(new Error("cancelled by user"));
     }, controller.signal)).rejects.toThrow("cancelled by user");
+  });
+
+  it("honors cancellation from an event-loop task while planning", async () => {
+    const controller = new AbortController();
+    const folders = Array.from({ length: 2_000 }, (_, index) => `Folder-${index}`);
+    const cancellation = new Error("cancelled during yield");
+    globalThis.setTimeout(() => controller.abort(cancellation), 0);
+
+    await expect(scanMigrationAsync({ folders, markdown: [] }, {}, undefined, controller.signal))
+      .rejects.toBe(cancellation);
+  });
+
+  it("reports progress without sleeping between checkpoints in the same time slice", async () => {
+    const folders = Array.from({ length: 1_000 }, (_, index) => `Folder-${index}`);
+    const clock = vi.spyOn(performance, "now").mockReturnValue(0);
+    const timer = vi.spyOn(window, "setTimeout");
+    let progress = 0;
+    try {
+      await scanMigrationAsync({ folders, markdown: [] }, {}, () => {
+        progress += 1;
+        if (progress === 3) clock.mockReturnValue(100);
+      });
+      expect(progress).toBeGreaterThan(3);
+      expect(timer).toHaveBeenCalledTimes(2);
+    } finally {
+      timer.mockRestore();
+      clock.mockRestore();
+    }
   });
 
   it("yields during a large preview and keeps progress bounded and nondecreasing", async () => {
