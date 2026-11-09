@@ -354,11 +354,15 @@ export function setLanguage(language: InterfaceLanguage): void { configuredLangu
 export function resolvedLanguage(): AvailableInterfaceLocale {
   if (configuredLanguage !== "auto") return configuredLanguage;
   const tag = getLanguage().trim().replaceAll("_", "-").toLowerCase();
-  if (tag === "zh" || tag.startsWith("zh-")) {
-    return /(?:^|[-])(hant|tw|hk|mo)(?:$|[-])/u.test(tag) ? "zh-TW" : "zh-CN";
+  const [primary, ...allSubtags] = tag.split("-");
+  const extensionIndex = allSubtags.findIndex((part) => part.length === 1);
+  const subtags = extensionIndex < 0 ? allSubtags : allSubtags.slice(0, extensionIndex);
+  if (primary === "zh") {
+    if (subtags.includes("hant")) return "zh-TW";
+    if (subtags.includes("hans")) return "zh-CN";
+    return subtags.some((part) => part === "tw" || part === "hk" || part === "mo") ? "zh-TW" : "zh-CN";
   }
   if (tag === "pt" || tag.startsWith("pt-")) return "pt-BR";
-  const primary = tag.split("-")[0];
   return isInterfaceLanguage(primary) && primary !== "auto" ? primary : "en";
 }
 
