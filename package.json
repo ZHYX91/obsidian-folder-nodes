@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.12.3",
+  "version": "0.12.4",
   "description": "Organize folders as same-named nodes with visual navigation and scalable ordering.",
   "type": "module",
   "main": "dist/main.js",
