@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use one cancellable bulk-organization planner for previews, commit validation, regression tests and scale checks, removing the duplicate synchronous implementation.
+
 - Preserve the actual canonical note when native note renames synchronize the folder, including `.MD` extensions; refuse replaced objects or ambiguous resulting pairs.
 
 - Plan repeated sorting, ordering-mode changes, placements and child appends from current note or editor state, preserving queued actions while Metadata Cache lags.
