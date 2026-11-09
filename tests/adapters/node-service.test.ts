@@ -1648,9 +1648,9 @@ describe("NodeService structural safety", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFolder("Parent");
-    fake.addFile("Parent/Parent.md", "", { folderNodeChildrenSort: "manual" });
+    fake.addFile("Parent/Parent.md", "---\nfolderNodeChildrenSort: manual\n---\n");
     const child = fake.addFolder("Child");
-    fake.addFile("Child/Child.md", "# Original child", { folderNodeSiblingRank: 1024 });
+    fake.addFile("Child/Child.md", "---\nfolderNodeSiblingRank: 1024\n---\n# Original child");
     const originalRename = fake.app.fileManager.renameFile.bind(fake.app.fileManager);
     fake.app.fileManager.renameFile = async (entry, nextPath) => {
       await originalRename(entry, nextPath);
@@ -1764,7 +1764,7 @@ describe("NodeService structural safety", () => {
   ])("refuses %s %s links that would change meaning before moving anything", async (which, syntax) => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
-    fake.addFile("Reference.md", "the original reference");
+    const reference = fake.addFile("Reference.md", "the original reference");
     const source = fake.addFolder("Source");
     const link = (path: string) => {
       if (syntax === "entity") return `[ref](${path.replaceAll(".", "&#46;")})`;
@@ -1779,9 +1779,11 @@ describe("NodeService structural safety", () => {
     const childText = which === "child" ? link("../../Reference.md") : "child body";
     fake.addFile("Source/Sub/Child.md", childText);
     fake.addFolder("Deep");
+    const differentReference = fake.addFile("Deep/Reference.md", "a different reference");
     const target = fake.addFolder("Deep/B");
     fake.addFile("Deep/B/B.md", "target body");
-    await expect(service(fake).mergeNode(source, target)).rejects.toThrow(syntax.startsWith("html-") ? "relative HTML link" : syntax === "entity" ? "entity-encoded" : syntax === "inline" ? "change a relative link target" : "reference definition");
+    fake.app.metadataCache.getFirstLinkpathDest = (_path, from) => from.startsWith("Source/") ? reference : differentReference;
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow(syntax.startsWith("html-") ? "relative HTML link" : syntax === "entity" ? "entity-encoded" : syntax === "inline" ? "change a Markdown link target" : "reference definition");
     expect(fake.renames).toEqual([]);
     expect(fake.trashed).toEqual([]);
     expect(fake.contents.get("Source/Source.md")).toBe(sourceText);
@@ -1838,9 +1840,13 @@ describe("NodeService structural safety", () => {
     fake.addFile("Vault.md");
     const source = fake.addFolder("Source");
     fake.addFile("Source/Source.md", "See [asset](asset.bin)");
-    fake.addFile("Source/asset.bin", "attachment");
+    const attachment = fake.addFile("Source/asset.bin", "attachment");
     const target = fake.addFolder("Target");
     fake.addFile("Target/Target.md", "target");
+    fake.app.metadataCache.getFirstLinkpathDest = (_path, from) => {
+      const expected = from.startsWith("Source/") ? "Source/asset.bin" : "Target/asset.bin";
+      return attachment.path === expected ? attachment : null;
+    };
     await service(fake).mergeNode(source, target);
     expect(fake.requireFile("Target/asset.bin")).toBeDefined();
     expect(fake.contents.get("Target/Target.md")).toContain("See [asset](asset.bin)");
@@ -1957,11 +1963,11 @@ describe("NodeService structural safety", () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFolder("Parent");
-    fake.addFile("Parent/Parent.md", "", { folderNodeChildrenSort: "manual" });
+    fake.addFile("Parent/Parent.md", "---\nfolderNodeChildrenSort: manual\n---\n");
     fake.addFolder("Parent/Existing");
-    fake.addFile("Parent/Existing/Existing.md", "", { folderNodeSiblingRank: 4096 });
+    fake.addFile("Parent/Existing/Existing.md", "---\nfolderNodeSiblingRank: 4096\n---\n");
     const child = fake.addFolder("Child");
-    fake.addFile("Child/Child.md", "", { folderNodeSiblingRank: 4096 });
+    fake.addFile("Child/Child.md", "---\nfolderNodeSiblingRank: 4096\n---\n");
     await fake.rename(child, "Parent/Child");
 
     await service(fake).reconcileRenamed(fake.requireFolder("Parent/Child"), "Child");

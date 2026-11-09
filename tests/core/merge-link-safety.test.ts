@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { assertMergeLinksKeepDestinations } from "../../src/core/merge-link-safety";
 
 const assertSafe = (source: string) => assertMergeLinksKeepDestinations(
-  source, "A/A.md", "Deep/B/B.md", "A", "Deep/B", "A/A.md",
+  source, "A/A.md", "Deep/B/B.md", "A/A.md",
 );
 
 describe("Node merge link preflight", () => {
@@ -14,9 +14,9 @@ describe("Node merge link preflight", () => {
   it("uses the host resolver for a basename target and leaves unrelated targets alone", () => {
     const identity = {};
     const resolve = (path: string) => ({ path: path === "A" ? "A/A.md" : "Other/Other.md", identity });
-    expect(() => assertMergeLinksKeepDestinations("[[A|Alias]]", "A/sub.md", "Deep/B/sub.md", "A", "Deep/B", "A/A.md", resolve))
+    expect(() => assertMergeLinksKeepDestinations("[[A|Alias]]", "A/sub.md", "Deep/B/sub.md", "A/A.md", resolve))
       .toThrow("removed Node Note: A/sub.md body line 1");
-    expect(() => assertMergeLinksKeepDestinations("[[Other]]", "A/A.md", "Deep/B/B.md", "A", "Deep/B", "A/A.md", resolve))
+    expect(() => assertMergeLinksKeepDestinations("[[Other]]", "A/A.md", "Deep/B/B.md", "A/A.md", resolve))
       .not.toThrow();
   });
   it.each(["different-path", "same-path-replacement", "unresolved-old", "unresolved-new"])(
@@ -27,7 +27,7 @@ describe("Node merge link preflight", () => {
         if ((mode === "unresolved-old" && from === "A/A.md") || (mode === "unresolved-new" && from === "B/B.md")) return null;
         return { path: mode === "different-path" && from === "B/B.md" ? "B/Reference.md" : "A/Reference.md", identity: mode === "same-path-replacement" && from === "B/B.md" ? replacement : original };
       });
-      expect(() => assertMergeLinksKeepDestinations("[[Reference#Heading|Alias]]", "A/A.md", "B/B.md", "A", "B", "A/A.md", resolve)).toThrow(/WikiLink target/u);
+      expect(() => assertMergeLinksKeepDestinations("[[Reference#Heading|Alias]]", "A/A.md", "B/B.md", "A/A.md", resolve)).toThrow(/WikiLink target/u);
       expect(resolve).toHaveBeenCalledWith("Reference", "A/A.md");
       if (mode !== "unresolved-old") expect(resolve).toHaveBeenCalledWith("Reference", "B/B.md");
     },
@@ -36,32 +36,32 @@ describe("Node merge link preflight", () => {
     const identity = {};
     const resolve = () => ({ path: "Elsewhere/Reference.md", identity });
     for (const source of ["[[Reference]]", "![[Sub/Reference#^block|Alias]]"]) {
-      expect(() => assertMergeLinksKeepDestinations(source, "A/A.md", "B/B.md", "A", "B", "A/A.md", resolve,
+      expect(() => assertMergeLinksKeepDestinations(source, "A/A.md", "B/B.md", "A/A.md", resolve,
         [{ from: "A/Sub/Reference.md", to: "B/Sub/Reference.md" }])).toThrow("Cannot prove");
     }
-    expect(() => assertMergeLinksKeepDestinations("[[A/asset]]", "A/A.md", "B/B.md", "A", "B", "A/A.md",
+    expect(() => assertMergeLinksKeepDestinations("[[A/asset]]", "A/A.md", "B/B.md", "A/A.md",
       () => ({ path: "A/asset.md", identity }), [{ from: "A/asset.md", to: "B/asset.md" }])).toThrow("Cannot prove");
-    expect(() => assertMergeLinksKeepDestinations("[[#Heading]] ![[#^block]]", "A/child.md", "B/child.md", "A", "B", "A/A.md", resolve)).not.toThrow();
+    expect(() => assertMergeLinksKeepDestinations("[[#Heading]] ![[#^block]]", "A/child.md", "B/child.md", "A/A.md", resolve)).not.toThrow();
   });
   it("retains the original identity for final validation instead of resolving the old context again", () => {
     const original = {};
     let changed = false;
     const resolve = vi.fn((_path: string, from: string) => ({ path: "Other.md", identity: changed && from === "B/B.md" ? {} : original }));
-    const validate = assertMergeLinksKeepDestinations("[[Other]]", "A/A.md", "B/B.md", "A", "B", "A/A.md", resolve);
+    const validate = assertMergeLinksKeepDestinations("[[Other]]", "A/A.md", "B/B.md", "A/A.md", resolve);
     resolve.mockClear();
-    validate();
+    validate("after");
     expect(resolve.mock.calls).toEqual([["Other", "B/B.md"]]);
     changed = true;
     expect(validate).toThrow("change a WikiLink target");
   });
   it.each(["Sub/../Reference", "Sub/./Reference", "Sub//Reference", "Reference/"])(
     "refuses an unproved noncanonical selector before projecting competitors: %s", (path) => {
-      expect(() => assertMergeLinksKeepDestinations(`[[${path}]]`, "A/A.md", "B/B.md", "A", "B", "A/A.md",
+      expect(() => assertMergeLinksKeepDestinations(`[[${path}]]`, "A/A.md", "B/B.md", "A/A.md",
         () => ({ path: "Fixed/Reference.md", identity: "fixed" }), [{ from: "A/Reference.md", to: "B/Reference.md" }])).toThrow("Cannot prove");
     },
   );
   it.each(["[[|Alias]]", "[[ ]]"])("does not treat an unproved empty selector as a child self-subpath: %s", (source) => {
-    expect(() => assertMergeLinksKeepDestinations(source, "A/child.md", "B/child.md", "A", "B", "A/A.md")).toThrow("Cannot prove");
+    expect(() => assertMergeLinksKeepDestinations(source, "A/child.md", "B/child.md", "A/A.md")).toThrow("Cannot prove");
   });
   it("ignores literal WikiLinks in code, comments, and escaped openers", () => {
     expect(() => assertSafe([
@@ -89,8 +89,11 @@ describe("Node merge link preflight", () => {
     expect(() => assertSafe("- - ~~~\n    literal\n    ~~~\n  [[A/A]]")).toThrow("mixed list and quote");
   });
   it("rejects a cross-directory relative target before merging", () => {
-    expect(() => assertSafe("[reference](../Reference.md)")).toThrow("change a relative link target");
-    expect(() => assertSafe("![image](../Image.png)")).toThrow("change a relative link target");
+    for (const link of ["[reference](../Reference.md)", "![image](../Image.png)"]) {
+      const identity = {};
+      const resolve = (_path: string, from: string) => ({ path: from === "A/A.md" ? "Reference.md" : "Deep/Reference.md", identity });
+      expect(() => assertMergeLinksKeepDestinations(link, "A/A.md", "Deep/B/B.md", "A/A.md", resolve)).toThrow("change a Markdown link target");
+    }
   });
   it.each(["&#46;&#46;/Reference.md", "&#x2e;&#x2e;/Reference.md", "..&sol;Reference.md", "&#35;section"])(
     "fails closed on entity-encoded relative destinations: %s", (destination) => {
@@ -100,11 +103,22 @@ describe("Node merge link preflight", () => {
       expect(() => assertSafe(`[reference](https://example.com/${destination})`)).not.toThrow();
     },
   );
-  it("allows references to child files moved to equivalent relative paths", () => {
-    expect(() => assertSafe("[asset](asset.bin) ![image](sub/pic.png)")).not.toThrow();
-    expect(() => assertMergeLinksKeepDestinations(
-      "[sibling](../other.md)", "A/sub/page.md", "Deep/B/sub/page.md", "A", "Deep/B", "A/A.md",
-    )).not.toThrow();
+  it.each([
+    ["A/A.md", "Deep/B/B.md", "asset.bin", "A/asset.bin", "Deep/B/asset.bin"],
+    ["A/A.md", "Deep/B/B.md", "sub/pic.png", "A/sub/pic.png", "Deep/B/sub/pic.png"],
+    ["A/sub/page.md", "Deep/B/sub/page.md", "../other.md", "A/other.md", "Deep/B/other.md"],
+  ])("binds a moved relative target before and after relocation from %s", (oldNote, newNote, path, from, to) => {
+    const identity = {};
+    let moved = false;
+    const resolve = (_path: string, source: string) => source === (moved ? newNote : oldNote) ? { path: moved ? to : from, identity } : null;
+    const validate = assertMergeLinksKeepDestinations(`[asset](${path})`, oldNote, newNote, "A/A.md", resolve, [{ from, to }]);
+    validate("before");
+    moved = true;
+    expect(() => validate("after")).not.toThrow();
+  });
+
+  it("requires a resolved file instead of treating a lexical relative path as proof", () => {
+    expect(() => assertSafe("[asset](asset.bin)")).toThrow("Cannot prove a Markdown link target");
   });
   it.each(["../Reference.md", "&#46;&#46;/Reference.md", "&#x2e&#x2e/Reference.md", "..&sol;Reference.md", "child.md", "#section"])(
     "refuses unproved relative HTML destinations: %s", (destination) => {
