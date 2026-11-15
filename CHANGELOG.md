@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Preserve distinct YAML property names containing Unicode spaces and neighboring top-level properties when updating node metadata.
+
 ## 0.12.4 - 2026-11-09
 
 - When following Obsidian’s language, honor explicit Simplified or Traditional Chinese scripts before region and ignore locale extensions.

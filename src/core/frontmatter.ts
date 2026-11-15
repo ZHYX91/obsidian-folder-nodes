@@ -194,8 +194,11 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
       });
       continue;
     }
-    const key = keys.find((candidate) => new RegExp(`^${escapePattern(candidate)}\\s*:`, "u").test(line));
-    if (key === undefined) continue;
+    const separator = blockMappingSeparator(line);
+    if (separator === null) continue;
+    // Unicode spaces belong to the authored key, not YAML separation.
+    const key = line.slice(0, separator).replace(/[ \t]+$/u, "");
+    if (!keys.includes(key)) continue;
     const range = { start: index, end: structure.valueEnds.get(index) ?? continuationEnd(lines, index, closingBoundary) };
     const existing = occurrences.get(key) ?? [];
     existing.push(range);
@@ -243,8 +246,8 @@ function inspectTopLevelStructure(lines: readonly string[], closingBoundary: num
       }
       continue;
     }
-    if (/^\s*(?:#.*)?$/u.test(line)) continue;
-    if (/^\s/u.test(line)) {
+    if (/^[ \t]*(?:#.*)?$/u.test(line)) continue;
+    if (/^[ \t]/u.test(line)) {
       if (mappingLines.size === 0) return null;
       continue;
     }
@@ -279,9 +282,9 @@ function blockMappingSeparator(line: string): number | null {
       continue;
     }
     if (index === 0 && (character === "'" || character === '"')) { quote = character; continue; }
-    if (character !== ":" || (line[index + 1] !== undefined && !/\s/u.test(line[index + 1]!))) continue;
-    const key = line.slice(0, index).trim();
-    if (key === "" || /^[-?](?:\s|$)/u.test(key) || key.startsWith("[") || key.startsWith("]") || /^[{}:,#&*!|>]/u.test(key)) return null;
+    if (character !== ":" || (line[index + 1] !== undefined && !/[ \t]/u.test(line[index + 1]!))) continue;
+    const key = line.slice(0, index).replace(/[ \t]+$/u, "");
+    if (key === "" || /^[-?](?:[ \t]|$)/u.test(key) || key.startsWith("[") || key.startsWith("]") || /^[{}:,#&*!|>]/u.test(key)) return null;
     return index;
   }
   return null;
@@ -369,8 +372,8 @@ function continuationEnd(lines: readonly string[], start: number, closingBoundar
   let hasContent = after === "" || /^[|>]/u.test(after);
   while (index < closingBoundary) {
     const line = lines[index] ?? "";
-    if (line === "" || /^\s/u.test(line)) {
-      if (!/^\s*(?:#.*)?$/u.test(line)) hasContent = true;
+    if (line === "" || /^[ \t]/u.test(line)) {
+      if (!/^[ \t]*(?:#.*)?$/u.test(line)) hasContent = true;
       index += 1;
     }
     else break;
@@ -514,8 +517,4 @@ function renderListItem(value: string): string {
 
 function renderScalar(value: string | number | boolean): string {
   return typeof value === "string" ? JSON.stringify(value) : String(value);
-}
-
-function escapePattern(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
