@@ -4,6 +4,12 @@ Use these fixtures only in a disposable Vault. `product-scenarios.json` declares
 expected behavior for desktop and Android emulator checks. A pass covers the selected scenarios
 and the exact installed candidate, not every host or input method.
 
+`unicode-property-ownership` uses the two `UnicodeWhitespace` child notes. Their U+00A0 and
+U+3000 characters belong to plain YAML keys. Retain the original file bytes and inspect in
+Source mode so Properties editing does not normalize the input before the product action.
+`settings-reload-persistence` observes normal disable/re-enable and host reload through the
+actual settings UI. It does not substitute for the automated controlled persistence races.
+
 The optional Folder Nodes Acceptance Provider stays idle until one of its explicit fixture commands
 is invoked. **Create deep Explorer reveal fixture** creates `Reveal/` with 120 reverse-ranked
 siblings and a five-level target path for reveal/order/viewport checks. **Create 501-node viewport

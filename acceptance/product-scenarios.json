@@ -448,6 +448,50 @@
       ]
     },
     {
+      "id": "unicode-property-ownership",
+      "title": "Exact YAML key ownership while hiding and showing nodes",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In a fresh disposable Vault, retain the original bytes of UnicodeWhitespace/NBSP/NBSP.md and UnicodeWhitespace/Ideographic/Ideographic.md. Their plain keys contain U+00A0 and U+3000 respectively; these are part of the keys, not YAML indentation or separators.",
+        "Use the Folder Nodes action to hide NBSP, enable the Root session eye to reveal it, and inspect its saved note. Repeat for Ideographic. Use Source mode only to inspect, without retyping the Unicode keys or letting Properties normalize the fixture.",
+        "Use the product action to show both nodes again. Close the notes, reload Obsidian, and read back both files from the disposable Vault. Compare their unrelated YAML lines and body sentinels with the retained originals."
+      ],
+      "expected": [
+        "Hide changes the owned legacy folderNodeHidden field into the exact folder-nodes property with hidden=true, and the host projection hides the chosen node.",
+        "The distinct folder-nodes key with a trailing Unicode space, the key beginning with that space, and the key containing colon followed by that space retain their exact names and values through hide and show. The body sentinel remains unchanged.",
+        "Show removes the owned hidden marker without removing or renaming any unrelated property. Both nodes are visible after reload with the Root session eye reset."
+      ]
+    },
+    {
+      "id": "settings-reload-persistence",
+      "title": "Settings persistence across plugin disable and host reload",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Open Folder Nodes settings in a disposable Vault. Set the interface language to English, change Apply hidden markers, then set the language to Chinese. Disable and re-enable Folder Nodes through the host's Community plugins controls.",
+        "Reopen the plugin settings and inspect the final language and Apply hidden markers value. Make a second different settings change, close the settings, reload Obsidian, and inspect those values again.",
+        "Change the language back to English after reload and save another setting. Confirm the controls remain usable and the plugin contributes one settings entry and one Root eye. Retain UI observations or screenshots of each selected value and its result after closing and reopening settings; do not export host or plugin configuration files."
+      ],
+      "expected": [
+        "The last selected settings survive disable/re-enable and host reload; a prior instance does not visibly restore older settings.",
+        "The new plugin instance can save normally after reload, without duplicate plugin-owned settings UI or Root controls.",
+        "These observations cover actual host lifecycle and persistence. They do not claim a delayed-write, disk-failure, future-schema or cross-process interleaving unless that condition was separately observed."
+      ]
+    },
+    {
       "id": "node-write-safety-and-settings",
       "title": "Quoted-key protection, recognized note renaming and stable settings rules",
       "surfaces": [
