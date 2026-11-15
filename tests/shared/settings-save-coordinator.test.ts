@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SettingsSaveCoordinator } from "../../src/shared/settings-save-coordinator";
+import { getSettingsStorageQueue, SettingsSaveCoordinator } from "../../src/shared/settings-save-coordinator";
 
 function deferred() {
   let reject!: (error: unknown) => void;
@@ -105,6 +105,42 @@ describe("SettingsSaveCoordinator", () => {
     await coordinator.flush();
 
     expect(persist).toHaveBeenNthCalledWith(2, { value: 4 });
+    expect(coordinator.getState()).toBe("saved");
+  });
+
+  it("reserves an accepted retry flush before later reads and lets it settle after close", async () => {
+    const first = deferred();
+    const queue = getSettingsStorageQueue({}, "folder-nodes");
+    let stored = 0;
+    const persist = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(async (snapshot: { value: number }) => { stored = snapshot.value; });
+    const coordinator = new SettingsSaveCoordinator<{ value: number }>(persist, undefined, queue);
+    const failed = expect(coordinator.save({ value: 7 })).rejects.toThrow("Disk unavailable");
+    const flush = coordinator.flush();
+    coordinator.close();
+    const read = queue.run(async () => stored);
+    first.reject(new Error("Disk unavailable"));
+
+    await Promise.all([failed, flush]);
+    await expect(read).resolves.toBe(7);
+    await expect(coordinator.save({ value: 9 })).rejects.toThrow("closed");
+    await expect(coordinator.retry()).rejects.toThrow("closed");
+    await expect(coordinator.flush()).rejects.toThrow("closed");
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(coordinator.getState()).toBe("saved");
+  });
+
+  it("does not retry an older failed snapshot when a newer save was accepted after flush", async () => {
+    const persist = vi.fn().mockRejectedValueOnce(new Error("Disk unavailable")).mockResolvedValue(undefined);
+    const coordinator = new SettingsSaveCoordinator<{ value: number }>(persist);
+    await expect(coordinator.save({ value: 1 })).rejects.toThrow("Disk unavailable");
+
+    const flush = coordinator.flush();
+    const latest = coordinator.save({ value: 2 });
+    await Promise.all([flush, latest]);
+
+    expect(persist.mock.calls).toEqual([[{ value: 1 }], [{ value: 2 }]]);
     expect(coordinator.getState()).toBe("saved");
   });
 });

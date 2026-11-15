@@ -8,6 +8,7 @@ vi.mock("obsidian", async (importOriginal) => ({
     public addCommand(command: Command): Command {
       return { ...command, id: `${this.manifest.id}:${command.id}`, name: `${this.manifest.name}: ${command.name}` };
     }
+    public async loadData(): Promise<unknown> { return null; }
     public async saveData(_snapshot: unknown): Promise<void> {}
   },
 }));

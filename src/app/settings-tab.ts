@@ -180,6 +180,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       this.plugin.getSettingsSaveState(),
       () => this.retrySettingsSave(),
     );
+    const panel = status.closest<HTMLElement>("[role=tabpanel]");
+    if (panel !== null) lockSettingsPanel(panel, this.plugin.getSettingsCompatibility().status === "incompatible");
   }
 
   private async retrySettingsSave(): Promise<void> {

@@ -27,6 +27,7 @@ import {
   type SettingsCompatibility,
 } from "../shared/settings";
 import {
+  getSettingsStorageQueue,
   SettingsSaveCoordinator,
   type SettingsSaveState,
 } from "../shared/settings-save-coordinator";
@@ -75,8 +76,9 @@ export default class FolderNodesPlugin extends Plugin {
   private ribbonElement: HTMLElement | null = null;
   private settingsSaveWasPending = false;
   private showHiddenNodesThisSession = false;
+  private readonly settingsStorageQueue = getSettingsStorageQueue(this.app, this.manifest.id);
   private readonly settingsSaver = new SettingsSaveCoordinator<PersistedFolderNodesSettings>(
-    (snapshot) => this.saveData(snapshot),
+    (snapshot) => this.persistSettingsSnapshot(snapshot),
     (state) => {
       if (state === "pending") {
         this.settingsSaveWasPending = true;
@@ -86,6 +88,7 @@ export default class FolderNodesPlugin extends Plugin {
         this.settingsTab?.refreshPersistenceStatus();
       }
     },
+    this.settingsStorageQueue,
   );
   private settingsCompatibility: SettingsCompatibility = {
     status: "compatible",
@@ -94,11 +97,11 @@ export default class FolderNodesPlugin extends Plugin {
   };
 
   public override async onload(): Promise<void> {
+    if (this.unloaded) return;
     const generation = ++this.lifecycleGeneration;
-    this.unloaded = false;
     this.initialized = false;
     this.settingsLoaded = false;
-    const stored: unknown = await this.loadData();
+    const stored: unknown = await this.settingsStorageQueue.run(() => this.loadData());
     if (this.unloaded || generation !== this.lifecycleGeneration) return;
     const loaded = loadSettingsData(stored);
     this.settings = loaded.settings;
@@ -182,9 +185,11 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   public override onunload(): void {
+    if (this.unloaded) return;
     if (this.settingsLoaded && this.settingsCompatibility.status === "compatible") {
       void this.settingsSaver.flush(createSettingsSnapshot(this.settings)).catch(() => undefined);
     }
+    this.settingsSaver.close();
     this.lifecycleGeneration += 1;
     this.unloaded = true;
     this.initialized = false;
@@ -213,6 +218,19 @@ export default class FolderNodesPlugin extends Plugin {
       throw new SettingsSchemaIncompatibleError(this.settingsCompatibility);
     }
     await this.settingsSaver.save(createSettingsSnapshot(this.settings));
+  }
+
+  private async persistSettingsSnapshot(snapshot: PersistedFolderNodesSettings): Promise<void> {
+    const { compatibility } = loadSettingsData(await this.loadData());
+    if (compatibility.status === "incompatible") {
+      this.settingsCompatibility = compatibility;
+      this.settingsTab?.refreshPersistenceStatus();
+    }
+    if (this.settingsCompatibility.status === "incompatible") {
+      throw new SettingsSchemaIncompatibleError(this.settingsCompatibility);
+    }
+    // This read guards observable schemas, not an atomic compare-and-swap with external writers.
+    await this.saveData(snapshot);
   }
 
   public getSettingsCompatibility(): SettingsCompatibility {

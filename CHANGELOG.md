@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Preserve distinct YAML property names containing Unicode spaces and neighboring top-level properties when updating node metadata.
+- Serialize settings startup reads and accepted writes across plugin reloads, reject work after unload, and recheck stored schemas before writing to preserve incompatible data.
 
 ## 0.12.4 - 2026-11-09
 

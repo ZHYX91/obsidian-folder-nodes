@@ -13,7 +13,7 @@ translation_status: source
 
 节点图谱测试直接导入真实生产入口，覆盖注册、启停、leaf 复用/关闭、状态迁移与 teardown，不把源码字符串断言当成行为证明。纯行为 fixture 覆盖三范围渐进默认、Root/局部边界、多个同时展开分支、普通/Alt/范围展开、收回一级、仅会话展开、旧关系迁移、搜索快照恢复、外部聚焦、节点主体打开/菜单、Tooltip/键盘/ARIA、Visual 回退、从左到右/从上到下结构锚点、独立链接锚点、链接 LOD 不删除结构边，以及单一 RuntimeStyles 权威。窄屏、粗指针和合成触控覆盖用于保护 Android 兼容代码，但不得表述成真实 Android 主机证据。
 
-回归测试还会注入 closed file 同期编辑、未保存的 open editor、同路径 TFile replacement，以及 rollback 期间的同路径 folder replacement。设置保存测试通过延迟和拒绝较早的持久化调用，证明快照隔离、顺序和 queued latest state 的恢复。
+回归测试还会注入 closed file 同期编辑、未保存的 open editor、同路径 TFile replacement，以及 rollback 期间的同路径 folder replacement。设置保存测试通过延迟和拒绝较早的持久化调用，证明快照隔离、顺序和 queued latest state 的恢复。生命周期回归调用真实插件的 `onload`、`onunload`、`saveSettings` 和重试入口，并用内存存储端口分别控制读取、写入提交与回执时序：覆盖跨实例及模块重载的启动等待、最终快照、失败后队列继续、App/插件 id 隔离、未加载就卸载、迟到的启动完成与关闭后拒绝新工作。更高或无效 schema 在启动迁移或排队最终写入派发前出现时必须保留原数据；已派发宿主写入与外部写者的竞争不属于原子保护范围。设置面板回归验证运行中转只读后保留草稿和导航并禁用控件。这些检查使用异步端口与 DOM 替身，不是实际 Obsidian 重载、磁盘原子性或跨进程验收证据。
 
 选定文件的整体阈值与全量源码 inventory 是两种不同的检查。`node-service.ts`、`explorer-events.ts` 和 `settings.ts` 另有独立文件阈值，具体数值声明在 `vitest.config.mts`。文档事件注册表、`settings-tab.ts` 与 `prompt-modal.ts` 纳入数值门禁，输入弹窗另有文件阈值。单独的 inventory 不会对 `plugin.ts` 或 `contents-view.ts` 施加阈值。
 

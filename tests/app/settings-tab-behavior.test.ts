@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import FolderNodesPlugin from "../../src/app/plugin";
 import { FolderNodesSettingTab } from "../../src/app/settings-tab";
-import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings } from "../../src/shared/settings";
+import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings, type SettingsCompatibility } from "../../src/shared/settings";
 import type { SettingsSaveState } from "../../src/shared/settings-save-coordinator";
 import { setLanguage, t } from "../../src/ui/i18n";
 import { AVAILABLE_INTERFACE_LOCALES, INTERFACE_LOCALE_LABELS } from "../../src/core/interface-languages";
@@ -17,6 +17,7 @@ vi.mock("obsidian", async (importOriginal) => {
     ...actual, PluginSettingTab: TestPluginSettingTab,
     Plugin: class {
       public constructor(public app: App, public manifest: PluginManifest) {}
+      public async loadData(): Promise<unknown> { return null; }
       public async saveData(_snapshot: unknown): Promise<void> {}
     },
   };
@@ -29,7 +30,7 @@ function fixture() {
   const plugin = {
     settings: structuredClone(DEFAULT_SETTINGS),
     ensureStyles: vi.fn(),
-    getSettingsCompatibility: () => ({
+    getSettingsCompatibility: (): SettingsCompatibility => ({
       status: "compatible" as const,
       currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
       storedSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
@@ -270,6 +271,31 @@ describe("imperative settings edit state", () => {
     await vi.waitFor(() => expect(tab.containerEl.querySelector(".folder-nodes-settings-warning")).toBeNull());
     expect(tab.containerEl.querySelector("[data-test-editor]")).toBe(editor);
     expect(document.activeElement).toBe(editor);
+  });
+
+  it("locks an open panel when a later persistence check discovers an incompatible schema", () => {
+    const { tab, plugin } = fixture();
+    Reflect.set(tab, "renderGeneral", (panel: HTMLElement) => { panel.createEl("input"); });
+    Reflect.set(tab, "revealActiveTab", () => undefined);
+    tab.display();
+    const input = tab.containerEl.querySelector<HTMLInputElement>("input")!;
+    input.value = "draft";
+    expect(input.disabled).toBe(false);
+    vi.spyOn(plugin, "getSettingsCompatibility").mockReturnValue({
+      status: "incompatible",
+      currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+      storedSchemaVersion: 4,
+      reason: "future-schema",
+    });
+
+    tab.refreshPersistenceStatus();
+
+    expect(tab.containerEl.querySelector("input")).toBe(input);
+    expect(input.value).toBe("draft");
+    expect(input.disabled).toBe(true);
+    expect(tab.containerEl.querySelector("[role=tabpanel]")?.getAttribute("aria-disabled")).toBe("true");
+    expect(tab.containerEl.querySelector(".folder-nodes-settings-warning")?.textContent).toContain(t("settingsReadOnly"));
+    expect([...tab.containerEl.querySelectorAll<HTMLButtonElement>("[role=tab]")].every((tabButton) => !tabButton.disabled)).toBe(true);
   });
 
   it("applies the retained committed graph snapshot after Retry while preserving an unfinished edit", async () => {
