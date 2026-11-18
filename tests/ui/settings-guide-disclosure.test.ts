@@ -4,19 +4,7 @@ import { createFolderSettingsGuide } from "../../src/ui/settings-guide-disclosur
 
 describe("Folder Nodes setting tutorials", () => {
   it("starts closed and retains state only in the owning session Set", () => {
-    Object.assign(HTMLElement.prototype, {
-      createEl(this: HTMLElement, tag: string, opts?: { cls?: string; text?: string }) {
-        const el = document.createElement(tag);
-        if (opts?.cls) el.className = opts.cls;
-        if (opts?.text) el.textContent = opts.text;
-        this.append(el);
-        return el;
-      },
-      createDiv(this: HTMLElement, opts?: { cls?: string }) {
-        return (this as unknown as { createEl(tag: string, opts?: unknown): HTMLElement })
-          .createEl("div", opts);
-      },
-    });
+    // The repository's Vitest setup installs Obsidian DOM factories.
     const panel = document.createElement("section");
     const state = new Set<string>();
     createFolderSettingsGuide(panel, "management", "About files and nodes", state);
