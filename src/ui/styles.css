@@ -179,18 +179,27 @@ body {
   .folder-nodes-settings-guide > summary:focus-visible { outline-color: Highlight; }
 }
 
-.folder-nodes-settings-guide-body {
+.folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
+  box-sizing: border-box;
   min-inline-size: 0;
   max-inline-size: 68ch;
   margin-block-start: 6px;
-  margin-inline-start: 18px;
+  margin-inline-start: 6px;
+  border-inline-start: 2px solid var(--background-modifier-border);
+  padding-inline-start: 10px;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.5;
 }
 
-@container (max-width: 360px) {
-  .folder-nodes-settings-guide-body { margin-inline-start: 0; }
+@supports (color: color-mix(in srgb, red, blue)) {
+  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
+    border-inline-start-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
+  }
+}
+
+@container (max-width: 24rem) {
+  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body { margin-inline-start: 0; }
 }
 
 .folder-nodes-settings-guide-body p { margin: 0; }
