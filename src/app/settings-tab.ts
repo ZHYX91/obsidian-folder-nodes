@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
@@ -15,6 +15,7 @@ import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { formatError, interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
 import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
 import { renderVisual } from "../presentation/render-visual";
+import { createFolderSettingsGuide } from "../ui/settings-guide-disclosure";
 
 type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";
 type ExemptionKind = "leaf" | "folder";
@@ -28,6 +29,7 @@ const ENABLE_DECLARATIVE_SETTINGS = false;
 
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
+  private readonly expandedGuides = new Set<string>();
   private installedEmojiFonts: EmojiFontFamily[] | null = null;
   private emojiFontScan: Promise<EmojiFontFamily[]> | null = null;
   private emojiFontScanGeneration = 0;
@@ -135,6 +137,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     else await this.plugin.saveSettings();
     if (reconcileNodeGraph) await this.plugin.reconcileSettingsChange();
     updateDeclarativeSettingTab(this);
+  }
+
+  public override hide(): void {
+    this.expandedGuides.clear();
+    super.hide();
   }
 
   public override display(): void {
@@ -373,14 +380,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderManagement(panel: HTMLElement): void {
-    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
-    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
-    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, "info");
-    heading.createEl("strong", { text: t("managementGuideTitle") });
-    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
+    // This distinction is required before running any structural operation.
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("managementGuideBoundary") });
+    const body = createFolderSettingsGuide(panel, "management", t("managementGuideTitle"), this.expandedGuides);
     body.createEl("p", { text: t("managementGuideStructure") });
-    body.createEl("p", { text: t("managementGuideBoundary") });
     body.createEl("p", { text: t("managementGuideActions") });
     this.renderUnmanagedGroup(panel, "leaf");
     this.renderUnmanagedGroup(panel, "folder");
@@ -476,14 +479,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderIconGuide(panel: HTMLElement): void {
-    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
-    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
-    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, "info");
-    heading.createEl("strong", { text: t("iconGuideTitle") });
-
-    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
-    body.createEl("p", { text: t("iconGuideIntro") });
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideIntro") });
+    const body = createFolderSettingsGuide(panel, "icons", t("iconGuideTitle"), this.expandedGuides);
     const example = body.createDiv({ cls: "folder-nodes-settings-guide-example" });
     example.createSpan({ text: t("iconPropertyExampleLabel") });
     example.createEl("code", { text: "icon: 💰", attr: { dir: "ltr" } });
@@ -495,7 +492,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "A Project", false);
     this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "Project", true);
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓 Project", false);
-    body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("iconGuideRootNote") });
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideRootNote") });
   }
 
   private renderIconComparisonRow(container: HTMLElement, label: string, iconValue: string, name: string, propertyIcon: boolean): void {
@@ -620,17 +617,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNamingGuide(panel: HTMLElement): void {
-    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
-    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
-    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, "info");
-    heading.createEl("strong", { text: t("creationGuideTitle") });
-
-    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
-    body.createEl("p", { text: t("creationGuideSelection") });
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideSelection") });
+    const body = createFolderSettingsGuide(panel, "selection-creation", t("creationGuideTitle"), this.expandedGuides);
     this.creationExample(body, "[[a]]", "a/a.md", null);
     this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));
-    body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("creationGuideScope") });
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideScope") });
   }
 
   private creationExample(container: HTMLElement, source: string, target: string, detail: string | null): void {
