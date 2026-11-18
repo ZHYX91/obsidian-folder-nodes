@@ -28,7 +28,7 @@ describe("settings tab compatibility contract", () => {
     expect(source).toContain('t("iconDistinctionDesc")');
     expect(styles).toContain(".folder-nodes-settings-guide");
     expect(styles).toContain(
-      "border-inline-start: 3px solid var(--interactive-accent)",
+      "border: 1px solid var(--background-modifier-border)",
     );
     expect(styles).toContain("background: var(--background-secondary)");
     expect(styles).toContain("--folder-nodes-glyph-font: var(--font-interface)");
