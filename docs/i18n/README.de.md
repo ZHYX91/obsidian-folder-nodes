@@ -4,6 +4,25 @@
 
 Diese Kurzfassung behandelt die wichtigsten Abläufe und Risiken. Ausführliche Anleitungen stehen auf [Englisch](../../README.md) und [vereinfachtem Chinesisch](README.zh-CN.md) bereit.
 
+## Installation
+
+Öffnen Sie „Einstellungen → Community-Plugins → Durchsuchen“, suchen Sie nach Folder Nodes und installieren und aktivieren Sie das Plugin. Falls es dort nicht verfügbar ist, laden Sie `folder-nodes-<version>.zip` unter [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) herunter und entpacken den enthaltenen Ordner `folder-nodes` nach `Vault/.obsidian/plugins/`. Das ZIP enthält den Plugin-Ordner bereits; entpacken Sie es nicht in `plugins/folder-nodes/`.
+
+Alternativ legen Sie `main.js`, `manifest.json` und `styles.css` aus derselben Version direkt in `Vault/.obsidian/plugins/folder-nodes/` ab. Laden Sie Obsidian neu und aktivieren Sie das Plugin. Mischen Sie keine Dateien verschiedener Versionen. Bewahren Sie bei Updates `data.json` auf, damit Einstellungen und Ausnahmeregeln erhalten bleiben.
+
+## Verwendung
+
+1. Sichern Sie Ihren Vault und öffnen Sie die Bereiche „Allgemein“ und „Verwaltung“ in den Folder-Nodes-Einstellungen.
+2. Prüfen Sie, ob im Ordner A die gleichnamige Notiz A/A.md liegt. Fehlende Bestandteile erstellen Sie bei Bedarf selbst oder markieren den Eintrag als „Nicht verwaltet“.
+3. Mit „Neuer Knoten“ erstellen Sie Ordner und Notiz zusammen. Ein Klick auf den Ordnernamen öffnet seine Knotennotiz. Unter „Knoteninhalte“ finden Sie Unterknoten, Bilder, Videos und weitere Dateien.
+4. Öffnen Sie den Node Graph: „Global“ zeigt alle verwalteten Knoten, „Unterbaum“ den gewählten Knoten mit Nachkommen und „Lokal“ sein Umfeld. Sie können 2D/3D und die Link-Überlagerung ein- oder ausschalten.
+
+Beim Erstellen eines Knotens aus markiertem Text können Sie Namen, Zielort und Aliase prüfen. Noch nicht angelegte interne Links können im verwalteten Bereich ebenfalls Knoten erzeugen. Eine Auswahl über mehrere Markdown-Tabellenzellen wird zum Schutz der Tabelle abgelehnt.
+
+Der Knoteninhalt zeigt den aktuellen Pfad und erklärt leere, ausgeblendete, nicht verwaltete oder unvollständige Zustände. Die angebotenen Schaltflächen öffnen einen gültigen Elternknoten, die Verwaltungsregeln, die schreibgeschützte Zustandsprüfung oder blenden versteckte Knoten für diese Sitzung ein. Im Canvas-Graphen führen Pfeiltasten zum nächstgelegenen Knoten in der jeweiligen Bildschirmrichtung; Pos1 und Ende wählen den ersten bzw. letzten sichtbaren Knoten.
+
+Scheitert das Erstellen nach dem Anlegen einer Notiz, werden nur nachweislich unveränderte Dateien dieser Aktion aufgeräumt. Geöffnete oder bearbeitete Notizen bleiben erhalten. Die Fehlermeldung nennt die verbliebenen Pfade und den Grund. Speichern und prüfen Sie diese Dateien, bevor Sie sie gegebenenfalls manuell löschen.
+
 ## Screenshots
 
 Die Bilder zeigen Knoteninhalte, den Datei-Explorer, den Node Graph sowie die Einstellungen für Symbole, Auswahl und Namen.
@@ -36,28 +55,11 @@ Obsidian 1.12.7 oder neuer ist erforderlich.
 
 Das Plugin unterstützt Desktop und Android. Auf Android werden Ordner über Menüs verschoben. Die Kompatibilität mit iOS ist noch nicht geprüft.
 
-## Installation
-
-Öffnen Sie „Einstellungen → Community-Plugins → Durchsuchen“, suchen Sie nach Folder Nodes und installieren und aktivieren Sie das Plugin. Falls es dort nicht verfügbar ist, laden Sie `folder-nodes-<version>.zip` unter [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) herunter und entpacken den enthaltenen Ordner `folder-nodes` nach `Vault/.obsidian/plugins/`. Das ZIP enthält den Plugin-Ordner bereits; entpacken Sie es nicht in `plugins/folder-nodes/`.
-
-Alternativ legen Sie `main.js`, `manifest.json` und `styles.css` aus derselben Version direkt in `Vault/.obsidian/plugins/folder-nodes/` ab. Laden Sie Obsidian neu und aktivieren Sie das Plugin. Mischen Sie keine Dateien verschiedener Versionen. Bewahren Sie bei Updates `data.json` auf, damit Einstellungen und Ausnahmeregeln erhalten bleiben.
-
-## Verwendung
-
-1. Sichern Sie Ihren Vault und öffnen Sie die Bereiche „Allgemein“ und „Verwaltung“ in den Folder-Nodes-Einstellungen.
-2. Prüfen Sie, ob im Ordner A die gleichnamige Notiz A/A.md liegt. Fehlende Bestandteile erstellen Sie bei Bedarf selbst oder markieren den Eintrag als „Nicht verwaltet“.
-3. Mit „Neuer Knoten“ erstellen Sie Ordner und Notiz zusammen. Ein Klick auf den Ordnernamen öffnet seine Knotennotiz. Unter „Knoteninhalte“ finden Sie Unterknoten, Bilder, Videos und weitere Dateien.
-4. Öffnen Sie den Node Graph: „Global“ zeigt alle verwalteten Knoten, „Unterbaum“ den gewählten Knoten mit Nachkommen und „Lokal“ sein Umfeld. Sie können 2D/3D und die Link-Überlagerung ein- oder ausschalten.
-
-Beim Erstellen eines Knotens aus markiertem Text können Sie Namen, Zielort und Aliase prüfen. Noch nicht angelegte interne Links können im verwalteten Bereich ebenfalls Knoten erzeugen. Eine Auswahl über mehrere Markdown-Tabellenzellen wird zum Schutz der Tabelle abgelehnt.
-
-Der Knoteninhalt zeigt den aktuellen Pfad und erklärt leere, ausgeblendete, nicht verwaltete oder unvollständige Zustände. Die angebotenen Schaltflächen öffnen einen gültigen Elternknoten, die Verwaltungsregeln, die schreibgeschützte Zustandsprüfung oder blenden versteckte Knoten für diese Sitzung ein. Im Canvas-Graphen führen Pfeiltasten zum nächstgelegenen Knoten in der jeweiligen Bildschirmrichtung; Pos1 und Ende wählen den ersten bzw. letzten sichtbaren Knoten.
-
-Scheitert das Erstellen nach dem Anlegen einer Notiz, werden nur nachweislich unveränderte Dateien dieser Aktion aufgeräumt. Geöffnete oder bearbeitete Notizen bleiben erhalten. Die Fehlermeldung nennt die verbliebenen Pfade und den Grund. Speichern und prüfen Sie diese Dateien, bevor Sie sie gegebenenfalls manuell löschen.
-
 ## Einstellungen
 
 **Allgemein:** Sprache, ausgeblendete Knoten und Startseite. **Verwaltung:** Ausnahmen, Sammelorganisation, Eigenschaftsmigration und schreibgeschützte Zustandsprüfung. **Symbole und Aussehen:** vererbte Symbole, Position und Emoji-Schrift. **Auswahl und Namen:** Bestätigung, Aliase und Benennungsregeln. **Node Graph:** Dimension, Richtung und Darstellung großer Graphen. Ein Sprachwechsel verändert keine Notizen.
+
+Standardmäßig bleiben `AGENTS.md` und `CLAUDE.md` im Hauptverzeichnis des Vaults unverwaltet, ebenso Markdown-Dateien und Ordner, deren Namen mit `.` oder `_` beginnen. Diese Regeln lassen sich in den Verwaltungseinstellungen ändern.
 
 ## Eigenschaft folder-nodes
 

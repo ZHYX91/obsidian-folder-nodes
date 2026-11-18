@@ -4,62 +4,6 @@
 
 让 Obsidian 的文件夹和同名笔记一起工作。例如 `A/` 和 `A/A.md` 组成一个 Folder Node；可以从它查看子节点、普通文件和节点关系，而不用替换 Obsidian 自带的文件列表。缺少其中一项时会显示**不完整**，由你决定补全还是设为不管理。
 
-## 截图
-
-### 节点内容
-
-在同一个侧栏里打开子节点、图片、视频和普通文件。即使某些文件夹设为“不管理”，内容也仍然可以正常访问。
-
-![Folder Nodes 侧栏显示子节点、媒体和不管理文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
-
-[相册图片来源与许可](../assets/PHOTO-CREDITS.md)。
-
-### 文件列表
-
-继续使用 Obsidian 自带的文件列表。Folder Nodes 会增加根节点入口、提示文件夹有没有对应笔记，还能设置图标和同级节点顺序；原有文件和文件夹操作不受影响。
-
-![Obsidian 文件列表显示 Root 眼睛与 Folder Nodes 状态标签](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
-
-### 节点图谱
-
-使用“全局”查看所有受管理节点；使用“子树”只看所选节点及其下级；使用“局部”查看所选节点、父级和附近的链接关系。可以展开分支，也可以切换 2D 或 3D 视图。
-
-![Folder Nodes 图谱显示展开的 Projects 子树](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
-
-### 图标与外观
-
-图标可以用库内图片、Lucide 图标、文字、表情符号或颜色。设置页会提前展示效果，也能看出图标和文件名里的普通字符有什么区别。
-
-![Folder Nodes 图标与外观设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
-
-### 选区与命名设置示例
-
-此示例展示命名和别名设置。当前页面还包含默认开启的**创建前确认**；从选中文字创建节点时，会打开独立的预览，供检查节点名称、存放位置和别名。选中文字会成为新笔记的正文。
-
-![选区与命名设置示例](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
-
-## 功能特性
-
-- **以文件夹为节点。** 可以创建、重命名、移动、合并、排序和删除完整 Folder Node，同时保留 Obsidian 原生“新建笔记”和“新建文件夹”。
-- **明确显示不完整状态。** 文件夹缺少同名笔记，或 Markdown 笔记缺少匹配文件夹时，会一直显示为橙色**不完整**，直到你补全或设为“不管理”。
-- **融入文件列表。** 点击完整节点的文件夹名称即可打开 Node Note。Root 旁的眼睛可在当前会话临时显示被 Folder Nodes 隐藏的节点。“名称”模式保留 Obsidian 原生排序；“手动”模式才使用 Folder Nodes 的显式 rank。
-- **节点内容侧栏。** 子节点、静态媒体相册和普通文件分别分页显示。GIF 使用静态缩略图；视频和音频不提供内嵌播放控件。
-- **节点图谱。** 层级结构始终存在；可选的“显示链接”只在结构图上叠加 Node Note 之间的链接，不改变层级布局。
-- **从选中文字创建节点。** 使用“从选中文字创建 Folder Node”后，插件会创建子节点、把选中文字写入新笔记，并用链接替换原选区。链接遵循 Obsidian 全局链接格式设置。“创建前确认”默认开启，可在“选区与命名”中关闭。单个 Markdown 表格单元格可以安全处理；跨单元格选区会在写入前停止。
-- **从未创建链接直接创建节点。** 在受管理范围内点击未创建的 `[[a]]` 会生成完整节点 `a/a.md`；明确指定多级路径时，也可以逐级创建缺失的上级节点。开启别名后，`[[a|b]]` 还会写入 `aliases: b`。不管理或无法安全处理的路径仍交给 Obsidian。
-- **节点图标。** 可在 Obsidian 的 `icon` 属性中依次设置图片、Lucide 图标、文字、表情符号或 `color:` 颜色。当前图标无法显示时，还可以选择使用上级节点的图标。
-- **隐藏子树。** 节点可写入 `hidden=true`。它只会从 Folder Nodes 管理的文件列表、节点内容和节点图谱中隐藏；Obsidian 搜索、快速切换、反向链接、原生图谱、链接和直接打开都不受影响。
-- **不管理边界。** 可按精确路径或“名称开头”规则，让某些 Markdown 或整个文件夹子树不参与 Folder Nodes 结构管理，但内容仍正常可见。
-- **先预览再维护。** 批量整理和旧属性迁移都会先显示将要发生的变化。遇到冲突或无法确认安全的输入时，插件会停止操作，不猜测处理。
-- **只在本地工作。** Folder Nodes 不上传 Vault 内容，也不发起网络请求。
-
-## 使用要求与兼容性
-
-- Obsidian **1.12.7 或更高版本**。
-- 支持桌面版和 Android 版 Obsidian。Android 使用菜单和原生移动文件夹，不使用 HTML5 拖放。
-- iOS 兼容性尚未验证。
-- 完整节点必须只有一个同名 Node Note；“不管理”规则定义 Folder Nodes 不执行结构操作的边界。
-
 ## 安装
 
 ### 社区插件
@@ -109,6 +53,62 @@
 
 合并会在写入前检查受支持的 Markdown 相对链接，例如 `../Reference.md`。目标会改变的链接、不支持的相对引用式定义（包括目标写在下一行）以及其他无法安全判定的路径会被拒绝，插件不会自动重写相对链接。请先处理提示的链接再重试，为重要笔记保留可恢复副本，并在成功合并后检查链接和附件。若删除来源前出现编辑器重新打开、已检查的笔记变化或插件卸载，操作会停止并尝试撤销自身改动，保留用户编辑。
 
+## 截图
+
+### 节点内容
+
+在同一个侧栏里打开子节点、图片、视频和普通文件。即使某些文件夹设为“不管理”，内容也仍然可以正常访问。
+
+![Folder Nodes 侧栏显示子节点、媒体和不管理文件](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+
+[相册图片来源与许可](../assets/PHOTO-CREDITS.md)。
+
+### 文件列表
+
+继续使用 Obsidian 自带的文件列表。Folder Nodes 会增加根节点入口、提示文件夹有没有对应笔记，还能设置图标和同级节点顺序；原有文件和文件夹操作不受影响。
+
+![Obsidian 文件列表显示 Root 眼睛与 Folder Nodes 状态标签](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+
+### 节点图谱
+
+使用“全局”查看所有受管理节点；使用“子树”只看所选节点及其下级；使用“局部”查看所选节点、父级和附近的链接关系。可以展开分支，也可以切换 2D 或 3D 视图。
+
+![Folder Nodes 图谱显示展开的 Projects 子树](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+
+### 图标与外观
+
+图标可以用库内图片、Lucide 图标、文字、表情符号或颜色。设置页会提前展示效果，也能看出图标和文件名里的普通字符有什么区别。
+
+![Folder Nodes 图标与外观设置](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+
+### 选区与命名设置示例
+
+此示例展示命名和别名设置。当前页面还包含默认开启的**创建前确认**；从选中文字创建节点时，会打开独立的预览，供检查节点名称、存放位置和别名。选中文字会成为新笔记的正文。
+
+![选区与命名设置示例](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+
+## 功能特性
+
+- **以文件夹为节点。** 可以创建、重命名、移动、合并、排序和删除完整 Folder Node，同时保留 Obsidian 原生“新建笔记”和“新建文件夹”。
+- **明确显示不完整状态。** 文件夹缺少同名笔记，或 Markdown 笔记缺少匹配文件夹时，会一直显示为橙色**不完整**，直到你补全或设为“不管理”。
+- **融入文件列表。** 点击完整节点的文件夹名称即可打开 Node Note。Root 旁的眼睛可在当前会话临时显示被 Folder Nodes 隐藏的节点。“名称”模式保留 Obsidian 原生排序；“手动”模式使用你指定的同级节点顺序。
+- **节点内容侧栏。** 子节点、静态媒体相册和普通文件分别分页显示。GIF 使用静态缩略图；视频和音频不提供内嵌播放控件。
+- **节点图谱。** 层级结构始终存在；可选的“显示链接”只在结构图上叠加 Node Note 之间的链接，不改变层级布局。
+- **从选中文字创建节点。** 使用“从选中文字创建 Folder Node”后，插件会创建子节点、把选中文字写入新笔记，并用链接替换原选区。链接遵循 Obsidian 全局链接格式设置。“创建前确认”默认开启，可在“选区与命名”中关闭。单个 Markdown 表格单元格可以安全处理；跨单元格选区会在写入前停止。
+- **从未创建链接直接创建节点。** 在受管理范围内点击未创建的 `[[a]]` 会生成完整节点 `a/a.md`；明确指定多级路径时，也可以逐级创建缺失的上级节点。开启别名后，`[[a|b]]` 还会写入 `aliases: b`。不管理或无法安全处理的路径仍交给 Obsidian。
+- **节点图标。** 可在 Obsidian 的 `icon` 属性中依次设置图片、Lucide 图标、文字、表情符号或 `color:` 颜色。当前图标无法显示时，还可以选择使用上级节点的图标。
+- **隐藏子树。** 节点可写入 `hidden=true`。它只会从 Folder Nodes 管理的文件列表、节点内容和节点图谱中隐藏；Obsidian 搜索、快速切换、反向链接、原生图谱、链接和直接打开都不受影响。
+- **不管理边界。** 可按精确路径或“名称开头”规则，让某些 Markdown 或整个文件夹子树不参与 Folder Nodes 结构管理，但内容仍正常可见。
+- **先预览再维护。** 批量整理和旧属性迁移都会先显示将要发生的变化。遇到冲突或无法确认安全的输入时，插件会停止操作，不猜测处理。
+- **只在本地工作。** Folder Nodes 不上传 Vault 内容，也不发起网络请求。
+
+## 使用要求与兼容性
+
+- Obsidian **1.12.7 或更高版本**。
+- 支持桌面版和 Android 版 Obsidian。Android 使用菜单和原生移动文件夹，不使用 HTML5 拖放。
+- iOS 兼容性尚未验证。
+- 完整节点必须只有一个同名 Node Note；“不管理”规则定义 Folder Nodes 不执行结构操作的边界。
+
 ## 设置
 
 - **常规**：界面语言、隐藏标记行为、可选 Root 主页。
@@ -121,7 +121,7 @@
 
 ## Folder Nodes 属性
 
-Folder Nodes 只用一个名为 `folder-nodes` 的扁平 Obsidian 文本列表保存结构选项。默认值不写入；没有任何 token 时会删除整个属性。
+Folder Nodes 只用一个名为 `folder-nodes` 的扁平 Obsidian 文本列表保存结构选项。默认值不写入；没有自定义设置时会删除整个属性。
 
 ```yaml
 folder-nodes:
@@ -168,7 +168,7 @@ Folder Nodes 只在本地运行，不发起网络请求。只有在结构检查�
 
 用户可以创建、修改、移动、重命名、合并或删除笔记和文件夹。多步操作会串行执行并核对已知冲突；批量维护会先预览、提交前复核。合并会检查受支持的相对链接，并拒绝不安全或无法判定的目标。**完整节点删除遵循 Obsidian 当前的文件删除设置**，不保证一定进入系统回收站。
 
-插件只有在用户明确执行复制操作后才把生成的 Markdown 链接写入系统剪贴板，**从不读取剪贴板**。插件偏好和“不管理”规则保存在 `data.json`，结构 token 保存在 Node Note 中。
+插件只有在用户明确执行复制操作后才把生成的 Markdown 链接写入系统剪贴板，**从不读取剪贴板**。插件偏好和“不管理”规则保存在 `data.json`，节点的排序和隐藏设置保存在同名笔记中。
 
 安全问题请按仓库的[安全策略](../../SECURITY.md)私下报告。
 

@@ -15,7 +15,6 @@ import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { formatError, interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
 import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
 import { renderVisual } from "../presentation/render-visual";
-import { createFolderSettingsGuide } from "../ui/settings-guide-disclosure";
 
 type TabId = "general" | "management" | "icons" | "naming" | "nodeGraph";
 type ExemptionKind = "leaf" | "folder";
@@ -29,7 +28,8 @@ const ENABLE_DECLARATIVE_SETTINGS = false;
 
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
-  private readonly expandedGuides = new Set<string>();
+  private readonly expandedGuides = new Set<TabId>();
+  private currentGuide: { tab: TabId; element: HTMLDetailsElement } | null = null;
   private installedEmojiFonts: EmojiFontFamily[] | null = null;
   private emojiFontScan: Promise<EmojiFontFamily[]> | null = null;
   private emojiFontScanGeneration = 0;
@@ -141,10 +141,17 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   public override hide(): void {
     this.expandedGuides.clear();
+    this.currentGuide = null;
     super.hide();
   }
 
   public override display(): void {
+    if (this.currentGuide) {
+      const { tab, element } = this.currentGuide;
+      if (element.open) this.expandedGuides.add(tab);
+      else this.expandedGuides.delete(tab);
+      this.currentGuide = null;
+    }
     this.plugin.ensureStyles(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
@@ -379,10 +386,18 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     });
   }
 
+  private createGuide(panel: HTMLElement, title: string): HTMLDivElement {
+    const element = panel.createEl("details", { cls: "folder-nodes-settings-guide" });
+    element.open = this.expandedGuides.has(this.activeTab);
+    element.createEl("summary", { text: title });
+    this.currentGuide = { tab: this.activeTab, element };
+    return element.createDiv({ cls: "folder-nodes-settings-guide-body" });
+  }
+
   private renderManagement(panel: HTMLElement): void {
     // This distinction is required before running any structural operation.
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("managementGuideBoundary") });
-    const body = createFolderSettingsGuide(panel, "management", t("managementGuideTitle"), this.expandedGuides);
+    const body = this.createGuide(panel, t("managementGuideTitle"));
     body.createEl("p", { text: t("managementGuideStructure") });
     body.createEl("p", { text: t("managementGuideActions") });
     this.renderUnmanagedGroup(panel, "leaf");
@@ -480,7 +495,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderIconGuide(panel: HTMLElement): void {
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideIntro") });
-    const body = createFolderSettingsGuide(panel, "icons", t("iconGuideTitle"), this.expandedGuides);
+    const body = this.createGuide(panel, t("iconGuideTitle"));
     const example = body.createDiv({ cls: "folder-nodes-settings-guide-example" });
     example.createSpan({ text: t("iconPropertyExampleLabel") });
     example.createEl("code", { text: "icon: 💰", attr: { dir: "ltr" } });
@@ -618,7 +633,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderNamingGuide(panel: HTMLElement): void {
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideSelection") });
-    const body = createFolderSettingsGuide(panel, "selection-creation", t("creationGuideTitle"), this.expandedGuides);
+    const body = this.createGuide(panel, t("creationGuideTitle"));
     this.creationExample(body, "[[a]]", "a/a.md", null);
     this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideScope") });

@@ -11,6 +11,7 @@ import { AVAILABLE_INTERFACE_LOCALES, INTERFACE_LOCALE_LABELS } from "../../src/
 vi.mock("obsidian", async (importOriginal) => {
   const actual = await importOriginal<typeof import("obsidian")>();
   class TestPluginSettingTab {
+    public hide(): void { this.containerEl.replaceChildren(); }
     public readonly containerEl = document.createElement("div");
   }
   return {
@@ -38,6 +39,7 @@ function fixture() {
     retrySettingsSave: vi.fn(async () => { state.current = "saved"; }),
     saveSettings: vi.fn(async (): Promise<void> => undefined),
     reconcileSettingsChange: vi.fn(async () => undefined),
+    previewSelectionName: (selection: string) => selection,
     openBatchOrganize: vi.fn(),
     openPropertyMigration: vi.fn(),
     showHealth: vi.fn(),
@@ -98,6 +100,42 @@ describe("imperative settings edit state", () => {
         [t("reportIssue"), "https://github.com/ZHYX91/obsidian-folder-nodes/issues/new/choose"],
       ]);
     } finally { tab.containerEl.remove(); setLanguage("en"); }
+  });
+
+  it("retains a guide across tab switches and forgets it when settings close", () => {
+    const { tab } = fixture();
+    const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
+    const guide = () => tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    tab.showManagement();
+    expect(guide().open).toBe(false);
+    guide().open = true;
+    select("general");
+    select("management");
+    const previous = guide();
+    expect(previous.open).toBe(true);
+    tab.hide();
+    previous.dispatchEvent(new Event("toggle"));
+    tab.display();
+    expect(guide().open).toBe(false);
+    tab.containerEl.remove();
+  });
+
+  it("shows icon and naming examples before the controls they explain", () => {
+    const { tab } = fixture();
+    tab.display();
+    const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
+    select("icons");
+    const guide = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    expect(guide.textContent).toContain("icon: 💰");
+    expect(guide.textContent).toContain(t("iconColorBehavior"));
+    expect(guide.querySelectorAll(".folder-nodes-icon-comparison-row")).toHaveLength(4);
+    expect(guide.compareDocumentPosition(tab.containerEl.querySelector(".setting-item")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    select("naming");
+    const naming = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    expect(naming.textContent).toContain("[[a|b]]");
+    expect(naming.textContent).toContain("a/a.md");
+    expect(naming.compareDocumentPosition(tab.containerEl.querySelector(".setting-item")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    tab.containerEl.remove();
   });
 
   it("opens the intended five tabs and management actions through the imperative surface", () => {

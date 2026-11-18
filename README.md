@@ -4,62 +4,6 @@
 
 Keep a folder and its same-named note together in Obsidian. For example, `A/A.md` belongs to folder `A`; Folder Nodes treats this pair as a *node*. Browse its children, files, and connections without replacing Obsidian's File Explorer. If either half is missing, it appears as **Incomplete** for you to fix or leave unmanaged.
 
-## Screenshots
-
-### Node contents
-
-Open a folder's child notes, pictures, videos and other files from one sidebar. Files you've chosen not to manage are still accessible.
-
-![Folder Nodes sidebar showing child nodes, visual media, and unmanaged files](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
-
-[Album photo credits](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/assets/PHOTO-CREDITS.md).
-
-### File Explorer
-
-Keep using Obsidian's own File Explorer. Folder Nodes adds a Root entry, shows which folders have a matching note, and lets you choose icons or reorder nearby nodes. Regular file and folder actions still work.
-
-![Obsidian File Explorer showing the Root eye and Folder Nodes status badges](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
-
-### Node Graph
-
-Browse every managed node with Global, focus on one node and its descendants with Subtree, or show a node alongside its parent and nearby connections with Local. Expand branches as needed and switch between 2D and 3D.
-
-![Folder Nodes Graph showing an expanded Projects subtree](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
-
-### Icons & appearance
-
-Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The settings page shows a live preview.
-
-![Folder Nodes Icons and appearance settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
-
-### Selection & naming settings example
-
-This example shows naming and alias settings. The current page also includes **Confirm before creating**, enabled by default. For creation from selected text, it opens a separate preview of the node name, destination, and aliases. The selected text becomes the new note body.
-
-![Selection & naming settings example](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
-
-## Features
-
-- **Folder-based nodes.** Create, rename, move, merge, reorder, and delete complete Folder Nodes while keeping Obsidian's native New note and New folder actions available.
-- **Clear incomplete states.** A folder without its same-named note, or a Markdown note without its matching folder, stays visible as **Incomplete** until you complete it or mark it unmanaged.
-- **File Explorer integration.** Click a complete node's folder name to open its Node Note. The Root eye temporarily reveals nodes hidden by Folder Nodes for the current session. Name mode leaves Obsidian's native sibling order alone; Manual mode uses explicit Folder Nodes ranks.
-- **Node Contents sidebar.** Browse child nodes, a static media album, and ordinary files in separate paged sections. GIFs use still thumbnails; video and audio never receive inline playback controls.
-- **Node Graph.** Structure is always the hierarchy. An optional **Show links** switch overlays resolved links between Node Notes without changing the structural layout.
-- **Create from selected text.** Choose **Create Folder Node from selection** to create a child node, write the selected text into the new note, and replace the selection with a link. Links follow Obsidian’s global link-format settings. **Confirm before creating** defaults on and can be turned off in Selection & naming. Table-cell selections are handled safely; cross-cell selections are rejected before writing.
-- **Create from uncreated links.** In managed scope, clicking an unresolved `[[a]]` creates the complete `a/a.md` node; an explicit nested link path can also create missing ancestor nodes. With aliases enabled, `[[a|b]]` writes `b` to `aliases`. Unsafe or unmanaged targets keep Obsidian's native behavior.
-- **Node icons.** Read one Obsidian `icon` Text/List as ordered image, Lucide, glyph, emoji, or `color:` candidates, with optional ancestor inheritance.
-- **Hidden subtrees.** A node can store `hidden=true`. Folder Nodes then hides that subtree only in File Explorer, Node Contents, and Folder Nodes Graph; Obsidian Search, Quick Switcher, backlinks, native Graph, links, and direct file access still work.
-- **Unmanaged boundaries.** Exact paths and name-start rules let you exclude Markdown files or whole folder subtrees from Folder Nodes management without hiding them.
-- **Preview-first maintenance.** Bulk organization and legacy-property migration show what will change before writing. Conflicts or ambiguous input stop the operation instead of guessing.
-- **Local-only operation.** Folder Nodes does not upload Vault content or make network requests.
-
-## Requirements and compatibility
-
-- Obsidian **1.12.7 or later**.
-- Desktop Obsidian and Android Obsidian are supported. Android uses menus and native folder moves instead of HTML5 drag-and-drop.
-- iOS compatibility has not been verified.
-- A complete node uses exactly one same-named Node Note. Unmanaged rules define boundaries where Folder Nodes does not perform structural actions.
-
 ## Installation
 
 ### Community Plugins
@@ -108,6 +52,62 @@ If creation fails after a note was created, cleanup removes only files it can st
 Save and close every tab editing the **source and target Node Notes and the Markdown descendants being moved** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder according to Obsidian's deletion setting.
 
 The merge checks supported relative Markdown links such as `../Reference.md` before writing. It refuses links whose targets would change, unsupported relative reference definitions (including a destination on the next line), and other ambiguous destinations. It does not rewrite relative links. Resolve the reported links before retrying, keep a recoverable copy of important notes, and check links and attachments after a successful merge. If an editor opens, checked notes change, or the plugin unloads before source removal, the operation stops and attempts to roll back its own changes while preserving user edits.
+
+## Screenshots
+
+### Node contents
+
+Open a folder's child notes, pictures, videos and other files from one sidebar. Files you've chosen not to manage are still accessible.
+
+![Folder Nodes sidebar showing child nodes, visual media, and unmanaged files](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
+
+[Album photo credits](https://github.com/ZHYX91/obsidian-folder-nodes/blob/main/docs/assets/PHOTO-CREDITS.md).
+
+### File Explorer
+
+Keep using Obsidian's own File Explorer. Folder Nodes adds a Root entry, shows which folders have a matching note, and lets you choose icons or reorder nearby nodes. Regular file and folder actions still work.
+
+![Obsidian File Explorer showing the Root eye and Folder Nodes status badges](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
+
+### Node Graph
+
+Browse every managed node with Global, focus on one node and its descendants with Subtree, or show a node alongside its parent and nearby connections with Local. Expand branches as needed and switch between 2D and 3D.
+
+![Folder Nodes Graph showing an expanded Projects subtree](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+
+### Icons & appearance
+
+Use a picture from your vault, a Lucide icon, a letter, emoji or a color. The settings page shows a live preview.
+
+![Folder Nodes Icons and appearance settings](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
+
+### Selection & naming settings example
+
+This example shows naming and alias settings. The current page also includes **Confirm before creating**, enabled by default. For creation from selected text, it opens a separate preview of the node name, destination, and aliases. The selected text becomes the new note body.
+
+![Selection & naming settings example](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-creation-en.png)
+
+## Features
+
+- **Folder-based nodes.** Create, rename, move, merge, reorder, and delete complete Folder Nodes while keeping Obsidian's native New note and New folder actions available.
+- **Clear incomplete states.** A folder without its same-named note, or a Markdown note without its matching folder, stays visible as **Incomplete** until you complete it or mark it unmanaged.
+- **File Explorer integration.** Click a complete node's folder name to open its Node Note. The Root eye temporarily reveals nodes hidden by Folder Nodes for the current session. Name mode leaves Obsidian's native sibling order alone; Manual mode uses the sibling order you choose.
+- **Node Contents sidebar.** Browse child nodes, a static media album, and ordinary files in separate paged sections. GIFs use still thumbnails; video and audio never receive inline playback controls.
+- **Node Graph.** Structure is always the hierarchy. An optional **Show links** switch overlays resolved links between Node Notes without changing the structural layout.
+- **Create from selected text.** Choose **Create Folder Node from selection** to create a child node, write the selected text into the new note, and replace the selection with a link. Links follow Obsidian’s global link-format settings. **Confirm before creating** defaults on and can be turned off in Selection & naming. Table-cell selections are handled safely; cross-cell selections are rejected before writing.
+- **Create from uncreated links.** In managed scope, clicking an unresolved `[[a]]` creates the complete `a/a.md` node; an explicit nested link path can also create missing ancestor nodes. With aliases enabled, `[[a|b]]` writes `b` to `aliases`. Unsafe or unmanaged targets keep Obsidian's native behavior.
+- **Node icons.** Read one Obsidian `icon` Text/List as ordered image, Lucide, glyph, emoji, or `color:` candidates, with optional ancestor inheritance.
+- **Hidden subtrees.** A node can store `hidden=true`. Folder Nodes then hides that subtree only in File Explorer, Node Contents, and Folder Nodes Graph; Obsidian Search, Quick Switcher, backlinks, native Graph, links, and direct file access still work.
+- **Unmanaged boundaries.** Exact paths and name-start rules let you exclude Markdown files or whole folder subtrees from Folder Nodes management without hiding them.
+- **Preview-first maintenance.** Bulk organization and legacy-property migration show what will change before writing. Conflicts or ambiguous input stop the operation instead of guessing.
+- **Local-only operation.** Folder Nodes does not upload Vault content or make network requests.
+
+## Requirements and compatibility
+
+- Obsidian **1.12.7 or later**.
+- Desktop Obsidian and Android Obsidian are supported. Android uses menus and native folder moves instead of HTML5 drag-and-drop.
+- iOS compatibility has not been verified.
+- A complete node uses exactly one same-named Node Note. Unmanaged rules define boundaries where Folder Nodes does not perform structural actions.
 
 ## Settings
 

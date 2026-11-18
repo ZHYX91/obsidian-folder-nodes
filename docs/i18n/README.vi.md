@@ -4,6 +4,25 @@
 
 Đây là hướng dẫn ngắn cho các thao tác thường dùng và những điều cần lưu ý. Xem tài liệu đầy đủ bằng [tiếng Anh](../../README.md) hoặc [tiếng Trung giản thể](README.zh-CN.md) khi cần chi tiết.
 
+## Cài đặt
+
+Mở “Cài đặt → Plugin cộng đồng → Duyệt”, tìm Folder Nodes rồi cài đặt và bật plugin. Nếu chưa có trong danh mục, tải `folder-nodes-<version>.zip` từ [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), rồi giải nén thư mục `folder-nodes` vào `Vault/.obsidian/plugins/`. ZIP đã chứa thư mục của plugin; đừng giải nén vào bên trong `plugins/folder-nodes/`.
+
+Bạn cũng có thể đặt `main.js`, `manifest.json` và `styles.css` cùng một phiên bản trực tiếp vào `Vault/.obsidian/plugins/folder-nodes/`. Tải lại Obsidian và bật plugin. Không trộn tệp từ các phiên bản khác nhau. Khi cập nhật, giữ `data.json` để bảo toàn tùy chọn và quy tắc không quản lý.
+
+## Sử dụng
+
+1. Sao lưu kho ghi chú trước, rồi xem mục “Chung” và “Quản lý” trong cài đặt Folder Nodes.
+2. Kiểm tra thư mục A có ghi chú A/A.md hay chưa. Nếu thiếu, bạn có thể chủ động tạo phần còn thiếu hoặc đặt thành “Không được quản lý”.
+3. Chọn “Nút mới” để tạo thư mục cùng ghi chú. Nhấp tên thư mục để mở ghi chú nút. Trong “Nội dung nút”, bạn có thể xem nút con, ảnh, video và các tệp khác.
+4. Mở Node Graph. “Toàn cục” hiển thị tất cả nút được quản lý, “Cây con” hiển thị nút đã chọn và các nút con, còn “Cục bộ” cho thấy khu vực lân cận. Có thể chuyển 2D/3D và bật liên kết giữa các ghi chú.
+
+Khi tạo nút từ văn bản đã chọn, hãy kiểm tra tên, nơi tạo và bí danh. Trong phạm vi quản lý, bạn cũng có thể tạo nút từ liên kết nội bộ chưa tồn tại. Vùng chọn đi qua nhiều ô trong bảng Markdown sẽ bị từ chối để tránh làm hỏng bảng.
+
+Nội dung nút hiển thị đường dẫn hiện tại và giải thích trạng thái trống, ẩn, không quản lý hoặc chưa hoàn chỉnh. Các nút có sẵn cho phép mở nút cha hợp lệ, xem quy tắc quản lý, chạy kiểm tra chỉ đọc hoặc hiện nút ẩn trong phiên này. Trong sơ đồ Canvas, phím mũi tên chọn nút gần nhất theo hướng đó trên màn hình; Home và End chọn nút hiển thị đầu tiên và cuối cùng.
+
+Nếu thao tác thất bại sau khi tạo ghi chú, plugin chỉ dọn các tệp vẫn xác định được là do thao tác đó tạo ra và chưa thay đổi. Ghi chú đã mở hoặc chỉnh sửa được giữ lại. Thông báo lỗi nêu các đường dẫn còn lại và lý do: hãy lưu và kiểm tra các tệp trước khi quyết định xóa thủ công.
+
 ## Ảnh minh họa
 
 Các hình minh họa nội dung nút, trình duyệt tệp, Node Graph và cài đặt biểu tượng, phần chọn và đặt tên.
@@ -36,28 +55,11 @@ Cần Obsidian 1.12.7 trở lên.
 
 Plugin hỗ trợ máy tính và Android. Trên Android, hãy dùng menu để di chuyển thư mục. Khả năng tương thích với iOS chưa được kiểm chứng.
 
-## Cài đặt
-
-Mở “Cài đặt → Plugin cộng đồng → Duyệt”, tìm Folder Nodes rồi cài đặt và bật plugin. Nếu chưa có trong danh mục, tải `folder-nodes-<version>.zip` từ [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases), rồi giải nén thư mục `folder-nodes` vào `Vault/.obsidian/plugins/`. ZIP đã chứa thư mục của plugin; đừng giải nén vào bên trong `plugins/folder-nodes/`.
-
-Bạn cũng có thể đặt `main.js`, `manifest.json` và `styles.css` cùng một phiên bản trực tiếp vào `Vault/.obsidian/plugins/folder-nodes/`. Tải lại Obsidian và bật plugin. Không trộn tệp từ các phiên bản khác nhau. Khi cập nhật, giữ `data.json` để bảo toàn tùy chọn và quy tắc không quản lý.
-
-## Sử dụng
-
-1. Sao lưu kho ghi chú trước, rồi xem mục “Chung” và “Quản lý” trong cài đặt Folder Nodes.
-2. Kiểm tra thư mục A có ghi chú A/A.md hay chưa. Nếu thiếu, bạn có thể chủ động tạo phần còn thiếu hoặc đặt thành “Không được quản lý”.
-3. Chọn “Nút mới” để tạo thư mục cùng ghi chú. Nhấp tên thư mục để mở ghi chú nút. Trong “Nội dung nút”, bạn có thể xem nút con, ảnh, video và các tệp khác.
-4. Mở Node Graph. “Toàn cục” hiển thị tất cả nút được quản lý, “Cây con” hiển thị nút đã chọn và các nút con, còn “Cục bộ” cho thấy khu vực lân cận. Có thể chuyển 2D/3D và bật liên kết giữa các ghi chú.
-
-Khi tạo nút từ văn bản đã chọn, hãy kiểm tra tên, nơi tạo và bí danh. Trong phạm vi quản lý, bạn cũng có thể tạo nút từ liên kết nội bộ chưa tồn tại. Vùng chọn đi qua nhiều ô trong bảng Markdown sẽ bị từ chối để tránh làm hỏng bảng.
-
-Nội dung nút hiển thị đường dẫn hiện tại và giải thích trạng thái trống, ẩn, không quản lý hoặc chưa hoàn chỉnh. Các nút có sẵn cho phép mở nút cha hợp lệ, xem quy tắc quản lý, chạy kiểm tra chỉ đọc hoặc hiện nút ẩn trong phiên này. Trong sơ đồ Canvas, phím mũi tên chọn nút gần nhất theo hướng đó trên màn hình; Home và End chọn nút hiển thị đầu tiên và cuối cùng.
-
-Nếu thao tác thất bại sau khi tạo ghi chú, plugin chỉ dọn các tệp vẫn xác định được là do thao tác đó tạo ra và chưa thay đổi. Ghi chú đã mở hoặc chỉnh sửa được giữ lại. Thông báo lỗi nêu các đường dẫn còn lại và lý do: hãy lưu và kiểm tra các tệp trước khi quyết định xóa thủ công.
-
 ## Thiết lập
 
 **Chung**: ngôn ngữ, nút ẩn và trang chủ. **Quản lý**: quy tắc loại trừ, sắp xếp hàng loạt, chuyển đổi thuộc tính và kiểm tra chỉ đọc. **Biểu tượng và giao diện**: kế thừa, vị trí và phông emoji. **Chọn và đặt tên**: xác nhận, bí danh và quy tắc tên. **Node Graph**: số chiều, hướng và hiệu suất. Đổi ngôn ngữ không sửa ghi chú.
+
+Theo mặc định, plugin không quản lý `AGENTS.md` và `CLAUDE.md` ở thư mục gốc của kho, cũng như các tệp Markdown và thư mục có tên bắt đầu bằng `.` hoặc `_`. Bạn có thể đổi các quy tắc này trong phần thiết lập quản lý.
 
 ## Thuộc tính folder-nodes
 
