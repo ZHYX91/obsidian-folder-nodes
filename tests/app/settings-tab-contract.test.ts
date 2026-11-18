@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("settings tab compatibility contract", () => {
-  it("places a themed icon guide before the appearance controls", () => {
+  it("provides the themed guide and emoji preview styles", () => {
     const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
     expect(styles).toContain(".folder-nodes-settings-guide");
@@ -19,7 +19,7 @@ describe("settings tab compatibility contract", () => {
     expect(styles).not.toContain(".folder-nodes-settings-icon-demo-badge");
   });
 
-  it("matches the established tab-to-section hierarchy without a duplicate plugin heading", () => {
+  it("styles tab controls for fine and coarse pointers", () => {
     const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
     expect(styles).toContain("container-type: inline-size");

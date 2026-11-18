@@ -138,6 +138,24 @@ describe("imperative settings edit state", () => {
     tab.containerEl.remove();
   });
 
+  it("shows independent timestamp fields only for naming parts that use a timestamp", () => {
+    const { tab, plugin } = fixture();
+    Object.assign(plugin.settings.prefix, { enabled: true, source: "timestamp", timestampFormat: "YYYY" });
+    Object.assign(plugin.settings.suffix, { enabled: true, source: "custom", timestampFormat: "HHmm" });
+    tab.display();
+    tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-naming")!.click();
+    const format = (part: "prefix" | "suffix") => [...tab.containerEl.querySelectorAll(".setting-item")]
+      .find((row) => row.querySelector(".setting-item-name")?.textContent === `${t(part)}: ${t("timestampFormat")}`)
+      ?.querySelector("input")?.value;
+    expect(format("prefix")).toBe("YYYY");
+    expect(format("suffix")).toBeUndefined();
+    plugin.settings.suffix.source = "timestamp";
+    tab.display();
+    expect(format("prefix")).toBe("YYYY");
+    expect(format("suffix")).toBe("HHmm");
+    tab.containerEl.remove();
+  });
+
   it("opens the intended five tabs and management actions through the imperative surface", () => {
     const { tab, plugin } = fixture();
     expect(tab.getSettingDefinitions()).toEqual([]);
@@ -150,6 +168,9 @@ describe("imperative settings edit state", () => {
     const essential = panel.querySelector<HTMLElement>(".folder-nodes-settings-guide-brief")!;
     const firstRule = panel.querySelector<HTMLElement>(".setting-item")!;
     expect(guide.open).toBe(false);
+    const ruleNames = [...panel.querySelectorAll(".setting-item-name")].map((name) => name.textContent);
+    expect(ruleNames).toContain(t("nameStartsWith", { prefix: "_" }));
+    expect(ruleNames).not.toContain("_*");
     expect(guide.querySelector("summary")?.textContent).toBe(t("managementGuideTitle"));
     expect(essential.textContent).toContain(t("managementGuideBoundary"));
     expect(guide.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
