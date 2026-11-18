@@ -107,7 +107,7 @@ export const ar: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "الحد الأقصى للروابط التمثيلية المعروضة في المخططات الكبيرة. تظل بنية العقد كاملة، وعند تحديد عقدة تظهر روابطها كلها.",
   "nodeGraphNumberInvalid": "أدخل عددًا صحيحًا بين {minimum} و{maximum}؛ لن يُحفظ إدخال غير صالح.",
   "nodeGraphFindNode": "البحث عن عقدة",
-  "managementGuideTitle": "الملفات والعقد ليست الشيء نفسه",
+  "managementGuideTitle": "ما الفرق بين الملف والعقدة؟",
   "managementGuideStructure": "يشكّل المجلد A والملاحظة A/A.md عقدة مكتملة. إذا غاب أحدهما تظهر «غير مكتملة»، ولا ينشئ البرنامج الجزء المفقود تلقائيًا.",
   "managementGuideBoundary": "تظل العناصر غير المُدارة متاحة في Obsidian. يتوقف Folder Nodes عن تعديل بنيتها ولا يخفيها أو يحذفها.",
   "managementGuideActions": "الإجراءات الأصلية تؤثر في ملف أو مجلد واحد؛ وإجراءات العقدة تشمل العقدة كاملة. تظهر معاينة قبل التنظيم الجماعي أو ترحيل الخصائص؛ فحص الحالة للقراءة فقط.",

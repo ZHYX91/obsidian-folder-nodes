@@ -107,7 +107,7 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "Em gráficos grandes, mostra menos links no início para facilitar a leitura. A hierarquia de nós continua completa; ao selecionar um nó, você verá todos os seus links.",
   "nodeGraphNumberInvalid": "Digite um número inteiro entre {minimum} e {maximum}. Valores inválidos não são salvos.",
   "nodeGraphFindNode": "Encontrar nó",
-  "managementGuideTitle": "Arquivos e nós são coisas diferentes",
+  "managementGuideTitle": "Qual é a diferença entre um arquivo e um nó?",
   "managementGuideStructure": "A pasta A e a nota A/A.md formam um nó completo. Se faltar uma parte, ele será marcado como \"Incompleto\" e nada será criado automaticamente.",
   "managementGuideBoundary": "Itens não gerenciados continuam acessíveis pelo Obsidian. O Folder Nodes deixa de executar ações estruturais nesses itens, mas não os oculta nem exclui.",
   "managementGuideActions": "\"Renomear arquivo\" altera somente um arquivo ou pasta. \"Renomear nó que contém a nota\" altera o nó inteiro. Organização e migração mostram uma prévia antes de salvar; a verificação de integridade não altera arquivos.",

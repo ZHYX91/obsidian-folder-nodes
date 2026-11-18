@@ -107,7 +107,7 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "Bei großen Graphen zunächst weniger Links anzeigen, damit sie lesbar bleiben. Die vollständige Knotenstruktur bleibt sichtbar; beim Auswählen eines Knotens werden alle seine Links angezeigt.",
   "nodeGraphNumberInvalid": "Geben Sie eine ganze Zahl zwischen {minimum} und {maximum} ein. Ungültige Werte werden nicht gespeichert.",
   "nodeGraphFindNode": "Knoten suchen",
-  "managementGuideTitle": "Dateien und Knoten sind nicht dasselbe",
+  "managementGuideTitle": "Was unterscheidet eine Datei von einem Knoten?",
   "managementGuideStructure": "Ordner A und A/A.md bilden zusammen einen vollständigen Knoten. Fehlt ein Teil, erscheint „Unvollständig“. Es wird nichts automatisch erstellt.",
   "managementGuideBoundary": "Nicht verwaltete Elemente bleiben in Obsidian erreichbar. Folder Nodes führt dafür keine Strukturaktionen aus, blendet sie aber nicht aus und löscht sie nicht.",
   "managementGuideActions": "„Datei umbenennen“ ändert nur eine Datei oder einen Ordner. „Enthaltenden Knoten umbenennen“ ändert den ganzen Knoten. Bei Sammelaktionen und Eigenschaftsmigration erscheint zuerst eine Vorschau; die Zustandsprüfung ändert keine Dateien.",

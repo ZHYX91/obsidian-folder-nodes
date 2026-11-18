@@ -120,7 +120,7 @@ describe("imperative settings edit state", () => {
     tab.containerEl.remove();
   });
 
-  it("shows icon and naming examples before the controls they explain", () => {
+  it("places optional examples after their related settings and keeps required guidance visible", () => {
     const { tab } = fixture();
     tab.display();
     const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
@@ -129,12 +129,15 @@ describe("imperative settings edit state", () => {
     expect(guide.textContent).toContain("icon: 💰");
     expect(guide.textContent).toContain(t("iconColorBehavior"));
     expect(guide.querySelectorAll(".folder-nodes-icon-comparison-row")).toHaveLength(4);
-    expect(guide.compareDocumentPosition(tab.containerEl.querySelector(".setting-item")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(guide.parentElement!.lastElementChild).toBe(guide);
+    expect(guide.parentElement!.querySelector(".folder-nodes-settings-guide-brief")?.textContent).toBe(t("iconGuideIntro"));
     select("naming");
     const naming = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
     expect(naming.textContent).toContain("[[a|b]]");
     expect(naming.textContent).toContain("a/a.md");
-    expect(naming.compareDocumentPosition(tab.containerEl.querySelector(".setting-item")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(naming.previousElementSibling?.querySelector(".setting-item-name")?.textContent).toBe(t("aliases"));
+    expect(naming.nextElementSibling?.querySelector(".setting-item-name")?.textContent).toBe(t("prefix"));
+    expect(naming.parentElement!.querySelector(".folder-nodes-settings-guide-brief")?.textContent).toBe(t("creationGuideSelection"));
     tab.containerEl.remove();
   });
 
@@ -173,7 +176,8 @@ describe("imperative settings edit state", () => {
     expect(ruleNames).not.toContain("_*");
     expect(guide.querySelector("summary")?.textContent).toBe(t("managementGuideTitle"));
     expect(essential.textContent).toContain(t("managementGuideBoundary"));
-    expect(guide.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(essential.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(panel.lastElementChild).toBe(guide);
     for (const [label, action] of [
       [t("previewOrganizePlan"), plugin.openBatchOrganize],
       [t("previewPropertyMigration"), plugin.openPropertyMigration],

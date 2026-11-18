@@ -72,3 +72,5 @@ Management shows two rule groups: Unmanaged Markdown files and Unmanaged folders
 
 ## Guide disclosure consistency
 Management, icon syntax and selection-to-node link examples live in one theme-aware, native, initially collapsed details block per topic. Short reminders about file/node boundaries, source ownership, filename/alias write scope and preview-before-apply remain visible outside the blocks; real naming previews, migration confirmation, save failures and schema warnings are not tutorial content. A setting-tab instance remembers open topics only until it is hidden/closed; switching tabs or re-rendering does not persist them to data.json. Native summary retains keyboard focus and works in narrow layouts.
+
+Each guide follows the controls it explains. Its plain summary uses a small chevron and a visible keyboard focus ring. The chevron follows the reading direction when closed and points down when open.

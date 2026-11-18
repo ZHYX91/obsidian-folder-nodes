@@ -107,7 +107,7 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "En gráficos grandes, se muestran menos enlaces al principio para mejorar la lectura. La jerarquía siempre está completa y, al seleccionar un nodo, verás todos sus enlaces.",
   "nodeGraphNumberInvalid": "Introduce un número entero entre {minimum} y {maximum}. Los valores incorrectos no se guardan.",
   "nodeGraphFindNode": "Buscar nodo",
-  "managementGuideTitle": "Los archivos y los nodos son diferentes",
+  "managementGuideTitle": "¿Qué diferencia hay entre un archivo y un nodo?",
   "managementGuideStructure": "La carpeta A y la nota A/A.md forman un nodo completo. Si falta una parte, se mostrará «Incompleto»; no se crea automáticamente.",
   "managementGuideBoundary": "Los elementos no administrados siguen siendo accesibles en Obsidian. Folder Nodes deja de realizar operaciones estructurales sobre ellos, pero no los oculta ni elimina.",
   "managementGuideActions": "«Cambiar nombre de archivo» afecta a un único archivo o carpeta. «Cambiar nombre del nodo contenedor» modifica el nodo completo. La organización y migración muestran una vista previa; la comprobación de estado nunca modifica archivos.",

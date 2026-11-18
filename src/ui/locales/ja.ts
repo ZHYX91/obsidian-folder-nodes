@@ -107,7 +107,7 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "大きなグラフでは最初に表示するリンクを減らして見やすくします。ノード階層は省略せず、ノードを選択するとそのリンクをすべて表示します。",
   "nodeGraphNumberInvalid": "{minimum} ～ {maximum} の整数を入力してください。無効な値は保存しません。",
   "nodeGraphFindNode": "ノードを検索",
-  "managementGuideTitle": "ファイルとノードの違い",
+  "managementGuideTitle": "ファイルとノードはどう違いますか？",
   "managementGuideStructure": "フォルダー A と A/A.md で 1 つの完全なノードになります。どちらかが欠けると「未完成」と表示され、自動では作成しません。",
   "managementGuideBoundary": "管理対象外の項目も Obsidian から開けます。Folder Nodes がノード構造を変更しないだけで、非表示や削除はしません。",
   "managementGuideActions": "「ファイル名を変更」はファイルまたはフォルダー 1 件だけを変更します。「所属ノードの名前を変更」はノード全体を変更します。一括整理とプロパティ移行は先にプレビューを表示し、状態チェックはファイルを変更しません。",

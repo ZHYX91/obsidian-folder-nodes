@@ -107,7 +107,7 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "큰 그래프에서는 처음에 링크를 적게 표시해 가독성을 높입니다. 노드 계층은 모두 유지되며, 노드를 선택하면 해당 링크를 전부 볼 수 있습니다.",
   "nodeGraphNumberInvalid": "{minimum}부터 {maximum} 사이의 정수를 입력하세요. 잘못된 값은 저장되지 않습니다.",
   "nodeGraphFindNode": "노드 찾기",
-  "managementGuideTitle": "파일과 노드는 다릅니다",
+  "managementGuideTitle": "파일과 노드는 어떻게 다른가요?",
   "managementGuideStructure": "폴더 A와 A/A.md가 하나의 완전한 노드입니다. 하나라도 없으면 '미완성'으로 표시되며 자동 생성하지 않습니다.",
   "managementGuideBoundary": "관리 대상에서 제외해도 Obsidian에서는 파일을 열 수 있습니다. Folder Nodes의 구조 관리만 제외될 뿐, 숨기거나 삭제하지 않습니다.",
   "managementGuideActions": "'파일 이름 변경'은 파일이나 폴더 하나만 변경합니다. '포함된 노드 이름 변경'은 노드 전체를 변경합니다. 일괄 정리와 속성 이전은 미리 보기를 먼저 보여 주고, 상태 검사는 파일을 수정하지 않습니다.",

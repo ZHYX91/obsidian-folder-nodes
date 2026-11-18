@@ -107,7 +107,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "大型圖譜最多繪製的代表性連結邊；結構骨架始終完整，聚焦後補全該節點的全部連結。",
   "nodeGraphNumberInvalid": "請輸入 {minimum} 到 {maximum} 之間的整數；無效輸入不會儲存。",
   "nodeGraphFindNode": "尋找節點",
-  "managementGuideTitle": "檔案與節點並不相同",
+  "managementGuideTitle": "檔案和節點有什麼不同？",
   "managementGuideStructure": "資料夾 A 和 A/A.md 構成完整節點；缺少一項顯示“不完整”，插件不會自動補全。",
   "managementGuideBoundary": "設為「不管理」的內容仍可在 Obsidian 中存取。Folder Nodes 只會停止對它執行節點結構操作，不會隱藏或刪除。",
   "managementGuideActions": "「重新命名檔案」只影響單一檔案或資料夾；「重新命名所在節點」會處理整個節點。批次整理與屬性遷移會先顯示預覽，「健康檢查」不會修改檔案。",

@@ -107,7 +107,7 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "Với sơ đồ lớn, ban đầu hiển thị ít liên kết hơn để dễ đọc. Cây phân cấp vẫn đầy đủ; chọn một nút sẽ hiển thị mọi liên kết của nó.",
   "nodeGraphNumberInvalid": "Nhập số nguyên từ {minimum} đến {maximum}. Giá trị không hợp lệ sẽ không được lưu.",
   "nodeGraphFindNode": "Tìm nút",
-  "managementGuideTitle": "Tệp và nút không giống nhau",
+  "managementGuideTitle": "Tệp và nút khác nhau như thế nào?",
   "managementGuideStructure": "Thư mục A cùng ghi chú A/A.md tạo thành một nút hoàn chỉnh. Nếu thiếu một phần, nút sẽ hiện “Chưa hoàn chỉnh”; plugin không tự tạo phần còn thiếu.",
   "managementGuideBoundary": "Bạn vẫn mở được các mục không được quản lý bằng Obsidian. Folder Nodes chỉ ngừng thao tác cấu trúc trên các mục này, chứ không ẩn hay xóa chúng.",
   "managementGuideActions": "“Đổi tên tệp” chỉ sửa một tệp hoặc thư mục. “Đổi tên nút chứa ghi chú” sửa cả nút. Tổ chức hàng loạt và chuyển đổi thuộc tính luôn xem trước; kiểm tra trạng thái không sửa tệp.",

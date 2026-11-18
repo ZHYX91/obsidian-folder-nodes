@@ -107,7 +107,7 @@ export const fr: Readonly<Record<TranslationKey, string>> = {
   "nodeGraphEdgeLimitDesc": "Pour les grands graphes, afficher moins de liens au départ pour améliorer la lisibilité. Toute la hiérarchie reste visible ; sélectionner un nœud montre tous ses liens.",
   "nodeGraphNumberInvalid": "Saisissez un entier entre {minimum} et {maximum}. Les valeurs invalides ne sont pas enregistrées.",
   "nodeGraphFindNode": "Chercher un nœud",
-  "managementGuideTitle": "Un fichier n’est pas un nœud",
+  "managementGuideTitle": "Quelle différence entre un fichier et un nœud ?",
   "managementGuideStructure": "Le dossier A et la note A/A.md forment un nœud complet. Si l’un manque, le nœud est indiqué comme incomplet et rien n’est créé automatiquement.",
   "managementGuideBoundary": "Les éléments non gérés restent accessibles dans Obsidian. Folder Nodes ne leur applique pas ses opérations de structure ; il ne les masque ni ne les supprime.",
   "managementGuideActions": "« Renommer le fichier » ne modifie qu’un fichier ou dossier. « Renommer le nœud contenant » agit sur tout le nœud. L’organisation et la migration affichent un aperçu avant modification ; le bilan de santé ne modifie aucun fichier.",
