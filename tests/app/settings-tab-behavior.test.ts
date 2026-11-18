@@ -108,9 +108,12 @@ describe("imperative settings edit state", () => {
       .toEqual([t("general"), t("management"), t("icons"), t("naming"), t("nodeGraph")]);
     tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-management")!.click();
     const panel = tab.containerEl.querySelector<HTMLElement>("[role=tabpanel]")!;
-    const guide = panel.querySelector<HTMLElement>("[role=note]")!;
+    const guide = panel.querySelector<HTMLDetailsElement>("details.folder-nodes-settings-guide")!;
+    const essential = panel.querySelector<HTMLElement>(".folder-nodes-settings-guide-brief")!;
     const firstRule = panel.querySelector<HTMLElement>(".setting-item")!;
-    expect(guide.textContent).toContain(t("managementGuideBoundary"));
+    expect(guide.open).toBe(false);
+    expect(guide.querySelector("summary")?.textContent).toBe(t("managementGuideTitle"));
+    expect(essential.textContent).toContain(t("managementGuideBoundary"));
     expect(guide.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     for (const [label, action] of [
       [t("previewOrganizePlan"), plugin.openBatchOrganize],
