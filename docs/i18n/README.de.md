@@ -44,6 +44,9 @@ Alternativ legen Sie `main.js`, `manifest.json` und `styles.css` aus derselben V
 
 ## Verwendung
 
+In **Node Contents** ändert das Ziehen einer Knotenkachel nur ihre Reihenfolge unter den Geschwisterknoten. Das Ablegen in der Mitte einer anderen Kachel verschiebt den Knoten nicht in diesen Knoten. Verwende zum Ändern des übergeordneten Knotens das Ablageziel im **Datei-Explorer**.
+
+
 1. Sichern Sie Ihren Vault und öffnen Sie die Bereiche „Allgemein“ und „Verwaltung“ in den Folder-Nodes-Einstellungen.
 2. Prüfen Sie, ob im Ordner A die gleichnamige Notiz A/A.md liegt. Fehlende Bestandteile erstellen Sie bei Bedarf selbst oder markieren den Eintrag als „Nicht verwaltet“.
 3. Mit „Neuer Knoten“ erstellen Sie Ordner und Notiz zusammen. Ein Klick auf den Ordnernamen öffnet seine Knotennotiz. Unter „Knoteninhalte“ finden Sie Unterknoten, Bilder, Videos und weitere Dateien.
