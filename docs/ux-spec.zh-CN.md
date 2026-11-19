@@ -33,7 +33,7 @@ File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、�
 
 Node、Album 与 Files 条目都通过右键、hover/focus 时的 More actions 按钮以及 Shift+F10/菜单键打开同一个 Obsidian Menu。健康 Folder Node 菜单使用渐进披露：一级只保留“打开”“在新标签打开”“创建子节点”和“Folder Nodes 操作”；“Folder Nodes 操作”打开按“打开、外观、结构、管理”分组的面板。Contents、Graph、原生文件夹和 Node Note surface 共用同一个中央动作模型，并过滤该 surface 已经提供的动作。排序边界动作继续显示但禁用；继承隐藏显示禁用的来源说明；设为不管理与删除明确写明作用于整个子树。File Explorer 文件夹菜单保留原生 rename/move/delete，Node Note 标签页保留原生笔记级动作；问题节点菜单继续短小并聚焦修复，不进入完整动作面板。hover/focus 主动作与菜单动作一致，状态 badge 本身不响应双击。不管理项提供“纳入管理”，匹配名称开头规则或位于不管理文件夹内时提示用户调整规则。原生创建与删除只改变实际存在的一侧，不自动补全或重建；删除文件夹时，其子树（包括 canonical Node Note）由 Obsidian 一并删除。普通文件菜单包含打开、在新标签打开、在 File Explorer 中显示、复制链接、rename、move 和 trash；支持的图片还可设为当前 Node visual。普通文件、Album 条目和不管理文件夹仍可通过 `file-menu` 接收其他插件注入的动作。所有写入失败都显示失败关闭 Notice。
 
-桌面端 Node 卡片上方 25% 是 before line，中间 50% 是 into highlight，下方 25% 是 after line；普通文件与 Album 条目只有 into。节点不能放入自身或后代，文件重名冲突禁止写入，Escape、dragend、离开目标和失败都清理视觉状态。Android 不显示拖拽 handle 或 drop marker，改用 Obsidian 原生移动文件夹、Folder Nodes 的 Move/Move up/Move down 以及普通文件 Move 菜单。原生跨父级移动进入手动排序父级时，移动节点获得目标顺序末尾的新 rank。选择模式在两端都可多选 Album/Files 条目以插入或复制链接；跨视图内部 drop 不接受。
+桌面端节点内容卡片的前置、中央和后置区域都只用于确定同级插入位置；中央区域不会改变节点的父节点。需要改变父节点时，应使用 File Explorer 的节点投放目标。普通文件与 Album 条目只有 into。节点不能放入自身或后代，文件重名冲突禁止写入，Escape、dragend、离开目标和失败都清理视觉状态。Android 不显示拖拽 handle 或 drop marker，改用 Obsidian 原生移动文件夹、Folder Nodes 的 Move/Move up/Move down 以及普通文件 Move 菜单。原生跨父级移动进入手动排序父级时，移动节点获得目标顺序末尾的新 rank。选择模式在两端都可多选 Album/Files 条目以插入或复制链接；跨视图内部 drop 不接受。
 
 空内容与问题状态会显示当前路径、说明原因，并只提供可执行的入口：打开有效且可见的父节点、检查管理规则、运行只读 Health，或在当前会话显示隐藏节点。不管理内容仍可访问。创建缺失笔记仍使用已有的页头动作；状态按钮不会隐式修复或删除文件。
 
