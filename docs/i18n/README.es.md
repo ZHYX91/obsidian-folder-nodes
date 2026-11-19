@@ -4,6 +4,27 @@
 
 Esta es una guía breve de uso y precauciones. Los casos avanzados se explican en las guías completas en [inglés](../../README.md) y [chino simplificado](README.zh-CN.md).
 
+## Instalación
+
+En « Ajustes → Complementos de la comunidad → Explorar », busca Folder Nodes, instálalo y actívalo. Si no aparece, descarga `folder-nodes-<version>.zip` desde [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) y extrae la carpeta `folder-nodes` en `Vault/.obsidian/plugins/`. El ZIP ya contiene la carpeta del complemento; no lo extraigas dentro de `plugins/folder-nodes/`.
+
+También puedes colocar `main.js`, `manifest.json` y `styles.css` de la misma versión directamente en `Vault/.obsidian/plugins/folder-nodes/`. Recarga Obsidian y activa el complemento. No mezcles versiones. Al actualizar, conserva `data.json` para mantener las preferencias y reglas de exclusión.
+
+## Uso
+
+1. Haz una copia de seguridad del almacén y revisa los apartados «General» y «Administración» de Folder Nodes.
+2. Comprueba que dentro de A exista A/A.md. Si falta algo, créalo cuando lo necesites o marca el elemento como «No administrado».
+3. Usa «Nuevo nodo» para crear la carpeta y la nota juntas. Haz clic en el nombre de la carpeta para abrir su nota. En «Contenido del nodo» puedes ver los nodos hijos, las fotos, los vídeos y otros archivos.
+4. Abre Node Graph. «Global» enseña todos los nodos administrados, «Subárbol» enseña un nodo y sus descendientes, y «Local» muestra su entorno. Puedes cambiar entre 2D y 3D y activar los enlaces entre notas.
+
+En el escritorio, arrastra las tarjetas de **Contenido del nodo** para ordenar los nodos que comparten un mismo padre. Para cambiar de padre, suelta el nodo sobre la carpeta de destino en el explorador de archivos. Para colocarlo justo antes o después de otro nodo, activa el orden manual de los hijos en el padre. En Android puedes mover y ordenar los nodos desde el menú.
+
+Al crear un nodo desde texto seleccionado, revisa su nombre, ubicación y alias. También puedes crear nodos desde enlaces internos que aún no existen en la zona administrada. Las selecciones que cruzan varias celdas de una tabla Markdown se rechazan para proteger la tabla.
+
+El contenido del nodo muestra la ruta actual y explica los estados vacío, oculto, no gestionado o incompleto. Los botones disponibles permiten abrir un padre válido, revisar las reglas, ejecutar la comprobación de solo lectura o mostrar nodos ocultos durante esta sesión. En los gráficos Canvas, las flechas van al nodo más cercano en esa dirección de la pantalla; Inicio y Fin seleccionan el primer y el último nodo visible.
+
+Si la creación falla después de crear una nota, solo se eliminan los archivos que siguen perteneciendo a esa operación y cuyo contenido no ha cambiado. Las notas abiertas o editadas se conservan. El error indica las rutas restantes y el motivo: guarda y revisa esos archivos antes de decidir si los borras manualmente.
+
 ## Capturas de pantalla
 
 Las imágenes muestran el contenido de los nodos, el explorador de archivos, Node Graph y los ajustes de iconos, selección y nombres.
@@ -36,31 +57,11 @@ Se necesita Obsidian 1.12.7 o posterior.
 
 Funciona en escritorio y Android. En Android, las carpetas se mueven mediante menús. La compatibilidad con iOS aún no se ha verificado.
 
-## Instalación
-
-En « Ajustes → Complementos de la comunidad → Explorar », busca Folder Nodes, instálalo y actívalo. Si no aparece, descarga `folder-nodes-<version>.zip` desde [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) y extrae la carpeta `folder-nodes` en `Vault/.obsidian/plugins/`. El ZIP ya contiene la carpeta del complemento; no lo extraigas dentro de `plugins/folder-nodes/`.
-
-También puedes colocar `main.js`, `manifest.json` y `styles.css` de la misma versión directamente en `Vault/.obsidian/plugins/folder-nodes/`. Recarga Obsidian y activa el complemento. No mezcles versiones. Al actualizar, conserva `data.json` para mantener las preferencias y reglas de exclusión.
-
-## Uso
-
-En **Contenido del nodo**, arrastrar una tarjeta solo cambia su orden entre los nodos hermanos; soltarla en el centro de otra tarjeta no la mueve dentro de ese nodo. Para cambiar el nodo padre, usa la zona de destino del **Explorador de archivos**.
-
-
-1. Haz una copia de seguridad del almacén y revisa los apartados «General» y «Administración» de Folder Nodes.
-2. Comprueba que dentro de A exista A/A.md. Si falta algo, créalo cuando lo necesites o marca el elemento como «No administrado».
-3. Usa «Nuevo nodo» para crear la carpeta y la nota juntas. Haz clic en el nombre de la carpeta para abrir su nota. En «Contenido del nodo» puedes ver los nodos hijos, las fotos, los vídeos y otros archivos.
-4. Abre Node Graph. «Global» enseña todos los nodos administrados, «Subárbol» enseña un nodo y sus descendientes, y «Local» muestra su entorno. Puedes cambiar entre 2D y 3D y activar los enlaces entre notas.
-
-Al crear un nodo desde texto seleccionado, revisa su nombre, ubicación y alias. También puedes crear nodos desde enlaces internos que aún no existen en la zona administrada. Las selecciones que cruzan varias celdas de una tabla Markdown se rechazan para proteger la tabla.
-
-El contenido del nodo muestra la ruta actual y explica los estados vacío, oculto, no gestionado o incompleto. Los botones disponibles permiten abrir un padre válido, revisar las reglas, ejecutar la comprobación de solo lectura o mostrar nodos ocultos durante esta sesión. En los gráficos Canvas, las flechas van al nodo más cercano en esa dirección de la pantalla; Inicio y Fin seleccionan el primer y el último nodo visible.
-
-Si la creación falla después de crear una nota, solo se eliminan los archivos que siguen perteneciendo a esa operación y cuyo contenido no ha cambiado. Las notas abiertas o editadas se conservan. El error indica las rutas restantes y el motivo: guarda y revisa esos archivos antes de decidir si los borras manualmente.
-
 ## Ajustes
 
 **General**: idioma, nodos ocultos y página de inicio. **Administración**: exclusiones, organización por lotes, migración y comprobación de solo lectura. **Iconos y apariencia**: herencia, posición y fuente de emojis. **Selección y nombres**: confirmación, alias y reglas de nombres. **Node Graph**: dimensiones, orientación y rendimiento. Cambiar el idioma no modifica las notas.
+
+De forma predeterminada, el complemento no gestiona `AGENTS.md` ni `CLAUDE.md` en la raíz de la bóveda, ni los archivos Markdown o carpetas cuyo nombre empiece por `.` o `_`. Puedes cambiar estas reglas en los ajustes de gestión.
 
 ## Propiedad folder-nodes
 

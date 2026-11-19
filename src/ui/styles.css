@@ -104,39 +104,102 @@ body {
 }
 
 .folder-nodes-settings-guide {
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border-inline-start: 3px solid var(--interactive-accent);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
-  color: var(--text-muted);
+  min-inline-size: 0;
+  margin-block: 4px 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   box-shadow: none;
+}
+
+.folder-nodes-settings-guide > summary {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-content: center;
+  column-gap: 6px;
+  box-sizing: border-box;
+  min-block-size: 32px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: start;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-normal, 400);
+  line-height: 1.5;
+  list-style: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.folder-nodes-settings-guide > summary::-webkit-details-marker {
+  display: none;
+}
+
+.folder-nodes-settings-guide > summary::before {
+  content: "";
+  box-sizing: border-box;
+  justify-self: center;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-block-start: calc(0.75em - 3.5px);
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.folder-nodes-settings-guide:not([open]) > summary:dir(rtl)::before {
+  transform: rotate(-135deg);
+}
+
+.folder-nodes-settings-guide[open] > summary::before {
+  transform: rotate(135deg);
+}
+
+.folder-nodes-settings-guide > summary:focus-visible {
+  color: var(--text-normal);
+  outline: 2px solid var(--interactive-accent, currentColor);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .folder-nodes-settings-guide > summary:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+}
+
+@media (any-pointer: coarse) {
+  .folder-nodes-settings-guide > summary { min-block-size: 44px; }
+}
+
+@media (forced-colors: active) {
+  .folder-nodes-settings-guide > summary:focus-visible { outline-color: Highlight; }
+}
+
+.folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  max-inline-size: 68ch;
+  margin-block-start: 6px;
+  margin-inline-start: 6px;
+  border-inline-start: 2px solid var(--background-modifier-border);
+  padding-inline-start: 10px;
+  color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.5;
 }
 
-.folder-nodes-settings-guide-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-normal);
+@supports (color: color-mix(in srgb, red, blue)) {
+  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
+    border-inline-start-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
+  }
 }
 
-.folder-nodes-settings-guide-heading strong { font-weight: var(--font-semibold); }
-
-.folder-nodes-settings-guide-icon {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  color: var(--interactive-accent);
-}
-
-.folder-nodes-settings-guide-icon > svg { width: 100%; height: 100%; }
-
-.folder-nodes-settings-guide-body {
-  max-inline-size: 68ch;
-  margin-block-start: 8px;
+@container (max-width: 24rem) {
+  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body { margin-inline-start: 0; }
 }
 
 .folder-nodes-settings-guide-body p { margin: 0; }
@@ -165,8 +228,6 @@ body {
   gap: 10px;
   unicode-bidi: isolate;
 }
-
-.folder-nodes-settings-guide-note { color: var(--text-faint); }
 
 .folder-nodes-node-graph-settings-tree {
   max-block-size: 420px;
@@ -1160,4 +1221,9 @@ button.folder-nodes-current:focus-visible {
   .folder-nodes-entry-menu { width: 44px; height: 44px; opacity: 1; }
   .folder-nodes-node-drag-handle { width: 44px; height: 44px; padding: 13px; opacity: 1; }
   .folder-nodes-file-row { padding-inline-end: 52px; }
+}
+
+.folder-nodes-settings-guide-brief {
+  color: var(--text-muted); font-size: var(--font-ui-small);
+  line-height: 1.45; margin-block: var(--size-4-2);
 }

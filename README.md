@@ -4,6 +4,55 @@
 
 Keep a folder and its same-named note together in Obsidian. For example, `A/A.md` belongs to folder `A`; Folder Nodes treats this pair as a *node*. Browse its children, files, and connections without replacing Obsidian's File Explorer. If either half is missing, it appears as **Incomplete** for you to fix or leave unmanaged.
 
+## Installation
+
+### Community Plugins
+
+Open **Settings → Community plugins → Browse**, search for **Folder Nodes**, install it, and enable it. If it is not available in your catalog, use manual installation.
+
+### Manual installation
+
+Download the versioned `folder-nodes-<version>.zip` from the [latest release](https://github.com/ZHYX91/obsidian-folder-nodes/releases/latest) and extract its `folder-nodes` directory into `Vault/.obsidian/plugins/`. You can also install the three loose files below.
+
+Download one matching release and place these three files in `Vault/.obsidian/plugins/folder-nodes/`:
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+Reload Obsidian and enable Folder Nodes. Do not mix runtime files from different releases.
+
+### Upgrade
+
+Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace only the three runtime files above unless you intentionally want to reset plugin preferences and unmanaged rules.
+
+## Usage
+
+### Getting started
+
+1. Back up your Vault and open **Settings → Folder Nodes → General** and **Management**.
+2. In File Explorer, a complete node consists of a folder and a same-named Markdown note, for example `A/` plus `A/A.md`. An orange **Incomplete** item is missing one side. Complete the ones you want managed, or mark them **Unmanaged**; the plugin will not silently create or move missing files.
+3. Use **New node**, the node context menu, or the command palette to create a complete node. **Unmanaged** items remain available in Obsidian, but Folder Nodes does not perform structural node operations there; it does not hide or delete those files.
+
+### More actions and safeguards
+
+1. Use **Create Folder Node from selection** to turn selected text into a child node. In managed scope, clicking an unresolved `[[a]]` or `[[a|b]]` link can also create a complete Folder Node.
+2. Open **Node contents** to browse the current node's children, media, and files. Right-click, More, or Shift+F10/Menu opens the same actions.
+3. Open **Node Graph** to browse the hierarchy: Global covers the Vault, Subtree anchors one node, and Local adds its parent. Expand branches, search, switch between 2D/3D, or enable **Show links** to overlay references.
+4. On desktop, drag cards in **Node Contents** to reorder nodes under the same parent. To change a node’s parent, drop it on the destination folder in **File Explorer**. Exact placement before or after a sibling requires **Manual** child order on the parent. On Android, use the native folder move or **Move / Move up / Move down**.
+5. Native Move/Delete operates on the selected file or folder; a native rename of a complete node's folder or Node Note also synchronizes the other half when unambiguous. Commands labelled **containing node** explicitly act on the whole Folder Node. Check the target before moving or deleting.
+6. **Batch organize** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Health check** is read-only. Cancel if the proposed scope differs from your intention.
+
+Node Contents shows the current path and explains empty, hidden, unmanaged, or incomplete states. Use the available buttons to open a valid parent, review management rules, run read-only Health, or reveal hidden nodes for this session. In Canvas graphs, arrow keys move toward the nearest node in that screen direction; Home and End select the first and last visible nodes.
+
+If creation fails after a note was created, cleanup removes only files it can still prove are unchanged and owned by that operation. An opened or edited note is kept. The error lists the remaining paths and reason: save and review those files before removing anything manually.
+
+### Before merging nodes
+
+Save and close every tab editing the **source and target Node Notes and the Markdown descendants being moved** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder according to Obsidian's deletion setting.
+
+The merge checks supported relative Markdown links such as `../Reference.md` before writing. It refuses links whose targets would change, unsupported relative reference definitions (including a destination on the next line), and other ambiguous destinations. It does not rewrite relative links. Resolve the reported links before retrying, keep a recoverable copy of important notes, and check links and attachments after a successful merge. If an editor opens, checked notes change, or the plugin unloads before source removal, the operation stops and attempts to roll back its own changes while preserving user edits.
+
 ## Screenshots
 
 ### Node contents
@@ -42,7 +91,7 @@ This example shows naming and alias settings. The current page also includes **C
 
 - **Folder-based nodes.** Create, rename, move, merge, reorder, and delete complete Folder Nodes while keeping Obsidian's native New note and New folder actions available.
 - **Clear incomplete states.** A folder without its same-named note, or a Markdown note without its matching folder, stays visible as **Incomplete** until you complete it or mark it unmanaged.
-- **File Explorer integration.** Click a complete node's folder name to open its Node Note. The Root eye temporarily reveals nodes hidden by Folder Nodes for the current session. Name mode leaves Obsidian's native sibling order alone; Manual mode uses explicit Folder Nodes ranks.
+- **File Explorer integration.** Click a complete node's folder name to open its Node Note. The Root eye temporarily reveals nodes hidden by Folder Nodes for the current session. Name mode leaves Obsidian's native sibling order alone; Manual mode uses the sibling order you choose.
 - **Node Contents sidebar.** Browse child nodes, a static media album, and ordinary files in separate paged sections. GIFs use still thumbnails; video and audio never receive inline playback controls.
 - **Node Graph.** Structure is always the hierarchy. An optional **Show links** switch overlays resolved links between Node Notes without changing the structural layout.
 - **Create from selected text.** Choose **Create Folder Node from selection** to create a child node, write the selected text into the new note, and replace the selection with a link. Links follow Obsidian’s global link-format settings. **Confirm before creating** defaults on and can be turned off in Selection & naming. Table-cell selections are handled safely; cross-cell selections are rejected before writing.
@@ -59,58 +108,6 @@ This example shows naming and alias settings. The current page also includes **C
 - Desktop Obsidian and Android Obsidian are supported. Android uses menus and native folder moves instead of HTML5 drag-and-drop.
 - iOS compatibility has not been verified.
 - A complete node uses exactly one same-named Node Note. Unmanaged rules define boundaries where Folder Nodes does not perform structural actions.
-
-## Installation
-
-### Community Plugins
-
-Open **Settings → Community plugins → Browse**, search for **Folder Nodes**, install it, and enable it. If it is not available in your catalog, use manual installation.
-
-### Manual installation
-
-Download the versioned `folder-nodes-<version>.zip` from the [latest release](https://github.com/ZHYX91/obsidian-folder-nodes/releases/latest) and extract its `folder-nodes` directory into `Vault/.obsidian/plugins/`. You can also install the three loose files below.
-
-Download one matching release and place these three files in `Vault/.obsidian/plugins/folder-nodes/`:
-
-- `main.js`
-- `manifest.json`
-- `styles.css`
-
-Reload Obsidian and enable Folder Nodes. Do not mix runtime files from different releases.
-
-### Upgrade
-
-Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace only the three runtime files above unless you intentionally want to reset plugin preferences and unmanaged rules.
-
-## Usage
-
-In **Node Contents**, dragging a node card changes its order among siblings; dropping on the middle of another card does not move it inside that node. Reparent a node from the **File Explorer** drop target instead.
-
-
-### Getting started
-
-1. Back up your Vault and open **Settings → Folder Nodes → General** and **Management**.
-2. In File Explorer, a complete node consists of a folder and a same-named Markdown note, for example `A/` plus `A/A.md`. An orange **Incomplete** item is missing one side. Complete the ones you want managed, or mark them **Unmanaged**; the plugin will not silently create or move missing files.
-3. Use **New node**, the node context menu, or the command palette to create a complete node. **Unmanaged** items remain available in Obsidian, but Folder Nodes does not perform structural node operations there; it does not hide or delete those files.
-
-### More actions and safeguards
-
-1. Use **Create Folder Node from selection** to turn selected text into a child node. In managed scope, clicking an unresolved `[[a]]` or `[[a|b]]` link can also create a complete Folder Node.
-2. Open **Node contents** to browse the current node's children, media, and files. Right-click, More, or Shift+F10/Menu opens the same actions.
-3. Open **Node Graph** to browse the hierarchy: Global covers the Vault, Subtree anchors one node, and Local adds its parent. Expand branches, search, switch between 2D/3D, or enable **Show links** to overlay references.
-4. On desktop, dropping a node into another changes its parent. Exact before/after ordering requires the parent's **Manual** child order. On Android, use native folder movement or **Move / Move up / Move down**.
-5. Native Move/Delete operates on the selected file or folder; a native rename of a complete node's folder or Node Note also synchronizes the other half when unambiguous. Commands labelled **containing node** explicitly act on the whole Folder Node. Check the target before moving or deleting.
-6. **Batch organize** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Health check** is read-only. Cancel if the proposed scope differs from your intention.
-
-Node Contents shows the current path and explains empty, hidden, unmanaged, or incomplete states. Use the available buttons to open a valid parent, review management rules, run read-only Health, or reveal hidden nodes for this session. In Canvas graphs, arrow keys move toward the nearest node in that screen direction; Home and End select the first and last visible nodes.
-
-If creation fails after a note was created, cleanup removes only files it can still prove are unchanged and owned by that operation. An opened or edited note is kept. The error lists the remaining paths and reason: save and review those files before removing anything manually.
-
-### Before merging nodes
-
-Save and close every tab editing the **source and target Node Notes and the Markdown descendants being moved** before starting **Merge node**. The merge moves children into the target folder, appends the source note's body to the target note, and then removes the source folder according to Obsidian's deletion setting.
-
-The merge checks supported relative Markdown links such as `../Reference.md` before writing. It refuses links whose targets would change, unsupported relative reference definitions (including a destination on the next line), and other ambiguous destinations. It does not rewrite relative links. Resolve the reported links before retrying, keep a recoverable copy of important notes, and check links and attachments after a successful merge. If an editor opens, checked notes change, or the plugin unloads before source removal, the operation stops and attempts to roll back its own changes while preserving user edits.
 
 ## Settings
 

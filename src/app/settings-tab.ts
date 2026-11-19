@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, setIcon, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
@@ -28,6 +28,8 @@ const ENABLE_DECLARATIVE_SETTINGS = false;
 
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
+  private readonly expandedGuides = new Set<TabId>();
+  private currentGuide: { tab: TabId; element: HTMLDetailsElement } | null = null;
   private installedEmojiFonts: EmojiFontFamily[] | null = null;
   private emojiFontScan: Promise<EmojiFontFamily[]> | null = null;
   private emojiFontScanGeneration = 0;
@@ -137,7 +139,19 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     updateDeclarativeSettingTab(this);
   }
 
+  public override hide(): void {
+    this.expandedGuides.clear();
+    this.currentGuide = null;
+    super.hide();
+  }
+
   public override display(): void {
+    if (this.currentGuide) {
+      const { tab, element } = this.currentGuide;
+      if (element.open) this.expandedGuides.add(tab);
+      else this.expandedGuides.delete(tab);
+      this.currentGuide = null;
+    }
     this.plugin.ensureStyles(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
@@ -306,8 +320,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       ...prefixes.map((value) => ({ type: "prefix" as const, value })),
     ];
     const items = [
-      ...paths.map((path) => ({ name: path, desc: t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")) })),
-      ...prefixes.map((prefix) => ({ name: t("nameStartsWith", { prefix }), desc: t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")) })),
+      ...paths.map((path) => ({ name: path, desc: t("exactPathRule") })),
+      ...prefixes.map((prefix) => ({ name: t("nameStartsWith", { prefix }), desc: t("nameStartRule") })),
     ];
     return [
       {
@@ -372,16 +386,17 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     });
   }
 
+  private createGuide(panel: HTMLElement, title: string): HTMLDivElement {
+    const element = panel.createEl("details", { cls: "folder-nodes-settings-guide" });
+    element.open = this.expandedGuides.has(this.activeTab);
+    element.createEl("summary", { text: title });
+    this.currentGuide = { tab: this.activeTab, element };
+    return element.createDiv({ cls: "folder-nodes-settings-guide-body" });
+  }
+
   private renderManagement(panel: HTMLElement): void {
-    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
-    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
-    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, "info");
-    heading.createEl("strong", { text: t("managementGuideTitle") });
-    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
-    body.createEl("p", { text: t("managementGuideStructure") });
-    body.createEl("p", { text: t("managementGuideBoundary") });
-    body.createEl("p", { text: t("managementGuideActions") });
+    // This distinction is required before running any structural operation.
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("managementGuideBoundary") });
     this.renderUnmanagedGroup(panel, "leaf");
     this.renderUnmanagedGroup(panel, "folder");
     new Setting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
@@ -394,10 +409,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       .setDesc(t("propertyMigrationDesc"))
       .addButton((button) => button.setButtonText(t("previewPropertyMigration")).onClick(() => this.plugin.openPropertyMigration()));
     new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
+    const body = this.createGuide(panel, t("managementGuideTitle"));
+    body.createEl("p", { text: t("managementGuideStructure") });
+    body.createEl("p", { text: t("managementGuideActions") });
   }
 
   private renderIcons(panel: HTMLElement): void {
-    this.renderIconGuide(panel);
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideIntro") });
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideRootNote") });
     this.renderEmojiFontSetting(panel);
     new Setting(panel).setName(t("iconInheritance")).setDesc(t("iconInheritanceDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.iconInheritance).onChange(async (value) => {
       this.plugin.settings.iconInheritance = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
@@ -408,6 +427,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new Setting(panel).setName(t("showIconInNoteTitle")).setDesc(t("showIconInNoteTitleDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.showIconInNoteTitle).onChange(async (value) => {
       this.plugin.settings.showIconInNoteTitle = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
     }));
+    this.renderIconGuide(panel);
   }
 
   private renderEmojiFontSetting(panel: HTMLElement): void {
@@ -476,14 +496,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderIconGuide(panel: HTMLElement): void {
-    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
-    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
-    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, "info");
-    heading.createEl("strong", { text: t("iconGuideTitle") });
-
-    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
-    body.createEl("p", { text: t("iconGuideIntro") });
+    const body = this.createGuide(panel, t("iconGuideTitle"));
     const example = body.createDiv({ cls: "folder-nodes-settings-guide-example" });
     example.createSpan({ text: t("iconPropertyExampleLabel") });
     example.createEl("code", { text: "icon: 💰", attr: { dir: "ltr" } });
@@ -495,7 +508,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "A Project", false);
     this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "Project", true);
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓 Project", false);
-    body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("iconGuideRootNote") });
   }
 
   private renderIconComparisonRow(container: HTMLElement, label: string, iconValue: string, name: string, propertyIcon: boolean): void {
@@ -510,13 +522,15 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNaming(panel: HTMLElement): void {
-    this.renderNamingGuide(panel);
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideSelection") });
+    panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideScope") });
     new Setting(panel).setName(t("confirmSelectionCreation")).setDesc(t("confirmSelectionCreationDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.confirmSelectionCreation).onChange(async (value) => {
       this.plugin.settings.confirmSelectionCreation = value; await this.plugin.saveSettings();
     }));
     new Setting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
       this.plugin.settings.addSelectionAlias = value; await this.plugin.saveSettings();
     }));
+    this.renderNamingGuide(panel);
     this.renderNamingPart(panel, t("prefix"), this.plugin.settings.prefix);
     this.renderNamingPart(panel, t("suffix"), this.plugin.settings.suffix);
     const preview = panel.createDiv({ cls: "folder-nodes-name-preview" });
@@ -620,17 +634,9 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNamingGuide(panel: HTMLElement): void {
-    const guide = panel.createDiv({ cls: "folder-nodes-settings-guide", attr: { role: "note" } });
-    const heading = guide.createDiv({ cls: "folder-nodes-settings-guide-heading" });
-    const icon = heading.createSpan({ cls: "folder-nodes-settings-guide-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, "info");
-    heading.createEl("strong", { text: t("creationGuideTitle") });
-
-    const body = guide.createDiv({ cls: "folder-nodes-settings-guide-body" });
-    body.createEl("p", { text: t("creationGuideSelection") });
+    const body = this.createGuide(panel, t("creationGuideTitle"));
     this.creationExample(body, "[[a]]", "a/a.md", null);
     this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));
-    body.createEl("p", { cls: "folder-nodes-settings-guide-note", text: t("creationGuideScope") });
   }
 
   private creationExample(container: HTMLElement, source: string, target: string, detail: string | null): void {
@@ -697,14 +703,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       .setHeading();
     for (const path of paths) new Setting(panel)
       .setName(path)
-      .setDesc(t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")))
+      .setDesc(t("exactPathRule"))
       .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
         button.setDisabled(true);
         void this.removeUnmanagedRule(kind, "path", path);
       }));
     for (const prefix of prefixes) new Setting(panel)
       .setName(t("nameStartsWith", { prefix }))
-      .setDesc(t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")))
+      .setDesc(t("nameStartRule"))
       .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
         button.setDisabled(true);
         void this.removeUnmanagedRule(kind, "prefix", prefix);

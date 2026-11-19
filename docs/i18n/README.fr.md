@@ -4,6 +4,27 @@
 
 Ce guide abrégé présente les opérations courantes et les précautions essentielles. Les guides complets sont disponibles en [anglais](../../README.md) et en [chinois simplifié](README.zh-CN.md).
 
+## Installation
+
+Dans « Paramètres → Modules communautaires → Parcourir », recherchez Folder Nodes, installez-le et activez-le. S’il est absent du catalogue, téléchargez `folder-nodes-<version>.zip` depuis les [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) et extrayez le dossier `folder-nodes` dans `Vault/.obsidian/plugins/`. Le ZIP contient déjà le dossier du plugin : ne l’extrayez pas dans `plugins/folder-nodes/`.
+
+Vous pouvez aussi placer `main.js`, `manifest.json` et `styles.css` d’une même version directement dans `Vault/.obsidian/plugins/folder-nodes/`. Rechargez Obsidian et activez le plugin, sans mélanger les versions. Lors d’une mise à jour, conservez `data.json` pour préserver vos préférences et règles d’exclusion.
+
+## Utilisation
+
+1. Sauvegardez votre coffre, puis ouvrez les réglages « Général » et « Gestion » de Folder Nodes.
+2. Vérifiez que le dossier A contient A/A.md. Si un élément manque, créez-le volontairement ou marquez-le « Non géré ».
+3. Utilisez « Nouveau nœud » pour créer le dossier et sa note ensemble. Cliquez sur le nom du dossier pour ouvrir la note de nœud. « Contenu du nœud » permet de parcourir les enfants, les images, les vidéos et les autres fichiers.
+4. Ouvrez Node Graph. Le mode « Global » montre tous les nœuds gérés ; « Sous-arbre » montre le nœud choisi et ses descendants ; « Local » montre son entourage. Vous pouvez passer de 2D à 3D et afficher les liens entre notes.
+
+Sur ordinateur, faites glisser les cartes dans **Contenu du nœud** pour réordonner les enfants d’un même nœud. Pour changer de parent, déposez le nœud sur le dossier de destination dans l’explorateur de fichiers. Pour le placer juste avant ou après un autre enfant, activez le tri manuel sur le parent. Sur Android, utilisez le menu pour déplacer ou réordonner les nœuds.
+
+Lorsqu’un nœud est créé depuis du texte sélectionné, vous pouvez vérifier son nom, son emplacement et ses alias. Les liens internes encore inexistants peuvent aussi créer des nœuds dans la partie gérée. Une sélection qui traverse plusieurs cellules d’un tableau Markdown est refusée pour préserver ce tableau.
+
+Le contenu du nœud indique le chemin actuel et explique les états vide, masqué, non géré ou incomplet. Les boutons proposés ouvrent un parent valide, les règles de gestion ou le contrôle en lecture seule, ou révèlent les nœuds masqués pour la session. Dans un graphe Canvas, les flèches vont au nœud le plus proche dans cette direction à l’écran ; Début et Fin sélectionnent le premier et le dernier nœud visible.
+
+Si la création échoue après avoir créé une note, le nettoyage ne supprime que les fichiers dont l’origine et le contenu inchangé peuvent être vérifiés. Une note ouverte ou modifiée est conservée. Le message d’erreur donne les chemins restants et la raison : enregistrez et vérifiez ces fichiers avant de décider de les supprimer manuellement.
+
 ## Captures d’écran
 
 Les images présentent le contenu des nœuds, l’explorateur de fichiers, le Node Graph ainsi que les réglages des icônes, de la sélection et du nommage.
@@ -36,31 +57,11 @@ Obsidian 1.12.7 ou une version ultérieure est nécessaire.
 
 Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements passent par les menus. La compatibilité avec iOS n’a pas été vérifiée.
 
-## Installation
-
-Dans « Paramètres → Modules communautaires → Parcourir », recherchez Folder Nodes, installez-le et activez-le. S’il est absent du catalogue, téléchargez `folder-nodes-<version>.zip` depuis les [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) et extrayez le dossier `folder-nodes` dans `Vault/.obsidian/plugins/`. Le ZIP contient déjà le dossier du plugin : ne l’extrayez pas dans `plugins/folder-nodes/`.
-
-Vous pouvez aussi placer `main.js`, `manifest.json` et `styles.css` d’une même version directement dans `Vault/.obsidian/plugins/folder-nodes/`. Rechargez Obsidian et activez le plugin, sans mélanger les versions. Lors d’une mise à jour, conservez `data.json` pour préserver vos préférences et règles d’exclusion.
-
-## Utilisation
-
-Dans **Contenu du nœud**, faire glisser une carte ne change que son ordre parmi les nœuds frères ; la déposer au centre d’une autre carte ne la déplace pas à l’intérieur de ce nœud. Pour changer le nœud parent, utilisez la zone de dépôt de l’**Explorateur de fichiers**.
-
-
-1. Sauvegardez votre coffre, puis ouvrez les réglages « Général » et « Gestion » de Folder Nodes.
-2. Vérifiez que le dossier A contient A/A.md. Si un élément manque, créez-le volontairement ou marquez-le « Non géré ».
-3. Utilisez « Nouveau nœud » pour créer le dossier et sa note ensemble. Cliquez sur le nom du dossier pour ouvrir la note de nœud. « Contenu du nœud » permet de parcourir les enfants, les images, les vidéos et les autres fichiers.
-4. Ouvrez Node Graph. Le mode « Global » montre tous les nœuds gérés ; « Sous-arbre » montre le nœud choisi et ses descendants ; « Local » montre son entourage. Vous pouvez passer de 2D à 3D et afficher les liens entre notes.
-
-Lorsqu’un nœud est créé depuis du texte sélectionné, vous pouvez vérifier son nom, son emplacement et ses alias. Les liens internes encore inexistants peuvent aussi créer des nœuds dans la partie gérée. Une sélection qui traverse plusieurs cellules d’un tableau Markdown est refusée pour préserver ce tableau.
-
-Le contenu du nœud indique le chemin actuel et explique les états vide, masqué, non géré ou incomplet. Les boutons proposés ouvrent un parent valide, les règles de gestion ou le contrôle en lecture seule, ou révèlent les nœuds masqués pour la session. Dans un graphe Canvas, les flèches vont au nœud le plus proche dans cette direction à l’écran ; Début et Fin sélectionnent le premier et le dernier nœud visible.
-
-Si la création échoue après avoir créé une note, le nettoyage ne supprime que les fichiers dont l’origine et le contenu inchangé peuvent être vérifiés. Une note ouverte ou modifiée est conservée. Le message d’erreur donne les chemins restants et la raison : enregistrez et vérifiez ces fichiers avant de décider de les supprimer manuellement.
-
 ## Paramètres
 
 **Général** : langue, masquage et page d’accueil. **Gestion** : règles d’exclusion, rangement groupé, migration des propriétés et contrôle en lecture seule. **Icônes et apparence** : héritage, position, police des émojis. **Sélection et noms** : confirmation, alias et règles de nommage. **Node Graph** : dimension, orientation et performance. Changer la langue ne modifie pas les notes.
+
+Par défaut, le plugin laisse de côté `AGENTS.md` et `CLAUDE.md` à la racine du coffre, ainsi que les fichiers Markdown et les dossiers dont le nom commence par `.` ou `_`. Vous pouvez modifier ces règles dans les paramètres de gestion.
 
 ## Propriété folder-nodes
 
