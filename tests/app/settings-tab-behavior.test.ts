@@ -124,6 +124,15 @@ describe("imperative settings edit state", () => {
     const { tab } = fixture();
     tab.display();
     const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
+    select("management");
+    const rows = [...tab.containerEl.querySelectorAll(".setting-item")];
+    const descriptionFor = (name: string) => rows
+      .find((row) => row.querySelector(".setting-item-name")?.textContent === name)
+      ?.querySelector(".setting-item-description")?.textContent;
+    expect(descriptionFor(t("leafExemptions"))).toBe(t("leafExemptionsDesc"));
+    expect(descriptionFor(t("folderExemptions"))).toBe(t("folderExemptionsDesc"));
+    expect(descriptionFor("AGENTS.md")).toBe(t("exactPathRule"));
+    expect(descriptionFor(t("nameStartsWith", { prefix: "_" }))).toBe(t("nameStartRule"));
     select("icons");
     const guide = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
     expect(guide.textContent).toContain("icon: 💰");

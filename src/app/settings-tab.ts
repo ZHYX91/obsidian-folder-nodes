@@ -320,8 +320,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       ...prefixes.map((value) => ({ type: "prefix" as const, value })),
     ];
     const items = [
-      ...paths.map((path) => ({ name: path, desc: t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")) })),
-      ...prefixes.map((prefix) => ({ name: t("nameStartsWith", { prefix }), desc: t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")) })),
+      ...paths.map((path) => ({ name: path, desc: t("exactPathRule") })),
+      ...prefixes.map((prefix) => ({ name: t("nameStartsWith", { prefix }), desc: t("nameStartRule") })),
     ];
     return [
       {
@@ -703,14 +703,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       .setHeading();
     for (const path of paths) new Setting(panel)
       .setName(path)
-      .setDesc(t("exactPathRule") + " · " + (kind === "leaf" ? t("leafExemptionItemDesc") : t("folderExemptionItemDesc")))
+      .setDesc(t("exactPathRule"))
       .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
         button.setDisabled(true);
         void this.removeUnmanagedRule(kind, "path", path);
       }));
     for (const prefix of prefixes) new Setting(panel)
       .setName(t("nameStartsWith", { prefix }))
-      .setDesc(t("nameStartRule") + " · " + (kind === "leaf" ? t("leafPrefixItemDesc") : t("folderPrefixItemDesc")))
+      .setDesc(t("nameStartRule"))
       .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
         button.setDisabled(true);
         void this.removeUnmanagedRule(kind, "prefix", prefix);
