@@ -44,6 +44,9 @@ Você também pode colocar `main.js`, `manifest.json` e `styles.css` da mesma ve
 
 ## Como usar
 
+Em **Node Contents**, arrastar um cartão de nó altera apenas sua ordem entre os nós irmãos; soltá-lo no centro de outro cartão não o move para dentro desse nó. Para alterar o nó pai, use o destino de soltura do **Explorador de arquivos**.
+
+
 1. Faça um backup do cofre e confira as opções "Geral" e "Gerenciamento" do Folder Nodes.
 2. Verifique se a pasta A contém A/A.md. Se faltar alguma parte, crie-a quando desejar ou marque o item como "Não gerenciado".
 3. Use "Novo nó" para criar pasta e nota juntas. Clique no nome da pasta para abrir a nota do nó. Em "Conteúdo do nó", veja os filhos, imagens, vídeos e outros arquivos.
