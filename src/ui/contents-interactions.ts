@@ -52,11 +52,21 @@ export function filesSectionKey(hasFolders: boolean): "files" | "filesAndFolders
 export type SiblingDropAxis = "horizontal" | "vertical";
 
 export function siblingDropAxis(rects: readonly Pick<DOMRect, "height" | "left" | "top" | "width">[]): SiblingDropAxis {
-  for (const [index, left] of rects.entries()) {
-    for (const right of rects.slice(index + 1)) {
-      const overlap = Math.min(left.top + left.height, right.top + right.height) - Math.max(left.top, right.top);
-      if (overlap > Math.min(left.height, right.height) / 2 && Math.abs(left.left - right.left) > 1) return "horizontal";
+  // Sweep in visual order. In a normal single-column list, expired cards leave
+  // the active set immediately instead of comparing every pair of siblings.
+  const ordered = [...rects].sort((left, right) => left.top - right.top);
+  const active: Array<(typeof ordered)[number]> = [];
+  for (const current of ordered) {
+    let retained = 0;
+    for (const candidate of active) {
+      const overlap = candidate.top + candidate.height - current.top;
+      if (overlap <= 0) continue;
+      if (overlap > Math.min(candidate.height, current.height) / 2
+        && Math.abs(candidate.left - current.left) > 1) return "horizontal";
+      active[retained++] = candidate;
     }
+    active.length = retained;
+    active.push(current);
   }
   return "vertical";
 }
