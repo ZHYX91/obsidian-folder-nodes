@@ -44,6 +44,9 @@ Vous pouvez aussi placer `main.js`, `manifest.json` et `styles.css` d’une mêm
 
 ## Utilisation
 
+Dans **Contenu du nœud**, faire glisser une carte ne change que son ordre parmi les nœuds frères ; la déposer au centre d’une autre carte ne la déplace pas à l’intérieur de ce nœud. Pour changer le nœud parent, utilisez la zone de dépôt de l’**Explorateur de fichiers**.
+
+
 1. Sauvegardez votre coffre, puis ouvrez les réglages « Général » et « Gestion » de Folder Nodes.
 2. Vérifiez que le dossier A contient A/A.md. Si un élément manque, créez-le volontairement ou marquez-le « Non géré ».
 3. Utilisez « Nouveau nœud » pour créer le dossier et sa note ensemble. Cliquez sur le nom du dossier pour ouvrir la note de nœud. « Contenu du nœud » permet de parcourir les enfants, les images, les vidéos et les autres fichiers.
