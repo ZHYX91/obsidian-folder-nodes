@@ -84,6 +84,9 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 
 ## Usage
 
+In **Node Contents**, dragging a node card changes its order among siblings; dropping on the middle of another card does not move it inside that node. Reparent a node from the **File Explorer** drop target instead.
+
+
 ### Getting started
 
 1. Back up your Vault and open **Settings → Folder Nodes → General** and **Management**.
