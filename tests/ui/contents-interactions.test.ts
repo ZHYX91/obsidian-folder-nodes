@@ -55,6 +55,13 @@ describe("Node Contents interactions", () => {
     ])).toBe("vertical");
   });
 
+  it("handles large single-column layouts without pairwise sibling comparisons", () => {
+    const rects = Array.from({ length: 1000 }, (_, index) => ({
+      top: index * 48, left: 0, width: 120, height: 40,
+    }));
+    expect(siblingDropAxis(rects)).toBe("vertical");
+  });
+
   it("keeps a stable visual slot for nodes without a custom icon", () => {
     expect(nodeEntryVisual("healthy", { kind: "fallback", value: "", accent: null, inheritedFrom: null })).toEqual({
       defaultVisual: true,
