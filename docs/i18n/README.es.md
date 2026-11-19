@@ -44,6 +44,9 @@ También puedes colocar `main.js`, `manifest.json` y `styles.css` de la misma ve
 
 ## Uso
 
+En **Contenido del nodo**, arrastrar una tarjeta solo cambia su orden entre los nodos hermanos; soltarla en el centro de otra tarjeta no la mueve dentro de ese nodo. Para cambiar el nodo padre, usa la zona de destino del **Explorador de archivos**.
+
+
 1. Haz una copia de seguridad del almacén y revisa los apartados «General» y «Administración» de Folder Nodes.
 2. Comprueba que dentro de A exista A/A.md. Si falta algo, créalo cuando lo necesites o marca el elemento como «No administrado».
 3. Usa «Nuevo nodo» para crear la carpeta y la nota juntas. Haz clic en el nombre de la carpeta para abrir su nota. En «Contenido del nodo» puedes ver los nodos hijos, las fotos, los vídeos y otros archivos.
