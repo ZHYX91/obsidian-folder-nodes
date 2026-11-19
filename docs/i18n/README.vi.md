@@ -44,6 +44,9 @@ Bạn cũng có thể đặt `main.js`, `manifest.json` và `styles.css` cùng m
 
 ## Sử dụng
 
+Trong **Node Contents**, kéo thẻ nút chỉ thay đổi thứ tự của nút trong nhóm nút cùng cấp; thả vào giữa thẻ khác không chuyển nút vào bên trong nút đó. Để đổi nút cha, hãy dùng vùng thả trong **File Explorer**.
+
+
 1. Sao lưu kho ghi chú trước, rồi xem mục “Chung” và “Quản lý” trong cài đặt Folder Nodes.
 2. Kiểm tra thư mục A có ghi chú A/A.md hay chưa. Nếu thiếu, bạn có thể chủ động tạo phần còn thiếu hoặc đặt thành “Không được quản lý”.
 3. Chọn “Nút mới” để tạo thư mục cùng ghi chú. Nhấp tên thư mục để mở ghi chú nút. Trong “Nội dung nút”, bạn có thể xem nút con, ảnh, video và các tệp khác.
