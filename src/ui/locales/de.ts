@@ -384,6 +384,7 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "Zielknoten nicht gefunden: {path}",
   "errorManualOrderRequired": "Dieser übergeordnete Knoten ist nach Namen sortiert. Wechseln Sie für eine genaue Platzierung auf manuelle Sortierung.",
   "errorStalePlacement": "Die Struktur hat sich geändert. Ziehen Sie den Knoten erneut an die gewünschte Stelle.",
+  "errorInvalidDropTarget": "Hier kann der Knoten nicht unter den Geschwisterknoten abgelegt werden. Wählen Sie eine andere Position.",
   "errorGeneric": "Aktion konnte nicht sicher abgeschlossen werden: {message}",
   "reconcileErrorsSummary": "Nach dem automatischen Strukturabgleich sind noch {count} Elemente unvollständig: {message}",
 };

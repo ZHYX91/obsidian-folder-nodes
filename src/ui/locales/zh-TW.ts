@@ -384,6 +384,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "找不到目標節點：{path}",
   "errorManualOrderRequired": "目前父節點按名稱排序。請先將“子節點排序”切換為手動，再精確調整同級位置。",
   "errorStalePlacement": "節點結構已變化，請重新拖動。",
+  "errorInvalidDropTarget": "此處不是有效的同級放置位置，請選擇其他位置。",
   "errorGeneric": "無法安全完成此次操作：{message}",
   "reconcileErrorsSummary": "自動結構同步有 {count} 項未完成：{message}",
 };

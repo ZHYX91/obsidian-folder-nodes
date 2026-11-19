@@ -169,7 +169,7 @@ const zh = {
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "创建过程中选区已改变，创建已停止。",
   errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
-  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "无法安全完成此次操作：{message}",
+  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorInvalidDropTarget: "此处不是有效的同级放置位置，请选择其他位置。", errorGeneric: "无法安全完成此次操作：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
 };
 
@@ -338,7 +338,7 @@ const en: typeof zh = {
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed during creation; creation stopped.",
   errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
-  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Could not complete this action safely: {message}",
+  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorInvalidDropTarget: "This is not a valid sibling drop position. Choose another position.", errorGeneric: "Could not complete this action safely: {message}",
   reconcileErrorsSummary: "Automatic structure synchronization left {count} items incomplete: {message}",
 };
 
@@ -422,5 +422,6 @@ export function formatError(error: unknown): string {
   if (target !== undefined) return t("errorUnknownTarget", { path: target });
   if (/^Enable manual child ordering before/u.test(message)) return t("errorManualOrderRequired");
   if (message === "The insertion position is stale; retry the drag") return t("errorStalePlacement");
+  if (message === "invalid_drop_target") return t("errorInvalidDropTarget");
   return t("errorGeneric", { message });
 }

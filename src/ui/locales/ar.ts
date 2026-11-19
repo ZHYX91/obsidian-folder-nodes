@@ -384,6 +384,7 @@ export const ar: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "لم يُعثر على العقدة الهدف: {path}",
   "errorManualOrderRequired": "ترتب هذه العقدة الأم الأبناء حسب الاسم. غيّر ترتيب الأبناء إلى يدوي قبل تحديد موضع بينهم.",
   "errorStalePlacement": "تغيرت بنية العقد منذ آخر سحب. اسحب العقدة مجددًا لاختيار موضعها الحالي.",
+  "errorInvalidDropTarget": "هذا ليس موضعًا صالحًا لإفلات العقدة بين العقد الشقيقة. اختر موضعًا آخر.",
   "errorGeneric": "أُوقفت العملية لتجنب تغيير غير آمن: {message}",
   "reconcileErrorsSummary": "تعذّر إكمال {count} عناصر أثناء مزامنة البنية: {message}",
 };

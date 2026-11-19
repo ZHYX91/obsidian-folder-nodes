@@ -384,6 +384,7 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "Nó de destino não encontrado: {path}",
   "errorManualOrderRequired": "Este nó pai é ordenado por nome. Mude a ordenação dos filhos para Manual antes de escolher uma posição exata.",
   "errorStalePlacement": "A estrutura mudou. Arraste novamente para escolher a posição.",
+  "errorInvalidDropTarget": "Não é possível soltar o nó aqui entre os irmãos. Escolha outra posição.",
   "errorGeneric": "Não foi possível concluir a ação com segurança: {message}",
   "reconcileErrorsSummary": "Após a sincronização automática, {count} itens ainda estão incompletos: {message}",
 };

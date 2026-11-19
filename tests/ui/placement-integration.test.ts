@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { NodeService } from "../../src/adapters/node-service";
 import { ExplorerAdapter } from "../../src/adapters/explorer-adapter";
 import { FolderNodeContentsView } from "../../src/ui/contents-view";
+import { formatError, setLanguage, t } from "../../src/ui/i18n";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { FakeObsidian } from "../helpers/fake-obsidian";
 
@@ -25,6 +26,33 @@ function makeView(fake: FakeObsidian, nodes: NodeService, reportError = vi.fn())
 }
 
 describe("Placement and identity integration", () => {
+  it("rejects dragging a sibling onto itself with localized feedback", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md", "", { "folder-nodes": ["order=manual"] });
+    addNode(fake, "A", ["rank=1024"]);
+    addNode(fake, "B", ["rank=2048"]);
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const reportError = vi.fn();
+    const view = makeView(fake, nodes, reportError);
+    setLanguage("zh-CN");
+    await view.onOpen();
+    try {
+      const source = view.contentEl.querySelector<HTMLElement>("[data-node-path='A'] .folder-nodes-node-drag-handle")!;
+      const target = view.contentEl.querySelector<HTMLElement>("[data-node-path='A']")!;
+      source.dispatchEvent(dragEvent("dragstart"));
+      target.dispatchEvent(dragEvent("dragover"));
+      expect(view.contentEl.querySelector(".folder-nodes-placement-feedback")?.textContent)
+        .toBe(t("errorInvalidDropTarget"));
+      target.dispatchEvent(dragEvent("drop"));
+      expect(reportError).toHaveBeenCalledOnce();
+      expect(formatError(reportError.mock.calls[0]?.[0])).toBe(t("errorInvalidDropTarget"));
+      expect(fake.renames).toHaveLength(0);
+    } finally {
+      setLanguage("auto");
+      await view.onClose();
+    }
+  });
+
   it.each(["", "/"])("moves a single file to the original Root with raw path %j", async (rootPath) => {
     const fake = new FakeObsidian();
     fake.root.path = rootPath;

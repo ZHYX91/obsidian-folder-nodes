@@ -384,6 +384,7 @@ export const ru: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "Целевой узел не найден: {path}",
   "errorManualOrderRequired": "Этот родительский узел отсортирован по имени. Переключите порядок дочерних узлов на ручной для точного размещения.",
   "errorStalePlacement": "Структура изменилась. Перетащите узел ещё раз.",
+  "errorInvalidDropTarget": "Нельзя поместить узел сюда среди узлов одного уровня. Выберите другое место.",
   "errorGeneric": "Не удалось безопасно завершить действие: {message}",
   "reconcileErrorsSummary": "После автоматической синхронизации структуры остаются неполными {count} элементов: {message}",
 };

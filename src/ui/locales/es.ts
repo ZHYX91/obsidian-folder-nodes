@@ -384,6 +384,7 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "Nodo de destino no encontrado: {path}",
   "errorManualOrderRequired": "Este nodo principal se ordena por nombre. Cambia el orden de hijos a Manual antes de indicar una posición exacta.",
   "errorStalePlacement": "La estructura ha cambiado. Vuelve a arrastrar el nodo.",
+  "errorInvalidDropTarget": "No puedes colocar el nodo aquí entre sus hermanos. Elige otra posición.",
   "errorGeneric": "No se pudo completar la operación con seguridad: {message}",
   "reconcileErrorsSummary": "Tras la sincronización automática, todavía quedan {count} elementos incompletos: {message}",
 };

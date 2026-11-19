@@ -384,6 +384,7 @@ export const fr: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "Nœud de destination introuvable : {path}",
   "errorManualOrderRequired": "Ce parent est trié par nom. Passez l’ordre des enfants en mode Manuel avant de choisir une position précise.",
   "errorStalePlacement": "La structure a changé. Recommencez le glisser-déposer.",
+  "errorInvalidDropTarget": "Impossible de déposer le nœud ici parmi les nœuds de même niveau. Choisissez une autre position.",
   "errorGeneric": "Impossible de terminer cette action sans risque : {message}",
   "reconcileErrorsSummary": "Après synchronisation automatique, {count} éléments restent incomplets : {message}",
 };

@@ -384,6 +384,7 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "移動先のノードが見つかりません：{path}",
   "errorManualOrderRequired": "この親ノードは名前順です。子ノードの並び順を「手動」に切り替えてから位置を指定してください。",
   "errorStalePlacement": "ノード構造が変わりました。もう一度ドラッグしてください。",
+  "errorInvalidDropTarget": "ここには同じ階層のノードを配置できません。別の位置を選んでください。",
   "errorGeneric": "操作を安全に完了できませんでした：{message}",
   "reconcileErrorsSummary": "自動同期後も未完成の項目が {count} 件あります：{message}",
 };

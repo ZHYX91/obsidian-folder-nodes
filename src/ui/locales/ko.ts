@@ -384,6 +384,7 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "대상 노드를 찾을 수 없습니다: {path}",
   "errorManualOrderRequired": "이 상위 노드는 이름순입니다. '하위 노드 정렬'을 '수동'으로 바꾼 뒤 정확한 위치를 지정하세요.",
   "errorStalePlacement": "노드 구조가 바뀌었습니다. 다시 드래그하세요.",
+  "errorInvalidDropTarget": "여기는 같은 단계의 노드를 놓을 수 있는 위치가 아닙니다. 다른 위치를 선택하세요.",
   "errorGeneric": "작업을 안전하게 완료할 수 없습니다: {message}",
   "reconcileErrorsSummary": "자동 구조 동기화 후에도 {count}개 항목이 미완성입니다: {message}",
 };

@@ -384,6 +384,7 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "errorUnknownTarget": "Không tìm thấy nút đích: {path}",
   "errorManualOrderRequired": "Nút cha này đang xếp theo tên. Hãy chuyển thứ tự nút con sang Thủ công trước khi chọn vị trí cụ thể.",
   "errorStalePlacement": "Cấu trúc đã thay đổi. Hãy kéo nút lần nữa.",
+  "errorInvalidDropTarget": "Không thể thả nút vào vị trí này giữa các nút cùng cấp. Hãy chọn vị trí khác.",
   "errorGeneric": "Không thể hoàn tất thao tác một cách an toàn: {message}",
   "reconcileErrorsSummary": "Sau khi tự đồng bộ cấu trúc, vẫn còn {count} mục chưa hoàn chỉnh: {message}",
 };
