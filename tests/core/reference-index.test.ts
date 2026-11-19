@@ -18,6 +18,18 @@ describe("ReferenceIndex", () => {
     expect(index.isReferenced("B.pdf")).toBe(false);
   });
 
+  it("updates multiplicities without dropping other sources or reporting unchanged targets", () => {
+    const index = new ReferenceIndex();
+    index.rebuild({ "A.md": { "Shared.md": 3, "Keep.md": 1 }, "B.md": { "Shared.md": 1 } });
+    expect(index.updateSource("A.md", { "Keep.md": 1, "Shared.md": 2 })).toEqual(new Set(["Shared.md"]));
+    expect(index.sourcesForTarget("Shared.md")).toEqual(["A.md", "B.md"]);
+    expect(index.updateSource("A.md", { "Shared.md": 2, "Keep.md": 1 }).size).toBe(0);
+    index.removeSource("A.md");
+    expect(index.isReferenced("Shared.md")).toBe(true);
+    index.removeSource("B.md");
+    expect(index.isReferenced("Shared.md")).toBe(false);
+  });
+
   it("tracks inbound source paths incrementally", () => {
     const index = new ReferenceIndex();
     index.rebuild({
