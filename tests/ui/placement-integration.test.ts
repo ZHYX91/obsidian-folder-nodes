@@ -6,10 +6,10 @@ import { formatError, setLanguage, t } from "../../src/ui/i18n";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { FakeObsidian } from "../helpers/fake-obsidian";
 
-function dragEvent(type: string): MouseEvent {
-  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: -1, clientY: -1 });
+function dragEvent(type: string, clientY = -1): DragEvent {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: -1, clientY });
   Object.defineProperty(event, "dataTransfer", { value: { setData: vi.fn(), effectAllowed: "all", dropEffect: "none" } });
-  return event;
+  return event as DragEvent;
 }
 const visual = { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) as const };
 const labels = () => ({ createNode: "Create", incompleteNode: "Incomplete", missingNodeFolder: "Missing folder", missingNodeNote: "Missing note", node: "Node", nodeConflict: "Conflict", root: "Root", unmanaged: "Unmanaged" });
@@ -25,7 +25,69 @@ function makeView(fake: FakeObsidian, nodes: NodeService, reportError = vi.fn())
   return new FolderNodeContentsView({ app: fake.app } as never, nodes, visual, { isReferenced: () => false } as never, actions, true);
 }
 
+async function manualSiblings() {
+  const fake = new FakeObsidian();
+  fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+  for (const [index, path] of ["A", "B", "C", "D"].entries()) addNode(fake, path, [`rank=${(index + 1) * 1024}`]);
+  const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+  const view = makeView(fake, nodes);
+  await view.onOpen();
+  const handle = (path: string) => view.contentEl.querySelector<HTMLElement>(`[data-node-path='${path}'] .folder-nodes-node-drag-handle`)!;
+  const card = (path: string) => view.contentEl.querySelector<HTMLElement>(`[data-node-path='${path}'] .folder-nodes-node-card`)!;
+  return { fake, nodes, view, handle, card, place: vi.spyOn(nodes, "placeNode") };
+}
+
 describe("Placement and identity integration", () => {
+  it("accepts entry into a new child of the same card when the mouse is released before another dragover", async () => {
+    const { nodes, view, handle, card, place } = await manualSiblings();
+    try {
+      handle("C").dispatchEvent(dragEvent("dragstart"));
+      card("A").querySelector(".folder-nodes-node-visual")!.dispatchEvent(dragEvent("dragover"));
+      const enter = dragEvent("dragenter");
+      card("A").dispatchEvent(enter);
+      expect(enter.defaultPrevented).toBe(true);
+      expect(enter.dataTransfer?.dropEffect).toBe("move");
+      expect(place).not.toHaveBeenCalled();
+      card("A").dispatchEvent(dragEvent("drop"));
+      await vi.waitFor(() => expect(nodes.children("").map((entry) => entry.childPath)).toEqual(["C", "A", "B", "D"]));
+      expect(place).toHaveBeenCalledOnce();
+    } finally { await view.onClose(); }
+  });
+
+  it.each([
+    { replaced: "A", end: "before", accepted: false },
+    { replaced: "B", end: "before", accepted: false },
+    { replaced: "B", end: "after", accepted: false },
+    { replaced: "A", end: "after", accepted: true },
+  ])("checks the rendered card and current gap after replacing $replaced, ending $end B", async ({ replaced, end, accepted }) => {
+    const { fake, nodes, view, handle, card, place } = await manualSiblings();
+    try {
+      handle("D").dispatchEvent(dragEvent("dragstart"));
+      card("B").dispatchEvent(dragEvent("dragover"));
+      await fake.app.fileManager.trashFile(fake.requireFolder(replaced));
+      addNode(fake, replaced, [replaced === "A" ? "rank=1024" : "rank=2048"]);
+      const y = end === "before" ? -1 : 1;
+      const enter = dragEvent("dragenter", y);
+      card("B").dispatchEvent(enter);
+      expect(enter.dataTransfer?.dropEffect).toBe(accepted ? "move" : "none");
+      card("B").dispatchEvent(dragEvent("drop", y));
+      expect(place).toHaveBeenCalledTimes(accepted ? 1 : 0);
+      await vi.waitFor(() => expect(nodes.children("").map((entry) => entry.childPath)).toEqual(
+        accepted ? ["A", "B", "D", "C"] : ["A", "B", "C", "D"]));
+    } finally { await view.onClose(); }
+  });
+
+  it("clears an accepted sibling gap when the view receives Escape", async () => {
+    const { view, handle, card, place } = await manualSiblings();
+    try {
+      handle("C").dispatchEvent(dragEvent("dragstart"));
+      card("A").dispatchEvent(dragEvent("dragenter"));
+      view.containerEl.ownerDocument.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      card("A").dispatchEvent(dragEvent("drop"));
+      expect(place).not.toHaveBeenCalled();
+    } finally { await view.onClose(); }
+  });
+
   it("rejects dragging a sibling onto itself with localized feedback", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "", { "folder-nodes": ["order=manual"] });
@@ -204,6 +266,9 @@ describe("Placement and identity integration", () => {
       const b = view.contentEl.querySelector<HTMLElement>("[data-node-path='B']")!;
       expect(view.contentEl.querySelector("[data-node-path='Hidden']")).toBeNull();
       view.contentEl.querySelector<HTMLElement>("[data-node-path='C'] .folder-nodes-node-drag-handle")!.dispatchEvent(dragEvent("dragstart"));
+      const enter = dragEvent("dragenter");
+      b.dispatchEvent(enter);
+      expect(enter.dataTransfer?.dropEffect).toBe("none");
       b.dispatchEvent(dragEvent("dragover"));
       expect(view.contentEl.querySelector(".folder-nodes-placement-feedback")?.textContent).toContain("hidden nodes");
       b.dispatchEvent(dragEvent("drop"));

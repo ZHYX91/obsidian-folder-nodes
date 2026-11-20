@@ -6,6 +6,7 @@
 - Allow missing links to create a node at the Vault root when Obsidian uses the root as its default new-note location.
 - Keep settings tabs styled when disabling the last Node Graph in their window.
 - Keep scroll position and keyboard focus when changing a node name's prefix or suffix settings.
+- Keep sibling reordering responsive when releasing the mouse just after crossing a card's icon or label.
 - Explain in the selected language which note to close in extra tabs before retrying a move or ordering change.
 - List existing Markdown files and folders missing a node note in the read-only health report.
 - Clarify sibling reordering, localize invalid drop feedback, and skip hidden cards when deciding the drop direction. Fold optional settings tutorials while keeping warnings visible.

@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:browser": "node scripts/test-tooltip-browser.mjs",
     "test:browser:keys": "node scripts/test-graph-keyboard-browser.mjs",
+    "test:browser:drag": "node scripts/test-contents-drag-browser.mjs",
     "test:coverage": "vitest run --coverage",
     "check:readme-i18n": "node scripts/check-readme-i18n.mjs",
     "check:docs-i18n": "node scripts/check-docs-i18n.mjs",

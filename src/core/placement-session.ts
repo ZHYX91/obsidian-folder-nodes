@@ -31,11 +31,21 @@ export class PlacementSession<T extends { path: string }> {
     return true;
   }
 
+  /** Crossing between descendants of one target does not grant a new ownership claim on the same gap. */
+  public continuePreview(intent: PlacementIntent): boolean {
+    if (this.intent !== null && JSON.stringify(intent) === JSON.stringify(this.intent)) return this.ownsBindings();
+    return this.preview(intent);
+  }
+
   public commit(intent: PlacementIntent): { source: T; intent: PlacementIntent } | null {
     if (this.source === null || this.intent === null || JSON.stringify(intent) !== JSON.stringify(this.intent)) return null;
-    if (this.resolve(this.sourcePath) !== this.source || this.source.path !== this.sourcePath) return null;
-    if (this.bindings.some(({ path, entry }) => this.resolve(path) !== entry || entry.path !== path)) return null;
+    if (!this.ownsBindings()) return null;
     return { source: this.source, intent: this.intent };
+  }
+
+  private ownsBindings(): boolean {
+    return this.source !== null && this.resolve(this.sourcePath) === this.source && this.source.path === this.sourcePath
+      && this.bindings.every(({ path, entry }) => this.resolve(path) === entry && entry.path === path);
   }
 
   public clear(): void {

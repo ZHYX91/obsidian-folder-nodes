@@ -721,23 +721,33 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private bindNodeReorderTarget(element: HTMLElement, target: TFolder, parentPath: string): void {
-    element.addEventListener("dragover", (event) => {
+    const targetPath = target.path;
+    const previewAt = (sourcePath: string, zone: "after" | "before"): PlacementPreview => {
+      if (target.path !== targetPath || this.service.getFolder(targetPath) !== target) return { kind: "blocked", reason: t("errorStalePlacement") };
+      const intent = this.nodeReorderIntent(targetPath, parentPath, zone);
+      return intent === null ? { kind: "blocked", reason: "invalid_drop_target" } : this.service.previewPlacement(sourcePath, intent);
+    };
+    const previewReorder = (event: DragEvent): void => {
       const sourcePath = this.draggedNodePath;
       if (sourcePath === null) return;
       event.preventDefault();
       event.stopPropagation();
       const placement = this.nodeDropPlacement(element, event);
-      const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
-      const preview = intent === null ? { kind: "blocked" as const, reason: "invalid_drop_target" } : this.service.previewPlacement(sourcePath, intent);
-      if (preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis) && this.placementSession.preview(preview.intent)) {
+      const preview = previewAt(sourcePath, placement.zone);
+      const renderable = preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis);
+      if (preview.kind === "ready" && renderable && this.placementSession.continuePreview(preview.intent)) {
         placementFeedback(this.contentEl, null);
         if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
         return;
       }
       this.clearDropTarget();
-      placementFeedback(this.contentEl, preview.kind === "blocked" ? formatError(new Error(preview.reason)) : preview.kind === "ready" ? t("errorHiddenGap") : null);
+      placementFeedback(this.contentEl, preview.kind === "blocked" ? formatError(new Error(preview.reason))
+        : preview.kind === "ready" ? t(renderable ? "errorStalePlacement" : "errorHiddenGap") : null);
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "none";
-    });
+    };
+    // Chromium can enter another child of the same card just before release, without a final dragover.
+    element.addEventListener("dragenter", previewReorder);
+    element.addEventListener("dragover", previewReorder);
     element.addEventListener("dragleave", (event) => this.onDragLeave(event, element));
     element.addEventListener("drop", (event) => {
       const sourcePath = this.draggedNodePath;
@@ -745,8 +755,7 @@ export class FolderNodeContentsView extends ItemView {
       event.preventDefault();
       event.stopPropagation();
       const placement = this.nodeDropPlacement(element, event);
-      const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
-      const preview = intent === null ? { kind: "blocked" as const, reason: "invalid_drop_target" } : this.service.previewPlacement(sourcePath, intent);
+      const preview = previewAt(sourcePath, placement.zone);
       const source = this.service.getFolder(sourcePath);
       const renderable = preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis);
       const accepted = preview.kind === "ready" ? this.placementSession.commit(preview.intent) : null;
