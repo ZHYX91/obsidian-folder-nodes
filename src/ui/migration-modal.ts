@@ -17,8 +17,10 @@ export class MigrationModal extends SubmittingModal {
     this.setTitle(this.healthMode ? t("healthSummary") : t("batchOrganize"));
     if (this.healthMode) this.contentEl.createEl("p", { cls: "setting-item-description", text: t("readOnlyHealth") });
     const summary = this.contentEl.createDiv({ cls: "folder-nodes-migration-summary" });
-    this.pathSection(summary, t("moveLeafNotes"), this.scan.leafMarkdown.map((path) => `${path} → ${this.target(path)}`));
-    this.pathSection(summary, t("createNodeNotes"), this.scan.missingNodeNotes.map((path) => this.notePath(path)));
+    this.pathSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"),
+      this.healthMode ? this.scan.leafMarkdown : this.scan.leafMarkdown.map((path) => `${path} → ${this.target(path)}`));
+    this.pathSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
+      this.scan.missingNodeNotes.map((path) => this.healthMode ? path || "/" : this.notePath(path)));
     this.pathSection(summary, t("skippedLeafNotes"), this.scan.exemptLeafMarkdown);
     this.pathSection(summary, t("skippedFolders"), this.scan.ignoredFolders);
     this.pathSection(summary, t("conflicts"), this.scan.conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`), true);

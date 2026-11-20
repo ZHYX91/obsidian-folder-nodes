@@ -148,7 +148,7 @@ const zh = {
   confirmSelectionCreationDesc: "从选中文字创建节点前预览位置、名称和 aliases。关闭后直接创建，仍会检查冲突和选区变化。",
   selectionCrossesTableCells: "选区跨越了 Markdown 表格的单元格或行；为避免破坏表格，本次未创建节点。",
   aliasValue: "Alias", aliasNone: "不添加", reloadLanguage: "界面语言已更新。",
-  leafMarkdown: "尚未组成节点的 Markdown", missingNotes: "缺失节点笔记", conflicts: "阻塞冲突",
+  leafMarkdown: "尚未组成节点的 Markdown", missingNotes: "缺失节点笔记", foldersMissingNodeNotes: "缺少节点笔记的文件夹", conflicts: "阻塞冲突",
   leafExemptions: "不管理的 Markdown 文件", leafExemptionsDesc: "匹配的 Markdown 只显示为文件，不作为节点，也不要求创建同名文件夹。默认包含路径 AGENTS.md、CLAUDE.md，以及名称以 . 或 _ 开头的规则。",
   folderExemptions: "不管理的文件夹", folderExemptionsDesc: "匹配的文件夹及其完整子树不作为节点管理，也不参与批量整理。默认名称开头规则为 .、_；Vault 配置目录、.git、.trash 始终受系统保护。",
   addExemption: "添加路径", addLeafExemption: "添加 Markdown 文件路径", addFolderExemption: "添加文件夹路径",
@@ -170,6 +170,7 @@ const zh = {
   errorTargetFolderUnknown: "找不到目标文件夹：{path}", errorTargetNotComplete: "目标不是完整的 Folder Node：{path}", errorSourceNodeChanged: "节点结构已变化，请重新执行操作。",
   errorUnmanagedMerge: "设为不管理的文件夹不能作为 Folder Node 合并。",
   errorMergeNoteOpen: "请先保存并关闭来源与目标节点笔记的所有标签页，再从文件列表重试合并：{path}",
+  errorStructuralNoteMultipleEditors: "笔记「{path}」已在多个标签页打开。请只保留一个标签页，然后重试。",
   errorSelectionSourceChanged: "创建过程中来源笔记已变化，创建已停止。", errorSelectionTableChanged: "创建过程中表格结构已变化，创建已停止。", errorSelectionEditorChanged: "创建过程中来源编辑器已变化，创建已停止。",
   errorSelectionWikiLinkLabelUnsafe: "所选文字无法安全用 WikiLink 表示；可切换 Obsidian 的 Markdown 链接格式后重试。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
@@ -323,7 +324,7 @@ const en: typeof zh = {
   confirmSelectionCreationDesc: "Preview the location, name, and aliases before creating a node from selected text. Turn off to create directly; conflicts and selection changes are still checked.",
   selectionCrossesTableCells: "The selection crosses Markdown table cells or rows. No node was created, to keep the table intact.",
   aliasValue: "Alias", aliasNone: "Do not add", reloadLanguage: "Interface language updated.",
-  leafMarkdown: "Leaf Markdown", missingNotes: "Missing node notes", conflicts: "Blocking conflicts",
+  leafMarkdown: "Leaf Markdown", missingNotes: "Missing node notes", foldersMissingNodeNotes: "Folders missing a node note", conflicts: "Blocking conflicts",
   leafExemptions: "Unmanaged Markdown files", leafExemptionsDesc: "Matching Markdown appears only as files, not nodes, and does not require a same-named folder. Defaults include the AGENTS.md and CLAUDE.md paths, plus rules for names starting with . or _.",
   folderExemptions: "Unmanaged folders", folderExemptionsDesc: "Matching folders and their complete subtrees are not managed as nodes or included in bulk organization. Default name-start rules are . and _. The Vault configuration directory, .git, and .trash are always protected.",
   addExemption: "Add path", addLeafExemption: "Add Markdown file path", addFolderExemption: "Add folder path",
@@ -345,6 +346,7 @@ const en: typeof zh = {
   errorTargetFolderUnknown: "Target folder not found: {path}", errorTargetNotComplete: "The target is not a complete Folder Node: {path}", errorSourceNodeChanged: "The node structure changed. Try the action again.",
   errorUnmanagedMerge: "An unmanaged folder cannot be merged as a Folder Node.",
   errorMergeNoteOpen: "Save and close all tabs for the source and target node notes, then retry merging from the file explorer: {path}",
+  errorStructuralNoteMultipleEditors: "The note “{path}” is open in multiple tabs. Close the extra tabs, then try again.",
   errorSelectionSourceChanged: "The source note changed during creation; creation stopped.", errorSelectionTableChanged: "The table structure changed during creation; creation stopped.", errorSelectionEditorChanged: "The source editor changed during creation; creation stopped.",
   errorSelectionWikiLinkLabelUnsafe: "The selected text cannot be represented safely as a WikiLink. Switch Obsidian to Markdown links and try again.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
@@ -389,7 +391,7 @@ export function t(key: TranslationKey, values: Record<string, string | number> =
   const dictionary = locale === "zh-CN" ? zh : locale === "en" ? en : LANGUAGE_OVERRIDES[locale] ?? {};
   const template = dictionary[key] ?? en[key];
   return Object.entries(values).reduce(
-    (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+    (text, [name, value]) => text.replaceAll(`{${name}}`, () => String(value)),
     template,
   );
 }
@@ -413,6 +415,7 @@ export function formatError(error: unknown): string {
       case "source_node_changed": return t("errorSourceNodeChanged");
       case "unmanaged_merge": return t("errorUnmanagedMerge");
       case "merge_note_open": return t("errorMergeNoteOpen", error.values);
+      case "structural_note_multiple_editors": return t("errorStructuralNoteMultipleEditors", error.values);
       case "selection_changed": return t("errorSelectionChanged");
       case "selection_source_changed": return t("errorSelectionSourceChanged");
       case "selection_table_changed": return t("errorSelectionTableChanged");

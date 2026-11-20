@@ -139,7 +139,7 @@ describe("runtime architecture contract", () => {
     expect(runtimeStyles).not.toContain('createElement("style")');
     expect(runtimeStyles).not.toContain("setTimeout");
     expect(runtimeStyles).not.toContain("nativeStylesAreReady");
-    expect(settings).toContain("ensureStyles(this.containerEl.ownerDocument)");
+    expect(settings).toContain("setSettingsDocument(this.containerEl.ownerDocument)");
     expect(build).toContain('loader: { ".css": "text" }');
     expect(source("styles.css")).not.toContain(".folder-nodes-");
   });

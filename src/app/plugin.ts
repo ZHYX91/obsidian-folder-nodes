@@ -73,6 +73,7 @@ export default class FolderNodesPlugin extends Plugin {
   private lifecycleGeneration = 0;
   private readonly runtimeStyles = new RuntimeStyles(PLUGIN_STYLES);
   private settingsTab: FolderNodesSettingTab | null = null;
+  private settingsDocument: Document | null = null;
   private readonly visualPickers = new Set<VisualPickerModal>();
   private readonly localizedCommands: Command[] = [];
   private ribbonElement: HTMLElement | null = null;
@@ -198,6 +199,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.initialized = false;
     this.settingsLoaded = false;
     this.settingsTab = null;
+    this.settingsDocument = null;
     this.localizedCommands.length = 0;
     this.ribbonElement = null;
     this.reconciliationReady = false;
@@ -261,6 +263,14 @@ export default class FolderNodesPlugin extends Plugin {
 
   public ensureStyles(document: Document): void {
     this.runtimeStyles.install(document);
+  }
+
+  public setSettingsDocument(document: Document | null): void {
+    if (this.unloaded) return;
+    const previous = this.settingsDocument;
+    this.settingsDocument = document;
+    if (previous !== null && previous !== document) this.ensureWorkspaceStyles();
+    else if (document !== null) this.ensureStyles(document);
   }
 
   public applyEmojiFontSetting(): void {
@@ -654,6 +664,7 @@ export default class FolderNodesPlugin extends Plugin {
     const documents = new Set<Document>([this.app.workspace.rootSplit.win.document]);
     this.app.workspace.iterateAllLeaves((leaf) => documents.add(leaf.view.containerEl.ownerDocument));
     this.unresolvedLinkDocuments.reconcile(documents);
+    if (this.settingsDocument !== null) documents.add(this.settingsDocument);
     this.runtimeStyles.reconcile(documents);
   }
 

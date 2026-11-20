@@ -144,6 +144,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   public override hide(): void {
     this.expandedGuides.clear();
     this.currentGuide = null;
+    this.plugin.setSettingsDocument(null);
     super.hide();
   }
 
@@ -154,7 +155,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       else this.expandedGuides.delete(tab);
       this.currentGuide = null;
     }
-    this.plugin.ensureStyles(this.containerEl.ownerDocument);
+    this.plugin.setSettingsDocument(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
     this.containerEl.dir = interfaceTextDirection();

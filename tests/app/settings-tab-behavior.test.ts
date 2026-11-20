@@ -1,7 +1,11 @@
 import { type App, type PluginManifest } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
+import { Window } from "happy-dom";
+import { readFileSync } from "node:fs";
 
 import FolderNodesPlugin from "../../src/app/plugin";
+import FolderNodesWithNodeGraphPlugin from "../../src/app/node-graph-plugin";
+import { NODE_GRAPH_VIEW_TYPE } from "../../src/ui/node-graph-view";
 import { FolderNodesSettingTab } from "../../src/app/settings-tab";
 import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings, type SettingsCompatibility } from "../../src/shared/settings";
 import type { SettingsSaveState } from "../../src/shared/settings-save-coordinator";
@@ -23,14 +27,14 @@ vi.mock("obsidian", async (importOriginal) => {
     },
   };
 });
-vi.mock("../../src/ui/styles.css", () => ({ default: ".folder-nodes {}" }));
+vi.mock("../../src/ui/styles.css", () => ({ default: readFileSync("src/ui/styles.css", "utf8") }));
 vi.mock("../../src/ui/node-graph.css", () => ({ default: ".folder-nodes-node-graph {}" }));
 
 function fixture() {
   const state: { current: SettingsSaveState } = { current: "saved" };
   const plugin = {
     settings: structuredClone(DEFAULT_SETTINGS),
-    ensureStyles: vi.fn(),
+    setSettingsDocument: vi.fn(),
     getSettingsCompatibility: (): SettingsCompatibility => ({
       status: "compatible" as const,
       currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
@@ -49,6 +53,61 @@ function fixture() {
   document.body.append(tab.containerEl);
   return { tab, plugin, state };
 }
+
+it("keeps settings styles when disabling the last graph leaf in its window", async () => {
+  const root = new Window().document as unknown as Document;
+  const settings = document;
+  const handlers = new Map<string, () => void>();
+  let graphOpen = true;
+  const leaf = { view: { containerEl: settings.createElement("div") }, detach: () => { graphOpen = false; } };
+  const workspace = {
+    rootSplit: { win: { document: root } },
+    on: (event: string, handler: () => void) => handlers.set(event, handler),
+    getLeavesOfType: (type: string) => type === NODE_GRAPH_VIEW_TYPE && graphOpen ? [leaf] : [],
+    iterateAllLeaves: (visit: (item: typeof leaf) => void) => { if (graphOpen) visit(leaf); },
+  };
+  const app = { workspace, vault: { on: vi.fn() }, metadataCache: { on: vi.fn() } } as unknown as App;
+  const plugin = new FolderNodesWithNodeGraphPlugin(app, { id: "folder-nodes" } as PluginManifest);
+  Reflect.set(plugin, "registerEvent", vi.fn());
+  Reflect.set(plugin, "explorer", { refresh: vi.fn() });
+  Reflect.set(plugin, "nodeGraphIndex", { invalidateAll: vi.fn() });
+  Reflect.set(plugin, "refreshLocalizedChrome", vi.fn());
+  vi.spyOn(plugin, "refreshVisuals").mockImplementation(() => undefined);
+  vi.spyOn(plugin, "saveSettings").mockResolvedValue(undefined);
+  Reflect.get(plugin, "registerEvents").call(plugin);
+  const tab = new FolderNodesSettingTab(app, plugin);
+  Reflect.set(plugin, "settingsTab", tab);
+  Reflect.set(tab, "revealActiveTab", vi.fn());
+  Reflect.set(tab, "activeTab", "nodeGraph");
+  settings.body.append(tab.containerEl);
+  const initial = [...settings.adoptedStyleSheets];
+  const listen = vi.spyOn(settings, "addEventListener");
+  try {
+    tab.display();
+    handlers.get("layout-change")!();
+    const sheet = settings.adoptedStyleSheets.at(-1);
+    expect(Array.from(sheet!.cssRules).some((rule) => rule.cssText.includes("button.folder-nodes-tab.is-active"))).toBe(true);
+    const workspaceClicks = listen.mock.calls.find(([event]) => event === "auxclick")?.[2] as AddEventListenerOptions;
+    expect(workspaceClicks.signal?.aborted).toBe(false);
+    const toggle = tab.containerEl.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change"));
+    await vi.waitFor(() => expect(toggle.isConnected).toBe(false));
+    expect(graphOpen).toBe(false);
+    handlers.get("layout-change")!();
+    expect(settings.adoptedStyleSheets).toContain(sheet);
+    expect(workspaceClicks.signal?.aborted).toBe(true);
+    expect(tab.containerEl.querySelectorAll('[role="tab"]')).toHaveLength(5);
+    expect(root.adoptedStyleSheets).toHaveLength(1);
+    tab.hide();
+    expect(settings.adoptedStyleSheets).toEqual(initial);
+    expect(root.adoptedStyleSheets).toHaveLength(1);
+  } finally {
+    listen.mockRestore();
+    tab.containerEl.remove();
+    settings.adoptedStyleSheets = initial;
+  }
+});
 
 function numberControl(tab: FolderNodesSettingTab, name: string, description: string, panel: HTMLElement = document.body.createDiv()) {
   const method = tab as unknown as {
@@ -74,7 +133,7 @@ function persistenceFixture(failures: number) {
     snapshots.push(structuredClone(snapshot as PersistedFolderNodesSettings));
     if (snapshots.length <= failures) throw new Error("Disk unavailable");
   });
-  vi.spyOn(plugin, "ensureStyles").mockImplementation(() => undefined);
+  vi.spyOn(plugin, "setSettingsDocument").mockImplementation(() => undefined);
   const reconcile = vi.spyOn(plugin, "reconcileSettingsChange").mockResolvedValue(undefined);
   const tab = new FolderNodesSettingTab({} as App, plugin);
   Reflect.set(plugin, "settingsTab", tab);

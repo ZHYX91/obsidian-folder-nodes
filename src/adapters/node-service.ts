@@ -1449,7 +1449,7 @@ export class NodeService {
       }];
     });
     if (targets.length > 1) {
-      throw new Error(`Cannot update structural metadata while a note is open in multiple editors: ${path}`);
+      throw new FolderNodesError("structural_note_multiple_editors", { path });
     }
     const target = targets[0] ?? null;
     if (target !== null && target.file !== file) {

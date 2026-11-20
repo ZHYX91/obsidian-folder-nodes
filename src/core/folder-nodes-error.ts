@@ -16,6 +16,7 @@ export type FolderNodesErrorCode =
   | "selection_table_changed"
   | "selection_wikilink_label_unsafe"
   | "source_node_changed"
+  | "structural_note_multiple_editors"
   | "target_folder_unknown"
   | "target_not_complete"
   | "unmanaged_merge";

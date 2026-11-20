@@ -1530,6 +1530,26 @@ describe("NodeService structural safety", () => {
     expect(nodes.children("")[0]?.childPath).toBe("C");
   });
 
+  it("refuses a move when the destination parent note is open in two editors", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    const parent = fake.addFolder("Parent $&");
+    const note = fake.addFile("Parent $&/Parent $&.md");
+    const child = fake.addFolder("Child");
+    fake.addFile("Child/Child.md");
+    const nodes = service(fake);
+    await nodes.setChildOrderMode(parent.path, "manual");
+    const before = new Map(fake.contents);
+    const tabs = [markdownEditorLeaf(note, before.get(note.path)!), markdownEditorLeaf(note, before.get(note.path)!)];
+    fake.app.workspace.getLeavesOfType = vi.fn(() => tabs.map((tab) => tab.leaf) as never);
+    await expect(nodes.moveNode(child, parent.path)).rejects.toMatchObject({
+      code: "structural_note_multiple_editors", values: { path: note.path },
+    });
+    expect(fake.contents).toEqual(before);
+    expect(fake.files.get("Child")).toBe(child);
+    for (const tab of tabs) expect(tab.requestSave).not.toHaveBeenCalled();
+  });
+
   it("does not change sorting mode for a structural move into a natural parent", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");

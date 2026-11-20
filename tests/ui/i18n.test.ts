@@ -11,6 +11,19 @@ afterEach(() => {
 });
 
 describe("interface language", () => {
+  it("localizes the multiple-editor write refusal and preserves the exact relative note path", () => {
+    const path = "资料/$&/$$.md";
+    const error = new FolderNodesError("structural_note_multiple_editors", { path });
+    for (const locale of AVAILABLE_INTERFACE_LOCALES) {
+      setLanguage(locale);
+      const message = formatError(error);
+      expect(message).toContain(path);
+      expect(message).not.toContain("{path}");
+      if (locale !== "en") expect(message).not.toContain("multiple tabs");
+    }
+    setLanguage("zh-CN");
+    expect(formatError(error)).toBe(`笔记「${path}」已在多个标签页打开。请只保留一个标签页，然后重试。`);
+  });
   it("localizes the incomplete parent refusal when opening a missing link", () => {
     for (const locale of AVAILABLE_INTERFACE_LOCALES) {
       setLanguage(locale);
