@@ -22,9 +22,9 @@ export class ReferenceIndex {
     for (const [rawPath, rawCount] of Object.entries(targets)) {
       if (Number.isFinite(rawCount) && rawCount > 0) next.set(normalizeVaultPath(rawPath), rawCount);
     }
-    if (next.size === (previous?.size ?? 0) && [...next].every(([path, count]) => previous?.get(path) === count)) return affected;
     if (previous !== undefined) {
       for (const [path, count] of previous) {
+        if (next.has(path)) continue;
         affected.add(path);
         this.adjust(path, -count);
         const incoming = this.incomingSources.get(path);
@@ -33,14 +33,20 @@ export class ReferenceIndex {
       }
     }
     for (const [path, count] of next) {
+      const oldCount = previous?.get(path) ?? 0;
+      if (oldCount === count) continue;
       affected.add(path);
-      this.adjust(path, count);
-      const incoming = this.incomingSources.get(path) ?? new Set<string>();
-      incoming.add(source);
-      this.incomingSources.set(path, incoming);
+      this.adjust(path, count - oldCount);
+      if (oldCount === 0) {
+        const incoming = this.incomingSources.get(path) ?? new Set<string>();
+        incoming.add(source);
+        this.incomingSources.set(path, incoming);
+      }
     }
-    if (next.size === 0) this.sources.delete(source);
-    else this.sources.set(source, next);
+    if (affected.size > 0) {
+      if (next.size === 0) this.sources.delete(source);
+      else this.sources.set(source, next);
+    }
     return affected;
   }
 

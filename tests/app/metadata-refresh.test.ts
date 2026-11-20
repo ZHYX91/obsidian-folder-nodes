@@ -9,7 +9,8 @@ describe("Folder Nodes metadata refresh fingerprint", () => {
     const fake = new FakeObsidian();
     const file = fake.addFile("A.md");
     const cache = fake.app.metadataCache;
-    cache.resolvedLinks[file.path] = { "B.md": 1 };
+    const unchanged = Object.fromEntries(Array.from({ length: 999 }, (_, index) => [`keep-${index}.md`, 1]));
+    cache.resolvedLinks[file.path] = { ...unchanged, "B.md": 1 };
     const references = new ReferenceIndex();
     references.rebuild(cache.resolvedLinks);
     const callbacks = new Map<string, (file: TFile) => void>();
@@ -20,7 +21,7 @@ describe("Folder Nodes metadata refresh fingerprint", () => {
     callbacks.get("resolve")?.(file);
     callbacks.get("resolved")?.(file);
     expect(refresh).not.toHaveBeenCalled();
-    cache.resolvedLinks[file.path] = { "C.md": 1 };
+    cache.resolvedLinks[file.path] = { ...unchanged, "C.md": 1 };
     callbacks.get("resolve")?.(file);
     expect(refresh.mock.calls).toEqual([["A.md", "reference"], ["B.md", "reference"], ["C.md", "reference"]]);
     expect(references.isReferenced("B.md")).toBe(false);
