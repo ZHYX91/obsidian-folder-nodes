@@ -13,6 +13,27 @@
   },
   "scenarios": [
     {
+      "id": "missing-link-navigation",
+      "title": "Opt-in node creation from Reading view and Live Preview",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "Open MissingLinkAcceptance.md. Check that creating folder nodes from missing links in Selection & naming is off. Open AcceptanceNativeLink and confirm that Obsidian handles it without creating a folder node.",
+        "Enable link creation and aliases. Open the Reading-view link in a new tab; inspect its note path and aliases. In Live Preview, place the caret inside the editor link and confirm that no file appears. Now follow the link with the host open gesture or keyboard command.",
+        "If running the Chrono Notes coexistence scenario, configure daily notes in Daily and enable its missing-link creation. Follow Daily/2026-11-20 in Reading view and Daily/2026-11-21 in Live Preview. Verify that each produces only the configured periodic note."
+      ],
+      "expected": [
+        "Merely editing a link creates no files. Following the named test links with the toggle enabled creates AcceptanceReadingLink/AcceptanceReadingLink.md and AcceptanceEditorLink/AcceptanceEditorLink.md with the selected aliases and pane.",
+        "A matching Chrono Notes action owns the periodic link when both features are enabled. Turning Folder Nodes off restores native handling of other missing links."
+      ]
+    },
+    {
       "id": "portable-name-and-delete-review",
       "title": "Portable node names and explicit subtree deletion",
       "surfaces": [

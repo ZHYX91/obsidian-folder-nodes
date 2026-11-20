@@ -62,6 +62,13 @@ describe("Node Contents interactions", () => {
     expect(siblingDropAxis(rects)).toBe("vertical");
   });
 
+  it("ignores hidden siblings whose zero-size rectangle intersects a scrolled card", () => {
+    expect(siblingDropAxis([
+      { top: -10, left: 16, width: 100, height: 30 },
+      { top: 0, left: 0, width: 0, height: 0 },
+    ])).toBe("vertical");
+  });
+
   it("keeps a stable visual slot for nodes without a custom icon", () => {
     expect(nodeEntryVisual("healthy", { kind: "fallback", value: "", accent: null, inheritedFrom: null })).toEqual({
       defaultVisual: true,

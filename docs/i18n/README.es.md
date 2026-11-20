@@ -25,6 +25,8 @@ El contenido del nodo muestra la ruta actual y explica los estados vacío, ocult
 
 Si la creación falla después de crear una nota, solo se eliminan los archivos que siguen perteneciendo a esa operación y cuyo contenido no ha cambiado. Las notas abiertas o editadas se conservan. El error indica las rutas restantes y el motivo: guarda y revisa esos archivos antes de decidir si los borras manualmente.
 
+**Crear nodos de carpeta al abrir enlaces sin destino** — Desactivado de forma predeterminada. Al abrir un enlace sin destino dentro del ámbito gestionado, se crean una carpeta y una nota con el mismo nombre. Editar el texto del enlace no crea archivos. Si está activa la creación mediante enlaces en Chrono Notes, las notas periódicas coincidentes tienen prioridad.
+
 ## Capturas de pantalla
 
 Las imágenes muestran el contenido de los nodos, el explorador de archivos, Node Graph y los ajustes de iconos, selección y nombres.

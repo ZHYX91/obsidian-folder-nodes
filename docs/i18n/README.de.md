@@ -25,6 +25,8 @@ Der Knoteninhalt zeigt den aktuellen Pfad und erklärt leere, ausgeblendete, nic
 
 Scheitert das Erstellen nach dem Anlegen einer Notiz, werden nur nachweislich unveränderte Dateien dieser Aktion aufgeräumt. Geöffnete oder bearbeitete Notizen bleiben erhalten. Die Fehlermeldung nennt die verbliebenen Pfade und den Grund. Speichern und prüfen Sie diese Dateien, bevor Sie sie gegebenenfalls manuell löschen.
 
+**Beim Öffnen fehlender Links Ordnerknoten erstellen** — Standardmäßig ausgeschaltet. Beim Öffnen eines fehlenden Links im verwalteten Bereich entstehen ein Ordner und eine gleichnamige Notiz. Beim Bearbeiten des Linktexts wird keine Datei erstellt. Ist die Erstellung über Links in Chrono Notes aktiviert, haben passende periodische Notizen Vorrang.
+
 ## Screenshots
 
 Die Bilder zeigen Knoteninhalte, den Datei-Explorer, den Node Graph sowie die Einstellungen für Symbole, Auswahl und Namen.

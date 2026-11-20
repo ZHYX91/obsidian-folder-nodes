@@ -64,6 +64,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       explorerIconPosition: settings.explorerIconPosition,
       showIconInNoteTitle: settings.showIconInNoteTitle,
       addSelectionAlias: settings.addSelectionAlias,
+      createNodesFromLinks: settings.createNodesFromLinks,
       confirmSelectionCreation: settings.confirmSelectionCreation,
       nodeGraphEnabled: settings.nodeGraph.enabled,
       nodeGraphDefaultDimension: settings.nodeGraph.defaultDimension,
@@ -110,6 +111,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         break;
       case "showIconInNoteTitle": settings.showIconInNoteTitle = Boolean(value); this.plugin.refreshVisuals(); break;
       case "addSelectionAlias": settings.addSelectionAlias = Boolean(value); break;
+      case "createNodesFromLinks": settings.createNodesFromLinks = Boolean(value); break;
       case "confirmSelectionCreation": settings.confirmSelectionCreation = Boolean(value); break;
       case "nodeGraphEnabled": settings.nodeGraph.enabled = Boolean(value); reconcileNodeGraph = true; break;
       case "nodeGraphDefaultDimension":
@@ -291,6 +293,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     return [
       { name: t("confirmSelectionCreation"), desc: t("confirmSelectionCreationDesc"), control: { type: "toggle", key: "confirmSelectionCreation", defaultValue: true } },
       { name: t("aliases"), desc: t("aliasesDesc"), control: { type: "toggle", key: "addSelectionAlias", defaultValue: true } },
+      { name: t("createNodesFromLinks"), desc: t("createNodesFromLinksDesc"), control: { type: "toggle", key: "createNodesFromLinks", defaultValue: false } },
       { name: `${t("prefix")}: ${t("enabled")}`, control: { type: "toggle", key: "prefixEnabled", defaultValue: false } },
       { name: `${t("prefix")}: ${t("source")}`, visible: settings.prefix.enabled, control: { type: "dropdown", key: "prefixSource", defaultValue: "current-file", options: sourceOptions } },
       { name: `${t("prefix")}: ${t("separator")}`, visible: settings.prefix.enabled, control: { type: "text", key: "prefixSeparator" } },
@@ -528,6 +531,9 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideScope") });
     new Setting(panel).setName(t("confirmSelectionCreation")).setDesc(t("confirmSelectionCreationDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.confirmSelectionCreation).onChange(async (value) => {
       this.plugin.settings.confirmSelectionCreation = value; await this.plugin.saveSettings();
+    }));
+    new Setting(panel).setName(t("createNodesFromLinks")).setDesc(t("createNodesFromLinksDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.createNodesFromLinks).onChange(async (value) => {
+      this.plugin.settings.createNodesFromLinks = value; await this.plugin.saveSettings();
     }));
     new Setting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
       this.plugin.settings.addSelectionAlias = value; await this.plugin.saveSettings();

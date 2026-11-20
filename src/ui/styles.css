@@ -199,7 +199,11 @@ body {
 }
 
 @container (max-width: 24rem) {
-  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body { margin-inline-start: 0; }
+  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
 }
 
 .folder-nodes-settings-guide-body p { margin: 0; }

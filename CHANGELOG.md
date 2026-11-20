@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 - 2026-11-20
+
+- Make folder-node creation from missing links opt-in in Selection & naming. Reading view and Live Preview honor the requested pane and anchor. Matching periodic links take priority when Chrono Notes link creation is enabled.
+- Clarify sibling reordering, localize invalid drop feedback, and skip hidden cards when deciding the drop direction. Fold optional settings tutorials while keeping warnings visible.
+- Refresh only changed reference targets and isolate node-merge validation and rollback.
 
 - Preserve distinct YAML property names containing Unicode spaces and neighboring top-level properties when updating node metadata.
 - Serialize settings startup reads and accepted writes across plugin reloads, reject work after unload, and recheck stored schemas before writing to preserve incompatible data.

@@ -25,6 +25,8 @@ Le contenu du nœud indique le chemin actuel et explique les états vide, masqu�
 
 Si la création échoue après avoir créé une note, le nettoyage ne supprime que les fichiers dont l’origine et le contenu inchangé peuvent être vérifiés. Une note ouverte ou modifiée est conservée. Le message d’erreur donne les chemins restants et la raison : enregistrez et vérifiez ces fichiers avant de décider de les supprimer manuellement.
 
+**Créer un nœud de dossier à l’ouverture d’un lien sans cible** — Désactivé par défaut. Dans le périmètre géré, ouvrir un lien sans cible crée un dossier et une note du même nom. Modifier le texte du lien ne crée aucun fichier. Si la création par lien de Chrono Notes est activée, elle a priorité pour les notes périodiques correspondantes.
+
 ## Captures d’écran
 
 Les images présentent le contenu des nœuds, l’explorateur de fichiers, le Node Graph ainsi que les réglages des icônes, de la sélection et du nommage.

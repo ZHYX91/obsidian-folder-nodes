@@ -25,6 +25,8 @@ Nội dung nút hiển thị đường dẫn hiện tại và giải thích tr�
 
 Nếu thao tác thất bại sau khi tạo ghi chú, plugin chỉ dọn các tệp vẫn xác định được là do thao tác đó tạo ra và chưa thay đổi. Ghi chú đã mở hoặc chỉnh sửa được giữ lại. Thông báo lỗi nêu các đường dẫn còn lại và lý do: hãy lưu và kiểm tra các tệp trước khi quyết định xóa thủ công.
 
+**Tạo nút thư mục khi mở liên kết chưa có đích** — Mặc định tắt. Khi bật, việc mở liên kết chưa có đích trong phạm vi quản lý sẽ tạo một thư mục và một ghi chú cùng tên. Chỉnh sửa văn bản liên kết không tạo tệp. Nếu Chrono Notes cũng bật tính năng tạo ghi chú từ liên kết, các liên kết định kỳ phù hợp sẽ do Chrono Notes xử lý trước.
+
 ## Ảnh minh họa
 
 Các hình minh họa nội dung nút, trình duyệt tệp, Node Graph và cài đặt biểu tượng, phần chọn và đặt tên.

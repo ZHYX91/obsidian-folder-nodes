@@ -61,6 +61,7 @@ export const DEFAULT_SETTINGS: FolderNodesSettings = deepFreeze({
   leafNotePrefixes: [".", "_"],
   ignoredFolderPrefixes: [".", "_"],
   addSelectionAlias: true,
+  createNodesFromLinks: false,
   confirmSelectionCreation: true,
   nodeGraph: structuredClone(DEFAULT_NODE_GRAPH_SETTINGS),
   prefix: {
@@ -99,6 +100,7 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     leafNotePrefixes: normalizePrefixes(input.leafNotePrefixes, DEFAULT_SETTINGS.leafNotePrefixes),
     ignoredFolderPrefixes: normalizePrefixes(input.ignoredFolderPrefixes, DEFAULT_SETTINGS.ignoredFolderPrefixes),
     addSelectionAlias: input.addSelectionAlias !== false,
+    createNodesFromLinks: input.createNodesFromLinks === true,
     confirmSelectionCreation: input.confirmSelectionCreation !== false,
     nodeGraph: normalizeNodeGraphSettings(input.nodeGraph),
     prefix: normalizeNamingPart(input.prefix, DEFAULT_SETTINGS.prefix, legacyMomentFormat((input as { timestampFormat?: unknown }).timestampFormat)),

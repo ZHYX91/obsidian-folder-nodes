@@ -54,7 +54,7 @@ export type SiblingDropAxis = "horizontal" | "vertical";
 export function siblingDropAxis(rects: readonly Pick<DOMRect, "height" | "left" | "top" | "width">[]): SiblingDropAxis {
   // Sweep in visual order. In a normal single-column list, expired cards leave
   // the active set immediately instead of comparing every pair of siblings.
-  const ordered = [...rects].sort((left, right) => left.top - right.top);
+  const ordered = rects.filter((rect) => rect.width > 0 && rect.height > 0).sort((left, right) => left.top - right.top);
   const active: Array<(typeof ordered)[number]> = [];
   for (const current of ordered) {
     let retained = 0;

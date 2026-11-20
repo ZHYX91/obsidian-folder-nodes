@@ -25,6 +25,8 @@ O conteúdo do nó mostra o caminho atual e explica os estados vazio, oculto, n�
 
 Se a criação falhar depois de criar uma nota, a limpeza remove apenas arquivos que ainda pertencem à operação e não foram alterados. Notas abertas ou editadas são preservadas. O erro informa os caminhos restantes e o motivo: salve e confira esses arquivos antes de decidir se os exclui manualmente.
 
+**Criar nós de pasta ao abrir links sem destino** — Desativado por padrão. Abrir um link sem destino no escopo gerenciado cria uma pasta e uma nota com o mesmo nome. Editar o texto do link não cria arquivos. Se a criação por links estiver ativada no Chrono Notes, ele terá prioridade nos links de notas periódicas correspondentes.
+
 ## Capturas de tela
 
 As imagens mostram o conteúdo dos nós, o explorador de arquivos, o Node Graph e as configurações de ícones, seleção e nomes.

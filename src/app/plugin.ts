@@ -1,4 +1,4 @@
-import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, Platform, Plugin, TAbstractFile, TFile, TFolder, type Command } from "obsidian";
+import { Editor, getLinkpath, Keymap, MarkdownView, Menu, Notice, parseLinktext, Platform, Plugin, TAbstractFile, TFile, TFolder, type Command } from "obsidian";
 
 import BASE_STYLES from "../ui/styles.css";
 import NODE_GRAPH_STYLES from "../ui/node-graph.css";
@@ -44,6 +44,7 @@ import { formatError, setLanguage, t } from "../ui/i18n";
 import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { DocumentEventRegistry } from "./document-event-registry";
+import { claimPeriodicLink, interceptLinkNavigation, type OpenLinkArgs } from "./link-navigation";
 import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { openPluginSettings } from "../adapters/plugin-settings";
@@ -64,6 +65,7 @@ export default class FolderNodesPlugin extends Plugin {
   private reconcileErrorCount = 0;
   private reconcileErrorMessages = new Set<string>();
   private readonly unresolvedLinkDocuments = new DocumentEventRegistry((event) => this.interceptUnresolvedLink(event));
+  private removeLinkNavigation: (() => void) | null = null;
   private readonly metadataFingerprints = new Map<string, string>();
   private unloaded = false;
   private initialized = false;
@@ -176,6 +178,7 @@ export default class FolderNodesPlugin extends Plugin {
       this.ensureWorkspaceStyles();
       this.explorer.start();
       this.reconciliationReady = true;
+      this.syncLinkNavigation();
       this.references.rebuild(this.app.metadataCache.resolvedLinks);
       this.seedMetadataFingerprints();
       this.app.workspace.iterateAllLeaves((leaf) => this.registerUnresolvedLinkDocument(leaf.view.containerEl.ownerDocument));
@@ -206,6 +209,8 @@ export default class FolderNodesPlugin extends Plugin {
     for (const batch of this.reconcileBatches.values()) window.clearTimeout(batch.timer);
     this.reconcileBatches.clear();
     this.unresolvedLinkDocuments.clear();
+    this.removeLinkNavigation?.();
+    this.removeLinkNavigation = null;
     this.metadataFingerprints.clear();
     this.runtimeStyles.removeAll();
     if (this.reconcileNoticeTimer !== null) window.clearTimeout(this.reconcileNoticeTimer);
@@ -217,6 +222,7 @@ export default class FolderNodesPlugin extends Plugin {
     if (this.settingsCompatibility.status === "incompatible") {
       throw new SettingsSchemaIncompatibleError(this.settingsCompatibility);
     }
+    this.syncLinkNavigation();
     await this.settingsSaver.save(createSettingsSnapshot(this.settings));
   }
 
@@ -658,50 +664,92 @@ export default class FolderNodesPlugin extends Plugin {
     );
   }
 
+  private syncLinkNavigation(): void {
+    if (!this.settings.createNodesFromLinks || !this.reconciliationReady) {
+      this.removeLinkNavigation?.();
+      this.removeLinkNavigation = null;
+    } else {
+      this.removeLinkNavigation ??= interceptLinkNavigation(this.app.workspace, (...args) => {
+        const action = this.openMissingLink(args);
+        return action?.catch((error: unknown) => this.reportActionError(error)) ?? null;
+      });
+    }
+  }
+
   private interceptUnresolvedLink(event: MouseEvent): void {
-    if (event.defaultPrevented || (event.button !== 0 && event.button !== 1)) return;
+    if (!this.settings.createNodesFromLinks || event.defaultPrevented || (event.button !== 0 && event.button !== 1)) return;
     const target = event.target as { closest?: (selector: string) => Element | null } | null;
     const link = target?.closest?.("a.internal-link.is-unresolved");
     const rawLinkText = link?.getAttribute("data-href")?.trim();
     if (link === null || link === undefined || rawLinkText === undefined || rawLinkText === "") return;
-    const source = this.sourceFileForLink(link);
-    if (source === null) return;
-    const linkPath = getLinkpath(rawLinkText).trim();
-    if (linkPath === "" || this.app.metadataCache.getFirstLinkpathDest(linkPath, source.path) !== null) return;
+    // Let the editor distinguish positioning the caret from actually following a link.
+    // Embedded notes and canvases have their own source context. Let Obsidian supply it.
+    if (link.closest(".cm-editor, .markdown-source-view, .internal-embed, .markdown-embed, .canvas-wrapper") !== null) return;
+    const view = this.sourceViewForLink(link);
+    if (!view?.file) return;
+    const pane = event.button === 1 ? "tab" : Keymap.isModEvent(event);
+    const action = this.openMissingLink([rawLinkText, view.file.path, pane], link.textContent ?? "", view);
+    if (action === null) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.runAction(action);
+  }
+
+  private openMissingLink(args: OpenLinkArgs, visibleText?: string, clickedView?: MarkdownView): Promise<void> | null {
+    if (!this.settings.createNodesFromLinks || this.unloaded) return null;
+    const [rawLinkText, sourcePath, pane, viewState] = args;
+    const source = this.app.vault.getFileByPath(sourcePath);
+    if (source?.extension.toLowerCase() !== "md") return null;
+    const { path, subpath } = parseLinktext(rawLinkText);
+    const linkPath = path.trim();
+    if (linkPath === "" || this.app.metadataCache.getFirstLinkpathDest(linkPath, source.path) !== null) return null;
     const requestedFile = linkPath.toLocaleLowerCase().endsWith(".md") ? linkPath : `${linkPath}.md`;
     const defaultParent = this.app.fileManager.getNewFileParent(source.path, requestedFile);
     const plan = planUnresolvedNode(linkPath, defaultParent.path);
-    if (plan === null || this.service.isIgnoredPath(plan.nodePath) || this.service.isLeafNoteExempt(plan.leafPath)) return;
-
-    const visibleText = link.textContent ?? "";
-    const cacheLinks = this.app.metadataCache.getFileCache(source)?.links ?? [];
-    const candidates: LinkAliasCandidate[] = cacheLinks.map((candidate) => ({
-      linkPath: getLinkpath(candidate.link),
-      original: candidate.original,
-      ...(candidate.displayText === undefined ? {} : { displayText: candidate.displayText }),
-    }));
-    const alias = this.settings.addSelectionAlias
-      ? aliasFromLinkDisplay(linkPath, visibleText, candidates, rawLinkText === linkPath)
-      : null;
-    const pane = event.button === 1 ? "tab" : Keymap.isModEvent(event);
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    this.runAction(this.createAndOpenUnresolvedNode(plan.nodePath, alias, pane));
+    if (plan === null || this.service.isIgnoredPath(plan.nodePath) || this.service.isLeafNoteExempt(plan.leafPath)) return null;
+    const state = subpath ? { ...viewState, eState: { ...viewState?.eState, subpath } } : viewState;
+    const origin = pane ? null : clickedView ?? this.app.workspace.getActiveViewOfType(MarkdownView);
+    // Metadata may lag a recent creation. Exact existing notes take precedence over a new node.
+    const paths = new Set([requestedFile, plan.leafPath, normalizeVaultPath(`${source.parent?.path ?? ""}/${requestedFile}`)]);
+    const existing = [...paths].map((candidate) => this.app.vault.getFileByPath(candidate)).filter((file) => file !== null);
+    if (existing.length > 1) return null;
+    if (existing[0]) return this.openLinkFile(Promise.resolve(existing[0]), pane, state, origin);
+    const claimed = claimPeriodicLink(this.app.workspace, args);
+    if (claimed !== null) return claimed;
+    const alias = this.settings.addSelectionAlias ? this.linkAlias(source, linkPath, rawLinkText, visibleText) : null;
+    const created = this.service.createNodePath(plan.nodePath, alias === null ? {} : { alias });
+    return this.openLinkFile(created, pane, state, origin).then(() => { if (!this.unloaded) this.refreshVisuals(); });
   }
 
-  private sourceFileForLink(link: Element): TFile | null {
-    let source: TFile | null = null;
+  private linkAlias(source: TFile, linkPath: string, rawLinkText: string, visibleText?: string): string | null {
+    const candidates: LinkAliasCandidate[] = (this.app.metadataCache.getFileCache(source)?.links ?? [])
+      .filter((candidate) => candidate.link === rawLinkText)
+      .map((candidate) => ({
+        linkPath: getLinkpath(candidate.link), original: candidate.original,
+        ...(candidate.displayText === undefined ? {} : { displayText: candidate.displayText }),
+      }));
+    // The public navigation method receives the destination without display text.
+    // Multiple authored occurrences can identify the alias only when all agree.
+    const display = visibleText ?? (new Set(candidates.map((item) => item.displayText)).size === 1 ? candidates[0]?.displayText : undefined);
+    return display ? aliasFromLinkDisplay(linkPath, display, candidates, visibleText !== undefined && rawLinkText === linkPath) : null;
+  }
+
+  private sourceViewForLink(link: Element): MarkdownView | null {
+    let source: MarkdownView | null = null;
     this.app.workspace.iterateAllLeaves((leaf) => {
-      if (source === null && leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(link)) source = leaf.view.file;
+      if (source === null && leaf.view instanceof MarkdownView && leaf.view.containerEl.contains(link)) source = leaf.view;
     });
     return source;
   }
 
-  private async createAndOpenUnresolvedNode(nodePath: string, alias: string | null, pane: ReturnType<typeof Keymap.isModEvent>): Promise<void> {
-    const note = await this.service.createNodePath(nodePath, alias === null ? {} : { alias });
+  private async openLinkFile(file: Promise<TFile>, pane: OpenLinkArgs[2], state: OpenLinkArgs[3], origin: MarkdownView | null): Promise<void> {
+    const sourceFile = origin?.file;
+    const note = await file;
     if (this.unloaded) return;
-    await this.app.workspace.getLeaf(pane).openFile(note);
-    this.refreshVisuals();
+    const reuse = origin?.navigation && origin.containerEl.isConnected && origin.leaf.view === origin
+      && origin.file === sourceFile && !origin.leaf.getViewState().pinned;
+    const leaf = reuse ? origin.leaf : this.app.workspace.getLeaf(origin ? "tab" : pane);
+    await leaf.openFile(note, state);
   }
 
   private reportReconcileError(error: unknown): void {
@@ -897,7 +945,11 @@ export default class FolderNodesPlugin extends Plugin {
   }
 
   private runAction(operation: Promise<unknown>): void {
-    void operation.catch((error) => new Notice(formatError(error), 8000));
+    void operation.catch((error: unknown) => this.reportActionError(error));
+  }
+
+  private reportActionError(error: unknown): void {
+    new Notice(formatError(error), 8000);
   }
 
   private async setLeafUnmanaged(path: string): Promise<void> {
