@@ -517,7 +517,8 @@ export class ExplorerAdapter extends Component {
       }
       button.dataset.parentPath = parent?.path ?? "";
       button.setAttribute("aria-label", label);
-      button.setAttribute("title", label);
+      // Obsidian shows the accessible label on hover; clear older Chromium tooltips on reused buttons.
+      button.removeAttribute("title");
       button.classList.toggle("is-hidden", !managed);
     }
   }

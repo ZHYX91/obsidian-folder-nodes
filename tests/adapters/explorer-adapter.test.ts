@@ -46,7 +46,11 @@ describe("ExplorerAdapter lifecycle", () => {
       setLanguage("en");
       adapter.start();
       const createNode = toolbar.querySelector<HTMLButtonElement>(".folder-nodes-create-node");
-      expect(createNode?.title).toBe("Folder Nodes · New node");
+      expect(createNode?.getAttribute("aria-label")).toBe("Folder Nodes · New node");
+      expect(createNode?.hasAttribute("title")).toBe(false);
+      createNode?.setAttribute("title", "Folder Nodes · New node");
+      adapter.refresh();
+      expect(createNode?.hasAttribute("title")).toBe(false);
       const noteRepair = folderTitle.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
       const folderRepair = fileTitle.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
       expect(noteRepair).not.toBeNull();
@@ -57,10 +61,9 @@ describe("ExplorerAdapter lifecycle", () => {
         expect(folderTitle.querySelector(".folder-nodes-explorer-repair")).toBe(noteRepair);
         expect(fileTitle.querySelector(".folder-nodes-explorer-repair")).toBe(folderRepair);
         expect(toolbar.querySelector(".folder-nodes-create-node")).toBe(createNode);
-        for (const [button, label] of [
-          [createNode, `Folder Nodes · ${t("createNode")}`],
-          [noteRepair, t("missingNodeNote")], [folderRepair, t("missingNodeFolder")],
-        ] as const) {
+        expect(createNode?.getAttribute("aria-label")).toBe(`Folder Nodes · ${t("createNode")}`);
+        expect(createNode?.hasAttribute("title")).toBe(false);
+        for (const [button, label] of [[noteRepair, t("missingNodeNote")], [folderRepair, t("missingNodeFolder")]] as const) {
           expect(button?.getAttribute("aria-label")).toBe(label);
           expect(button?.getAttribute("title")).toBe(label);
         }
