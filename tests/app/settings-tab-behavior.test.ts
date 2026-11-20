@@ -145,6 +145,18 @@ function persistenceFixture(failures: number) {
   return { plugin, tab, input, snapshots, reconcile };
 }
 
+function namingFixture() {
+  const { tab, plugin } = fixture();
+  Object.assign(plugin.settings.suffix, { enabled: true, source: "timestamp" });
+  tab.display();
+  tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-naming")!.click();
+  const control = (key: "enabled" | "source" | "separator" | "customText" | "timestampFormat") =>
+    [...tab.containerEl.querySelectorAll(".setting-item")]
+      .find((row) => row.querySelector(".setting-item-name")?.textContent === `${t("suffix")}: ${t(key)}`)
+      ?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
+  return { tab, plugin, control };
+}
+
 describe("imperative settings edit state", () => {
   it.each(["en", "zh-CN", "ar"] as const)("offers the local user guide and issue form from General in %s", (locale) => {
     const { tab } = fixture();
@@ -239,6 +251,79 @@ describe("imperative settings edit state", () => {
     expect(format("prefix")).toBe("YYYY");
     expect(format("suffix")).toBe("HHmm");
     tab.containerEl.remove();
+  });
+
+  it("keeps the scrolled naming controls and keyboard focus while switching the suffix source", async () => {
+    const { tab, plugin, control } = namingFixture();
+    try {
+      const originalSource = control("source")!;
+      const separator = control("separator")!;
+      const scroller = tab.containerEl;
+      scroller.style.cssText = "height: 180px; overflow: auto";
+      // Model the host revealing a top tab when a whole page is rebuilt.
+      Reflect.set(tab, "revealActiveTab", () => { scroller.scrollTop = 0; });
+      originalSource.focus();
+      scroller.scrollTop = 650;
+      originalSource.value = "custom";
+      originalSource.dispatchEvent(new Event("change"));
+      await vi.waitFor(() => expect(control("customText")).toBeDefined());
+      expect(scroller.scrollTop).toBe(650);
+      expect(document.activeElement === originalSource).toBe(true);
+      expect(control("separator") === separator).toBe(true);
+      expect(control("timestampFormat")).toBeUndefined();
+
+      const custom = control("customText")!;
+      custom.focus();
+      custom.value = "Chapter";
+      custom.dispatchEvent(new Event("input"));
+      expect(plugin.settings.suffix.customText).toBe("Chapter");
+      originalSource.focus();
+      originalSource.value = "timestamp";
+      originalSource.dispatchEvent(new Event("change"));
+      await vi.waitFor(() => expect(control("timestampFormat")).toBeDefined());
+      expect(document.activeElement === originalSource).toBe(true);
+      expect(control("customText")).toBeUndefined();
+      expect(scroller.scrollTop).toBe(650);
+    } finally { tab.containerEl.remove(); }
+  });
+
+  it("keeps the naming toggle and honors the user's focus and tab changes during pending saves", async () => {
+    const { tab, plugin, control } = namingFixture();
+    const delayNextSave = () => {
+      let finish!: () => void;
+      const promise = new Promise<void>((resolve) => { finish = resolve; });
+      plugin.saveSettings.mockReturnValueOnce(promise);
+      return { finish, promise };
+    };
+    try {
+      const toggle = control("enabled") as HTMLInputElement;
+      toggle.focus();
+      toggle.click();
+      await vi.waitFor(() => expect(control("source")).toBeUndefined());
+      expect(document.activeElement === toggle).toBe(true);
+
+      const enableSave = delayNextSave();
+      toggle.click();
+      const source = control("source")!;
+      source.focus();
+      enableSave.finish();
+      await enableSave.promise;
+      expect(document.activeElement === source).toBe(true);
+
+      const sourceSave = delayNextSave();
+      source.value = "custom";
+      source.dispatchEvent(new Event("change"));
+      tab.showManagement();
+      const managementTab = document.activeElement;
+      const managementPanel = tab.containerEl.querySelector('[role="tabpanel"]')!;
+      tab.containerEl.scrollTop = 260;
+      sourceSave.finish();
+      await sourceSave.promise;
+      expect(managementPanel.isConnected).toBe(true);
+      expect(document.activeElement === managementTab).toBe(true);
+      expect(tab.containerEl.scrollTop).toBe(260);
+      expect(plugin.settings.suffix.source).toBe("custom");
+    } finally { tab.containerEl.remove(); }
   });
 
   it("opens the intended five tabs and management actions through the imperative surface", () => {

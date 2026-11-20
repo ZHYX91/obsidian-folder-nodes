@@ -676,21 +676,46 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderNamingPart(panel: HTMLElement, label: string, part: NamingPart): void {
     new Setting(panel).setName(label).setHeading();
-    new Setting(panel).setName(`${label}: ${t("enabled")}`).addToggle((toggle) => toggle.setValue(part.enabled).onChange(async (value) => {
-      part.enabled = value; await this.plugin.saveSettings(); this.display();
+    const enabled = new Setting(panel).setName(`${label}: ${t("enabled")}`);
+    const options = panel.createDiv();
+    enabled.addToggle((toggle) => toggle.setValue(part.enabled).onChange((value) => {
+      part.enabled = value;
+      options.empty();
+      if (value) this.renderNamingOptions(panel, options, label, part);
+      this.updatePreview(panel);
+      return this.plugin.saveSettings();
     }));
-    if (!part.enabled) return;
-    new Setting(panel).setName(`${label}: ${t("source")}`).addDropdown((dropdown) => dropdown.addOptions({
+    if (part.enabled) this.renderNamingOptions(panel, options, label, part);
+  }
+
+  private renderNamingOptions(panel: HTMLElement, options: HTMLElement, label: string, part: NamingPart): void {
+    const source = new Setting(options).setName(`${label}: ${t("source")}`);
+    new Setting(options).setName(`${label}: ${t("separator")}`).addText((text) => text.setValue(part.separator).onChange((value) => {
+      part.separator = value;
+      this.updatePreview(panel);
+      return this.plugin.saveSettings();
+    }));
+    const fields = options.createDiv();
+    source.addDropdown((dropdown) => dropdown.addOptions({
       "current-file": t("currentFile"), "current-node": t("currentNode"), "current-heading": t("currentHeading"), timestamp: t("timestamp"), custom: t("customText"),
-    }).setValue(part.source).onChange(async (value) => { part.source = value as NamingPart["source"]; await this.plugin.saveSettings(); this.display(); }));
-    new Setting(panel).setName(`${label}: ${t("separator")}`).addText((text) => text.setValue(part.separator).onChange(async (value) => {
-      part.separator = value; await this.plugin.saveSettings(); this.updatePreview(panel);
+    }).setValue(part.source).onChange((value) => {
+      part.source = value as NamingPart["source"];
+      fields.empty();
+      this.renderNamingSourceInput(panel, fields, label, part);
+      this.updatePreview(panel);
+      return this.plugin.saveSettings();
     }));
-    if (part.source === "custom") new Setting(panel).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange(async (value) => {
-      part.customText = value; await this.plugin.saveSettings(); this.updatePreview(panel);
+    this.renderNamingSourceInput(panel, fields, label, part);
+  }
+
+  private renderNamingSourceInput(panel: HTMLElement, fields: HTMLElement, label: string, part: NamingPart): void {
+    if (part.source === "custom") new Setting(fields).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange((value) => {
+      part.customText = value;
+      this.updatePreview(panel);
+      return this.plugin.saveSettings();
     }));
     if (part.source === "timestamp") {
-      const setting = new Setting(panel).setName(`${label}: ${t("timestampFormat")}`);
+      const setting = new Setting(fields).setName(`${label}: ${t("timestampFormat")}`);
       const updateDescription = (value: string) => {
         const valid = isValidMomentTimestampFormat(value);
         setting.setDesc(valid
@@ -701,14 +726,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       setting.addText((text) => {
         text.setValue(part.timestampFormat);
         updateDescription(part.timestampFormat);
-        text.onChange(async (value) => {
+        text.onChange((value) => {
           const valid = updateDescription(value);
           text.inputEl.toggleClass("is-invalid", !valid);
           text.inputEl.setAttr("aria-invalid", String(!valid));
           if (!valid) return;
           part.timestampFormat = value;
-          await this.plugin.saveSettings();
           this.updatePreview(panel);
+          return this.plugin.saveSettings();
         });
       });
     }

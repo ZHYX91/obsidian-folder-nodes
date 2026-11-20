@@ -5,6 +5,7 @@
 - Make folder-node creation from missing links opt-in in Selection & naming. Reading view and Live Preview honor the requested pane and anchor. Matching periodic links take priority when Chrono Notes link creation is enabled.
 - Allow missing links to create a node at the Vault root when Obsidian uses the root as its default new-note location.
 - Keep settings tabs styled when disabling the last Node Graph in their window.
+- Keep scroll position and keyboard focus when changing a node name's prefix or suffix settings.
 - Explain in the selected language which note to close in extra tabs before retrying a move or ordering change.
 - List existing Markdown files and folders missing a node note in the read-only health report.
 - Clarify sibling reordering, localize invalid drop feedback, and skip hidden cards when deciding the drop direction. Fold optional settings tutorials while keeping warnings visible.
