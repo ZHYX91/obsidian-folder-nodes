@@ -1472,8 +1472,11 @@ export class NodeService {
     path: string,
     kind: abstract new (...args: never[]) => T,
   ): void {
-    const current = this.app.vault.getAbstractFileByPath(normalizePath(path));
-    if (!(entry instanceof kind) || entry.path !== path || current !== entry) {
+    // The host exposes the Vault root through getRoot(); its path can be "/" while our ordering paths use "".
+    const root = path === "" || path === "/";
+    const current = root ? this.app.vault.getRoot() : this.app.vault.getAbstractFileByPath(normalizePath(path));
+    const samePath = root ? entry.path === "" || entry.path === "/" : entry.path === path;
+    if (!(entry instanceof kind) || !samePath || current !== entry) {
       throw new Error(`Vault entry identity changed during operation: ${path}`);
     }
   }

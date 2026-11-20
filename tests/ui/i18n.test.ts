@@ -11,6 +11,13 @@ afterEach(() => {
 });
 
 describe("interface language", () => {
+  it("localizes the incomplete parent refusal when opening a missing link", () => {
+    for (const locale of AVAILABLE_INTERFACE_LOCALES) {
+      setLanguage(locale);
+      expect(formatError(new Error("Missing canonical Node Note: Projects"))).toBe(t("errorMissingNote", { path: "Projects" }));
+    }
+  });
+
   it("explains retained creation paths through the selection workflow aggregate error", () => {
     setLanguage("en");
     const cause = new FolderNodesError("created_file_open", { path: "A/A.md" });

@@ -416,7 +416,7 @@ export function formatError(error: unknown): string {
   const pathExists = /^Path already exists:\s*(.+)$/u.exec(message)?.[1];
   if (pathExists !== undefined) return t("errorPathExists", { path: pathExists });
   if (/cannot be moved|cannot be merged/u.test(message)) return t("errorInvalidMove");
-  const missing = /^(?:Missing node note|Cannot update missing node note):\s*(.+)$/u.exec(message)?.[1];
+  const missing = /^(?:Missing canonical Node Note|Missing node note|Cannot update missing node note):\s*(.+)$/u.exec(message)?.[1];
   if (missing !== undefined) return t("errorMissingNote", { path: missing });
   const merge = /^Merge (?:property )?conflict:\s*(.+)$/u.exec(message)?.[1];
   if (merge !== undefined) return t("errorMergeConflict", { detail: merge });

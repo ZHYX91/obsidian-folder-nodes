@@ -99,6 +99,23 @@ describe("opening missing links", () => {
     expect(f.trigger).not.toHaveBeenCalled();
   });
 
+  it.each(["", "/"])("creates and opens a node at the Vault root represented as %j", async (rootPath) => {
+    const f = fixture();
+    const { vault, fileManager } = f.fake.app;
+    f.fake.root.path = rootPath;
+    vi.spyOn(fileManager, "getNewFileParent").mockReturnValue(f.fake.root);
+    const lookup = vault.getAbstractFileByPath.bind(vault);
+    vi.spyOn(vault, "getAbstractFileByPath").mockImplementation((path) =>
+      path === "" || path === "/" ? null : lookup(path));
+    f.enable();
+    await f.follow("Ordinary target", f.source.path, "tab");
+    const note = f.fake.files.get("Ordinary target/Ordinary target.md");
+    expect(note).toBeDefined();
+    expect(f.open).toHaveBeenCalledWith(note, undefined);
+    expect(f.native).not.toHaveBeenCalled();
+    expect(f.fake.trashed).toEqual([]);
+  });
+
   it("routes a Reading-view click once, and defers failed or cancelled periodic navigation without creating nodes", async () => {
     const f = fixture((request) => {
       if (request.linkText === "Cancel") request.claim(Promise.resolve());
@@ -116,6 +133,28 @@ describe("opening missing links", () => {
     expect(f.click("Topic#Here")).toBe(true);
     await vi.waitFor(() => expect(f.open).toHaveBeenCalledOnce());
     expect(f.fake.frontmatters.get("Notes/Topic/Topic.md")?.aliases).toContain("Alias");
+  });
+
+  it("refuses a replaced root even when the old root remains in the generic path lookup", async () => {
+    const f = fixture();
+    const { vault, fileManager } = f.fake.app;
+    const root = f.fake.root;
+    const replacement = new FakeObsidian().root;
+    replacement.children = root.children;
+    const rootNote = f.fake.addFile("Vault.md");
+    vi.spyOn(fileManager, "getNewFileParent").mockReturnValue(root);
+    const read = vault.read.bind(vault);
+    vi.spyOn(vault, "read").mockImplementation(async (file) => {
+      if (file === rootNote) vi.spyOn(vault, "getRoot").mockReturnValue(replacement);
+      return read(file);
+    });
+    const report = vi.spyOn(f.plugin as unknown as { reportActionError(error: unknown): void }, "reportActionError");
+    f.enable();
+    await f.follow("Refused", f.source.path);
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("identity changed") }));
+    expect(f.fake.files.has("Refused")).toBe(false);
+    expect(f.fake.files.get("Vault.md")).toBe(rootNote);
+    expect(f.native).not.toHaveBeenCalled();
   });
 
   it("opens a new tab when the originating view is repurposed during creation", async () => {

@@ -25,7 +25,7 @@
       },
       "steps": [
         "Open MissingLinkAcceptance.md. Check that creating folder nodes from missing links in Selection & naming is off. Open AcceptanceNativeLink and confirm that Obsidian handles it without creating a folder node.",
-        "Enable link creation and aliases. Open the Reading-view link in a new tab; inspect its note path and aliases. In Live Preview, place the caret inside the editor link and confirm that no file appears. Now follow the link with the host open gesture or keyboard command.",
+        "Set Obsidian's default new-note location to the Vault folder. Enable link creation and aliases. Open the Reading-view link in a new tab; inspect its root-level folder, note path and aliases. In Live Preview, place the caret inside the editor link and confirm that no file appears. Now follow the link with the host open gesture or keyboard command.",
         "If running the Chrono Notes coexistence scenario, configure daily notes in Daily and enable its missing-link creation. Follow Daily/2026-11-20 in Reading view and Daily/2026-11-21 in Live Preview. Verify that each produces only the configured periodic note."
       ],
       "expected": [
