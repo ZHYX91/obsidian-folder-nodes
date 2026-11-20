@@ -209,6 +209,44 @@ body {
 .folder-nodes-settings-guide-body p { margin: 0; }
 .folder-nodes-settings-guide-body p + p { margin-block-start: 6px; }
 
+.folder-nodes-guide-title-with-icon {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 6px;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.folder-nodes-guide-title-with-icon > span:first-child {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.folder-nodes-guide-book {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.folder-nodes-guide-book > svg {
+  inline-size: 1em;
+  block-size: 1em;
+}
+
+.folder-nodes-icon-guide-section + .folder-nodes-icon-guide-section { margin-block-start: 14px; }
+.folder-nodes-icon-guide-section > .setting-item.mod-settings-heading {
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.folder-nodes-icon-guide-section .setting-item-name {
+  color: var(--text-normal);
+  font-size: inherit;
+  font-weight: var(--font-semibold);
+}
+
 .folder-nodes-settings-guide-example {
   display: flex;
   flex-wrap: wrap;

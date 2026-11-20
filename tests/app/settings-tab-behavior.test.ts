@@ -136,6 +136,19 @@ describe("imperative settings edit state", () => {
     expect(descriptionFor(t("nameStartsWith", { prefix: "_" }))).toBe(t("nameStartRule"));
     select("icons");
     const guide = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    expect(guide.open).toBe(false);
+    const summary = guide.querySelector("summary")!;
+    expect(summary.textContent).toBe(t("iconGuideTitle"));
+    const book = summary.querySelector('[aria-hidden="true"] svg[data-icon="book-open"]');
+    expect(book).not.toBeNull();
+    expect(summary.querySelector("button, a, [role=button], [tabindex]")).toBeNull();
+    const sections = [...guide.querySelectorAll("section")];
+    expect(sections.map((section) => section.querySelector(".mod-settings-heading .setting-item-name")?.textContent)).toEqual([
+      t("iconGuideFormatTitle"), t("iconGuideOrderTitle"), t("iconGuideColorTitle"),
+    ]);
+    expect(sections[0]?.textContent).toContain(t("iconGuideFormats"));
+    expect(sections[1]?.textContent).toContain(t("iconGuideOrder"));
+    expect(sections[2]?.textContent).toContain(t("iconColorBehavior"));
     expect(guide.textContent).toContain("icon: 💰");
     expect(guide.textContent).toContain(t("iconColorBehavior"));
     expect(guide.querySelectorAll(".folder-nodes-icon-comparison-row")).toHaveLength(4);
@@ -297,6 +310,8 @@ describe("imperative settings edit state", () => {
       const example = panel.querySelector<HTMLElement>("code");
       expect(example?.textContent).toBe("icon: 💰");
       expect(example?.dir).toBe("ltr");
+      expect(panel.querySelector("summary")?.textContent).toBe(t("iconGuideTitle"));
+      expect(panel.querySelector("section .setting-item-name")?.textContent).toBe(t("iconGuideFormatTitle"));
       const mappings = [...panel.querySelectorAll<HTMLElement>(".folder-nodes-settings-guide-mapping")];
       expect(mappings).toHaveLength(2);
       expect(mappings.map((mapping) => mapping.dir)).toEqual(["ltr", "ltr"]);

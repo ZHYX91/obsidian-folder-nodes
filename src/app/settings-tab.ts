@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, setIcon, Setting, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
@@ -391,10 +391,18 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     });
   }
 
-  private createGuide(panel: HTMLElement, title: string): HTMLDivElement {
+  private createGuide(panel: HTMLElement, title: string, icon?: "book-open"): HTMLDivElement {
     const element = panel.createEl("details", { cls: "folder-nodes-settings-guide" });
     element.open = this.expandedGuides.has(this.activeTab);
-    element.createEl("summary", { text: title });
+    const summary = element.createEl("summary");
+    if (icon) {
+      const label = summary.createSpan({ cls: "folder-nodes-guide-title-with-icon" });
+      label.createSpan({ text: title });
+      const mark = label.createSpan({ cls: "folder-nodes-guide-book", attr: { "aria-hidden": "true" } });
+      setIcon(mark, icon);
+    } else {
+      summary.textContent = title;
+    }
     this.currentGuide = { tab: this.activeTab, element };
     return element.createDiv({ cls: "folder-nodes-settings-guide-body" });
   }
@@ -501,18 +509,27 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderIconGuide(panel: HTMLElement): void {
-    const body = this.createGuide(panel, t("iconGuideTitle"));
-    const example = body.createDiv({ cls: "folder-nodes-settings-guide-example" });
+    const body = this.createGuide(panel, t("iconGuideTitle"), "book-open");
+    const format = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
+    new Setting(format).setName(t("iconGuideFormatTitle")).setHeading();
+    format.createEl("p", { text: t("iconGuideFormats") });
+    const example = format.createDiv({ cls: "folder-nodes-settings-guide-example" });
     example.createSpan({ text: t("iconPropertyExampleLabel") });
     example.createEl("code", { text: "icon: 💰", attr: { dir: "ltr" } });
-    body.createEl("p", { text: t("iconGuideFormats") });
-    body.createEl("p", { text: t("iconColorBehavior") });
-    body.createEl("p", { text: t("iconDistinctionDesc") });
-    const comparison = body.createDiv({ cls: "folder-nodes-icon-comparison", attr: { "aria-label": t("iconDistinctionTitle") } });
+    format.createEl("p", { text: t("iconDistinctionDesc") });
+    const comparison = format.createDiv({ cls: "folder-nodes-icon-comparison", attr: { "aria-label": t("iconDistinctionTitle") } });
     this.renderIconComparisonRow(comparison, t("iconFromProperty"), "A", "Project", true);
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "A Project", false);
     this.renderIconComparisonRow(comparison, t("iconFromProperty"), "📓", "Project", true);
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓 Project", false);
+
+    const order = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
+    new Setting(order).setName(t("iconGuideOrderTitle")).setHeading();
+    order.createEl("p", { text: t("iconGuideOrder") });
+
+    const color = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
+    new Setting(color).setName(t("iconGuideColorTitle")).setHeading();
+    color.createEl("p", { text: t("iconColorBehavior") });
   }
 
   private renderIconComparisonRow(container: HTMLElement, label: string, iconValue: string, name: string, propertyIcon: boolean): void {
