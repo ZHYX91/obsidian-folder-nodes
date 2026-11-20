@@ -493,7 +493,7 @@ export class ExplorerAdapter extends Component {
   }
 
   private decorateCreateActions(root: HTMLElement): void {
-    const labels = this.getRootLabels();
+    const label = `Folder Nodes · ${this.getRootLabels().createNode}`;
     const parentPath = this.createParentPath();
     const parent = parentPath === "" ? this.app.vault.getRoot() : this.service.getFolder(parentPath);
     const managed = parent !== null && !this.service.isIgnoredPath(parent.path);
@@ -516,8 +516,8 @@ export class ExplorerAdapter extends Component {
         container.prepend(button);
       }
       button.dataset.parentPath = parent?.path ?? "";
-      button.setAttribute("aria-label", labels.createNode);
-      button.setAttribute("title", labels.createNode);
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
       button.classList.toggle("is-hidden", !managed);
     }
   }

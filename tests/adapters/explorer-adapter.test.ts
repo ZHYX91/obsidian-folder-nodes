@@ -9,8 +9,13 @@ import { AVAILABLE_INTERFACE_LOCALES } from "../../src/core/interface-languages"
 import { setLanguage, t } from "../../src/ui/i18n";
 
 describe("ExplorerAdapter lifecycle", () => {
-  it("updates existing repair tooltips and accessible names across all interface languages", () => {
+  it("updates localized explorer action names and identifies only the plugin's new-node toolbar button", () => {
     const root = document.createElement("div");
+    root.className = "workspace-leaf-content";
+    const toolbar = root.createDiv({ cls: "nav-header" }).createDiv({ cls: "nav-buttons-container" });
+    const nativeActions = ["New note", "New folder"].map((label) => toolbar.createEl("button", {
+      cls: "clickable-icon nav-action-button", attr: { title: label, "aria-label": label },
+    }));
     root.createDiv({ cls: "nav-files-container" });
     const folderTitle = root.createDiv({ cls: "nav-folder-title", attr: { "data-path": "Missing" } });
     folderTitle.createSpan({ cls: "nav-folder-title-content", text: "Missing" });
@@ -40,6 +45,8 @@ describe("ExplorerAdapter lifecycle", () => {
     try {
       setLanguage("en");
       adapter.start();
+      const createNode = toolbar.querySelector<HTMLButtonElement>(".folder-nodes-create-node");
+      expect(createNode?.title).toBe("Folder Nodes · New node");
       const noteRepair = folderTitle.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
       const folderRepair = fileTitle.querySelector<HTMLButtonElement>(".folder-nodes-explorer-repair");
       expect(noteRepair).not.toBeNull();
@@ -49,9 +56,19 @@ describe("ExplorerAdapter lifecycle", () => {
         adapter.refresh();
         expect(folderTitle.querySelector(".folder-nodes-explorer-repair")).toBe(noteRepair);
         expect(fileTitle.querySelector(".folder-nodes-explorer-repair")).toBe(folderRepair);
-        for (const [button, label] of [[noteRepair, t("missingNodeNote")], [folderRepair, t("missingNodeFolder")]] as const) {
+        expect(toolbar.querySelector(".folder-nodes-create-node")).toBe(createNode);
+        for (const [button, label] of [
+          [createNode, `Folder Nodes · ${t("createNode")}`],
+          [noteRepair, t("missingNodeNote")], [folderRepair, t("missingNodeFolder")],
+        ] as const) {
           expect(button?.getAttribute("aria-label")).toBe(label);
           expect(button?.getAttribute("title")).toBe(label);
+        }
+        for (const [index, label] of ["New note", "New folder"].entries()) {
+          const native = nativeActions[index]!;
+          expect(native.parentElement).toBe(toolbar);
+          expect(native.title).toBe(label);
+          expect(native.getAttribute("aria-label")).toBe(label);
         }
       }
       noteRepair?.click();
