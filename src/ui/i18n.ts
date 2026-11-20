@@ -59,7 +59,7 @@ const zh = {
   nodeGraphEdgeLimit: "链接概览边数", nodeGraphEdgeLimitDesc: "图谱很大时先少显示一些链接，避免挤成一团。节点层级仍会完整显示；选中节点后可以看见它的全部链接。",
   nodeGraphNumberInvalid: "请输入 {minimum} 到 {maximum} 之间的整数；无效输入不会保存。",
   nodeGraphFindNode: "查找节点",
-  managementGuideTitle: "文件与节点并不相同", managementGuideStructure: "文件夹 A 和 A/A.md 构成完整节点；缺少一项显示“不完整”，插件不会自动补全。", managementGuideBoundary: "不管理内容仍能在 Obsidian 中访问，Folder Nodes 只是停止对它执行节点结构操作；并非隐藏或删除。", managementGuideActions: "“重命名文件”等操作只影响一个文件或文件夹；“重命名所在节点”等操作会处理整个节点。批量整理和属性迁移会先给你看预览，“健康检查”不会改动文件。",
+  managementGuideTitle: "文件和节点有什么区别？", managementGuideStructure: "文件夹 A 和 A/A.md 构成完整节点；缺少一项显示“不完整”，插件不会自动补全。", managementGuideBoundary: "不管理内容仍能在 Obsidian 中访问，Folder Nodes 只是停止对它执行节点结构操作；并非隐藏或删除。", managementGuideActions: "“重命名文件”等操作只影响一个文件或文件夹；“重命名所在节点”等操作会处理整个节点。批量整理和属性迁移会先给你看预览，“健康检查”不会改动文件。",
   maintenance: "结构维护", health: "Folder Nodes 健康检查",
   batchOrganize: "批量整理不完整节点", previewOrganizePlan: "预览整理方案",
   scanningStructure: "正在扫描结构", scanningStructureDesc: "正在查找 Folder Nodes 管理的文件夹和笔记。扫描期间仍可正常使用 Obsidian。",
@@ -145,11 +145,9 @@ const zh = {
   leafMarkdown: "尚未组成节点的 Markdown", missingNotes: "缺失节点笔记", conflicts: "阻塞冲突",
   leafExemptions: "不管理的 Markdown 文件", leafExemptionsDesc: "匹配的 Markdown 只显示为文件，不作为节点，也不要求创建同名文件夹。默认包含路径 AGENTS.md、CLAUDE.md，以及名称以 . 或 _ 开头的规则。",
   folderExemptions: "不管理的文件夹", folderExemptionsDesc: "匹配的文件夹及其完整子树不作为节点管理，也不参与批量整理。默认名称开头规则为 .、_；Vault 配置目录、.git、.trash 始终受系统保护。",
-  leafExemptionItemDesc: "此 Markdown 文件不作为节点管理", folderExemptionItemDesc: "此文件夹的完整子树不由 Folder Nodes 管理",
   addExemption: "添加路径", addLeafExemption: "添加 Markdown 文件路径", addFolderExemption: "添加文件夹路径",
   leafPrefixRules: "Markdown 名称开头", leafPrefixRulesDesc: "匹配任意层级的 Markdown 文件名开头。",
   folderPrefixRules: "文件夹名称开头", folderPrefixRulesDesc: "匹配任意路径段的文件夹名称开头。",
-  leafPrefixItemDesc: "匹配此前缀的 Markdown 文件不作为节点管理", folderPrefixItemDesc: "匹配此前缀的文件夹子树不受管理",
   addRule: "添加规则", addRuleDesc: "可添加一个指定路径，或添加适用于任意层级的名称开头规则。",
   addPathRule: "添加路径", exactPathRule: "指定路径", namePrefixRule: "名称开头规则", nameStartRule: "名称开头规则", nameStartsWith: "名称以“{prefix}”开头",
   addPrefixRule: "添加名称开头规则", addNameStartRule: "添加名称开头规则", addLeafPrefix: "添加 Markdown 名称开头规则", addFolderPrefix: "添加文件夹名称开头规则",
@@ -171,7 +169,7 @@ const zh = {
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "创建过程中选区已改变，创建已停止。",
   errorHiddenGap: "请先临时显示隐藏节点，再选择精确排序位置。",
-  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorGeneric: "无法安全完成此次操作：{message}",
+  errorUnknownTarget: "找不到目标节点：{path}", errorManualOrderRequired: "当前父节点按名称排序。请先将“子节点排序”切换为手动，再精确调整同级位置。", errorStalePlacement: "节点结构已变化，请重新拖动。", errorInvalidDropTarget: "此处不是有效的同级放置位置，请选择其他位置。", errorGeneric: "无法安全完成此次操作：{message}",
   reconcileErrorsSummary: "自动结构同步有 {count} 项未完成：{message}",
 };
 
@@ -230,7 +228,7 @@ const en: typeof zh = {
   nodeGraphEdgeLimit: "Link overview edge limit", nodeGraphEdgeLimitDesc: "On large graphs, show fewer links at first to keep them readable. The complete node hierarchy stays visible; selecting a node shows all its links.",
   nodeGraphNumberInvalid: "Enter a whole number from {minimum} to {maximum}; invalid input is not saved.",
   nodeGraphFindNode: "Find node",
-  managementGuideTitle: "Files and nodes are different", managementGuideStructure: "Folder A and A/A.md form a complete node; a missing part shows Incomplete and is not created automatically.", managementGuideBoundary: "Unmanaged items stay available in Obsidian. Folder Nodes stops structural node actions there; it does not hide or delete them.", managementGuideActions: "Actions such as Rename file change one file or folder. Actions such as Rename containing node change the whole node. Bulk organization and property migration show a preview first; Check health never edits files.",
+  managementGuideTitle: "How do files and nodes differ?", managementGuideStructure: "Folder A and A/A.md form a complete node; a missing part shows Incomplete and is not created automatically.", managementGuideBoundary: "Unmanaged items stay available in Obsidian. Folder Nodes stops structural node actions there; it does not hide or delete them.", managementGuideActions: "Actions such as Rename file change one file or folder. Actions such as Rename containing node change the whole node. Bulk organization and property migration show a preview first; Check health never edits files.",
   maintenance: "Structure maintenance", health: "Check Folder Nodes health",
   batchOrganize: "Organize incomplete nodes", previewOrganizePlan: "Preview organization plan",
   scanningStructure: "Scanning structure", scanningStructureDesc: "Inventorying the managed scope in batches. Obsidian remains responsive during the scan.",
@@ -316,11 +314,9 @@ const en: typeof zh = {
   leafMarkdown: "Leaf Markdown", missingNotes: "Missing node notes", conflicts: "Blocking conflicts",
   leafExemptions: "Unmanaged Markdown files", leafExemptionsDesc: "Matching Markdown appears only as files, not nodes, and does not require a same-named folder. Defaults include the AGENTS.md and CLAUDE.md paths, plus rules for names starting with . or _.",
   folderExemptions: "Unmanaged folders", folderExemptionsDesc: "Matching folders and their complete subtrees are not managed as nodes or included in bulk organization. Default name-start rules are . and _. The Vault configuration directory, .git, and .trash are always protected.",
-  leafExemptionItemDesc: "This Markdown file is not managed as a node", folderExemptionItemDesc: "This folder subtree is not managed by Folder Nodes",
   addExemption: "Add path", addLeafExemption: "Add Markdown file path", addFolderExemption: "Add folder path",
   leafPrefixRules: "Markdown name start", leafPrefixRulesDesc: "Matches the start of Markdown file names at any level.",
   folderPrefixRules: "Folder name start", folderPrefixRulesDesc: "Matches the start of folder names in any path segment.",
-  leafPrefixItemDesc: "Markdown files with this prefix are not managed as nodes", folderPrefixItemDesc: "Folder subtrees with this prefix are unmanaged",
   addRule: "Add rule", addRuleDesc: "Add one exact path or a name-start rule that applies at every level.",
   addPathRule: "Add path", exactPathRule: "Exact path", namePrefixRule: "Name-start rule", nameStartRule: "Name-start rule", nameStartsWith: "Name starts with “{prefix}”",
   addPrefixRule: "Add name-start rule", addNameStartRule: "Add name-start rule", addLeafPrefix: "Add Markdown name-start rule", addFolderPrefix: "Add folder name-start rule",
@@ -342,7 +338,7 @@ const en: typeof zh = {
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed during creation; creation stopped.",
   errorHiddenGap: "Show hidden nodes for this session before choosing an exact position.",
-  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorGeneric: "Could not complete this action safely: {message}",
+  errorUnknownTarget: "Target node not found: {path}", errorManualOrderRequired: "This parent uses name order. Switch Child order to Manual before placing a node at an exact sibling position.", errorStalePlacement: "The node structure changed. Drag again to choose the current position.", errorInvalidDropTarget: "This is not a valid sibling drop position. Choose another position.", errorGeneric: "Could not complete this action safely: {message}",
   reconcileErrorsSummary: "Automatic structure synchronization left {count} items incomplete: {message}",
 };
 
@@ -426,5 +422,6 @@ export function formatError(error: unknown): string {
   if (target !== undefined) return t("errorUnknownTarget", { path: target });
   if (/^Enable manual child ordering before/u.test(message)) return t("errorManualOrderRequired");
   if (message === "The insertion position is stale; retry the drag") return t("errorStalePlacement");
+  if (message === "invalid_drop_target") return t("errorInvalidDropTarget");
   return t("errorGeneric", { message });
 }

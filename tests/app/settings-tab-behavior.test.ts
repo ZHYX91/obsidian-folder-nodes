@@ -11,6 +11,7 @@ import { AVAILABLE_INTERFACE_LOCALES, INTERFACE_LOCALE_LABELS } from "../../src/
 vi.mock("obsidian", async (importOriginal) => {
   const actual = await importOriginal<typeof import("obsidian")>();
   class TestPluginSettingTab {
+    public hide(): void { this.containerEl.replaceChildren(); }
     public readonly containerEl = document.createElement("div");
   }
   return {
@@ -39,6 +40,7 @@ function fixture() {
     retrySettingsSave: vi.fn(async () => { state.current = "saved"; }),
     saveSettings: vi.fn(async (): Promise<void> => undefined),
     reconcileSettingsChange: vi.fn(async () => undefined),
+    previewSelectionName: (selection: string) => selection,
     openBatchOrganize: vi.fn(),
     openPropertyMigration: vi.fn(),
     showHealth: vi.fn(),
@@ -101,6 +103,72 @@ describe("imperative settings edit state", () => {
     } finally { tab.containerEl.remove(); setLanguage("en"); }
   });
 
+  it("retains a guide across tab switches and forgets it when settings close", () => {
+    const { tab } = fixture();
+    const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
+    const guide = () => tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    tab.showManagement();
+    expect(guide().open).toBe(false);
+    guide().open = true;
+    select("general");
+    select("management");
+    const previous = guide();
+    expect(previous.open).toBe(true);
+    tab.hide();
+    previous.dispatchEvent(new Event("toggle"));
+    tab.display();
+    expect(guide().open).toBe(false);
+    tab.containerEl.remove();
+  });
+
+  it("places optional examples after their related settings and keeps required guidance visible", () => {
+    const { tab } = fixture();
+    tab.display();
+    const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
+    select("management");
+    const rows = [...tab.containerEl.querySelectorAll(".setting-item")];
+    const descriptionFor = (name: string) => rows
+      .find((row) => row.querySelector(".setting-item-name")?.textContent === name)
+      ?.querySelector(".setting-item-description")?.textContent;
+    expect(descriptionFor(t("leafExemptions"))).toBe(t("leafExemptionsDesc"));
+    expect(descriptionFor(t("folderExemptions"))).toBe(t("folderExemptionsDesc"));
+    expect(descriptionFor("AGENTS.md")).toBe(t("exactPathRule"));
+    expect(descriptionFor(t("nameStartsWith", { prefix: "_" }))).toBe(t("nameStartRule"));
+    select("icons");
+    const guide = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    expect(guide.textContent).toContain("icon: 💰");
+    expect(guide.textContent).toContain(t("iconColorBehavior"));
+    expect(guide.querySelectorAll(".folder-nodes-icon-comparison-row")).toHaveLength(4);
+    expect(guide.parentElement!.lastElementChild).toBe(guide);
+    expect(guide.parentElement!.querySelector(".folder-nodes-settings-guide-brief")?.textContent).toBe(t("iconGuideIntro"));
+    select("naming");
+    const naming = tab.containerEl.querySelector<HTMLDetailsElement>("details")!;
+    expect(naming.textContent).toContain("[[a|b]]");
+    expect(naming.textContent).toContain("a/a.md");
+    expect(naming.previousElementSibling?.querySelector(".setting-item-name")?.textContent).toBe(t("aliases"));
+    expect(naming.nextElementSibling?.querySelector(".setting-item-name")?.textContent).toBe(t("prefix"));
+    expect(naming.parentElement!.querySelector(".folder-nodes-settings-guide-brief")?.textContent).toBe(t("creationGuideSelection"));
+    tab.containerEl.remove();
+  });
+
+  it("shows independent timestamp fields only for naming parts that use a timestamp", () => {
+    const { tab, plugin } = fixture();
+    Object.assign(plugin.settings.prefix, { enabled: true, source: "timestamp", timestampFormat: "YYYY" });
+    Object.assign(plugin.settings.suffix, { enabled: true, source: "custom", timestampFormat: "HHmm" });
+    tab.display();
+    tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-naming")!.click();
+    const format = (part: "prefix" | "suffix") => [...tab.containerEl.querySelectorAll(".setting-item")]
+      .find((row) => row.querySelector(".setting-item-name")?.textContent === `${t(part)}: ${t("timestampFormat")}`)
+      ?.querySelector("input")?.value;
+    expect(format("prefix")).toBe("YYYY");
+    expect(format("suffix")).toBeUndefined();
+    plugin.settings.suffix.source = "timestamp";
+    tab.display();
+    expect(format("prefix")).toBe("YYYY");
+    expect(format("suffix")).toBe("HHmm");
+    tab.containerEl.remove();
+  });
+
   it("opens the intended five tabs and management actions through the imperative surface", () => {
     const { tab, plugin } = fixture();
     expect(tab.getSettingDefinitions()).toEqual([]);
@@ -109,10 +177,17 @@ describe("imperative settings edit state", () => {
       .toEqual([t("general"), t("management"), t("icons"), t("naming"), t("nodeGraph")]);
     tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-management")!.click();
     const panel = tab.containerEl.querySelector<HTMLElement>("[role=tabpanel]")!;
-    const guide = panel.querySelector<HTMLElement>("[role=note]")!;
+    const guide = panel.querySelector<HTMLDetailsElement>("details.folder-nodes-settings-guide")!;
+    const essential = panel.querySelector<HTMLElement>(".folder-nodes-settings-guide-brief")!;
     const firstRule = panel.querySelector<HTMLElement>(".setting-item")!;
-    expect(guide.textContent).toContain(t("managementGuideBoundary"));
-    expect(guide.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(guide.open).toBe(false);
+    const ruleNames = [...panel.querySelectorAll(".setting-item-name")].map((name) => name.textContent);
+    expect(ruleNames).toContain(t("nameStartsWith", { prefix: "_" }));
+    expect(ruleNames).not.toContain("_*");
+    expect(guide.querySelector("summary")?.textContent).toBe(t("managementGuideTitle"));
+    expect(essential.textContent).toContain(t("managementGuideBoundary"));
+    expect(essential.compareDocumentPosition(firstRule) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(panel.lastElementChild).toBe(guide);
     for (const [label, action] of [
       [t("previewOrganizePlan"), plugin.openBatchOrganize],
       [t("previewPropertyMigration"), plugin.openPropertyMigration],

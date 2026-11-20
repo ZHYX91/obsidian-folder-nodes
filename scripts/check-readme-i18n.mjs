@@ -25,11 +25,11 @@ export async function assertReadmeRepositoryLinks(projectRoot, relativePath, sou
 }
 
 const REQUIRED_ENGLISH = [
+  "Installation",
+  "Usage",
   "Screenshots",
   "Features",
   "Requirements and compatibility",
-  "Installation",
-  "Usage",
   "Settings",
   "Folder Nodes property",
   "Icon property",
@@ -40,11 +40,11 @@ const REQUIRED_ENGLISH = [
   "License",
 ];
 const REQUIRED_CHINESE = [
+  "安装",
+  "使用",
   "截图",
   "功能特性",
   "使用要求与兼容性",
-  "安装",
-  "使用",
   "设置",
   "Folder Nodes 属性",
   "icon 属性",
@@ -144,7 +144,7 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
       ];
       // These safeguards must have equivalent localized explanations, not
       // merely a top navigation bar and a brief introduction.
-      for (const token of essential.filter((value) => value !== "AGENTS.md" && value !== "CLAUDE.md")) {
+      for (const token of essential) {
         if (!source.includes(token)) throw new Error(`${relativePath} lacks ${token}`);
       }
       for (const file of [

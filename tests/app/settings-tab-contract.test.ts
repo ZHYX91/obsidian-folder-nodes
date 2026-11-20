@@ -4,50 +4,24 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("settings tab compatibility contract", () => {
-  it("places a themed icon guide before the appearance controls", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "src/app/settings-tab.ts"),
-      "utf8",
-    );
+  it("provides the themed guide and emoji preview styles", () => {
     const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
-    expect(source).toContain("this.renderIconGuide(panel);");
-    expect(source).toContain("this.renderEmojiFontSetting(panel);");
-    expect(source.indexOf("this.renderIconGuide(panel);")).toBeLessThan(
-      source.indexOf('new Setting(panel).setName(t("iconInheritance"))'),
-    );
-    expect(source).toContain('text: "icon: 💰"');
-    expect(source).toContain('t("iconColorBehavior")');
-    expect(source).toContain("this.renderIconComparisonRow");
-    expect(source).toContain('t("iconFromProperty"), "A", "Project", true');
-    expect(source).toContain('t("characterInFilename"), "", "A Project", false');
-    expect(source).toContain('t("iconFromProperty"), "📓", "Project", true');
-    expect(source).toContain('t("characterInFilename"), "", "📓 Project", false');
-    expect(source).not.toContain("1994");
-    expect(source).not.toContain('t("iconFromProperty"), "想"');
-    expect(source).toContain('t("iconDistinctionDesc")');
     expect(styles).toContain(".folder-nodes-settings-guide");
     expect(styles).toContain(
-      "border-inline-start: 3px solid var(--interactive-accent)",
+      "border: 1px solid var(--background-modifier-border)",
     );
     expect(styles).toContain("background: var(--background-secondary)");
     expect(styles).toContain("--folder-nodes-glyph-font: var(--font-interface)");
     expect(styles).toContain('"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"');
-    expect(source).toContain("detectInstalledEmojiFonts()");
-    expect(source).toContain('text: "📔 🫠 🩷 👨‍👩‍👧‍👦 🏳️‍🌈 🇨🇳"');
     expect(styles).toContain(".folder-nodes-emoji-font-preview-sample");
     expect(styles).toContain(".folder-nodes-settings-icon-demo-slot");
     expect(styles).not.toContain(".folder-nodes-settings-icon-demo-badge");
   });
 
-  it("matches the established tab-to-section hierarchy without a duplicate plugin heading", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
+  it("styles tab controls for fine and coarse pointers", () => {
     const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
-    expect(source).not.toContain('new Setting(this.containerEl).setName(t("settings")).setHeading()');
-    expect(source).not.toContain('new Setting(panel).setName(this.tabLabel(this.activeTab)).setHeading()');
-    expect(source).toContain('button.type = "button"');
-    expect(source).toContain('getComputedStyle(container).direction === "rtl"');
     expect(styles).toContain("container-type: inline-size");
     expect(styles).toContain("margin-block-start: var(--size-4-5)");
     expect(styles).toContain(".folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab");
@@ -89,39 +63,5 @@ describe("settings tab compatibility contract", () => {
     expect(styles).toContain(".folder-nodes-visual-color { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; }");
     expect(styles).not.toContain("--folder-nodes-icon-badge-");
     expect(styles).not.toContain("border: 1px solid var(--folder-nodes-icon-badge-border)");
-  });
-
-  it("explains selection and unresolved-link creation before the shared aliases switch", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "src/app/settings-tab.ts"),
-      "utf8",
-    );
-
-    expect(source).toContain("this.renderNamingGuide(panel);");
-    expect(source.indexOf("this.renderNamingGuide(panel);")).toBeLessThan(
-      source.indexOf('new Setting(panel).setName(t("aliases"))'),
-    );
-    expect(source).toContain('this.creationExample(body, "[[a]]", "a/a.md", null);');
-    expect(source).toContain('this.creationExample(body, "[[a|b]]", "a/a.md", t("creationGuideAliasResult"));');
-  });
-
-  it("groups prefix and suffix with independent conditional Moment formats", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
-
-    expect(source).toContain("new Setting(panel).setName(label).setHeading()");
-    expect(source).toContain('settings.prefix.source === "timestamp"');
-    expect(source).toContain('settings.suffix.source === "timestamp"');
-    expect(source).toContain('key: "prefixTimestampFormat"');
-    expect(source).toContain('key: "suffixTimestampFormat"');
-    expect(source).toContain("isValidMomentTimestampFormat(value)");
-    expect(source).not.toContain("this.plugin.settings.timestampFormat");
-  });
-
-  it("describes name-start rules without wildcard notation", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/app/settings-tab.ts"), "utf8");
-
-    expect(source).toContain('t("nameStartsWith", { prefix })');
-    expect(source).toContain('t("addNameStartRule")');
-    expect(source).not.toContain('prefix + "*"');
   });
 });

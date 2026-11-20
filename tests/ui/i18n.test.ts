@@ -149,6 +149,18 @@ describe("interface language", () => {
     expect(interfaceTextDirection()).toBe("ltr");
   });
 
+  it("localizes invalid sibling drop targets in all interface languages", () => {
+    setLanguage("en");
+    const english = t("errorInvalidDropTarget");
+    for (const locale of AVAILABLE_INTERFACE_LOCALES) {
+      setLanguage(locale);
+      const message = formatError(new Error("invalid_drop_target"));
+      expect(message, locale).toBe(t("errorInvalidDropTarget"));
+      expect(message, locale).not.toContain("invalid_drop_target");
+      if (locale !== "en") expect(message, locale).not.toBe(english);
+    }
+  });
+
   it("localizes stable structural errors without exposing internal English messages", () => {
     setLanguage("zh-CN");
     expect(formatError(new FolderNodesError("root_cannot_hide", {}, "The Root Node cannot be hidden")))

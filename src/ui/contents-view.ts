@@ -728,7 +728,7 @@ export class FolderNodeContentsView extends ItemView {
       event.stopPropagation();
       const placement = this.nodeDropPlacement(element, event);
       const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
-      const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(sourcePath, intent);
+      const preview = intent === null ? { kind: "blocked" as const, reason: "invalid_drop_target" } : this.service.previewPlacement(sourcePath, intent);
       if (preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis) && this.placementSession.preview(preview.intent)) {
         placementFeedback(this.contentEl, null);
         if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "move";
@@ -746,7 +746,7 @@ export class FolderNodeContentsView extends ItemView {
       event.stopPropagation();
       const placement = this.nodeDropPlacement(element, event);
       const intent = this.nodeReorderIntent(target.path, parentPath, placement.zone);
-      const preview = intent === null ? { kind: "blocked" as const, reason: "No valid drop target" } : this.service.previewPlacement(sourcePath, intent);
+      const preview = intent === null ? { kind: "blocked" as const, reason: "invalid_drop_target" } : this.service.previewPlacement(sourcePath, intent);
       const source = this.service.getFolder(sourcePath);
       const renderable = preview.kind === "ready" && this.markNodePlacement(element, preview.intent, placement.axis);
       const accepted = preview.kind === "ready" ? this.placementSession.commit(preview.intent) : null;

@@ -4,6 +4,27 @@
 
 Este guia curto explica as tarefas mais comuns e os cuidados necessários. As instruções completas estão em [inglês](../../README.md) e [chinês simplificado](README.zh-CN.md).
 
+## Instalação
+
+Em “Configurações → Plugins da comunidade → Explorar”, procure Folder Nodes, instale e ative o plugin. Se ele não aparecer, baixe `folder-nodes-<version>.zip` em [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) e extraia a pasta `folder-nodes` em `Vault/.obsidian/plugins/`. O ZIP já contém a pasta do plugin; não o extraia dentro de `plugins/folder-nodes/`.
+
+Você também pode colocar `main.js`, `manifest.json` e `styles.css` da mesma versão diretamente em `Vault/.obsidian/plugins/folder-nodes/`. Recarregue o Obsidian e ative o plugin. Não misture versões. Ao atualizar, preserve `data.json` para manter as preferências e regras de exclusão.
+
+## Como usar
+
+1. Faça um backup do cofre e confira as opções "Geral" e "Gerenciamento" do Folder Nodes.
+2. Verifique se a pasta A contém A/A.md. Se faltar alguma parte, crie-a quando desejar ou marque o item como "Não gerenciado".
+3. Use "Novo nó" para criar pasta e nota juntas. Clique no nome da pasta para abrir a nota do nó. Em "Conteúdo do nó", veja os filhos, imagens, vídeos e outros arquivos.
+4. Abra o Node Graph: "Global" mostra todos os nós gerenciados, "Subárvore" mostra o nó selecionado e seus descendentes, e "Local" mostra a vizinhança. Você pode alternar 2D/3D e exibir links entre notas.
+
+No computador, arraste os cartões em **Conteúdo do nó** para reordenar os nós que têm o mesmo pai. Para mudar o pai, solte o nó sobre a pasta de destino no explorador de arquivos. Para posicioná-lo logo antes ou depois de outro nó, ative a ordenação manual dos filhos no nó pai. No Android, use o menu para mover ou reordenar nós.
+
+Ao criar um nó a partir de texto selecionado, é possível conferir nome, local e aliases. Links internos que ainda não existem também podem criar nós na área gerenciada. Seleções que atravessam várias células de uma tabela Markdown são recusadas para evitar danos à tabela.
+
+O conteúdo do nó mostra o caminho atual e explica os estados vazio, oculto, não gerenciado ou incompleto. Os botões disponíveis abrem um nó pai válido, as regras de gerenciamento ou a verificação somente leitura, ou mostram nós ocultos durante a sessão. Nos gráficos Canvas, as setas vão ao nó mais próximo naquela direção da tela; Home e End selecionam o primeiro e o último nó visível.
+
+Se a criação falhar depois de criar uma nota, a limpeza remove apenas arquivos que ainda pertencem à operação e não foram alterados. Notas abertas ou editadas são preservadas. O erro informa os caminhos restantes e o motivo: salve e confira esses arquivos antes de decidir se os exclui manualmente.
+
 ## Capturas de tela
 
 As imagens mostram o conteúdo dos nós, o explorador de arquivos, o Node Graph e as configurações de ícones, seleção e nomes.
@@ -36,28 +57,11 @@ Você pode criar, renomear, mover, mesclar, ordenar e excluir nós completos. O 
 
 O plugin funciona no computador e no Android. No Android, as pastas são movidas pelos menus. A compatibilidade com iOS ainda não foi verificada.
 
-## Instalação
-
-Em “Configurações → Plugins da comunidade → Explorar”, procure Folder Nodes, instale e ative o plugin. Se ele não aparecer, baixe `folder-nodes-<version>.zip` em [Releases](https://github.com/ZHYX91/obsidian-folder-nodes/releases) e extraia a pasta `folder-nodes` em `Vault/.obsidian/plugins/`. O ZIP já contém a pasta do plugin; não o extraia dentro de `plugins/folder-nodes/`.
-
-Você também pode colocar `main.js`, `manifest.json` e `styles.css` da mesma versão diretamente em `Vault/.obsidian/plugins/folder-nodes/`. Recarregue o Obsidian e ative o plugin. Não misture versões. Ao atualizar, preserve `data.json` para manter as preferências e regras de exclusão.
-
-## Como usar
-
-1. Faça um backup do cofre e confira as opções "Geral" e "Gerenciamento" do Folder Nodes.
-2. Verifique se a pasta A contém A/A.md. Se faltar alguma parte, crie-a quando desejar ou marque o item como "Não gerenciado".
-3. Use "Novo nó" para criar pasta e nota juntas. Clique no nome da pasta para abrir a nota do nó. Em "Conteúdo do nó", veja os filhos, imagens, vídeos e outros arquivos.
-4. Abra o Node Graph: "Global" mostra todos os nós gerenciados, "Subárvore" mostra o nó selecionado e seus descendentes, e "Local" mostra a vizinhança. Você pode alternar 2D/3D e exibir links entre notas.
-
-Ao criar um nó a partir de texto selecionado, é possível conferir nome, local e aliases. Links internos que ainda não existem também podem criar nós na área gerenciada. Seleções que atravessam várias células de uma tabela Markdown são recusadas para evitar danos à tabela.
-
-O conteúdo do nó mostra o caminho atual e explica os estados vazio, oculto, não gerenciado ou incompleto. Os botões disponíveis abrem um nó pai válido, as regras de gerenciamento ou a verificação somente leitura, ou mostram nós ocultos durante a sessão. Nos gráficos Canvas, as setas vão ao nó mais próximo naquela direção da tela; Home e End selecionam o primeiro e o último nó visível.
-
-Se a criação falhar depois de criar uma nota, a limpeza remove apenas arquivos que ainda pertencem à operação e não foram alterados. Notas abertas ou editadas são preservadas. O erro informa os caminhos restantes e o motivo: salve e confira esses arquivos antes de decidir se os exclui manualmente.
-
 ## Configurações
 
 **Geral**: idioma, nós ocultos e página inicial. **Gerenciamento**: regras de exclusão, organização em lote, migração e verificação somente leitura. **Ícones e aparência**: herança, posição e fontes de emoji. **Seleção e nomes**: confirmação, aliases e regras de nome. **Node Graph**: dimensão, direção e desempenho. Trocar o idioma não modifica as notas.
+
+Por padrão, o plugin não gerencia `AGENTS.md` e `CLAUDE.md` na raiz do cofre, nem arquivos Markdown ou pastas com nomes que começam com `.` ou `_`. Você pode alterar essas regras nas configurações de gerenciamento.
 
 ## Propriedade folder-nodes
 
