@@ -1470,7 +1470,7 @@ describe("NodeService structural safety", () => {
     const target = fake.addFolder("Target");
     fake.addFile("Target/Target.md", "target");
     await service(fake).mergeNode(source, target);
-    expect(fake.contents.get("Target/Target.md")).toBe("target\n\n## Merged from Source\n\n# Heading\nbody");
+    expect(fake.contents.get("Target/Target.md")).toBe("target\n\n## Merged from Source\n\n# Heading\r\nbody");
     expect(fake.modifyListeners.size).toBe(0);
   });
 

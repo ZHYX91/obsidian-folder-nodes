@@ -1,13 +1,13 @@
 import { type App, type Editor, type WorkspaceLeaf, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { assertMergeLinksKeepDestinations, type MergeLinkResolver } from "../core/merge-link-safety";
-import { assertMergeAppendBoundary } from "../core/merge-markdown";
+import { prepareMergeAppend } from "../core/merge-markdown";
 import { compareChildren, naturalOrder, planAppendChildren } from "../core/ordering";
 import { basename, dirname, isDescendantPath } from "../core/paths";
 import type { ChildOrderRecord, OrderPatch } from "../core/types";
 import {
-  assertMergePropertyLinks, deepEqual, mergeFrontmatterProperties, readMergeFrontmatter,
-  readOrderingProperties, stripMergeFrontmatter, STRUCTURAL_PROPERTIES,
+  assertMergePropertyLinks, deepEqual, mergeFrontmatterProperties,
+  readMergeDocument, readOrderingProperties, STRUCTURAL_PROPERTIES,
 } from "./node-merge-frontmatter";
 import type { VaultEventKind } from "./vault-operation-coordinator";
 
@@ -64,16 +64,10 @@ export class NodeMerge {
     for (const entry of movable) await this.host.assertAvailable(normalizePath(`${targetPath}/${entry.name}`));
     const sourceSnapshot = await this.readClosedMergeNote(sourceNote, sourceNotePath, "source");
     const targetSnapshot = await this.readClosedMergeNote(targetNote, targetNotePath, "target");
-    const sourceProperties = readMergeFrontmatter(sourceSnapshot, sourceNotePath);
-    const targetWithProperties = mergeFrontmatterProperties(
-      targetSnapshot,
-      sourceProperties,
-      targetNotePath,
-    );
-    const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
-    const targetBody = stripMergeFrontmatter(targetWithProperties, targetNotePath);
-    const mergeHeading = /\S/u.test(sourceBody) ? `## Merged from ${source.name}` : null;
-    if (mergeHeading !== null) assertMergeAppendBoundary(targetBody, mergeHeading);
+    const sourceDocument = readMergeDocument(sourceSnapshot, sourceNotePath);
+    const targetDocument = readMergeDocument(targetSnapshot, targetNotePath);
+    const targetWithProperties = mergeFrontmatterProperties(targetDocument, sourceDocument.frontmatter, targetNotePath);
+    const append = prepareMergeAppend(targetDocument.body, sourceDocument.body, source.name, targetDocument.eol);
     const resolveLink: MergeLinkResolver = (path, from) => {
       const file = this.app.metadataCache.getFirstLinkpathDest(path, from);
       return file == null || this.app.vault.getAbstractFileByPath(normalizePath(file.path)) !== file ? null : { path: file.path, identity: file };
@@ -81,10 +75,9 @@ export class NodeMerge {
     const movingFiles = this.app.vault.getAllLoadedFiles()
       .filter((file): file is TFile => file instanceof TFile && file !== sourceNote && file.path.startsWith(sourcePath + "/"))
       .map((file) => ({ from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
-    const targetProperties = readMergeFrontmatter(targetSnapshot, targetNotePath);
     const mergeLinkChecks = [
-      assertMergePropertyLinks(sourceProperties, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetProperties),
-      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetBody),
+      assertMergePropertyLinks(sourceDocument.frontmatter, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetDocument.frontmatter),
+      assertMergeLinksKeepDestinations(sourceDocument.body, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, append?.target),
     ];
     const movingMarkdown = this.app.vault.getMarkdownFiles()
       .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
@@ -93,9 +86,10 @@ export class NodeMerge {
     for (const entry of movingMarkdown) {
       const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
       movingSources.set(entry.file, contents);
+      const document = readMergeDocument(contents, entry.from);
       mergeLinkChecks.push(
-        assertMergePropertyLinks(readMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourceNotePath, resolveLink, movingFiles),
-        assertMergeLinksKeepDestinations(stripMergeFrontmatter(contents, entry.from), entry.from, entry.to, sourceNotePath, resolveLink, movingFiles),
+        assertMergePropertyLinks(document.frontmatter, entry.from, entry.to, sourceNotePath, resolveLink, movingFiles),
+        assertMergeLinksKeepDestinations(document.body, entry.from, entry.to, sourceNotePath, resolveLink, movingFiles),
       );
     }
 
@@ -191,9 +185,9 @@ export class NodeMerge {
         await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
       }
 
-      if (mergeHeading !== null) {
+      if (append !== null) {
         const expectedBefore = latestTarget;
-        const appended = `${expectedBefore}\n\n${mergeHeading}\n\n${sourceBody}`;
+        const appended = expectedBefore + append.suffix;
         const receipt = await this.applyClosedMergeFileChange(
           targetNote,
           targetNotePath,
@@ -230,10 +224,11 @@ export class NodeMerge {
         for (const entry of movingMarkdown) {
           const contents = await this.readClosedMergeNote(entry.file, entry.to, "source");
           const original = movingSources.get(entry.file)!;
-          const properties = (source: string) => Object.fromEntries(Object.entries(readMergeFrontmatter(source, entry.to))
+          const before = readMergeDocument(original, entry.from);
+          const after = readMergeDocument(contents, entry.to);
+          const properties = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value)
             .filter(([key]) => !STRUCTURAL_PROPERTIES.has(key)));
-          if (stripMergeFrontmatter(contents, entry.to) !== stripMergeFrontmatter(original, entry.from)
-            || !deepEqual(properties(contents), properties(original))) {
+          if (before.body !== after.body || !deepEqual(properties(before.frontmatter), properties(after.frontmatter))) {
             throw new Error(`source Markdown changed during merge: ${entry.to}`);
           }
         }

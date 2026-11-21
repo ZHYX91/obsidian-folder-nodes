@@ -1,4 +1,5 @@
 import { assertNoNewReferenceBindings, mergeWikiLinks, scanMergeMarkdown } from "./merge-markdown";
+import type { MergeMarkdownReferences } from "./merge-markdown-blocks";
 
 export interface MergeLinkTarget {
   readonly path: string;
@@ -25,7 +26,7 @@ export function assertMergeLinksKeepDestinations(
   retiredNote: string,
   resolveLink: MergeLinkResolver = () => null,
   movingFiles: readonly MergeFileRelocation[] = [],
-  targetBody?: string,
+  targetMarkdown?: MergeMarkdownReferences,
 ): MergeLinkCheck {
   if (oldNote === newNote) return () => undefined;
   const checks: MergeLinkCheck[] = [];
@@ -63,20 +64,15 @@ export function assertMergeLinksKeepDestinations(
       if (!covered.has(index)) throw new Error("Cannot safely merge an unsupported Markdown link");
     }
     checks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
-    for (const attribute of visible.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*))/giu)) {
-      const raw = attribute[1] ?? attribute[2] ?? attribute[3] ?? "";
-      // HTML decodes references (including some without a semicolon) and
-      // resolves local paths from the containing note. Only explicit absolute
-      // destinations are proven stable here; never rewrite authored bytes.
-      if (!absolute(raw)) throw new Error("Cannot safely merge a relative HTML link");
-    }
   });
+  for (const target of sourceMarkdown.htmlTargets) {
+    if (!absolute(target)) throw new Error("Cannot safely merge a relative HTML link");
+  }
   const definitions = sourceMarkdown.references;
   for (const candidates of definitions.values()) {
     for (const destination of candidates) if (!external(destination)) throw new Error("Cannot safely merge a relative reference definition");
   }
-  if (targetBody?.includes("[") && (definitions.size > 0 || (sourceMarkdown.inline.length > 0 && targetBody.includes("]:")))) {
-    const targetMarkdown = scanMergeMarkdown(targetBody);
+  if (targetMarkdown !== undefined) {
     // The destination note appears first in the merged document. Its first
     // definition of a normalized label would shadow the source definition.
     for (const [label, earlier] of targetMarkdown.references) {

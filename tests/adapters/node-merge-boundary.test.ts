@@ -21,6 +21,53 @@ function fixture(targetText: string, sourceText = fencedExample, sourceName = "S
 }
 
 describe("appending a Node Note body", () => {
+  it.each([
+    ["d: !!timestamp 2024-01-01", "d: !!timestamp 2024-01-02", false],
+    ["d: !!timestamp 2024-01-01", "d: !!timestamp 2024-01-01", true],
+    ["v: !!set {alma, beta}", "v: !!set {alma, gamma}", false],
+    ["v: !!set {alma, beta}", "v: !!set {beta, alma}", true],
+    ["v: {é: 1, e\u0301: 2}", "v: {e\u0301: 2, é: 1}", true],
+  ])("compares YAML mappings and tagged property values before moving notes: %s", async (a, b, safe) => {
+    const target = `---\n${a}\n---\ntarget`;
+    const source = `---\n${b}\n---\nsource`;
+    const { vault, merge } = fixture(target, source);
+    if (safe) {
+      await merge();
+      expect(vault.contents.get(targetNote)).toBe(`${target}\n\n## Merged from Source\n\nsource`);
+    } else {
+      const before = new Map(vault.contents);
+      await expect(merge()).rejects.toThrow("property conflict");
+      expect(vault.contents).toEqual(before);
+      expect(vault.trashed).toEqual([]);
+    }
+  });
+  it("refuses a property whose type cannot survive host YAML serialization into an unannotated target", async () => {
+    const { vault, merge } = fixture("target", "---\nd: !!timestamp 2024-01-01\n---\nsource");
+    const before = new Map(vault.contents);
+    await expect(merge()).rejects.toThrow(/serialize merge properties/u);
+    expect(vault.contents).toEqual(before);
+    expect(vault.trashed).toEqual([]);
+  });
+  it("normalizes a bare CR only in the YAML parser input", async () => {
+    const target = "first\rsecond";
+    const { vault, merge } = fixture(target, "---\nimported: yes\n---\nsource");
+    await merge();
+    expect(vault.contents.get(targetNote)).toBe("---\rimported: yes\r---\rfirst\rsecond\r\r## Merged from Source\r\rsource");
+  });
+  it.each(["none", "block", "flow"])("preserves authored body endings when transferring properties (target frontmatter: %s)", async (frontmatter) => {
+    const targetBody = "target one\r\ntarget two\ntarget end";
+    const target = (frontmatter === "none" ? "" : `---\r\n${frontmatter === "flow" ? "{tags: [target]}" : "tags: [target]"}\r\n---\r\n`) + targetBody;
+    const sourceBody = "line one\r\nline two\nlast\r\n";
+    const source = "\uFEFF---\r\nimported: yes\r\n---\r\n" + sourceBody;
+    const { vault, merge } = fixture(target, source);
+    await merge();
+    const merged = vault.contents.get(targetNote)!;
+    expect(merged).toContain(targetBody);
+    expect(merged).toContain("imported:");
+    expect(merged).toContain("\r\n\r\n## Merged from Source\r\n\r\n");
+    expect(merged.endsWith(sourceBody)).toBe(true);
+    expect(vault.trashed).toEqual(["Source"]);
+  });
   it.each(["```", "<!-- open", "<pre>example", "%% open"])(
     "refuses a target ending in %j before moving children or changing notes", async (targetText) => {
       const { vault, merge } = fixture(targetText);
@@ -85,6 +132,24 @@ describe("active links inside raw HTML when a Node moves", () => {
     expect(vault.trashed).toEqual([]);
   });
 
+  it.each([
+    ['Use href="local.md" as an example.', true],
+    [`<span title='href="local.md"'>text</span>`, true],
+    ['<a href=\n "https://example.com">go</a>', true],
+    ['<a href=\n "local.md">go</a>', false],
+    ['<div><img src=local.png /badsyntax></div>', false],
+  ])("checks actual HTML attributes and retains raw HTML ambiguity: %s", async (body, safe) => {
+    const { vault, merge } = fixture("target", body);
+    if (safe) {
+      await merge();
+      expect(vault.contents.get(targetNote)).toContain(body);
+    } else {
+      const before = new Map(vault.contents);
+      await expect(merge()).rejects.toThrow("relative HTML link");
+      expect(vault.contents).toEqual(before);
+      expect(vault.trashed).toEqual([]);
+    }
+  });
   it("keeps Markdown image syntax as literal text in a pre block", async () => {
     const body = "<pre>![photo](../local.png)</pre>";
     expect(markdown.render(body)).not.toContain("<img");

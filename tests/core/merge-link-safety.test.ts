@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { assertMergeLinksKeepDestinations } from "../../src/core/merge-link-safety";
 
+import { scanMergeMarkdown } from "../../src/core/merge-markdown";
+
 const assertSafe = (source: string) => assertMergeLinksKeepDestinations(
   source, "A/A.md", "Deep/B/B.md", "A/A.md",
 );
@@ -36,7 +38,7 @@ describe("Node merge link preflight", () => {
     const identity = {};
     const resolve = () => ({ path: "Elsewhere/Guide.md", identity });
     for (const wiki of ["[[Guide]]", "![[Guide]]"]) {
-      expect(() => assertMergeLinksKeepDestinations(wiki, "A/A.md", "B/B.md", "A/A.md", resolve, [], "[guide]: https://example.com")).not.toThrow();
+      expect(() => assertMergeLinksKeepDestinations(wiki, "A/A.md", "B/B.md", "A/A.md", resolve, [], scanMergeMarkdown("[guide]: https://example.com"))).not.toThrow();
     }
   });
   it("rejects moving targets and future best-match competitors without rewriting", () => {
@@ -240,7 +242,7 @@ describe("Node merge link preflight", () => {
     ["[guide]: https://one.example", "[guide]: https://one.example \"valid title\"\n\n[guide]: https://shadowed.example", true],
     ["[Guide]: https://one.example", "`[guide]: https://two.example`", true],
   ])("checks normalized labels against the destination body: %s", (source, target, safe) => {
-    const preflight = () => assertMergeLinksKeepDestinations(source, "A/A.md", "B/B.md", "A/A.md", undefined, [], target);
+    const preflight = () => assertMergeLinksKeepDestinations(source, "A/A.md", "B/B.md", "A/A.md", undefined, [], scanMergeMarkdown(target));
     if (safe) expect(preflight).not.toThrow();
     else expect(preflight).toThrow("conflicting reference definitions");
   });
