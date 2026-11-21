@@ -113,6 +113,68 @@ describe("appending a Node Note body", () => {
   });
 });
 
+describe("the subtree bound by a node merge", () => {
+  it.each(["", "/"])("merges into a Vault root reported as %j", async (rootPath) => {
+    const vault = new FakeObsidian();
+    vault.root.path = rootPath;
+    const manual = rootPath === "/";
+    vault.addFile("Vault.md", manual ? "---\nfolder-nodes: [order=manual]\n---\ntarget" : "target");
+    const source = vault.addFolder("Source");
+    vault.addFile("Source/Source.md", "source");
+    const child = vault.addFolder("Source/Child");
+    const childNote = vault.addFile("Source/Child/Child.md", "child");
+    const attachment = vault.addFile("Source/image.png", "image");
+    const nodes = new NodeService(vault.app, () => structuredClone(DEFAULT_SETTINGS));
+
+    await nodes.mergeNode(source, vault.root);
+    expect(vault.requireFolder("Child")).toBe(child);
+    expect(vault.requireFile("Child/Child.md")).toBe(childNote);
+    expect(vault.requireFile("image.png")).toBe(attachment);
+    expect(vault.contents.get("Vault.md")).toContain("## Merged from Source\n\nsource");
+    if (manual) expect(vault.frontmatters.get("Child/Child.md")?.["folder-nodes"]).toContain("rank=1024");
+    expect(vault.trashed).toEqual(["Source"]);
+  });
+
+  it("keeps the root when it is supplied as a merge source", async () => {
+    const vault = new FakeObsidian();
+    vault.addFile("Vault.md", "root");
+    const target = vault.addFolder("Target");
+    vault.addFile("Target/Target.md", "target");
+    const nodes = new NodeService(vault.app, () => structuredClone(DEFAULT_SETTINGS));
+
+    await expect(nodes.mergeNode(vault.root, target)).rejects.toThrow("Root Node cannot be deleted");
+    expect(vault.renames).toEqual([]);
+    expect(vault.trashed).toEqual([]);
+  });
+
+  it.each(["before the first move", "after the folder moves"])(
+    "preserves the source when a new nested note appears %s", async (phase) => {
+      const { vault, merge } = fixture("target", "source");
+      const folder = vault.addFolder("Source/Assets");
+      const nested = vault.addFolder("Source/Assets/Nested");
+      const existing = vault.addFile("Source/Assets/Nested/existing.md", "existing");
+      const late = "[original](../../../reference.md)";
+      const read = vault.app.vault.read.bind(vault.app.vault);
+      let inserted = false;
+      vault.app.vault.read = async (file) => {
+        if (!inserted && file === existing && (folder.path === "Source/Assets") === (phase === "before the first move")) {
+          inserted = true;
+          vault.addFile(`${nested.path}/late.md`, late);
+        }
+        return read(file);
+      };
+
+      await expect(merge()).rejects.toThrow(/structure changed/iu);
+      expect(inserted).toBe(true);
+      expect(vault.requireFolder("Source/Assets")).toBe(folder);
+      expect(vault.contents.get("Source/Assets/Nested/late.md")).toBe(late);
+      expect(vault.contents.get(targetNote)).toBe("target");
+      expect(vault.trashed).toEqual([]);
+      if (phase === "before the first move") expect(vault.renames).toEqual([]);
+    },
+  );
+});
+
 describe("active links inside raw HTML when a Node moves", () => {
   const markdown = new MarkdownIt("commonmark", { html: true });
   it.each([

@@ -3,7 +3,7 @@ import { FolderNodesError } from "../core/folder-nodes-error";
 import { assertMergeLinksKeepDestinations, type MergeLinkResolver } from "../core/merge-link-safety";
 import { prepareMergeAppend } from "../core/merge-markdown";
 import { compareChildren, naturalOrder, planAppendChildren } from "../core/ordering";
-import { basename, dirname, isDescendantPath } from "../core/paths";
+import { dirname, isDescendantPath, normalizeVaultPath } from "../core/paths";
 import type { ChildOrderRecord, OrderPatch } from "../core/types";
 import {
   assertMergePropertyLinks, deepEqual, mergeFrontmatterProperties,
@@ -48,9 +48,11 @@ export class NodeMerge {
 
   public async run(source: TFolder, target: TFolder): Promise<void> {
     if (this.host.isIgnoredPath(source.path) || this.host.isIgnoredPath(target.path)) throw new FolderNodesError("unmanaged_merge", {}, "An unmanaged folder cannot be merged as a Folder Node");
+    if (source === this.app.vault.getRoot()) throw new FolderNodesError("root_cannot_delete", {}, "The Root Node cannot be deleted");
     if (source.path === target.path || isDescendantPath(target.path, source.path)) throw new Error("A node cannot be merged into itself or a descendant");
     const sourcePath = source.path;
-    const targetPath = target.path;
+    const targetPath = normalizeVaultPath(target.path);
+    const relocate = (path: string) => normalizeVaultPath(targetPath + path.slice(sourcePath.length));
     const sourceNote = this.host.requireCanonicalNote(source);
     const targetNote = this.host.requireCanonicalNote(target);
     const sourceNotePath = sourceNote.path;
@@ -58,10 +60,14 @@ export class NodeMerge {
     const initialSourceChildren = [...source.children];
     const initialTargetChildren = [...target.children];
     const movable = initialSourceChildren.filter((entry) => entry !== sourceNote).map((entry) => ({
-      entry, path: entry.path, name: entry.name, parent: entry.parent,
+      entry, path: entry.path, destination: relocate(entry.path), name: entry.name, parent: entry.parent,
     }));
 
-    for (const entry of movable) await this.host.assertAvailable(normalizePath(`${targetPath}/${entry.name}`));
+    const inventory = this.snapshotMovingContents(movable.map(({ entry }) => entry), relocate);
+    const movingFiles = inventory.files;
+    const movingMarkdown = movingFiles.filter(({ file }) => file.extension.toLowerCase() === "md");
+
+    for (const { destination } of movable) await this.host.assertAvailable(destination);
     const sourceSnapshot = await this.readClosedMergeNote(sourceNote, sourceNotePath, "source");
     const targetSnapshot = await this.readClosedMergeNote(targetNote, targetNotePath, "target");
     const sourceDocument = readMergeDocument(sourceSnapshot, sourceNotePath);
@@ -72,16 +78,10 @@ export class NodeMerge {
       const file = this.app.metadataCache.getFirstLinkpathDest(path, from);
       return file == null || this.app.vault.getAbstractFileByPath(normalizePath(file.path)) !== file ? null : { path: file.path, identity: file };
     };
-    const movingFiles = this.app.vault.getAllLoadedFiles()
-      .filter((file): file is TFile => file instanceof TFile && file !== sourceNote && file.path.startsWith(sourcePath + "/"))
-      .map((file) => ({ from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
     const mergeLinkChecks = [
       assertMergePropertyLinks(sourceDocument.frontmatter, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetDocument.frontmatter),
       assertMergeLinksKeepDestinations(sourceDocument.body, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, append?.target),
     ];
-    const movingMarkdown = this.app.vault.getMarkdownFiles()
-      .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
-      .map((file) => ({ file, from: file.path, to: targetPath + file.path.slice(sourcePath.length) }));
     const movingSources = new Map<TFile, string>();
     for (const entry of movingMarkdown) {
       const contents = await this.readClosedMergeNote(entry.file, entry.from, "source");
@@ -101,7 +101,7 @@ export class NodeMerge {
         const note = this.host.getCanonicalFile(child.childPath);
         const contents = note === null ? undefined : movingSources.get(note);
         if (note === null || contents === undefined) throw new Error(`Merge rank source changed: ${child.childPath}`);
-        rankBindings.push({ file: note, before: note.path, after: targetPath + note.path.slice(sourcePath.length), folder: normalizePath(`${targetPath}/${basename(child.childPath)}`), editor: null });
+        rankBindings.push({ file: note, before: note.path, after: relocate(note.path), folder: relocate(child.childPath), editor: null });
         return { ...child, order: readOrderingProperties(contents, note.path, "rank", "merge").rank };
       });
       const sourceOrder = readOrderingProperties(sourceSnapshot, sourceNotePath, "order", "merge").order === "manual"
@@ -118,7 +118,7 @@ export class NodeMerge {
         targetChildren.push({ ...child, order: readOrderingProperties(contents, path, "rank", "merge").rank });
       }
       mergeOrder = planAppendChildren(targetChildren, sourceOrder.map((child) => ({
-        ...child, childPath: normalizePath(`${targetPath}/${basename(child.childPath)}`), order: null,
+        ...child, childPath: relocate(child.childPath), order: null,
       })));
       const patchedFolders = new Set(mergeOrder.patches.map(({ childPath }) => childPath));
       for (const binding of rankBindings) {
@@ -136,18 +136,18 @@ export class NodeMerge {
     await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", targetSnapshot);
     this.assertMergeStructure(source, sourcePath, initialSourceChildren);
     this.assertMergeStructure(target, targetPath, initialTargetChildren);
+    inventory.assertUnchanged("from");
     for (const check of mergeLinkChecks) check("before");
     const undos: Undo[] = [];
     let latestTarget = targetSnapshot;
     try {
       for (const snapshot of movable) {
         this.host.assertActive();
-        const { entry, path: sourceEntryPath, name, parent } = snapshot;
+        const { entry, path: sourceEntryPath, destination, name, parent } = snapshot;
         this.host.assertEntryIdentity(entry, sourceEntryPath, entry instanceof TFolder ? TFolder : TFile);
         if (entry.name !== name || entry.parent !== parent || parent !== source) {
           throw new Error(`source child changed during merge: ${sourceEntryPath}`);
         }
-        const destination = normalizePath(`${targetPath}/${name}`);
         this.host.expectEvent("rename", destination, sourceEntryPath, entry instanceof TFolder);
         await this.app.fileManager.renameFile(entry, destination);
         undos.push(async () => {
@@ -245,8 +245,8 @@ export class NodeMerge {
           this.assertMergeRankBinding(binding, binding.after, rankSources.get(binding.file)!);
           if (this.host.getCanonicalFile(binding.folder) !== binding.file) throw new Error(`Merge rank source changed: ${binding.folder}`);
         }
+        inventory.assertUnchanged("to");
         for (const entry of movingMarkdown) {
-          this.host.assertEntryIdentity(entry.file, entry.to, TFile);
           this.assertMergeNoteClosed(entry.file, entry.to, "source");
         }
         for (const check of mergeLinkChecks) check("after");
@@ -344,6 +344,34 @@ export class NodeMerge {
     if (matching.length === 1) {
       throw new FolderNodesError("merge_note_open", { path }, `Cannot merge while the ${role} Node Note is open in a Markdown editor: ${path}`);
     }
+  }
+
+  private snapshotMovingContents(pending: TAbstractFile[], relocate: (path: string) => string) {
+    const files: { file: TFile; from: string; to: string }[] = [];
+    const folders: { folder: TFolder; from: string; to: string; childCount: number }[] = [];
+    while (pending.length > 0) {
+      const entry = pending.pop()!;
+      const from = entry.path;
+      const to = relocate(from);
+      if (entry instanceof TFolder) {
+        folders.push({ folder: entry, from, to, childCount: entry.children.length });
+        for (const child of entry.children) pending.push(child);
+      } else if (entry instanceof TFile) files.push({ file: entry, from, to });
+    }
+    return {
+      files,
+      assertUnchanged: (phase: "from" | "to") => {
+        // Paths and identities pin every original entry. Counts detect additions,
+        // including new notes in an otherwise unchanged nested folder.
+        for (const binding of folders) {
+          this.host.assertEntryIdentity(binding.folder, binding[phase], TFolder);
+          if (binding.folder.children.length !== binding.childCount) {
+            throw new Error(`source structure changed during merge: ${binding[phase]}`);
+          }
+        }
+        for (const binding of files) this.host.assertEntryIdentity(binding.file, binding[phase], TFile);
+      },
+    };
   }
 
   private assertMergeStructure(
