@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, setIcon, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
@@ -392,18 +392,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     });
   }
 
-  private createGuide(panel: HTMLElement, title: string, icon?: "book-open"): HTMLDivElement {
+  private createGuide(panel: HTMLElement, title: string): HTMLDivElement {
     const element = panel.createEl("details", { cls: "folder-nodes-settings-guide" });
     element.open = this.expandedGuides.has(this.activeTab);
-    const summary = element.createEl("summary");
-    if (icon) {
-      const label = summary.createSpan({ cls: "folder-nodes-guide-title-with-icon" });
-      label.createSpan({ text: title });
-      const mark = label.createSpan({ cls: "folder-nodes-guide-book", attr: { "aria-hidden": "true" } });
-      setIcon(mark, icon);
-    } else {
-      summary.textContent = title;
-    }
+    element.createEl("summary", { text: title });
     this.currentGuide = { tab: this.activeTab, element };
     return element.createDiv({ cls: "folder-nodes-settings-guide-body" });
   }
@@ -510,7 +502,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderIconGuide(panel: HTMLElement): void {
-    const body = this.createGuide(panel, t("iconGuideTitle"), "book-open");
+    const body = this.createGuide(panel, t("iconGuideTitle"));
     const format = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
     new Setting(format).setName(t("iconGuideFormatTitle")).setHeading();
     format.createEl("p", { text: t("iconGuideFormats") });
