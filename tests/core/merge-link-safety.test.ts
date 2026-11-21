@@ -149,6 +149,28 @@ describe("Node merge link preflight", () => {
       "%% [hidden](../Reference.md) %%",
     ].join("\n"))).not.toThrow();
   });
+  it.each([
+    "- [ref]: ../Reference.md",
+    "2) [ref]: ../Reference.md",
+    "- \t[ref]: ../Reference.md",
+    "> - [ref]: ../Reference.md",
+    "- > [ref]: ../Reference.md",
+    "- - [ref]:\n    ../Reference.md",
+    "10. A list item\n\n    [ref]: ../Reference.md",
+  ])("checks reference definitions inside Markdown containers: %s", (source) => {
+    expect(() => assertSafe(source)).toThrow("reference definition");
+  });
+
+  it.each([
+    "- [ref]: https://example.com",
+    "- `[ref]: ../Reference.md`",
+    "-     [ref]: ../Reference.md",
+    "    - [ref]: ../Reference.md",
+    "- ~~~\n  [ref]: ../Reference.md\n  ~~~",
+  ])("allows external or literal reference text in lists: %s", (source) => {
+    expect(() => assertSafe(source)).not.toThrow();
+  });
+
   it("fails closed on ambiguous reference and hyperlink syntax", () => {
     expect(() => assertSafe("[ref]: ../Reference.md")).toThrow("reference definition");
     expect(() => assertSafe("[[../Reference]]")).toThrow("relative WikiLink");

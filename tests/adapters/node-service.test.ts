@@ -1775,6 +1775,19 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Source")).toBe(false);
   });
 
+  it("unhides one node without moving commented list entries into a neighboring property", async () => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Node");
+    const source = ["---", "tags:", "  - personal", "folder-nodes:", "  - hidden=true",
+      "# sorting", "  - rank=10", "# future setting", "  - 'future=value' # keep this spelling",
+      "# following property", "description: example", "---", "Body"].join("\r\n");
+    const file = fake.addFile("Node/Node.md", source);
+    await service(fake).setNodeHidden(folder, false);
+    const updated = fake.contents.get(file.path)!;
+    expectFrontmatterPropertyChanges(source, updated, { "folder-nodes": ["rank=10", "future=value"] });
+    expect(updated).toBe(source.replace("  - hidden=true\r\n", ""));
+  });
+
   it("does not copy hidden state while merging nodes", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
@@ -1796,6 +1809,7 @@ describe("NodeService structural safety", () => {
     ["source", "inline"], ["child", "inline"],
     ["source", "reference"], ["child", "reference"],
     ["source", "quoted-reference"], ["child", "quoted-reference"],
+    ["source", "list-reference"], ["child", "list-reference"],
     ["source", "entity"], ["child", "entity"],
     ["source", "html-decimal"], ["child", "html-decimal"],
     ["source", "html-named"], ["child", "html-named"],
@@ -1806,6 +1820,7 @@ describe("NodeService structural safety", () => {
     const reference = fake.addFile("Reference.md", "the original reference");
     const source = fake.addFolder("Source");
     const link = (path: string) => {
+      if (syntax === "list-reference") return `[open][ref]\n\n- [ref]: ${path}`;
       if (syntax === "quoted-reference") return `> [open][ref]\n>\n> [ref]: ${path}`;
       if (syntax === "entity") return `[ref](${path.replaceAll(".", "&#46;")})`;
       if (syntax === "html-decimal") return `<a href="${path.replaceAll(".", "&#46;")}">ref</a>`;

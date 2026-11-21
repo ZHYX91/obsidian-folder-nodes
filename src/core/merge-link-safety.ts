@@ -38,11 +38,11 @@ export function assertMergeLinksKeepDestinations(
   for (const [lineIndex, line] of source.split(/\r\n|\r|\n/u).entries()) {
     const quotePrefix = quotePrefixPattern.exec(line)?.[0] ?? "";
     const quoteDepth = quotePrefix.split(">").length - 1;
-    const fenceLine = line.slice(quotePrefix.length);
+    const fenceLine = expandTabs(line.slice(quotePrefix.length));
     if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
     if (fence !== null) {
       const boundPrefix = fence.quoteDepth === 0 ? "" : new RegExp(`^(?:${quoteMarker}){${fence.quoteDepth}}`, "u").exec(line)?.[0] ?? "";
-      const content = line.slice(boundPrefix.length).replaceAll("\t", "    ");
+      const content = expandTabs(line.slice(boundPrefix.length));
       const indentation = /^[ ]*/u.exec(content)?.[0].length ?? 0;
       if (content.trim() !== "" && indentation < fence.listIndent) fence = null;
       else {
@@ -52,7 +52,7 @@ export function assertMergeLinksKeepDestinations(
       }
     }
     const blank = /^\s*$/u.test(fenceLine);
-    const indentation = /^[ \t]*/u.exec(fenceLine)?.[0].replaceAll("\t", "    ").length ?? 0;
+    const indentation = /^ */u.exec(fenceLine)?.[0].length ?? 0;
     if (quoteDepth !== listQuoteDepth) listIndents = [];
     listQuoteDepth = quoteDepth;
     const listCandidate = /^([ \t]*)(?:[-+*]|(\d{1,9})[.)])[ \t]+/u.exec(fenceLine);
@@ -64,8 +64,9 @@ export function assertMergeLinksKeepDestinations(
       ? null : listCandidate;
     if (!blank) {
       while ((listIndents.at(-1) ?? 0) > indentation) listIndents.pop();
-      if (list !== null) listIndents.push(list[0].replaceAll("\t", "    ").length);
     }
+    const parentListIndent = listIndents.at(-1) ?? 0;
+    if (!blank && list !== null) listIndents.push(list[0].length);
     const listIndent = listIndents.at(-1) ?? 0;
     if (comment === null && indentation >= listIndent + 4 && (previousBlank || indentedCode)) {
       indentedCode = true;
@@ -74,7 +75,7 @@ export function assertMergeLinksKeepDestinations(
     }
     if (!blank) indentedCode = false;
     previousBlank = blank;
-    const listContent = fenceLine.replaceAll("\t", "    ").slice(listIndent);
+    const listContent = fenceLine.slice(listIndent);
     if (comment === null && list !== null && /^(?:(?:[-+*]|\d+[.)])[ \t]+|>[ \t]*)+(?:\x60{3,}|~{3,})/u.test(listContent)) {
       throw new Error("Cannot safely merge a fence with mixed list and quote openers");
     }
@@ -110,8 +111,8 @@ export function assertMergeLinksKeepDestinations(
     }
     // An empty first line can continue its destination on the next line.
     // Refuse that unsupported form at the opener, before any merge effects.
-    const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S*)/u.exec(visible.slice(quotePrefix.length));
-    if (definition?.[1] != null && !external(definition[1])) {
+    const destination = referenceDefinitionDestination(visible.slice(quotePrefix.length), parentListIndent);
+    if (destination !== undefined && !external(destination)) {
       throw new Error("Cannot safely merge a relative reference definition");
     }
     checks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
@@ -124,6 +125,27 @@ export function assertMergeLinksKeepDestinations(
     }
   }
   return (phase) => { for (const check of checks) check(phase); };
+}
+
+function expandTabs(line: string): string {
+  let addedColumns = 0;
+  return line.replace(/\t/gu, (_tab, offset: number) => {
+    const width = 4 - (offset + addedColumns) % 4;
+    addedColumns += width - 1;
+    return " ".repeat(width);
+  });
+}
+
+function referenceDefinitionDestination(line: string, parentIndent: number): string | undefined {
+  if (!line.includes("]:")) return undefined;
+  const expanded = expandTabs(line);
+  // Consume each list/quote container once. Five spaces after a list marker
+  // introduce literal indented code rather than a reference definition.
+  const container = / {0,3}(?:> ?|(?:[-+*]|\d{1,9}[.)]) {1,4}(?! ))/yu;
+  let offset = parentIndent;
+  container.lastIndex = offset;
+  while (container.test(expanded)) offset = container.lastIndex;
+  return /^ {0,3}\[(?:\\.|[^\]\\\r\n])+\]:[ \t]*(\S*)/u.exec(expanded.slice(offset))?.[1];
 }
 
 /** Accepts visible prose or a parsed Text/List property value, without YAML escaping. */

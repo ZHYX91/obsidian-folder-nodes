@@ -117,26 +117,36 @@ function patchParsedSource(parsed: ParsedSource, entries: readonly string[], leg
     ...[...legacyToRemove].map((key) => parsed.ranges.get(key)),
   ].filter((range): range is SourceRange => range !== undefined);
   const insertion = ranges.reduce((minimum, range) => Math.min(minimum, range.start), parsed.closingBoundary);
-  const preserved = unknownBlockItems(parsed, new Set(unknownEntries));
-  const rendered = entries.length === 0 ? [] : [FOLDER_NODES_PROPERTY + ":", ...entries.map((entry) =>
-    preserved.get(entry)?.shift() ?? `  - ${renderListItem(entry)}`)];
+  const rendered = renderCanonicalBlock(parsed, entries, new Set(unknownEntries));
   return rebuildSource(parsed, ranges, insertion, rendered);
 }
 
-function unknownBlockItems(parsed: ParsedSource, unknown: ReadonlySet<string>): Map<string, string[]> {
-  const preserved = new Map<string, string[]>();
+function renderCanonicalBlock(parsed: ParsedSource, entries: readonly string[], unknown: ReadonlySet<string>): string[] {
+  const retained = new Set(entries);
+  const originalRows = new Map<string, string[][]>();
+  let pending: string[] = [];
   const range = parsed.ranges.get(FOLDER_NODES_PROPERTY);
-  if (range === undefined || stripYamlComment(valueAfterColon(parsed.lines[range.start] ?? "")).trim() !== "") return preserved;
-  for (const line of parsed.lines.slice(range.start + 1, range.end)) {
-    const match = /^\s+-\s+(.+)$/u.exec(line);
-    if (match === null) continue;
-    const value = parseYamlScalar(match[1]!);
-    if (typeof value !== "string" || !unknown.has(value)) continue;
-    const rows = preserved.get(value) ?? [];
-    rows.push(`  ${line.trimStart()}`);
-    preserved.set(value, rows);
+  if (range !== undefined && stripYamlComment(valueAfterColon(parsed.lines[range.start] ?? "")).trim() === "") {
+    for (const line of parsed.lines.slice(range.start + 1, range.end)) {
+      if (/^[ \t]*(?:#.*)?$/u.test(line)) {
+        pending.push(line);
+        continue;
+      }
+      const match = /^\s+-\s+(.+)$/u.exec(line);
+      const value = match === null ? null : parseYamlScalar(match[1]!);
+      if (typeof value !== "string" || !retained.has(value)) continue;
+      // Preserve standalone comments with the next surviving list item, even
+      // when a removed item preceded them or canonical ordering changes.
+      const groups = originalRows.get(value) ?? [];
+      pending.push(unknown.has(value) ? `  ${line.trimStart()}` : `  - ${renderListItem(value)}`);
+      groups.push(pending);
+      originalRows.set(value, groups);
+      pending = [];
+    }
   }
-  return preserved;
+  const rendered = entries.length === 0 ? [] : [FOLDER_NODES_PROPERTY + ":"];
+  for (const entry of entries) rendered.push(...(originalRows.get(entry)?.shift() ?? [`  - ${renderListItem(entry)}`]));
+  return [...rendered, ...pending];
 }
 
 function rebuildSource(parsed: ParsedSource, removedRanges: readonly SourceRange[], insertion: number, rendered: readonly string[]): string {
@@ -199,7 +209,7 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     // Unicode spaces belong to the authored key, not YAML separation.
     const key = line.slice(0, separator).replace(/[ \t]+$/u, "");
     if (!keys.includes(key)) continue;
-    const range = { start: index, end: structure.valueEnds.get(index) ?? continuationEnd(lines, index, closingBoundary) };
+    const range = { start: index, end: structure.valueEnds.get(index) ?? continuationEnd(lines, index, closingBoundary, key) };
     const existing = occurrences.get(key) ?? [];
     existing.push(range);
     occurrences.set(key, existing);
@@ -366,8 +376,20 @@ function parseFolderNodesValue(lines: readonly string[], range: SourceRange): un
   return values;
 }
 
-function continuationEnd(lines: readonly string[], start: number, closingBoundary: number): number {
+function continuationEnd(lines: readonly string[], start: number, closingBoundary: number, key: string): number {
   const after = stripYamlComment(valueAfterColon(lines[start] ?? "")).trim();
+  if (key === FOLDER_NODES_PROPERTY && after === "") {
+    // Standalone YAML comments can be unindented inside a block sequence.
+    // Its range ends after the last value, leaving trailing comments untouched.
+    let end = start + 1;
+    for (let index = start + 1; index < closingBoundary; index += 1) {
+      const line = lines[index] ?? "";
+      if (/^[ \t]*(?:#.*)?$/u.test(line)) continue;
+      if (!/^[ \t]/u.test(line)) break;
+      end = index + 1;
+    }
+    return end;
+  }
   let index = start + 1;
   let hasContent = after === "" || /^[|>]/u.test(after);
   while (index < closingBoundary) {
