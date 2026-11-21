@@ -11,6 +11,9 @@ export interface MergeFileRelocation {
 export type MergeLinkResolver = (path: string, sourcePath: string) => MergeLinkTarget | null;
 export type MergeLinkCheck = (phase: "before" | "after") => void;
 
+const quoteMarker = / {0,3}>[ \t]?/u.source;
+const quotePrefixPattern = new RegExp(`^(?:${quoteMarker})+`, "u");
+
 /**
  * Reject location-sensitive link syntax before a Node merge moves any files.
  * Bind Markdown and WikiLinks to their actual host-resolved file identities.
@@ -33,12 +36,12 @@ export function assertMergeLinksKeepDestinations(
   let listIndents: number[] = [];
   let listQuoteDepth = 0;
   for (const [lineIndex, line] of source.split(/\r\n|\r|\n/u).entries()) {
-    const quotePrefix = /^(?: {0,3}>[ \t]?)+/u.exec(line)?.[0] ?? "";
+    const quotePrefix = quotePrefixPattern.exec(line)?.[0] ?? "";
     const quoteDepth = quotePrefix.split(">").length - 1;
     const fenceLine = line.slice(quotePrefix.length);
     if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
     if (fence !== null) {
-      const boundPrefix = fence.quoteDepth === 0 ? "" : new RegExp(`^ {0,3}(?:>[ \\t]?){${fence.quoteDepth}}`, "u").exec(line)?.[0] ?? "";
+      const boundPrefix = fence.quoteDepth === 0 ? "" : new RegExp(`^(?:${quoteMarker}){${fence.quoteDepth}}`, "u").exec(line)?.[0] ?? "";
       const content = line.slice(boundPrefix.length).replaceAll("\t", "    ");
       const indentation = /^[ ]*/u.exec(content)?.[0].length ?? 0;
       if (content.trim() !== "" && indentation < fence.listIndent) fence = null;

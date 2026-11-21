@@ -4,6 +4,7 @@
 
 - Keep cell boundaries intact when creating nodes from selections in quoted tables and tables with short column separators.
 - Refuse node merges that would relocate a relative reference definition inside a blockquote.
+- Check links after a fenced code block closes inside a nested blockquote before merging nodes.
 - Make the three expandable settings guides easier to find with the theme accent.
 
 ## 0.13.0 - 2026-11-20

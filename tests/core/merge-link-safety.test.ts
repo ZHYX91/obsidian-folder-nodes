@@ -88,6 +88,15 @@ describe("Node merge link preflight", () => {
     expect(() => assertSafe("- > ~~~\n  > literal\n  > ~~~\n[[A/A]]")).toThrow("mixed list and quote");
     expect(() => assertSafe("- - ~~~\n    literal\n    ~~~\n  [[A/A]]")).toThrow("mixed list and quote");
   });
+  it.each([
+    [">  > ```", ">  > "],
+    [">  > - ```", ">  >   "],
+  ])("checks links after a spaced nested quote fence closes: %s", (opening, prefix) => {
+    const fence = [opening, `${prefix}[literal](sibling.md) [[Target]]`, prefix + "```"].join("\n");
+    expect(() => assertSafe(fence)).not.toThrow();
+    expect(() => assertSafe(`${fence}\n${prefix}[open](sibling.md)`)).toThrow("Cannot prove a Markdown link target");
+    expect(() => assertSafe(`${fence}\n${prefix}[[Target]]`)).toThrow("Cannot prove a WikiLink target");
+  });
   it("rejects a cross-directory relative target before merging", () => {
     for (const link of ["[reference](../Reference.md)", "![image](../Image.png)"]) {
       const identity = {};
