@@ -264,6 +264,32 @@ describe("Node Graph plugin integration", () => {
     expect(check()).toEqual([false, false]);
   });
 
+  it("only offers scoped graph actions for nodes reachable in the current visibility session", async () => {
+    const fixture = pluginFixture();
+    const child = fixture.addNode("A/Child");
+    fixture.setActiveFile(fixture.notes.get(child.path)!);
+    const plugin = fixture.createPlugin();
+    await plugin.onload();
+    const commands = plugin.commands.filter(({ id }) =>
+      id === "open-node-graph-subtree" || id === "open-node-graph-local");
+    const available = () => commands.map(({ checkCallback }) => (checkCallback as (checking: boolean) => boolean)(true));
+    const menuActions = (): unknown[] => {
+      const actions: unknown[] = [];
+      Reflect.get(plugin, "contributeNodeActions").call(plugin, actions, child, "contents");
+      return actions;
+    };
+    const visible = vi.spyOn(fixture.service, "isNodeVisible");
+    visible.mockImplementation((path) => !path.startsWith("A/") && path !== "A");
+    expect(available()).toEqual([false, false]);
+    expect(menuActions()).toHaveLength(0);
+    visible.mockReturnValue(true);
+    expect(available()).toEqual([true, true]);
+    expect(menuActions()).toHaveLength(3);
+    fixture.removeCanonical("A");
+    expect(available()).toEqual([false, false]);
+    expect(menuActions()).toHaveLength(0);
+  });
+
   it("routes refresh batches to partial index invalidation and cached visual refresh", async () => {
     const fixture = pluginFixture();
     const plugin = fixture.createPlugin();
@@ -774,6 +800,7 @@ function pluginFixture() {
     },
     isCanonicalFile: (file: TFile) => notes.get(file.parent?.path ?? "") === file,
     isIgnoredPath: (path: string) => ignoredPaths.has(path),
+    isNodeVisible: (_path: string) => true,
     rootNotePath: () => "Test Vault.md",
   };
   const visuals = { resolve: vi.fn<(folder: TFolder) => NodeVisual>((folder) => {

@@ -115,7 +115,7 @@ export class FolderNodeContentsView extends ItemView {
     super(leaf);
     this.registerDomEvent(this.containerEl.ownerDocument, "keydown", (event) => {
       if (event.key !== "Escape") return;
-      if (this.selectionMode) this.finishSelection();
+      if (this.selectionMode && !event.defaultPrevented && event.composedPath().includes(this.containerEl)) this.finishSelection();
       else this.clearAllDrag();
     });
   }

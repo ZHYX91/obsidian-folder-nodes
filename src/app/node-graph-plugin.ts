@@ -165,7 +165,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   }
 
   protected override contributeNodeActions(actions: NodeAction[], folder: TFolder, surface: NodeActionSurface): void {
-    if (!this.settings.nodeGraph.enabled || surface === "graph") return;
+    if (!this.settings.nodeGraph.enabled || surface === "graph" || !this.graphFolderIsEligible(folder)) return;
     actions.push(
       { id: "node-graph", group: "open", icon: "git-fork", title: label("openInGraph"), run: () => this.openNodeGraph(folder.path) },
       { id: "node-graph-subtree", group: "open", icon: "git-branch", title: label("openSubtreeGraph"), run: () => this.openNodeGraph(folder.path, { mode: "subtree", rootPath: folder.path }) },
@@ -272,7 +272,13 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
 
   private graphFolderIsEligible(folder: TFolder): boolean {
     const path = normalizeVaultPath(folder.path);
-    return path === "" || (!this.service.isIgnoredPath(path) && this.service.getCanonicalFile(path) !== null);
+    if (this.service.isIgnoredPath(path) || !this.service.isNodeVisible(path)) return false;
+    for (let current: TFolder | null = folder; current !== null; current = current.parent) {
+      const currentPath = normalizeVaultPath(current.path);
+      if (currentPath === "") return true;
+      if (this.service.getCanonicalFile(currentPath) === null) return false;
+    }
+    return false;
   }
 
   private decorateContentsViews(): void {
