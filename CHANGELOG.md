@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Keep cell boundaries intact when creating nodes from selections in quoted tables and tables with short column separators.
+- Refuse node merges that would relocate a relative reference definition inside a blockquote.
+
 ## 0.13.0 - 2026-11-20
 
 - Make folder-node creation from missing links opt-in in Selection & naming. Reading view and Live Preview honor the requested pane and anchor. Matching periodic links take priority when Chrono Notes link creation is enabled.

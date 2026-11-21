@@ -33,7 +33,7 @@ export function assertMergeLinksKeepDestinations(
   let listIndents: number[] = [];
   let listQuoteDepth = 0;
   for (const [lineIndex, line] of source.split(/\r\n|\r|\n/u).entries()) {
-    const quotePrefix = /^ {0,3}(?:>[ \t]?)+/u.exec(line)?.[0] ?? "";
+    const quotePrefix = /^(?: {0,3}>[ \t]?)+/u.exec(line)?.[0] ?? "";
     const quoteDepth = quotePrefix.split(">").length - 1;
     const fenceLine = line.slice(quotePrefix.length);
     if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
@@ -107,7 +107,7 @@ export function assertMergeLinksKeepDestinations(
     }
     // An empty first line can continue its destination on the next line.
     // Refuse that unsupported form at the opener, before any merge effects.
-    const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S*)/u.exec(visible);
+    const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S*)/u.exec(visible.slice(quotePrefix.length));
     if (definition?.[1] != null && !external(definition[1])) {
       throw new Error("Cannot safely merge a relative reference definition");
     }
