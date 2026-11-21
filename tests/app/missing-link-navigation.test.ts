@@ -99,6 +99,70 @@ describe("opening missing links", () => {
     expect(f.trigger).not.toHaveBeenCalled();
   });
 
+  it.each(["folder", "leaf"])("respects the spelling a new unresolved Node will use for a %s exemption", async (type) => {
+    const f = fixture();
+    f.enable();
+    if (type === "folder") f.plugin.settings.ignoredFolders = ["Notes/Café"];
+    else f.plugin.settings.leafNoteExemptions = ["Notes/Café.md"];
+    const raw = "Cafe\u0301";
+    await f.follow(raw, f.source.path);
+    expect(f.native).toHaveBeenCalledWith(raw, f.source.path);
+    expect(f.fake.files.has("Notes/Café")).toBe(false);
+    expect(f.trigger).not.toHaveBeenCalled();
+  });
+
+  it.each(["Café", "Cafe\u0301"])("opens an existing leaf with spelling %s while metadata is catching up", async (name) => {
+    const f = fixture();
+    f.enable();
+    const existing = f.fake.addFile(`Notes/${name}.md`);
+    await f.follow("Cafe\u0301", f.source.path, "tab");
+    expect(f.open).toHaveBeenCalledWith(existing, undefined);
+    expect(f.fake.files.has("Notes/Café")).toBe(false);
+    expect(f.trigger).not.toHaveBeenCalled();
+  });
+
+  it("keeps the exact existing ancestor when only the new leaf needs normalization", async () => {
+    const f = fixture();
+    f.enable();
+    for (const name of ["Café", "Cafe\u0301"]) {
+      f.fake.addFolder(name);
+      f.fake.addFile(`${name}/${name}.md`);
+    }
+    const spelling = "Cafe\u0301/Ele\u0300ve";
+    f.plugin.settings.ignoredFolders = ["Café"];
+    await f.follow(spelling, f.source.path, "tab");
+    const note = f.fake.requireFile("Cafe\u0301/Elève/Elève.md");
+    expect(f.open).toHaveBeenCalledWith(note, undefined);
+    expect(f.fake.files.has("Café/Elève")).toBe(false);
+    expect(f.native).not.toHaveBeenCalled();
+  });
+
+  it("refuses to open a leaf across a normalized ancestor collision", async () => {
+    const f = fixture();
+    f.enable();
+    f.fake.addFolder("Café");
+    f.fake.addFile("Café/Café.md");
+    f.fake.addFile("Café/Topic.md");
+    const report = vi.spyOn(f.plugin as unknown as { reportActionError(error: unknown): void }, "reportActionError");
+    await f.follow("Cafe\u0301/Topic", f.source.path, "tab");
+    expect(report).toHaveBeenCalledOnce();
+    expect(f.open).not.toHaveBeenCalled();
+    expect(f.native).not.toHaveBeenCalled();
+    expect(f.fake.files.has("Café/Topic")).toBe(false);
+  });
+
+  it("hands a differently spelled file returned by Vault lookup back to native navigation", async () => {
+    const f = fixture();
+    f.enable();
+    const other = f.fake.addFile("Notes/CASE.md");
+    const lookup = f.fake.app.vault.getFileByPath.bind(f.fake.app.vault);
+    vi.spyOn(f.fake.app.vault, "getFileByPath").mockImplementation((path) => path === "Notes/Case.md" ? other : lookup(path));
+    await f.follow("Case", f.source.path, "tab");
+    expect(f.native).toHaveBeenCalledWith("Case", f.source.path, "tab");
+    expect(f.open).not.toHaveBeenCalled();
+    expect(f.fake.files.has("Notes/Case")).toBe(false);
+  });
+
   it.each(["", "/"])("creates and opens a node at the Vault root represented as %j", async (rootPath) => {
     const f = fixture();
     const { vault, fileManager } = f.fake.app;

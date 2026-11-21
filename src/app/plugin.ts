@@ -15,7 +15,7 @@ import { configuredEmojiFontStack } from "../core/emoji-font";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
 import { classifySelectionTableContext, matchesTableLinkWriteback, prepareSelectionLink } from "../core/selection-link";
-import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
+import { aliasFromLinkDisplay, planUnresolvedNode, projectUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
 import type { FolderNodesSettings } from "../core/types";
 import {
   CURRENT_SETTINGS_SCHEMA_VERSION,
@@ -712,23 +712,32 @@ export default class FolderNodesPlugin extends Plugin {
     if (!this.settings.createNodesFromLinks || this.unloaded) return null;
     const [rawLinkText, sourcePath, pane, viewState] = args;
     const source = this.app.vault.getFileByPath(sourcePath);
-    if (source?.extension.toLowerCase() !== "md") return null;
+    if (source?.extension.toLowerCase() !== "md" || source.path !== sourcePath) return null;
     const { path, subpath } = parseLinktext(rawLinkText);
     const linkPath = path.trim();
     if (linkPath === "" || this.app.metadataCache.getFirstLinkpathDest(linkPath, source.path) !== null) return null;
     const requestedFile = linkPath.toLocaleLowerCase().endsWith(".md") ? linkPath : `${linkPath}.md`;
     const defaultParent = this.app.fileManager.getNewFileParent(source.path, requestedFile);
     const plan = planUnresolvedNode(linkPath, defaultParent.path);
-    if (plan === null || this.service.isIgnoredPath(plan.nodePath) || this.service.isLeafNoteExempt(plan.leafPath)) return null;
+    if (plan === null) return null;
+    const projected = projectUnresolvedNode(plan, (candidate) => this.app.vault.getAbstractFileByPath(candidate)?.path ?? null);
+    if ([plan, projected].some((candidate) => this.service.isIgnoredPath(candidate.nodePath) || this.service.isLeafNoteExempt(candidate.leafPath))) return null;
     const state = subpath ? { ...viewState, eState: { ...viewState?.eState, subpath } } : viewState;
     const origin = pane ? null : clickedView ?? this.app.workspace.getActiveViewOfType(MarkdownView);
     // Metadata may lag a recent creation. Exact existing notes take precedence over a new node.
     const paths = new Set([requestedFile, plan.leafPath, normalizeVaultPath(`${source.parent?.path ?? ""}/${requestedFile}`)]);
-    const existing = [...paths].map((candidate) => this.app.vault.getFileByPath(candidate)).filter((file) => file !== null);
-    if (existing.length > 1) return null;
-    if (existing[0]) return this.openLinkFile(Promise.resolve(existing[0]), pane, state, origin);
+    if (projected.conflict === null) paths.add(projected.leafPath);
+    let existing: TFile | null = null;
+    for (const candidate of paths) {
+      const file = this.app.vault.getFileByPath(candidate);
+      if (file === null) continue;
+      if (file.path !== candidate || (existing !== null && existing !== file)) return null;
+      existing = file;
+    }
+    if (existing !== null) return this.openLinkFile(Promise.resolve(existing), pane, state, origin);
     const claimed = claimPeriodicLink(this.app.workspace, args);
     if (claimed !== null) return claimed;
+    if (projected.conflict !== null) return Promise.reject(new Error(`Path already exists: ${projected.conflict}`));
     const alias = this.settings.addSelectionAlias ? this.linkAlias(source, linkPath, rawLinkText, visibleText) : null;
     const created = this.service.createNodePath(plan.nodePath, alias === null ? {} : { alias });
     return this.openLinkFile(created, pane, state, origin).then(() => { if (!this.unloaded) this.refreshVisuals(); });

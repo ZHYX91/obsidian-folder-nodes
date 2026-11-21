@@ -255,7 +255,7 @@ export function setTooltip(element: HTMLElement, value: string): void {
 }
 
 export function normalizePath(path: string): string {
-  return path.replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
+  return path.normalize("NFC").replace(/[\u00a0\u202f]/gu, " ").replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
 }
 
 export function parseYaml(source: string): unknown { return parse(source) as unknown; }

@@ -32,7 +32,7 @@ export class PropertyMigrationModal extends SubmittingModal {
 
     const summary = this.contentEl.createDiv({ cls: "folder-nodes-migration-summary" });
     if (this.structureScan !== null) {
-      this.pathSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"), this.structureScan.leafMarkdown);
+      this.pathSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"), this.structureScan.leafMoves.map(({ sourcePath }) => sourcePath));
       this.pathSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
         this.structureScan.missingNodeNotes.map((path) => path || "/"));
       this.pathSection(summary, t("skippedLeafNotes"), this.structureScan.exemptLeafMarkdown);

@@ -38,6 +38,25 @@ export function planUnresolvedNode(linkPath: string, defaultParentPath: string):
   };
 }
 
+/** Existing Vault entries keep their spelling. Only genuinely new segments
+ * use the NFC spelling accepted by the creation path. */
+export function projectUnresolvedNode(plan: UnresolvedNodePlan, lookupPath: (path: string) => string | null) {
+  let nodePath = "";
+  let conflict: string | null = null;
+  for (const name of plan.nodePath.split("/")) {
+    const prefix = nodePath === "" ? "" : nodePath + "/";
+    const requested = prefix + name;
+    const generated = prefix + name.normalize("NFC");
+    nodePath = requested;
+    if (requested === generated) continue;
+    const existing = lookupPath(requested);
+    if (existing === requested) continue;
+    nodePath = generated;
+    if (existing !== null || lookupPath(generated) !== null) conflict ??= generated;
+  }
+  return { nodePath, leafPath: nodePath + ".md", conflict };
+}
+
 export function aliasFromLinkDisplay(
   linkPath: string,
   visibleText: string,
