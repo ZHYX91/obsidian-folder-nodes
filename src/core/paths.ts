@@ -11,6 +11,11 @@ export function normalizeVaultPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\/+|\/+$/gu, "").replace(/\/{2,}/gu, "/");
 }
 
+/** Join a Vault path without changing the spelling of existing names. */
+export function childVaultPath(parent: string, name: string): string {
+  return normalizeVaultPath(`${parent}/${name}`);
+}
+
 export function basename(path: string): string {
   const normalized = normalizeVaultPath(path);
   return normalized.slice(normalized.lastIndexOf("/") + 1);

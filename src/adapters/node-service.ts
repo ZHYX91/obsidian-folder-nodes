@@ -18,7 +18,7 @@ import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatt
 import { resolveLeafTarget } from "../core/leaf-target";
 import { scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planInsert } from "../core/ordering";
-import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
+import { basename, childVaultPath, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
 import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import {
   FOLDER_NODES_PROPERTY,
@@ -374,7 +374,7 @@ export class NodeService {
       const name = sanitizeNodeName(rawName) === oldName ? oldName : sanitizeNewNodeName(rawName);
       if (name === oldName) return folder;
       const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
-      const nextPath = normalizeVaultPath(parentPath === "" ? name : `${parentPath}/${name}`);
+      const nextPath = childVaultPath(parentPath, name);
       const nextNotePath = `${nextPath}/${name}.md`;
       const conflictingNoteBeforeMove = `${sourcePath}/${name}.md`;
       await this.assertAvailable(nextPath, folder);
@@ -493,7 +493,7 @@ export class NodeService {
     return this.exclusive(async () => {
       this.assertEntryIdentity(file, sourcePath, TFile);
       assertTarget();
-      const nextPath = normalizeVaultPath(normalizedTarget === "" ? file.name : `${normalizedTarget}/${file.name}`);
+      const nextPath = childVaultPath(normalizedTarget, file.name);
       if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
       this.assertEntryIdentity(file, sourcePath, TFile);
@@ -510,7 +510,7 @@ export class NodeService {
       if (rawName === file.name) return;
       const name = normalizePath(validateFileName(rawName));
       const parentPath = normalizeVaultPath(file.parent?.path ?? "");
-      const nextPath = normalizeVaultPath(parentPath === "" ? name : `${parentPath}/${name}`);
+      const nextPath = childVaultPath(parentPath, name);
       if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
       this.assertEntryIdentity(file, sourcePath, TFile);
@@ -831,7 +831,7 @@ export class NodeService {
     if (intent.kind === "move-into" && oldParentPath === parentPath) return null;
 
     if (oldParentPath !== parentPath) {
-      const destination = normalizeVaultPath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
+      const destination = childVaultPath(parentPath, folder.name);
       if (targetParent.children.some((entry) => isSameVaultName(entry.name, folder.name))) {
         throw new Error(`Path already exists: ${destination}`);
       }
@@ -882,7 +882,7 @@ export class NodeService {
     const targetParent = parentPath === "" ? null : this.getFolder(parentPath);
     if (parentPath !== "" && targetParent === null) throw new Error(`Unknown target folder: ${parentPath}`);
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
-    const nextPath = normalizeVaultPath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
+    const nextPath = childVaultPath(parentPath, folder.name);
     if (oldParentPath !== parentPath) await this.assertAvailable(nextPath);
     this.assertEntryIdentity(folder, sourcePath, TFolder);
     this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
@@ -937,7 +937,7 @@ export class NodeService {
     try {
       for (const [index, part] of parts.entries()) {
         this.assertActive();
-        const folderPath = normalizeVaultPath(parentPath === "" ? part : `${parentPath}/${part}`);
+        const folderPath = childVaultPath(parentPath, part);
         if (this.isIgnoredPath(folderPath)) throw new FolderNodesError("folder_unmanaged", { path: folderPath }, `Folder is unmanaged: ${folderPath}`);
         const existing = this.app.vault.getAbstractFileByPath(folderPath);
         const isTarget = index === parts.length - 1;
@@ -969,7 +969,7 @@ export class NodeService {
     if (normalizedParent !== "" && this.getFolder(normalizedParent) === null) throw new Error(`Unknown parent folder: ${normalizedParent}`);
     const name = sanitizeNewNodeName(rawName);
     this.assertChildFolderNameAllowed(normalizedParent, name);
-    const folderPath = normalizeVaultPath(normalizedParent === "" ? name : `${normalizedParent}/${name}`);
+    const folderPath = childVaultPath(normalizedParent, name);
     const notePath = `${folderPath}/${name}.md`;
     await this.assertAvailable(folderPath);
     await this.assertAvailable(notePath);
@@ -1057,7 +1057,7 @@ export class NodeService {
     if (sourcePath === "") return;
     const renamedNotePath = renamedNote.path;
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
-    const nextPath = normalizeVaultPath(parentPath === "" ? name : `${parentPath}/${name}`);
+    const nextPath = childVaultPath(parentPath, name);
     await this.assertAvailable(nextPath);
     this.assertActive();
     this.assertEntryIdentity(folder, sourcePath, TFolder);

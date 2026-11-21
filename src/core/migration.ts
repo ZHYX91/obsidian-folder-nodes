@@ -2,7 +2,7 @@ import type { LeafMove, MigrationConflict, MigrationScan } from "./types";
 import { SiblingPathIndex } from "./sibling-path-index";
 import { resolveLeafTarget } from "./leaf-target";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "./exemptions";
-import { basename, dirname, isSameVaultName, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "./paths";
+import { basename, childVaultPath, dirname, isSameVaultName, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "./paths";
 
 const SCAN_SLICE_MS = 8;
 
@@ -122,7 +122,7 @@ export async function scanMigrationAsync(
     }
     const parent = dirname(note);
     const name = sanitizeNodeName(basename(note).slice(0, -3));
-    const targetFolder = parent === "" ? name : `${parent}/${name}`;
+    const targetFolder = childVaultPath(parent, name);
     const matchingFolders = foldersByKey.get(targetFolder) ?? [];
     const target = resolveLeafTarget(note, matchingFolders);
     if (fileKeys.has(targetFolder)) conflicts.push({ path: note, reason: `Target folder path is occupied by a file: ${targetFolder}` });

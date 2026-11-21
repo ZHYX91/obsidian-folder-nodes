@@ -1,4 +1,4 @@
-import { basename, normalizeVaultPath, sanitizeNewNodeName } from "./paths";
+import { basename, childVaultPath, normalizeVaultPath, sanitizeNewNodeName } from "./paths";
 
 export interface UnresolvedNodePlan {
   nodeName: string;
@@ -29,7 +29,7 @@ export function planUnresolvedNode(linkPath: string, defaultParentPath: string):
 
   const explicitPath = parts.length > 1;
   const parentPath = explicitPath ? parts.slice(0, -1).join("/") : normalizeVaultPath(defaultParentPath);
-  const nodePath = normalizeVaultPath(parentPath === "" ? nodeName : `${parentPath}/${nodeName}`);
+  const nodePath = childVaultPath(parentPath, nodeName);
   return {
     nodeName,
     nodePath,
