@@ -1810,6 +1810,7 @@ describe("NodeService structural safety", () => {
     ["source", "reference"], ["child", "reference"],
     ["source", "quoted-reference"], ["child", "quoted-reference"],
     ["source", "list-reference"], ["child", "list-reference"],
+    ["source", "nested-list-reference"], ["child", "wrapped-list-reference"],
     ["source", "entity"], ["child", "entity"],
     ["source", "html-decimal"], ["child", "html-decimal"],
     ["source", "html-named"], ["child", "html-named"],
@@ -1820,6 +1821,8 @@ describe("NodeService structural safety", () => {
     const reference = fake.addFile("Reference.md", "the original reference");
     const source = fake.addFolder("Source");
     const link = (path: string) => {
+      if (syntax === "nested-list-reference") return `[open][ref]\n\n- - - example\n\n      [ref]: ${path}`;
+      if (syntax === "wrapped-list-reference") return `[open][my ref]\n\n- [my\n  ref]: ${path}`;
       if (syntax === "list-reference") return `[open][ref]\n\n- [ref]: ${path}`;
       if (syntax === "quoted-reference") return `> [open][ref]\n>\n> [ref]: ${path}`;
       if (syntax === "entity") return `[ref](${path.replaceAll(".", "&#46;")})`;

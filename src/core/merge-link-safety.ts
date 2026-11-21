@@ -35,7 +35,10 @@ export function assertMergeLinksKeepDestinations(
   let indentedCode = false;
   let listIndents: number[] = [];
   let listQuoteDepth = 0;
-  for (const [lineIndex, line] of source.split(/\r\n|\r|\n/u).entries()) {
+  const lines = source.split(/\r\n|\r|\n/u);
+  // A skipped literal line must also interrupt a multiline reference label.
+  const referenceLines = Array<string>(lines.length).fill("");
+  for (const [lineIndex, line] of lines.entries()) {
     const quotePrefix = quotePrefixPattern.exec(line)?.[0] ?? "";
     const quoteDepth = quotePrefix.split(">").length - 1;
     const fenceLine = expandTabs(line.slice(quotePrefix.length));
@@ -53,21 +56,29 @@ export function assertMergeLinksKeepDestinations(
     }
     const blank = /^\s*$/u.test(fenceLine);
     const indentation = /^ */u.exec(fenceLine)?.[0].length ?? 0;
+    const deeperQuote = quoteDepth > listQuoteDepth;
     if (quoteDepth !== listQuoteDepth) listIndents = [];
     listQuoteDepth = quoteDepth;
     const listCandidate = /^([ \t]*)(?:[-+*]|(\d{1,9})[.)])[ \t]+/u.exec(fenceLine);
-    if (comment === null && listCandidate?.[2] !== undefined && listCandidate[2] !== "1"
+    if (comment === null && listCandidate?.[2] !== undefined && !/^0*1$/u.test(listCandidate[2])
       && /^(?:\x60{3,}|~{3,})/u.test(fenceLine.slice(listCandidate[0].length))) {
       throw new Error("Cannot safely merge an ambiguous numbered-list fence");
     }
-    const list = listCandidate?.[2] !== undefined && listCandidate[2] !== "1" && !previousBlank && listIndents.length === 0
+    const list = listCandidate?.[2] !== undefined && !/^0*1$/u.test(listCandidate[2]) && !previousBlank && listIndents.length === 0
       ? null : listCandidate;
     if (!blank) {
       while ((listIndents.at(-1) ?? 0) > indentation) listIndents.pop();
     }
     const parentListIndent = listIndents.at(-1) ?? 0;
-    if (!blank && list !== null) listIndents.push(list[0].length);
-    const listIndent = listIndents.at(-1) ?? 0;
+    const listIndent = list === null ? parentListIndent : list[0].length;
+    if (list !== null) {
+      listIndents.push(listIndent);
+      // A compact list opener can establish several continuation indents on
+      // one line. Keep each level so later siblings and code retain their depth.
+      const nestedMarker = / {0,3}(?:[-+*]|\d{1,9}[.)]) {1,4}(?! )/yu;
+      nestedMarker.lastIndex = listIndent;
+      while (nestedMarker.test(fenceLine)) listIndents.push(nestedMarker.lastIndex);
+    }
     if (comment === null && indentation >= listIndent + 4 && (previousBlank || indentedCode)) {
       indentedCode = true;
       previousBlank = blank;
@@ -109,11 +120,15 @@ export function assertMergeLinksKeepDestinations(
     for (let index = visible.indexOf("]("); index >= 0; index = visible.indexOf("](", index + 2)) {
       if (!covered.has(index)) throw new Error("Cannot safely merge an unsupported Markdown link");
     }
-    // An empty first line can continue its destination on the next line.
-    // Refuse that unsupported form at the opener, before any merge effects.
-    const destination = referenceDefinitionDestination(visible.slice(quotePrefix.length), parentListIndent);
-    if (destination !== undefined && !external(destination)) {
-      throw new Error("Cannot safely merge a relative reference definition");
+    const containerText = expandTabs(visible.slice(quotePrefix.length)).slice(parentListIndent);
+    const referenceText = stripReferenceContainers(containerText);
+    // A reference cannot interrupt a plain paragraph. Recognize this only
+    // after an unambiguous text line; a heading or fence can end a block.
+    const afterPlainText = /^[\p{L}\p{N}][\p{L}\p{N} \t.,!?]*$/u.test(referenceLines[lineIndex - 1] ?? "");
+    if (!afterPlainText || deeperQuote || list !== null || referenceText !== containerText && listCandidate === null) {
+      referenceLines[lineIndex] = referenceText;
+    } else if (!containerText.trimStart().startsWith("[")) {
+      referenceLines[lineIndex] = containerText;
     }
     checks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
     for (const attribute of visible.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*))/giu)) {
@@ -124,6 +139,7 @@ export function assertMergeLinksKeepDestinations(
       if (!absolute(raw)) throw new Error("Cannot safely merge a relative HTML link");
     }
   }
+  assertReferenceDestinations(referenceLines);
   return (phase) => { for (const check of checks) check(phase); };
 }
 
@@ -136,16 +152,22 @@ function expandTabs(line: string): string {
   });
 }
 
-function referenceDefinitionDestination(line: string, parentIndent: number): string | undefined {
-  if (!line.includes("]:")) return undefined;
-  const expanded = expandTabs(line);
-  // Consume each list/quote container once. Five spaces after a list marker
-  // introduce literal indented code rather than a reference definition.
+function stripReferenceContainers(line: string): string {
   const container = / {0,3}(?:> ?|(?:[-+*]|\d{1,9}[.)]) {1,4}(?! ))/yu;
-  let offset = parentIndent;
-  container.lastIndex = offset;
-  while (container.test(expanded)) offset = container.lastIndex;
-  return /^ {0,3}\[(?:\\.|[^\]\\\r\n])+\]:[ \t]*(\S*)/u.exec(expanded.slice(offset))?.[1];
+  let offset = 0;
+  while (container.test(line)) offset = container.lastIndex;
+  return line.slice(offset);
+}
+
+function assertReferenceDestinations(lines: readonly string[]): void {
+  // Labels may contain escaped punctuation and nonblank line breaks. A
+  // destination may follow on the next line or be enclosed in angle brackets.
+  const definitions = /^ {0,3}\[(?:\\[^\n]|[^[\]\\\n]|\n(?![ \t]*(?:\n|$))){1,999}\]:[ \t]*(?:\n[ \t]*)?(?:<([^<>\n]*)>|(\S+))/gmu;
+  for (const match of lines.join("\n").matchAll(definitions)) {
+    if (!external(match[1] ?? match[2] ?? "")) {
+      throw new Error("Cannot safely merge a relative reference definition");
+    }
+  }
 }
 
 /** Accepts visible prose or a parsed Text/List property value, without YAML escaping. */

@@ -152,6 +152,11 @@ describe("Node merge link preflight", () => {
   it.each([
     "- [ref]: ../Reference.md",
     "2) [ref]: ../Reference.md",
+    "A paragraph\n01. [ref]: ../Reference.md",
+    "# Heading\n2. [ref]: ../Reference.md",
+    "- paragraph\n- [ref]: ../Reference.md",
+    "paragraph\n> [ref]: ../Reference.md",
+    "~~~\ncode\n~~~\n2. [ref]: ../Reference.md",
     "- \t[ref]: ../Reference.md",
     "> - [ref]: ../Reference.md",
     "- > [ref]: ../Reference.md",
@@ -163,6 +168,12 @@ describe("Node merge link preflight", () => {
 
   it.each([
     "- [ref]: https://example.com",
+    "- [ref]: <https://example.com/a>",
+    "- [ref]:\n  <https://example.com/a>",
+    "- [multi\n  line]:\n  https://example.com/a",
+    "A paragraph\n2. [ref]: ../Reference.md",
+    "- paragraph\n  [ref]: ../Reference.md",
+    "- - - example\n\n          [ref]: ../Reference.md",
     "- `[ref]: ../Reference.md`",
     "-     [ref]: ../Reference.md",
     "    - [ref]: ../Reference.md",
