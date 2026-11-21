@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Preserve managed node metadata around YAML comments when unhiding nodes.
+- Refuse merges that would change reference link destinations across empty or nested lists or when the two notes define the same label differently.
+
 ## 0.13.2 - 2026-11-21
 
 - Allow table selection link edits to settle, including Obsidian’s column width adjustments, before saving the source note. Keep the new node if the link edit cannot be confirmed.

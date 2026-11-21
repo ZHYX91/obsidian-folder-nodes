@@ -1,3 +1,5 @@
+import { referenceDestinations } from "./merge-reference-definitions";
+
 export interface MergeLinkTarget {
   readonly path: string;
   readonly identity: unknown;
@@ -11,8 +13,18 @@ export interface MergeFileRelocation {
 export type MergeLinkResolver = (path: string, sourcePath: string) => MergeLinkTarget | null;
 export type MergeLinkCheck = (phase: "before" | "after") => void;
 
-const quoteMarker = / {0,3}>[ \t]?/u.source;
-const quotePrefixPattern = new RegExp(`^(?:${quoteMarker})+`, "u");
+function quotePrefix(line: string, previousDepth: number, maxDepth = Infinity): string {
+  let offset = 0;
+  for (let depth = 0; depth < maxDepth; depth += 1) {
+    // A continuing blockquote can indent its marker further. A new blockquote
+    // can start only within three columns of its enclosing container.
+    const marker = depth < previousDepth ? /^[ \t]*>[ \t]?/u : /^ {0,3}>[ \t]?/u;
+    const match = marker.exec(line.slice(offset));
+    if (match === null) break;
+    offset += match[0].length;
+  }
+  return line.slice(0, offset);
+}
 
 /**
  * Reject location-sensitive link syntax before a Node merge moves any files.
@@ -26,78 +38,11 @@ export function assertMergeLinksKeepDestinations(
   retiredNote: string,
   resolveLink: MergeLinkResolver = () => null,
   movingFiles: readonly MergeFileRelocation[] = [],
+  targetBody?: string,
 ): MergeLinkCheck {
   if (oldNote === newNote) return () => undefined;
   const checks: MergeLinkCheck[] = [];
-  let fence: { mark: string; width: number; quoteDepth: number; listIndent: number } | null = null;
-  let comment: LiteralBlock | null = null;
-  let previousBlank = true;
-  let indentedCode = false;
-  let listIndents: number[] = [];
-  let listQuoteDepth = 0;
-  const lines = source.split(/\r\n|\r|\n/u);
-  // A skipped literal line must also interrupt a multiline reference label.
-  const referenceLines = Array<string>(lines.length).fill("");
-  for (const [lineIndex, line] of lines.entries()) {
-    const quotePrefix = quotePrefixPattern.exec(line)?.[0] ?? "";
-    const quoteDepth = quotePrefix.split(">").length - 1;
-    const fenceLine = expandTabs(line.slice(quotePrefix.length));
-    if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
-    if (fence !== null) {
-      const boundPrefix = fence.quoteDepth === 0 ? "" : new RegExp(`^(?:${quoteMarker}){${fence.quoteDepth}}`, "u").exec(line)?.[0] ?? "";
-      const content = expandTabs(line.slice(boundPrefix.length));
-      const indentation = /^[ ]*/u.exec(content)?.[0].length ?? 0;
-      if (content.trim() !== "" && indentation < fence.listIndent) fence = null;
-      else {
-        const close = new RegExp("^ {0,3}" + fence.mark + "{" + fence.width + ",}[ \\t]*$", "u");
-        if (close.test(content.slice(fence.listIndent))) fence = null;
-        continue;
-      }
-    }
-    const blank = /^\s*$/u.test(fenceLine);
-    const indentation = /^ */u.exec(fenceLine)?.[0].length ?? 0;
-    const deeperQuote = quoteDepth > listQuoteDepth;
-    if (quoteDepth !== listQuoteDepth) listIndents = [];
-    listQuoteDepth = quoteDepth;
-    const listCandidate = /^([ \t]*)(?:[-+*]|(\d{1,9})[.)])[ \t]+/u.exec(fenceLine);
-    if (comment === null && listCandidate?.[2] !== undefined && !/^0*1$/u.test(listCandidate[2])
-      && /^(?:\x60{3,}|~{3,})/u.test(fenceLine.slice(listCandidate[0].length))) {
-      throw new Error("Cannot safely merge an ambiguous numbered-list fence");
-    }
-    const list = listCandidate?.[2] !== undefined && !/^0*1$/u.test(listCandidate[2]) && !previousBlank && listIndents.length === 0
-      ? null : listCandidate;
-    if (!blank) {
-      while ((listIndents.at(-1) ?? 0) > indentation) listIndents.pop();
-    }
-    const parentListIndent = listIndents.at(-1) ?? 0;
-    const listIndent = list === null ? parentListIndent : list[0].length;
-    if (list !== null) {
-      listIndents.push(listIndent);
-      // A compact list opener can establish several continuation indents on
-      // one line. Keep each level so later siblings and code retain their depth.
-      const nestedMarker = / {0,3}(?:[-+*]|\d{1,9}[.)]) {1,4}(?! )/yu;
-      nestedMarker.lastIndex = listIndent;
-      while (nestedMarker.test(fenceLine)) listIndents.push(nestedMarker.lastIndex);
-    }
-    if (comment === null && indentation >= listIndent + 4 && (previousBlank || indentedCode)) {
-      indentedCode = true;
-      previousBlank = blank;
-      continue;
-    }
-    if (!blank) indentedCode = false;
-    previousBlank = blank;
-    const listContent = fenceLine.slice(listIndent);
-    if (comment === null && list !== null && /^(?:(?:[-+*]|\d+[.)])[ \t]+|>[ \t]*)+(?:\x60{3,}|~{3,})/u.test(listContent)) {
-      throw new Error("Cannot safely merge a fence with mixed list and quote openers");
-    }
-    const opening = comment === null ? /^ {0,3}(\x60{3,}|~{3,})(.*)$/u.exec(listContent) : null;
-    if (opening?.[1] != null && !(opening[1][0] === "\x60" && (opening[2] ?? "").includes("\x60"))) {
-      fence = { mark: opening[1][0] ?? "~", width: opening[1].length, quoteDepth, listIndent };
-      continue;
-    }
-    const masked = maskInlineLiterals(line, comment);
-    comment = masked.comment;
-    const visible = masked.text;
+  const definitions = scanMergeDefinitions(source, (visible, lineIndex) => {
     const matches = /!?\[[^\]\r\n]*\]\(([^)\r\n]*)\)/gu;
     const covered = new Set<number>();
     for (const link of visible.matchAll(matches)) {
@@ -120,16 +65,6 @@ export function assertMergeLinksKeepDestinations(
     for (let index = visible.indexOf("]("); index >= 0; index = visible.indexOf("](", index + 2)) {
       if (!covered.has(index)) throw new Error("Cannot safely merge an unsupported Markdown link");
     }
-    const containerText = expandTabs(visible.slice(quotePrefix.length)).slice(parentListIndent);
-    const referenceText = stripReferenceContainers(containerText);
-    // A reference cannot interrupt a plain paragraph. Recognize this only
-    // after an unambiguous text line; a heading or fence can end a block.
-    const afterPlainText = /^[\p{L}\p{N}][\p{L}\p{N} \t.,!?]*$/u.test(referenceLines[lineIndex - 1] ?? "");
-    if (!afterPlainText || deeperQuote || list !== null || referenceText !== containerText && listCandidate === null) {
-      referenceLines[lineIndex] = referenceText;
-    } else if (!containerText.trimStart().startsWith("[")) {
-      referenceLines[lineIndex] = containerText;
-    }
     checks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
     for (const attribute of visible.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*))/giu)) {
       const raw = attribute[1] ?? attribute[2] ?? attribute[3] ?? "";
@@ -138,9 +73,125 @@ export function assertMergeLinksKeepDestinations(
       // destinations are proven stable here; never rewrite authored bytes.
       if (!absolute(raw)) throw new Error("Cannot safely merge a relative HTML link");
     }
+  });
+  for (const targets of definitions.values()) {
+    for (const destination of targets) {
+      if (!external(destination)) throw new Error("Cannot safely merge a relative reference definition");
+    }
   }
-  assertReferenceDestinations(referenceLines);
+  if (definitions.size > 0 && targetBody?.includes("]:")) {
+    // The destination note appears first in the merged document. Its first
+    // definition of a normalized label would shadow the source definition.
+    for (const [label, earlier] of scanMergeDefinitions(targetBody)) {
+      const incoming = definitions.get(label);
+      if (incoming !== undefined && (earlier.size > 1 || incoming.size > 1 || !earlier.has([...incoming][0]!))) {
+        throw new Error("Cannot merge conflicting reference definitions");
+      }
+    }
+  }
   return (phase) => { for (const check of checks) check(phase); };
+}
+
+function scanMergeDefinitions(source: string, checkLine?: (visible: string, lineIndex: number) => void): Map<string, Set<string>> {
+  let fence: { mark: string; width: number; quoteDepth: number; listIndent: number } | null = null;
+  let comment: LiteralBlock | null = null;
+  let previousBlank = true;
+  let indentedCode = false;
+  let listIndents: number[] = [];
+  let listQuoteDepth = 0;
+  let previousItemEmpty = false;
+  const lines = source.split(/\r\n|\r|\n/u);
+  // A skipped literal line must also interrupt a multiline reference label.
+  const referenceLines = Array<string>(lines.length).fill("");
+  for (const [lineIndex, line] of lines.entries()) {
+    const prefix = quotePrefix(line, fence?.quoteDepth ?? listQuoteDepth);
+    const quoteDepth = prefix.split(">").length - 1;
+    const fenceLine = expandTabs(line.slice(prefix.length));
+    if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
+    if (fence !== null) {
+      const boundPrefix = quotePrefix(line, fence.quoteDepth, fence.quoteDepth);
+      const content = expandTabs(line.slice(boundPrefix.length));
+      const indentation = /^[ ]*/u.exec(content)?.[0].length ?? 0;
+      if (content.trim() !== "" && indentation < fence.listIndent) fence = null;
+      else {
+        const close = new RegExp("^ {0,3}" + fence.mark + "{" + fence.width + ",}[ \\t]*$", "u");
+        if (close.test(content.slice(fence.listIndent))) fence = null;
+        continue;
+      }
+    }
+    const blank = /^\s*$/u.test(fenceLine);
+    const indentation = /^ */u.exec(fenceLine)?.[0].length ?? 0;
+    const deeperQuote = quoteDepth > listQuoteDepth;
+    const quoteChanged = quoteDepth !== listQuoteDepth;
+    if (quoteChanged) listIndents = [];
+    else if (blank && previousItemEmpty) listIndents.pop();
+    previousItemEmpty = false;
+    listQuoteDepth = quoteDepth;
+    const listCandidate = /^( *)(?:[-+*]|(\d{1,9})[.)])( +|$)/u.exec(fenceLine);
+    const emptyItem = listCandidate !== null && listCandidate[0].length === fenceLine.length;
+    const afterPlainText = /^[\p{L}\p{N}][\p{L}\p{N} \t.,!?]*$/u.test(referenceLines[lineIndex - 1] ?? "");
+    if (comment === null && listCandidate?.[2] !== undefined && !/^0*1$/u.test(listCandidate[2])
+      && /^(?:\x60{3,}|~{3,})/u.test(fenceLine.slice(listCandidate[0].length))) {
+      throw new Error("Cannot safely merge an ambiguous numbered-list fence");
+    }
+    const interruptsParagraph = emptyItem ? afterPlainText && !quoteChanged
+      : listCandidate?.[2] !== undefined && !/^0*1$/u.test(listCandidate[2]) && !previousBlank;
+    const list = interruptsParagraph && listIndents.length === 0 ? null : listCandidate;
+    if (!blank) {
+      while ((listIndents.at(-1) ?? 0) > indentation) listIndents.pop();
+    }
+    const parentListIndent = listIndents.at(-1) ?? 0;
+    if (comment === null && indentation >= parentListIndent + 4 && (previousBlank || indentedCode)) {
+      indentedCode = true;
+      previousBlank = blank;
+      continue;
+    }
+    // An empty item still establishes one column of padding, even if its
+    // marker ends the physical line. Preserve that indent on continuations.
+    const listIndent = list === null ? parentListIndent
+      : emptyItem ? list[0].trimEnd().length + 1 : list[0].length;
+    if (list !== null) {
+      listIndents.push(listIndent);
+      previousItemEmpty = emptyItem;
+      // A compact list opener can establish several continuation indents on
+      // one line. Keep each level so later siblings and code retain their depth.
+      const nestedMarker = / {0,3}(?:[-+*]|\d{1,9}[.)])( {1,4}(?! )|$)/yu;
+      nestedMarker.lastIndex = listIndent;
+      let inner: RegExpExecArray | null;
+      while ((inner = nestedMarker.exec(fenceLine)) !== null) {
+        previousItemEmpty = nestedMarker.lastIndex === fenceLine.length;
+        listIndents.push(nestedMarker.lastIndex + (inner[1] === "" ? 1 : 0));
+      }
+    }
+    if (!blank) indentedCode = false;
+    previousBlank = blank;
+    const listContent = fenceLine.slice(listIndent);
+    if (comment === null && list !== null && /^(?:(?:[-+*]|\d+[.)])[ \t]+|>[ \t]*)+(?:\x60{3,}|~{3,})/u.test(listContent)) {
+      throw new Error("Cannot safely merge a fence with mixed list and quote openers");
+    }
+    const opening = comment === null ? /^ {0,3}(\x60{3,}|~{3,})(.*)$/u.exec(listContent) : null;
+    if (opening?.[1] != null && !(opening[1][0] === "\x60" && (opening[2] ?? "").includes("\x60"))) {
+      fence = { mark: opening[1][0] ?? "~", width: opening[1].length, quoteDepth, listIndent };
+      continue;
+    }
+    const masked = maskInlineLiterals(line, comment);
+    comment = masked.comment;
+    const visible = masked.text;
+    const containerText = expandTabs(visible.slice(prefix.length)).slice(parentListIndent);
+    const referenceText = list !== null && emptyItem ? "" : stripReferenceContainers(containerText);
+    // A reference cannot interrupt a plain paragraph. Recognize this only
+    // after an unambiguous text line; a heading or fence can end a block.
+    if (!afterPlainText || deeperQuote || list !== null || referenceText !== containerText && listCandidate === null) {
+      // Literal masking decides where definitions may start. Compare the
+      // original spelling of their labels and destinations, including backticks.
+      referenceLines[lineIndex] = referenceText.trim() === "" ? ""
+        : expandTabs(line.slice(prefix.length)).slice(parentListIndent + containerText.length - referenceText.length);
+    } else if (!containerText.trimStart().startsWith("[")) {
+      referenceLines[lineIndex] = containerText;
+    }
+    checkLine?.(visible, lineIndex);
+  }
+  return referenceDestinations(referenceLines, lines);
 }
 
 function expandTabs(line: string): string {
@@ -157,17 +208,6 @@ function stripReferenceContainers(line: string): string {
   let offset = 0;
   while (container.test(line)) offset = container.lastIndex;
   return line.slice(offset);
-}
-
-function assertReferenceDestinations(lines: readonly string[]): void {
-  // Labels may contain escaped punctuation and nonblank line breaks. A
-  // destination may follow on the next line or be enclosed in angle brackets.
-  const definitions = /^ {0,3}\[(?:\\[^\n]|[^[\]\\\n]|\n(?![ \t]*(?:\n|$))){1,999}\]:[ \t]*(?:\n[ \t]*)?(?:<([^<>\n]*)>|(\S+))/gmu;
-  for (const match of lines.join("\n").matchAll(definitions)) {
-    if (!external(match[1] ?? match[2] ?? "")) {
-      throw new Error("Cannot safely merge a relative reference definition");
-    }
-  }
 }
 
 /** Accepts visible prose or a parsed Text/List property value, without YAML escaping. */

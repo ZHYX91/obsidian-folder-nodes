@@ -161,6 +161,10 @@ describe("Node merge link preflight", () => {
     "> - [ref]: ../Reference.md",
     "- > [ref]: ../Reference.md",
     "- - [ref]:\n    ../Reference.md",
+    "- -\n      [ref]: ../Reference.md",
+    "> paragraph\n-\n    [ref]: ../Reference.md",
+    ">\n    > [ref]: ../Reference.md",
+    "[ref]: https://example.com invalid trailing title\n\n[ref]: ../Reference.md",
     "10. A list item\n\n    [ref]: ../Reference.md",
   ])("checks reference definitions inside Markdown containers: %s", (source) => {
     expect(() => assertSafe(source)).toThrow("reference definition");
@@ -176,10 +180,28 @@ describe("Node merge link preflight", () => {
     "- - - example\n\n          [ref]: ../Reference.md",
     "- `[ref]: ../Reference.md`",
     "-     [ref]: ../Reference.md",
+    "-\n\n    [ref]: ../Reference.md",
+    "1)\n\n    - [ref]: ../Reference.md",
     "    - [ref]: ../Reference.md",
     "- ~~~\n  [ref]: ../Reference.md\n  ~~~",
   ])("allows external or literal reference text in lists: %s", (source) => {
     expect(() => assertSafe(source)).not.toThrow();
+  });
+
+  it.each([
+    ["[Guide   to\n  Straße]: https://one.example", "[guide TO STRASSE]: https://two.example", false],
+    ["[Guide]: https://site.example/`one`", "[guide]: https://site.example/`two`", false],
+    ["[Guide]: https://one.example", "[guide]: ../unrelated.md", false],
+    ["[Guide]: https://one.example", "[other]: ../unrelated.md", true],
+    ["[guide]: https://one.example", "[GUIDE]: https://one.example\n[Guide]: https://shadowed.example", true],
+    ["[guide]: https://one.example\n[Guide]: ../shadowed.md", "[GUIDE]: https://one.example", true],
+    ["[guide]: https://one.example", "[guide]: https://one.example bad title\n\n[guide]: https://changed.example", false],
+    ["[guide]: https://one.example", "[guide]: https://one.example \"valid title\"\n\n[guide]: https://shadowed.example", true],
+    ["[Guide]: https://one.example", "`[guide]: https://two.example`", true],
+  ])("checks normalized labels against the destination body: %s", (source, target, safe) => {
+    const preflight = () => assertMergeLinksKeepDestinations(source, "A/A.md", "B/B.md", "A/A.md", undefined, [], target);
+    if (safe) expect(preflight).not.toThrow();
+    else expect(preflight).toThrow("conflicting reference definitions");
   });
 
   it("fails closed on ambiguous reference and hyperlink syntax", () => {

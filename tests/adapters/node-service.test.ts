@@ -80,6 +80,48 @@ describe("NodeService structural safety", () => {
     },
   );
 
+
+  it.each(["1.\n[ref]:", "-\n    [ref]:", "1)\n    [ref]:"])("checks definitions after empty list items: %s", async (definition) => {
+    const fake = new FakeObsidian();
+    const source = fake.addFolder("Source");
+    const sourceText = definition + " ../Reference.md\n\n[open][ref]";
+    fake.addFile("Source/Source.md", sourceText);
+    fake.addFile("Reference.md", "original");
+    fake.addFolder("Deep");
+    fake.addFile("Deep/Reference.md", "different");
+    const target = fake.addFolder("Deep/B");
+    fake.addFile("Deep/B/B.md", "target");
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("relative reference definition");
+    expect(fake.trashed).toEqual([]);
+    expect(fake.contents.get("Deep/B/B.md")).toBe("target");
+  });
+
+  it.each([
+    ["[Guide]: https://other.example", false],
+    ["[Guide]: https://source.example", true],
+    ["[Other]: https://other.example", true],
+    ["~~~\n[Guide]: https://other.example\n~~~", true],
+    ["> [GuIdE]: https://other.example", false],
+  ])("compares effective source and target reference definitions: %s", async (targetText, safe) => {
+    const fake = new FakeObsidian();
+    const source = fake.addFolder("Source");
+    const sourceText = "[open][guide]\n\n[guide]: <https://source.example>";
+    fake.addFile("Source/Source.md", sourceText);
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", targetText);
+    const merged = service(fake).mergeNode(source, target);
+    if (safe) {
+      await merged;
+      expect(fake.contents.get("Target/Target.md")).toContain(sourceText);
+    } else {
+      await expect(merged).rejects.toThrow("reference definition");
+      expect(fake.contents.get("Target/Target.md")).toBe(targetText);
+      expect(fake.contents.get("Source/Source.md")).toBe(sourceText);
+      expect(fake.renames).toEqual([]);
+      expect(fake.trashed).toEqual([]);
+    }
+  });
+
   it("merges safe WikiLinks while ignoring examples in code and comments", async () => {
     const fake = new FakeObsidian();
     const source = fake.addFolder("A");

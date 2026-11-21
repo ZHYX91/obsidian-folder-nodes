@@ -80,7 +80,8 @@ export class NodeMerge {
     const targetProperties = readMergeFrontmatter(targetSnapshot, targetNotePath);
     const mergeLinkChecks = [
       assertMergePropertyLinks(sourceProperties, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetProperties),
-      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles),
+      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles,
+        stripMergeFrontmatter(targetSnapshot, targetNotePath)),
     ];
     const movingMarkdown = this.app.vault.getMarkdownFiles()
       .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
