@@ -1,6 +1,6 @@
 import type { MigrationConflict, MigrationScan } from "./types";
 import { matchesFolderExemption, matchesLeafNoteExemption } from "./exemptions";
-import { basename, dirname, isSameVaultName, normalizeVaultPath, sanitizeNodeName } from "./paths";
+import { basename, dirname, isSameVaultName, nodeNotePath, normalizeVaultPath, sanitizeNodeName } from "./paths";
 
 const SCAN_SLICE_MS = 8;
 
@@ -8,6 +8,8 @@ export interface VaultInventory {
   folders: readonly string[];
   markdown: readonly string[];
   files?: readonly string[];
+  rootNotePath?: string;
+  configDir?: string;
 }
 
 export interface MigrationExemptions {
@@ -24,11 +26,12 @@ export async function scanMigrationAsync(
   signal?: AbortSignal,
 ): Promise<MigrationScan> {
   const configuredFolders = (exemptions.folders ?? []).map(normalizeVaultPath).filter((path) => path !== "");
+  if (inventory.configDir) configuredFolders.push(normalizeVaultPath(inventory.configDir));
   const configuredLeafNotes = (exemptions.leafMarkdown ?? []).map(normalizeVaultPath).filter((path) => path !== "");
   const folderPrefixes = exemptions.folderPrefixes ?? [];
   const leafMarkdownPrefixes = exemptions.leafMarkdownPrefixes ?? [];
   const files = inventory.files ?? inventory.markdown;
-  const total = inventory.folders.length * 3 + inventory.markdown.length * 3 + files.length;
+  const total = inventory.folders.length * 3 + inventory.markdown.length * 3 + files.length + (inventory.rootNotePath === undefined ? 0 : 1);
   let completed = 0;
   let nextYieldAt = 0;
   const checkpoint = async (): Promise<void> => {
@@ -57,8 +60,12 @@ export async function scanMigrationAsync(
     if (!ignored) folders.add(path);
     await checkpoint();
   }
-  const folderByKey = new Map([...folders].map((path) => [vaultPathKey(path), path] as const));
-  const fileKeys = new Set([...allFiles].map(vaultPathKey));
+  if (inventory.rootNotePath !== undefined) folders.add("");
+  const rootBasename = inventory.rootNotePath?.slice(0, -3);
+  const folderByKey = new Map([...allFolders].map((path) => [siblingPathKey(path), path] as const));
+  // The host can omit its configuration directory from the loaded entries.
+  if (inventory.configDir) folderByKey.set(siblingPathKey(inventory.configDir), inventory.configDir);
+  const fileKeys = new Set([...allFiles].map(siblingPathKey));
   const scopedMarkdown: string[] = [];
   const exemptLeafMarkdown: string[] = [];
   const canonicalNotes = new Set<string>();
@@ -67,12 +74,11 @@ export async function scanMigrationAsync(
     if (!isIgnored(dirname(path))) {
       scopedMarkdown.push(path);
       const parent = dirname(path);
-      const folder = folderByKey.get(vaultPathKey(parent));
-      if (folder !== undefined && isSameVaultName(basename(path).slice(0, -3), basename(folder))) {
-        const folderKey = vaultPathKey(folder);
-        const canonical = canonicalByFolder.get(folderKey) ?? [];
+      const expectedName = parent === "" ? rootBasename : basename(parent);
+      if (folders.has(parent) && expectedName !== undefined && isSameVaultName(basename(path).slice(0, -3), expectedName)) {
+        const canonical = canonicalByFolder.get(parent) ?? [];
         canonical.push(path);
-        canonicalByFolder.set(folderKey, canonical);
+        canonicalByFolder.set(parent, canonical);
         canonicalNotes.add(path);
       }
     }
@@ -80,12 +86,22 @@ export async function scanMigrationAsync(
   }
   const missingNodeNotes: string[] = [];
   const conflicts: MigrationConflict[] = [];
+  const requiredNotePaths = new Set<string>();
   const completedByLeafMoves = new Set<string>();
   const plannedLeafTargets = new Map<string, string[]>();
   for (const folder of folders) {
-    const canonical = canonicalByFolder.get(vaultPathKey(folder)) ?? [];
-    if (canonical.length === 0) missingNodeNotes.push(folder);
-    else if (canonical.length > 1) conflicts.push({ path: folder, reason: `Multiple canonical Node Notes: ${canonical.join(", ")}` });
+    const canonical = canonicalByFolder.get(folder) ?? [];
+    if (canonical.length === 0) {
+      const notePath = folder === "" ? inventory.rootNotePath! : nodeNotePath(folder);
+      const key = siblingPathKey(notePath);
+      requiredNotePaths.add(key);
+      const occupant = folderByKey.get(key);
+      if (occupant === undefined) missingNodeNotes.push(folder);
+      else conflicts.push({ path: folder, reason: `Node Note path is occupied by a folder: ${occupant}` });
+    } else if (canonical.length > 1) {
+      const label = folder === "" ? "Root" : "canonical";
+      conflicts.push({ path: folder, reason: `Multiple ${label} Node Notes: ${canonical.join(", ")}` });
+    }
     await checkpoint();
   }
   const leafMarkdown: string[] = [];
@@ -100,14 +116,17 @@ export async function scanMigrationAsync(
     const name = sanitizeNodeName(basename(note).slice(0, -3));
     const targetFolder = parent === "" ? name : `${parent}/${name}`;
     const targetFile = `${targetFolder}/${name}.md`;
-    const existingFolder = folderByKey.get(vaultPathKey(targetFolder));
-    if (fileKeys.has(vaultPathKey(targetFolder))) conflicts.push({ path: note, reason: `Target folder path is occupied by a file: ${targetFolder}` });
+    const folderKey = siblingPathKey(targetFolder);
+    const existingFolder = allFolders.has(targetFolder) ? targetFolder : folderByKey.get(folderKey);
+    const fileKey = siblingPathKey(targetFile);
+    if (fileKeys.has(folderKey)) conflicts.push({ path: note, reason: `Target folder path is occupied by a file: ${targetFolder}` });
     else if (isIgnored(existingFolder ?? targetFolder)) conflicts.push({ path: note, reason: `Target belongs to an unmanaged folder: ${targetFolder}` });
+    else if (requiredNotePaths.has(folderKey)) conflicts.push({ path: note, reason: `Target folder path is required for a Node Note: ${targetFolder}` });
     else if (existingFolder !== undefined && existingFolder !== targetFolder) conflicts.push({ path: note, reason: `Target folder differs only by case: ${existingFolder}` });
-    else if ((canonicalByFolder.get(vaultPathKey(targetFolder))?.length ?? 0) > 0) conflicts.push({ path: note, reason: `Target node already exists: ${targetFile}` });
+    else if (folderByKey.has(fileKey)) conflicts.push({ path: note, reason: `Target Node Note path is occupied by a folder: ${targetFile}` });
+    else if (canonicalByFolder.has(targetFolder)) conflicts.push({ path: note, reason: `Target node already exists: ${targetFile}` });
     else {
-      const targetKey = vaultPathKey(targetFile);
-      const planned = plannedLeafTargets.get(targetKey) ?? [];
+      const planned = plannedLeafTargets.get(folderKey) ?? [];
       if (planned.length === 1) {
         const first = planned[0]!;
         const index = leafMarkdown.indexOf(first);
@@ -120,15 +139,14 @@ export async function scanMigrationAsync(
         leafMarkdown.push(note);
       }
       planned.push(note);
-      plannedLeafTargets.set(targetKey, planned);
+      plannedLeafTargets.set(folderKey, planned);
     }
     await checkpoint();
   }
   for (const note of leafMarkdown) {
     const parent = dirname(note);
     const name = sanitizeNodeName(basename(note).slice(0, -3));
-    const existingFolder = folderByKey.get(vaultPathKey(parent === "" ? name : `${parent}/${name}`));
-    if (existingFolder !== undefined) completedByLeafMoves.add(existingFolder);
+    completedByLeafMoves.add(parent === "" ? name : `${parent}/${name}`);
   }
   throwIfScanAborted(signal);
   onProgress?.(Math.max(1, total), Math.max(1, total));
@@ -147,6 +165,7 @@ function throwIfScanAborted(signal?: AbortSignal): void {
   throw signal.reason instanceof Error ? signal.reason : new Error("Folder Nodes operation cancelled");
 }
 
-function vaultPathKey(path: string): string {
-  return normalizeVaultPath(path).normalize("NFC").toLocaleLowerCase();
+function siblingPathKey(path: string): string {
+  // Entries from different physical parents never compete for the same child name.
+  return `${dirname(path)}/${basename(path).normalize("NFC").toLocaleLowerCase()}`;
 }

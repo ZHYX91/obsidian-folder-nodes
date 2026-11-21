@@ -153,6 +153,22 @@ describe("migration scan", () => {
     expect(scan.conflicts.every(({ reason }) => reason.includes("same target: A B/A B.md"))).toBe(true);
   });
 
+  it("plans independent leaf moves under distinct parent folders with equivalent names", async () => {
+    const scan = await scanMigrationAsync({
+      folders: ["Case", "case", "case/Topic"],
+      markdown: ["Case/Case.md", "case/case.md", "Case/Topic.md", "case/topic.md"],
+    });
+    expect(scan.conflicts).toEqual([{ path: "case/topic.md", reason: "Target folder differs only by case: case/Topic" }]);
+    expect(scan.leafMarkdown).toEqual(["Case/Topic.md"]);
+
+    const siblings = await scanMigrationAsync({
+      folders: ["Case", "case"],
+      markdown: ["Case/Case.md", "case/case.md", "Case/Topic.md", "case/Topic.md"],
+    });
+    expect(siblings.conflicts).toEqual([]);
+    expect(siblings.leafMarkdown).toEqual(["Case/Topic.md", "case/Topic.md"]);
+  });
+
   it("keeps canonical notes structural even when a leaf exemption matches them", async () => {
     expect(await scanMigrationAsync(
       { folders: ["A"], markdown: ["A/A.md"] },

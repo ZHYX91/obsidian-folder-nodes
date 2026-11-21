@@ -528,10 +528,10 @@ export class NodeService {
       if (file instanceof TFolder && normalizeVaultPath(file.path) !== "") folders.push(normalizeVaultPath(file.path));
       if (file instanceof TFile) {
         files.push(file.path);
-        if (file.extension.toLocaleLowerCase() === "md" && !(normalizeVaultPath(file.parent?.path ?? "") === "" && this.isCanonicalFile(file))) markdown.push(file.path);
+        if (file.extension.toLocaleLowerCase() === "md") markdown.push(file.path);
       }
     }
-    return { files, folders, markdown };
+    return { files, folders, markdown, rootNotePath: this.rootNotePath(), configDir: this.app.vault.configDir };
   }
 
   public async scanAsync(onProgress?: (completed: number, total: number) => void, externalSignal?: AbortSignal): Promise<MigrationScan> {
@@ -544,14 +544,7 @@ export class NodeService {
       leafMarkdownPrefixes: this.getSettings().leafNotePrefixes,
     }, onProgress, signal);
     throwIfAborted(signal);
-    const rootCandidates = this.canonicalFiles("");
-    if (rootCandidates.length > 1) {
-      return {
-        ...result,
-        conflicts: [{ path: "", reason: `Multiple Root Node Notes: ${rootCandidates.map(({ path }) => path).join(", ")}` }, ...result.conflicts],
-      };
-    }
-    return rootCandidates.length === 0 ? { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] } : result;
+    return result;
   }
 
   public migrate(expected: MigrationScan, onStep?: (completed: number, total: number) => void): Promise<void> {

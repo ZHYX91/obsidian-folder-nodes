@@ -1417,11 +1417,80 @@ describe("NodeService structural safety", () => {
     expect((await service(fake).scanAsync()).conflicts[0]?.reason).toContain("occupied by a file");
   });
 
+  it.each(["already present", "planned by a leaf move"])(
+    "blocks a folder occupying a canonical note path in the preview: %s", async (collision) => {
+      for (const parent of ["", "A"]) {
+        const fake = new FakeObsidian();
+        if (parent !== "") {
+          fake.addFile("Vault.md");
+          fake.addFolder(parent);
+        }
+        const target = parent === "" ? "Vault.md" : "A/A.md";
+        if (collision === "already present") {
+          fake.addFolder(target);
+          if (parent !== "") fake.addFile("A.md", "leaf targeting occupied note path");
+        } else fake.addFile(`${target}.md`, "keep");
+        fake.addFile("Loose.md", "keep this too");
+        const nodes = service(fake);
+        const before = new Map(fake.files);
+        const preview = await nodes.scanAsync();
+        expect(preview.conflicts.some(({ reason }) => reason.includes(target))).toBe(true);
+        expect(preview.leafMarkdown).toEqual(["Loose.md"]);
+        if (collision === "already present") expect(preview.missingNodeNotes).not.toContain(parent);
+        await expect(nodes.migrate(preview)).rejects.toThrow("blocking conflicts");
+        expect(fake.files).toEqual(before);
+        expect(fake.renames).toEqual([]);
+        expect(fake.trashed).toEqual([]);
+      }
+    },
+  );
+
+  it("keeps the configuration directory reserved when it is absent from the file inventory", async () => {
+    const fake = new FakeObsidian();
+    fake.app.vault.configDir = "Vault.md";
+    fake.addFile("Vault.md.md", "leave in place");
+    const nodes = service(fake);
+    const scan = await nodes.scanAsync();
+    expect(scan.missingNodeNotes).toEqual([]);
+    expect(scan.leafMarkdown).toEqual([]);
+    expect(scan.conflicts).toHaveLength(2);
+    await expect(nodes.migrate(scan)).rejects.toThrow("blocking conflicts");
+    expect(fake.renames).toEqual([]);
+    expect(fake.trashed).toEqual([]);
+
+    fake.app.vault.configDir = "Settings";
+    fake.addFile("Settings.md");
+    const next = await nodes.scanAsync();
+    expect(next.conflicts).toContainEqual({ path: "Settings.md", reason: "Target belongs to an unmanaged folder: Settings" });
+  });
+
+  it.each([["Case", "case"], ["Café", "Cafe\u0301"]])(
+    "counts canonical notes in their actual parent folders: %s and %s", async (first, second) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder(first);
+      fake.addFolder(second);
+      const original = fake.addFile(`${first}/${first}.MD`, "original");
+      const nodes = service(fake);
+
+      const preview = await nodes.scanAsync();
+      expect(preview.missingNodeNotes).toEqual([second]);
+      expect(preview.conflicts).toEqual([]);
+      await nodes.migrate(preview);
+      expect(fake.requireFile(original.path)).toBe(original);
+      expect(fake.contents.get(original.path)).toBe("original");
+      expect(nodes.getCanonicalFile(second)?.path).toBe(`${second}/${second}.md`);
+      expect((await nodes.scanAsync()).conflicts).toEqual([]);
+    },
+  );
+
   it("reports ambiguous case-only Root Node Notes instead of choosing one", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("vault.md");
-    expect((await service(fake).scanAsync()).conflicts[0]?.reason).toContain("Multiple Root Node Notes");
+    const preview = await service(fake).scanAsync();
+    expect(preview.conflicts[0]?.reason).toContain("Multiple Root Node Notes");
+    expect(preview.leafMarkdown).toEqual([]);
   });
 
   it("serializes competing creates and leaves exactly one complete node", async () => {
