@@ -7,7 +7,13 @@ describe("settings tab compatibility contract", () => {
   it("provides the themed guide and emoji preview styles", () => {
     const styles = readFileSync(resolve(process.cwd(), "src/ui/styles.css"), "utf8");
 
-    expect(styles).toContain(".folder-nodes-settings-guide");
+    const rule = (selector: string) => styles.split(selector + " {")[1]?.split("}")[0];
+    const card = ".folder-nodes-settings-guide";
+    expect(rule(card)).toContain("background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-primary))");
+    expect(rule(card)).toContain("border: 1px solid var(--background-modifier-border)");
+    expect(rule(`${card} > summary::before`)).toContain("color: var(--interactive-accent)");
+    expect(rule(`${card}[open] > .folder-nodes-settings-guide-body`))
+      .toContain("border-inline-start: 2px solid var(--interactive-accent)");
     expect(styles).toContain(
       "border: 1px solid var(--background-modifier-border)",
     );

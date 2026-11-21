@@ -107,8 +107,10 @@ body {
   min-inline-size: 0;
   margin-block: 4px 12px;
   padding: 0;
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-primary));
   box-shadow: none;
 }
 
@@ -119,7 +121,7 @@ body {
   column-gap: 6px;
   box-sizing: border-box;
   min-block-size: 32px;
-  padding: 2px 0;
+  padding: 4px 8px;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -141,10 +143,11 @@ body {
 .folder-nodes-settings-guide > summary::before {
   content: "";
   box-sizing: border-box;
+  color: var(--interactive-accent);
   justify-self: center;
-  inline-size: 7px;
-  block-size: 7px;
-  margin-block-start: calc(0.75em - 3.5px);
+  inline-size: 8px;
+  block-size: 8px;
+  margin-block-start: calc(0.75em - 4px);
   border-top: 1.5px solid currentColor;
   border-right: 1.5px solid currentColor;
   transform: rotate(45deg);
@@ -175,6 +178,10 @@ body {
   .folder-nodes-settings-guide > summary { min-block-size: 44px; }
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .folder-nodes-settings-guide > summary::before { transition: transform 120ms ease; }
+}
+
 @media (forced-colors: active) {
   .folder-nodes-settings-guide > summary:focus-visible { outline-color: Highlight; }
 }
@@ -183,56 +190,16 @@ body {
   box-sizing: border-box;
   min-inline-size: 0;
   max-inline-size: 68ch;
-  margin-block-start: 6px;
-  margin-inline-start: 6px;
-  border-inline-start: 2px solid var(--background-modifier-border);
-  padding-inline-start: 10px;
+  margin: 2px 8px 8px;
+  border-inline-start: 2px solid var(--interactive-accent);
+  padding-inline-start: 8px;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.5;
 }
 
-@supports (color: color-mix(in srgb, red, blue)) {
-  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
-    border-inline-start-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
-  }
-}
-
-@container (max-width: 24rem) {
-  .folder-nodes-settings-guide[open] > .folder-nodes-settings-guide-body {
-    margin-inline-start: 0;
-    padding-inline-start: 0;
-    border-inline-start: 0;
-  }
-}
-
 .folder-nodes-settings-guide-body p { margin: 0; }
 .folder-nodes-settings-guide-body p + p { margin-block-start: 6px; }
-
-.folder-nodes-guide-title-with-icon {
-  display: inline-flex;
-  justify-self: start;
-  align-items: center;
-  gap: 6px;
-  min-inline-size: 0;
-  max-inline-size: 100%;
-}
-
-.folder-nodes-guide-title-with-icon > span:first-child {
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-
-.folder-nodes-guide-book {
-  display: inline-flex;
-  flex: none;
-  color: var(--text-muted);
-}
-
-.folder-nodes-guide-book > svg {
-  inline-size: 1em;
-  block-size: 1em;
-}
 
 .folder-nodes-icon-guide-section + .folder-nodes-icon-guide-section { margin-block-start: 14px; }
 .folder-nodes-icon-guide-section > .setting-item.mod-settings-heading {

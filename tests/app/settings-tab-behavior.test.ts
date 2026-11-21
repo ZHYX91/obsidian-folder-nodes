@@ -210,8 +210,7 @@ describe("imperative settings edit state", () => {
     expect(guide.open).toBe(false);
     const summary = guide.querySelector("summary")!;
     expect(summary.textContent).toBe(t("iconGuideTitle"));
-    const book = summary.querySelector('[aria-hidden="true"] svg[data-icon="book-open"]');
-    expect(book).not.toBeNull();
+    expect(summary.querySelector("svg")).toBeNull();
     expect(summary.querySelector("button, a, [role=button], [tabindex]")).toBeNull();
     const sections = [...guide.querySelectorAll("section")];
     expect(sections.map((section) => section.querySelector(".mod-settings-heading .setting-item-name")?.textContent)).toEqual([
