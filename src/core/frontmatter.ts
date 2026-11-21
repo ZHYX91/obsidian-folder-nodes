@@ -129,7 +129,17 @@ function renderCanonicalBlock(parsed: ParsedSource, entries: readonly string[]):
   let pending: string[] = [];
   const range = parsed.ranges.get(FOLDER_NODES_PROPERTY);
   let header = FOLDER_NODES_PROPERTY + ":" + parsed.eol;
-  if (range !== undefined && stripYamlComment(valueAfterColon(parsed.lines[range.start] ?? "")).trim() === "") {
+  let headerComment = "";
+  const line = range === undefined ? "" : parsed.lines[range.start]!;
+  const rawValue = valueAfterColon(line);
+  const value = stripYamlComment(rawValue);
+  if (range !== undefined && rawValue.length !== value.length) {
+    const ending = parsed.endings[range.start]!;
+    headerComment = rawValue.slice(value.length) + ending;
+    // A flow sequence becomes a block, but its comment still describes the property.
+    header = line.slice(0, line.indexOf(":") + 1) + (/[ \t]*$/u.exec(value)?.[0] || " ") + headerComment;
+  }
+  if (range !== undefined && value.trim() === "") {
     header = parsed.lines[range.start]! + parsed.endings[range.start]!;
     for (let index = range.start + 1; index < range.end; index += 1) {
       const line = parsed.lines[index]!;
@@ -149,7 +159,7 @@ function renderCanonicalBlock(parsed: ParsedSource, entries: readonly string[]):
       pending = [];
     }
   }
-  const rendered = entries.length === 0 ? [] : [header];
+  const rendered = entries.length > 0 ? [header] : headerComment ? [headerComment] : [];
   for (const entry of entries) rendered.push(...(originalRows.get(entry)?.shift() ?? [`  - ${renderListItem(entry)}${parsed.eol}`]));
   return [...rendered, ...pending];
 }

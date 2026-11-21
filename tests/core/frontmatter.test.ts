@@ -10,6 +10,12 @@ import {
 } from "../../src/core/frontmatter";
 
 describe("source-preserving frontmatter patches", () => {
+  it("keeps flow-property header comments when converting the list or removing its final entry", () => {
+    const source = "---\r\nfolder-nodes: [hidden=true]  # used by my dashboard\r---\nbody";
+    expect(patchFolderNodesFrontmatter(source, { rank: 1 })).toContain("folder-nodes:  # used by my dashboard\r");
+    expect(patchFolderNodesFrontmatter(source, { hidden: false })).toBe("---\r\n# used by my dashboard\r---\nbody");
+  });
+
   it("retains attached comments, quotes and each surviving separator inside managed lists", () => {
     const source = "---\r\nfolder-nodes: # controls\n  - hidden=true\r# comment\r\n  - 'rank=10' # keep\r---";
     expect(patchFolderNodesFrontmatter(source, { hidden: false })).toBe(source.replace("  - hidden=true\r", ""));
