@@ -1,4 +1,4 @@
-import { type App, type Editor, type WorkspaceLeaf, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
+import { type App, type Editor, type WorkspaceLeaf, TAbstractFile, TFile, TFolder } from "obsidian";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { assertMergeLinksKeepDestinations, type MergeLinkResolver } from "../core/merge-link-safety";
 import { prepareMergeAppend } from "../core/merge-markdown";
@@ -76,7 +76,7 @@ export class NodeMerge {
     const append = prepareMergeAppend(targetDocument.body, sourceDocument.body, source.name, targetDocument.eol);
     const resolveLink: MergeLinkResolver = (path, from) => {
       const file = this.app.metadataCache.getFirstLinkpathDest(path, from);
-      return file == null || this.app.vault.getAbstractFileByPath(normalizePath(file.path)) !== file ? null : { path: file.path, identity: file };
+      return file == null || this.app.vault.getAbstractFileByPath(file.path) !== file ? null : { path: file.path, identity: file };
     };
     const mergeLinkChecks = [
       assertMergePropertyLinks(sourceDocument.frontmatter, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetDocument.frontmatter),

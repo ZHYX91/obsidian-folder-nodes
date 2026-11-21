@@ -1,3 +1,4 @@
+import * as obsidian from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { NodeService } from "../../src/adapters/node-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
@@ -64,6 +65,32 @@ describe("Merge link target identity", () => {
       await service(fake).mergeNode(source, target);
       expect(fake.contents.get("Target/Target.md")).toContain(link);
       expect(fake.requireFile("Library/Reference.md")).toBe(original);
+      expect(fake.trashed).toEqual(["Source"]);
+    },
+  );
+
+  it.each([["Cafe\u0301", "Café"], ["Project\u00a0Notes", "Project Notes"]])(
+    "keeps the exact path of the host-resolved file when merging: %s", async (actualName, normalizedName) => {
+      const fake = new FakeObsidian();
+      const source = fake.addFolder("Source");
+      const target = fake.addFolder("Target");
+      fake.addFile("Source/Source.md", `[[${actualName}]]`);
+      fake.addFile("Target/Target.md", "target");
+      const original = fake.addFile(`${actualName}.md`, "original");
+      fake.addFile(`${normalizedName}.md`, "other");
+      fake.app.metadataCache.getFirstLinkpathDest = () => original;
+
+      // The SDK normalizes user-entered paths to NFC and replaces nonbreaking spaces.
+      const normalize = obsidian.normalizePath;
+      const sdk = vi.spyOn(obsidian, "normalizePath").mockImplementation((path) =>
+        normalize(path).normalize("NFC").replace(/[\u00a0\u202f]/gu, " "));
+      try {
+        await service(fake).mergeNode(source, target);
+      } finally {
+        sdk.mockRestore();
+      }
+      expect(fake.contents.get("Target/Target.md")).toContain(`[[${actualName}]]`);
+      expect(fake.requireFile(original.path)).toBe(original);
       expect(fake.trashed).toEqual(["Source"]);
     },
   );
