@@ -435,13 +435,13 @@ export class FolderNodeGraphView extends ItemView {
       const viewport = this.captureViewportState();
       this.indexSnapshot = null;
       this.displayGraphData = null;
-      this.render(this.searchEditorFocused());
+      this.render();
       this.restoreViewportState(viewport);
     }, 50);
   }
 
-  private render(preserveSearchEditor = false): void {
-    const retainedToolbar = preserveSearchEditor
+  private render(): void {
+    const retainedToolbar = this.settings().enabled
       ? this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-toolbar")
       : null;
     this.disconnectViewportButtons?.();
@@ -497,11 +497,6 @@ export class FolderNodeGraphView extends ItemView {
     this.highlightSearch(this.searchQuery);
     this.applyNeighborhood();
     if (this.searchQuery.trim() !== "") this.centerSearchPreview();
-  }
-
-  private searchEditorFocused(): boolean {
-    const input = this.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
-    return input !== null && input === this.contentEl.ownerDocument.activeElement;
   }
 
   private graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
@@ -771,7 +766,7 @@ export class FolderNodeGraphView extends ItemView {
       this.focusPath = restored.focusId;
       this.currentExpansion = restored.expansion;
       this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, restored.expansion);
-      this.render(true);
+      this.render();
       this.restoreViewportState(restored.camera);
       if (focusChanged) this.markWorkspaceStateDirty();
       return;
@@ -787,7 +782,7 @@ export class FolderNodeGraphView extends ItemView {
     if (changed) {
       this.currentExpansion = expanded;
       this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expanded);
-      this.render(true);
+      this.render();
     } else {
       this.highlightSearch(value);
       this.centerSearchPreview();

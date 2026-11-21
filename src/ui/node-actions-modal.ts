@@ -44,11 +44,16 @@ export class NodeActionsModal extends Modal {
         button.createSpan({ cls: "folder-nodes-action-label", text: action.title });
         button.addEventListener("click", () => {
           this.close();
-          void Promise.resolve(action.run()).catch((error) => this.reportError(error));
+          void this.runAction(action);
         });
       }
     }
   }
+  private async runAction(action: NodeAction): Promise<void> {
+    try { await action.run(); }
+    catch (error) { this.reportError(error); }
+  }
+
 }
 
 function groupLabel(group: NodeActionGroup): string {

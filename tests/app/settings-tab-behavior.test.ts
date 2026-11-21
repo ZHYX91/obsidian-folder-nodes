@@ -174,6 +174,22 @@ describe("imperative settings edit state", () => {
     } finally { tab.containerEl.remove(); setLanguage("en"); }
   });
 
+  it("connects every settings tab to a mounted panel before and after keyboard navigation", () => {
+    const { tab } = fixture();
+    tab.display();
+    document.body.append(tab.containerEl);
+    try {
+      for (let step = 0; step < 5; step += 1) {
+        const tabs = [...tab.containerEl.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+        const current = tabs.find((button) => button.getAttribute("aria-selected") === "true")!;
+        const panel = tab.containerEl.querySelector<HTMLElement>("[role=tabpanel]")!;
+        expect(document.getElementById(panel.getAttribute("aria-labelledby")!)).toBe(current);
+        for (const button of tabs) expect(document.getElementById(button.getAttribute("aria-controls")!)).toBe(panel);
+        current.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+        expect(document.activeElement?.getAttribute("aria-selected")).toBe("true");
+      }
+    } finally { tab.containerEl.remove(); }
+  });
   it("retains a guide across tab switches and forgets it when settings close", () => {
     const { tab } = fixture();
     const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();

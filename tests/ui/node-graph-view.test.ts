@@ -22,6 +22,20 @@ afterEach(async () => {
 });
 
 describe("Node Graph progressive view", () => {
+  it("keeps keyboard focus on graph controls when their actions redraw the scene", async () => {
+    const { view } = await graphViewFixture();
+    document.body.append(view.contentEl);
+    try {
+      const links = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!;
+      const dimension = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")].find((button) => button.textContent === "3D")!;
+      for (const button of [links, dimension]) {
+        button.focus();
+        button.click();
+        expect(document.activeElement).toBe(button);
+      }
+      expect(view.getState()).toMatchObject({ dimension: "3d", showLinks: true });
+    } finally { view.contentEl.remove(); }
+  });
   it("refreshes the host tab title without resetting search, scope or the viewport", async () => {
     const { view } = await graphViewFixture();
     view.setGraphScope({ mode: "subtree", rootPath: "Work" });

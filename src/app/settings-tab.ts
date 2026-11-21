@@ -25,6 +25,7 @@ const TABS: TabId[] = ["general", "management", "icons", "naming", "nodeGraph"];
 // display() for non-empty definitions, removing the established top-tab surface
 // and degrading the settings experience. Retain dormant definitions for tests only.
 const ENABLE_DECLARATIVE_SETTINGS = false;
+const PANEL_ID = "folder-nodes-settings-panel";
 
 export class FolderNodesSettingTab extends PluginSettingTab {
   private activeTab: TabId = "general";
@@ -167,7 +168,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     for (const id of TABS) this.addTabButton(tabs, id, this.tabLabel(id));
     const panel = this.containerEl.createDiv({
       cls: "folder-nodes-tab-panel",
-      attr: { id: this.panelId(this.activeTab), role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },
+      attr: { id: PANEL_ID, role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },
     });
     const compatibility = this.plugin.getSettingsCompatibility();
     const status = panel.createDiv({ cls: "folder-nodes-settings-persistence-status" });
@@ -215,7 +216,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     const button = container.createEl("button", {
       text: label,
       cls: `folder-nodes-tab${isActive ? " is-active" : ""}`,
-      attr: { id: this.tabId(id), role: "tab", "aria-selected": String(isActive), "aria-controls": this.panelId(id), tabindex: isActive ? "0" : "-1" },
+      attr: { id: this.tabId(id), role: "tab", "aria-selected": String(isActive), "aria-controls": PANEL_ID, tabindex: isActive ? "0" : "-1" },
     });
     button.type = "button";
     button.addEventListener("click", () => this.selectTab(id, false));
@@ -250,7 +251,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
           : id === "naming" ? t("naming") : t("nodeGraph");
   }
   private tabId(id: TabId): string { return `folder-nodes-settings-tab-${id}`; }
-  private panelId(id: TabId): string { return `folder-nodes-settings-panel-${id}`; }
 
   private generalDefinitions(): SettingDefinitionItem[] {
     return [
