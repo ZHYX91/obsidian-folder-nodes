@@ -318,6 +318,7 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "Confirmar antes de crear",
   "confirmSelectionCreationDesc": "Comprueba la ubicación, el nombre y los alias antes de crear un nodo con texto seleccionado. Si desactivas la confirmación, se seguirán verificando los conflictos y los cambios en la selección.",
   "selectionCrossesTableCells": "La selección cruza varias celdas o filas de una tabla Markdown. No se creó ningún nodo para evitar dañar la tabla.",
+  "selectionTableSyntax": "Selecciona texto dentro de una celda. La selección incluye marcas de formato de la tabla Markdown.",
   "aliasValue": "Alias",
   "aliasNone": "No añadir",
   "reloadLanguage": "Se ha cambiado el idioma de la interfaz.",

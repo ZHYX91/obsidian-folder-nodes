@@ -318,6 +318,7 @@ export const ru: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "Подтверждать перед созданием",
   "confirmSelectionCreationDesc": "Перед созданием из выделения покажите место, имя и псевдонимы. Если отключить подтверждение, конфликты и изменение выделения всё равно проверяются.",
   "selectionCrossesTableCells": "Выделение пересекает несколько ячеек или строк таблицы Markdown. Узел не создан, чтобы не повредить таблицу.",
+  "selectionTableSyntax": "Выберите текст внутри ячейки. Сейчас в выделение входит разметка таблицы Markdown.",
   "aliasValue": "Псевдоним",
   "aliasNone": "Не добавлять",
   "reloadLanguage": "Язык интерфейса изменён.",

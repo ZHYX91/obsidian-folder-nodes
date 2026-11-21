@@ -318,6 +318,7 @@ export const ar: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "طلب التأكيد قبل الإنشاء",
   "confirmSelectionCreationDesc": "عاين الموضع والاسم والأسماء البديلة قبل إنشاء عقدة من نص محدد. عند التعطيل يتم الإنشاء مباشرة مع استمرار التحقق من التعارضات وتغيّر التحديد.",
   "selectionCrossesTableCells": "يمتد التحديد عبر خلايا أو صفوف جدول Markdown. لم تُنشأ عقدة حتى لا يتضرر الجدول.",
+  "selectionTableSyntax": "حدّد نصًا داخل خلية واحدة. يتضمن التحديد علامات تنسيق جدول Markdown.",
   "aliasValue": "اسم بديل",
   "aliasNone": "عدم الإضافة",
   "reloadLanguage": "تم تغيير لغة الواجهة.",

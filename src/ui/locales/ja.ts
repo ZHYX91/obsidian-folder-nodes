@@ -318,6 +318,7 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "作成前に確認",
   "confirmSelectionCreationDesc": "選択テキストからノードを作る前に、場所、名前、別名を確認します。オフにしても競合と選択内容の変更は確認されます。",
   "selectionCrossesTableCells": "選択範囲が Markdown テーブルの複数セルや行にまたがっています。表を壊さないよう、ノードは作成されませんでした。",
+  "selectionTableSyntax": "表のセル内のテキストを選択してください。現在の選択範囲には Markdown の表の構文が含まれています。",
   "aliasValue": "別名",
   "aliasNone": "追加しない",
   "reloadLanguage": "表示言語を変更しました。",

@@ -318,6 +318,7 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "Confirmar antes de criar",
   "confirmSelectionCreationDesc": "Confira local, nome e aliases antes de criar um nó a partir do texto selecionado. Se desativado, conflitos e alterações na seleção ainda serão verificados.",
   "selectionCrossesTableCells": "A seleção atravessa células ou linhas de uma tabela Markdown. Nenhum nó foi criado para preservar a tabela.",
+  "selectionTableSyntax": "Selecione o texto dentro de uma célula. A seleção contém marcas de formatação da tabela Markdown.",
   "aliasValue": "Alias",
   "aliasNone": "Não adicionar",
   "reloadLanguage": "O idioma da interface foi alterado.",

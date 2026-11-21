@@ -69,7 +69,7 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
   let leaves = [{ view }] as unknown as WorkspaceLeaf[];
   const events = new Map<string, (...args: unknown[]) => void>();
   Object.assign(fake.app.workspace, {
-    getLeavesOfType: () => leaves,
+    getLeavesOfType: (type: string) => type === "markdown" ? leaves : [],
     getActiveFile: () => file,
     on: (event: string, callback: (...args: unknown[]) => void) => { events.set(event, callback); return {}; },
   });
@@ -306,6 +306,23 @@ describe("selection creation through the plugin", () => {
     expect(f.view.save).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["command", "| Left | Right |", "| :--- | ---: |", 1, 3, "---"],
+    ["editor-menu", "> Left | Right", "> :--- | ---:", 0, 0, ">"],
+    ["command", "| Name |", ":---:", 1, 1, "---"],
+  ] as const)("protects Markdown table syntax through the %s", (entry, header, separator, line, ch, label) => {
+    const f = fixture({ confirm: false, label });
+    f.lines.splice(0, f.lines.length, header, separator);
+    f.selectRange({ line, ch }, { line, ch: ch + label.length });
+    const before = f.editor.getValue();
+    f.trigger(entry);
+    expect(notices).toEqual([t("selectionTableSyntax")]);
+    expect(f.editor.getValue()).toBe(before);
+    expect(f.generate).not.toHaveBeenCalled();
+    expect(f.editor.transaction).not.toHaveBeenCalled();
+    expect([...f.fake.files.keys()]).toEqual(["", "Parent", "Parent/Parent.md", "Parent/Source.md"]);
+  });
+
   it("refuses a cell selection that does not match the full source range", () => {
     const f = fixture({ table: true, label: "Alpha" });
     f.lines[0] = "| before | Other | after |";
@@ -409,6 +426,24 @@ describe("selection creation through the plugin", () => {
     });
     f.trigger();
     await vi.waitFor(() => expect(notices).toHaveLength(1));
+    expect(f.fake.files.has("Parent/Selected text")).toBe(false);
+    expect(f.fake.opened).toEqual([]);
+  });
+
+  it.each([false, true])("stops before editor dispatch when unloaded after creating the node, table %s", async (table) => {
+    const f = fixture({ confirm: false, table });
+    const create = f.plugin.service.createNode.bind(f.plugin.service);
+    vi.spyOn(f.plugin.service, "createNode").mockImplementationOnce(async (...args) => {
+      const note = await create(...args);
+      f.plugin.onunload();
+      return note;
+    });
+    const before = f.editor.getValue();
+    f.trigger();
+    await vi.waitFor(() => expect(notices).toHaveLength(1));
+    expect(f.editor.getValue()).toBe(before);
+    expect(f.editor.replaceSelection).not.toHaveBeenCalled();
+    expect(f.editor.transaction).not.toHaveBeenCalled();
     expect(f.fake.files.has("Parent/Selected text")).toBe(false);
     expect(f.fake.opened).toEqual([]);
   });

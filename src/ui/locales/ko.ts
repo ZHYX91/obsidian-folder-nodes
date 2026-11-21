@@ -318,6 +318,7 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "만들기 전 확인",
   "confirmSelectionCreationDesc": "선택 텍스트로 노드를 만들기 전에 위치, 이름, 별칭을 미리 확인합니다. 끄더라도 충돌 및 선택 변경은 검사합니다.",
   "selectionCrossesTableCells": "선택 범위가 Markdown 표의 여러 셀이나 행에 걸쳐 있습니다. 표를 보호하기 위해 노드를 만들지 않았습니다.",
+  "selectionTableSyntax": "표의 셀 안에 있는 텍스트를 선택하세요. 현재 선택 영역에 Markdown 표의 구문이 포함되어 있습니다.",
   "aliasValue": "별칭",
   "aliasNone": "추가 안 함",
   "reloadLanguage": "인터페이스 언어가 변경되었습니다.",

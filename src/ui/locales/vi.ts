@@ -318,6 +318,7 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "Xác nhận trước khi tạo",
   "confirmSelectionCreationDesc": "Xem trước vị trí, tên và bí danh trước khi tạo nút từ văn bản đã chọn. Nếu tắt xác nhận, xung đột và thay đổi phần chọn vẫn được kiểm tra.",
   "selectionCrossesTableCells": "Phần chọn trải qua nhiều ô hoặc hàng của bảng Markdown. Không tạo nút để tránh làm hỏng bảng.",
+  "selectionTableSyntax": "Hãy chọn văn bản bên trong một ô. Vùng chọn hiện chứa ký hiệu định dạng bảng Markdown.",
   "aliasValue": "Bí danh",
   "aliasNone": "Không thêm",
   "reloadLanguage": "Đã thay đổi ngôn ngữ giao diện.",

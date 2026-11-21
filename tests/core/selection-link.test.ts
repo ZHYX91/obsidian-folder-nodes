@@ -7,14 +7,14 @@ describe("selection link safety", () => {
     const line = lines[0] ?? "";
     const from = { line: 0, ch: line.indexOf("selected") };
     const to = { line: 0, ch: line.indexOf(" text") + 5 };
-    const context = classifySelectionTableContext(from, to, (lineNumber) => lines[lineNumber] ?? "");
+    const context = classifySelectionTableContext(from, to, lines.join("\n"));
     expect(context).toBe("single-cell");
     expect(prepareSelectionLink("[[Node/Node|selected text]]", "selected text", context)).toBe("[[Node/Node\\|selected text]]");
   });
 
   it("keeps the ordinary wiki-link separator outside tables", () => {
     const line = "selected text";
-    const context = classifySelectionTableContext({ line: 0, ch: 0 }, { line: 0, ch: line.length }, () => line);
+    const context = classifySelectionTableContext({ line: 0, ch: 0 }, { line: 0, ch: line.length }, line);
     expect(context).toBe("outside-table");
     expect(prepareSelectionLink("[[Node/Node|selected text]]", line, context)).toBe("[[Node/Node|selected text]]");
   });
@@ -24,14 +24,54 @@ describe("selection link safety", () => {
     expect(classifySelectionTableContext(
       { line: 0, ch: 2 },
       { line: 0, ch: 10 },
-      (lineNumber) => lines[lineNumber] ?? "",
+      lines.join("\n"),
     )).toBe("cross-cell");
     expect(classifySelectionTableContext(
       { line: 0, ch: 2 },
       { line: 2, ch: 4 },
-      (lineNumber) => lines[lineNumber] ?? "",
+      lines.join("\n"),
     )).toBe("cross-cell");
     expect(() => prepareSelectionLink("[[Node/Node|one | two]]", "one | two", "cross-cell")).toThrow("cross-cell");
+  });
+
+  it("distinguishes table alignment syntax from dash-only header and data cells", () => {
+    const lines = ["| --- | --- |", "| :--- | ---: |", "| --- | --- |"];
+    const classify = (line: number) => classifySelectionTableContext(
+      { line, ch: 3 }, { line, ch: 5 }, lines.join("\n"),
+    );
+    expect(classify(0)).toBe("single-cell");
+    expect(classify(1)).toBe("table-structure");
+    expect(classify(2)).toBe("single-cell");
+    expect(() => prepareSelectionLink("[[Node]]", "---", "table-structure")).toThrow("Table syntax");
+  });
+
+  it.each([
+    ["| Name |", ":---:"],
+    ["> | Name |", "> ---"],
+    ["| Name |", "| --- |"],
+    ["A | B", ":--- | ---:"],
+  ])("protects the parsed separator after %s with %s", (header, separator) => {
+    const body = header.startsWith(">") ? "> body" : "body";
+    const source = [header, separator, body].join("\n");
+    const ch = separator.indexOf("-");
+    expect(classifySelectionTableContext({ line: 1, ch }, { line: 1, ch: ch + 1 }, source)).toBe("table-structure");
+    const data = body.indexOf("body");
+    expect(classifySelectionTableContext({ line: 2, ch: data }, { line: 2, ch: data + 1 }, source)).toBe("single-cell");
+    const content = header.indexOf("Name") >= 0 ? header.indexOf("Name") : header.indexOf("A");
+    expect(classifySelectionTableContext({ line: 0, ch: content }, { line: 0, ch: content + 1 }, source)).toBe("single-cell");
+  });
+
+  it.each([
+    [["A | B", "| --- |"], 1],
+    [["A | B", "--- | --- | ---"], 1],
+    [["A | B", ":---:"], 1],
+    [["Name", "| --- |"], 1],
+    [["    | Name |", "    | --- |"], 1],
+    [["~~~markdown", "| Name |", "| --- |", "~~~"], 2],
+    [["> A | B", "> | --- |"], 0],
+  ] as const)("keeps unmatched or literal table syntax editable (%j)", (lines, line) => {
+    const ch = Math.max(0, lines[line]!.indexOf("-"));
+    expect(classifySelectionTableContext({ line, ch }, { line, ch: ch + 1 }, lines.join("\n"))).toBe("outside-table");
   });
 
   it("does not mistake an escaped pipe inside a cell for a boundary", () => {
@@ -40,7 +80,7 @@ describe("selection link safety", () => {
     expect(classifySelectionTableContext(
       { line: 2, ch: line.indexOf("one") },
       { line: 2, ch: line.indexOf("literal") + "literal".length },
-      (lineNumber) => lines[lineNumber] ?? "",
+      lines.join("\n"),
     )).toBe("single-cell");
   });
 
@@ -49,7 +89,7 @@ describe("selection link safety", () => {
     expect(classifySelectionTableContext(
       { line: 0, ch: line.indexOf("a") },
       { line: 0, ch: line.indexOf("prose") + "prose".length },
-      (lineNumber) => lineNumber === 0 ? line : "",
+      line,
     )).toBe("outside-table");
   });
 

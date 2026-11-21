@@ -318,6 +318,7 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "Vor dem Erstellen bestätigen",
   "confirmSelectionCreationDesc": "Vor dem Erstellen aus Auswahl werden Ort, Name und Aliase angezeigt. Ohne Bestätigung wird direkt erstellt; Konflikte und geänderte Auswahlen werden trotzdem geprüft.",
   "selectionCrossesTableCells": "Die Auswahl umfasst mehrere Zellen oder Zeilen einer Markdown-Tabelle. Zum Schutz der Tabelle wurde kein Knoten erstellt.",
+  "selectionTableSyntax": "Wähle Text innerhalb einer Tabellenzelle aus. Die Auswahl enthält Markdown-Tabellensyntax.",
   "aliasValue": "Alias",
   "aliasNone": "Keinen hinzufügen",
   "reloadLanguage": "Die Oberflächensprache wurde geändert.",

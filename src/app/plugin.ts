@@ -1108,13 +1108,14 @@ export default class FolderNodesPlugin extends Plugin {
     const sourcePath = file.path;
     const from = { ...editor.getCursor("from") };
     const to = { ...editor.getCursor("to") };
-    const tableContext = classifySelectionTableContext(from, to, (line) => editor.getLine(line));
-    if (tableContext === "cross-cell") {
-      new Notice(t("selectionCrossesTableCells"), 8000);
+    const originalSource = editor.getValue();
+    const tableContext = classifySelectionTableContext(from, to, originalSource);
+    if (tableContext === "cross-cell" || tableContext === "table-structure") {
+      new Notice(t(tableContext === "cross-cell" ? "selectionCrossesTableCells" : "selectionTableSyntax"), 8000);
       return;
     }
     const tableSelection = tableContext === "single-cell" ? {
-      source: editor.getValue(), from: editor.posToOffset(from), to: editor.posToOffset(to),
+      source: originalSource, from: editor.posToOffset(from), to: editor.posToOffset(to),
     } : null;
     if (tableSelection !== null && tableSelection.source.slice(tableSelection.from, tableSelection.to) !== selection) {
       new Notice(t("errorSelectionEditorChanged"), 8000);
@@ -1146,15 +1147,17 @@ export default class FolderNodesPlugin extends Plugin {
       .find((view): view is MarkdownView => view instanceof MarkdownView && view.file === file && view.editor === editor);
     const create = async (nodeName = name): Promise<void> => {
       const assertSelectionCurrent = (): MarkdownView => {
+        if (this.unloaded) throw new FolderNodesError("selection_editor_changed");
         if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
         if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
         const currentFrom = editor.getCursor("from");
         const currentTo = editor.getCursor("to");
         if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
-        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
+        const currentSource = editor.getValue();
+        if (currentSource !== originalSource && classifySelectionTableContext(currentFrom, currentTo, currentSource) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
         const view = findSourceView();
         if (view === undefined) throw new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview");
-        if (tableSelection !== null && (editor.getValue() !== tableSelection.source || view.getViewData() !== tableSelection.source)) {
+        if (tableSelection !== null && (currentSource !== tableSelection.source || view.getViewData() !== tableSelection.source)) {
           throw new FolderNodesError("selection_source_changed", {}, "Table source changed after preview");
         }
         return view;

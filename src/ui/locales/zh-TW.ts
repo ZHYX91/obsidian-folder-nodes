@@ -318,6 +318,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "confirmSelectionCreation": "建立前確認",
   "confirmSelectionCreationDesc": "從選中文字建立節點前預覽位置、名稱和 aliases。關閉後直接建立，仍會檢查衝突和選區變化。",
   "selectionCrossesTableCells": "選區跨越了 Markdown 表格的單元格或行；為避免破壞表格，本次未建立節點。",
+  "selectionTableSyntax": "請選取表格儲存格內的文字。目前選取範圍包含 Markdown 表格的結構標記。",
   "aliasValue": "Alias",
   "aliasNone": "不添加",
   "reloadLanguage": "介面語言已更新。",
