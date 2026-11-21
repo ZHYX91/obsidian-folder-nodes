@@ -32,6 +32,13 @@ describe("Node merge link preflight", () => {
       if (mode !== "unresolved-old") expect(resolve).toHaveBeenCalledWith("Reference", "B/B.md");
     },
   );
+  it("keeps a host-resolved WikiLink independent of a new Markdown definition", () => {
+    const identity = {};
+    const resolve = () => ({ path: "Elsewhere/Guide.md", identity });
+    for (const wiki of ["[[Guide]]", "![[Guide]]"]) {
+      expect(() => assertMergeLinksKeepDestinations(wiki, "A/A.md", "B/B.md", "A/A.md", resolve, [], "[guide]: https://example.com")).not.toThrow();
+    }
+  });
   it("rejects moving targets and future best-match competitors without rewriting", () => {
     const identity = {};
     const resolve = () => ({ path: "Elsewhere/Reference.md", identity });
@@ -70,6 +77,23 @@ describe("Node merge link preflight", () => {
       "", "    [[A/A]]", "", "<pre>[[A/A]]</pre>", "<code>[[A/A]]</code>",
       "<!--", "2. ~~~", "[[A/A]]", "-->",
     ].join("\n"))).not.toThrow();
+  });
+  it("considers links after Obsidian literals and preserves Markdown definition destinations", () => {
+    expect(() => assertSafe("%%\n~~~\n%%\n[[A/A]]")).toThrow("removed Node Note");
+    expect(() => assertSafe("~~~\n%%\n~~~\n[[A/A]]")).toThrow("removed Node Note");
+    expect(() => assertSafe("[ok]: https://example/%%open\n\n[[A/A]]")).toThrow("removed Node Note");
+    expect(() => assertSafe("\\``[[A/A]]`")).not.toThrow();
+    expect(() => assertSafe("\\`[[A/A]]`")).toThrow("removed Node Note");
+  });
+  it("checks rendered HTML destinations and Markdown links inside inline HTML code", () => {
+    expect(() => assertSafe("<code>[go](local.md)</code>")).toThrow("Markdown link target");
+    expect(() => assertSafe('<pre><a href="local.md">go</a></pre>')).toThrow("relative HTML link");
+    expect(() => assertSafe('<pre><img src="local.png"></pre>')).toThrow("relative HTML link");
+    expect(() => assertSafe("<pre>![photo](local.png)</pre>")).not.toThrow();
+    expect(() => assertSafe("<code>`[go](local.md)`</code>")).not.toThrow();
+    expect(() => assertSafe("<code-widget>[[A/A]]</code-widget>")).toThrow("removed Node Note");
+    expect(() => assertSafe('[go](https://example.com/%% "<code>")\n\n[ref]: local.md')).toThrow("relative reference definition");
+    expect(() => assertSafe('<pre><span title="</pre> %%">sample</span></pre>\n\n[go](local.md)')).toThrow("Markdown link target");
   });
   it("ends a quoted code fence when its quote ends and still checks list continuations", () => {
     expect(() => assertSafe("> ~~~\n> example\n\n[[A/A]]")).toThrow("removed Node Note");
@@ -189,7 +213,24 @@ describe("Node merge link preflight", () => {
   });
 
   it.each([
+    ["-\n  \n    [ref]: ../local.md", false],
+    ["1.\n    \n      [ref]: ../local.md", false],
+    ["1.\n  \n      [ref]: ../local.md", true],
+    ["-\n  \n      [ref]: ../local.md", true],
+    ["[guide]: https://example.com\n    [ref]: ../local.md", false],
+    ["[guide]: https://example.com\n    > [ref]: ../local.md", true],
+    ["[guide]: https://example.com\n    [GUIDE]: ../shadowed.md", true],
+    ["[guide]: https://example.com\n    [ref]: https://example.com/other", true],
+  ])("preserves the possible first definitions across differing CommonMark indentation interpretations: %j", (body, safe) => {
+    if (safe) expect(() => assertSafe(body)).not.toThrow();
+    else expect(() => assertSafe(body)).toThrow("relative reference definition");
+  });
+
+  it.each([
     ["[Guide   to\n  Straße]: https://one.example", "[guide TO STRASSE]: https://two.example", false],
+    ["[Guide]: https://site.example/%%one%%", "[guide]: https://site.example/%%two%%", false],
+    ["[Guide]: https://site.example/%%one%%", "[guide]: https://site.example/%%one%%", true],
+    ["%%\n\n[guide]: ../hidden.md\n\n%%\n\n[guide]: https://site.example", "[guide]: https://site.example", true],
     ["[Guide]: https://site.example/`one`", "[guide]: https://site.example/`two`", false],
     ["[Guide]: https://one.example", "[guide]: ../unrelated.md", false],
     ["[Guide]: https://one.example", "[other]: ../unrelated.md", true],

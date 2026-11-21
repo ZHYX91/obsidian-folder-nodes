@@ -1,6 +1,7 @@
 import { type App, type Editor, type WorkspaceLeaf, normalizePath, TAbstractFile, TFile, TFolder } from "obsidian";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { assertMergeLinksKeepDestinations, type MergeLinkResolver } from "../core/merge-link-safety";
+import { assertMergeAppendBoundary } from "../core/merge-markdown";
 import { compareChildren, naturalOrder, planAppendChildren } from "../core/ordering";
 import { basename, dirname, isDescendantPath } from "../core/paths";
 import type { ChildOrderRecord, OrderPatch } from "../core/types";
@@ -70,6 +71,9 @@ export class NodeMerge {
       targetNotePath,
     );
     const sourceBody = stripMergeFrontmatter(sourceSnapshot, sourceNotePath);
+    const targetBody = stripMergeFrontmatter(targetWithProperties, targetNotePath);
+    const mergeHeading = /\S/u.test(sourceBody) ? `## Merged from ${source.name}` : null;
+    if (mergeHeading !== null) assertMergeAppendBoundary(targetBody, mergeHeading);
     const resolveLink: MergeLinkResolver = (path, from) => {
       const file = this.app.metadataCache.getFirstLinkpathDest(path, from);
       return file == null || this.app.vault.getAbstractFileByPath(normalizePath(file.path)) !== file ? null : { path: file.path, identity: file };
@@ -80,8 +84,7 @@ export class NodeMerge {
     const targetProperties = readMergeFrontmatter(targetSnapshot, targetNotePath);
     const mergeLinkChecks = [
       assertMergePropertyLinks(sourceProperties, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetProperties),
-      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles,
-        stripMergeFrontmatter(targetSnapshot, targetNotePath)),
+      assertMergeLinksKeepDestinations(sourceBody, sourceNotePath, targetNotePath, sourceNotePath, resolveLink, movingFiles, targetBody),
     ];
     const movingMarkdown = this.app.vault.getMarkdownFiles()
       .filter((file) => file !== sourceNote && file.path.startsWith(sourcePath + "/"))
@@ -188,9 +191,9 @@ export class NodeMerge {
         await this.assertClosedMergeNoteSnapshot(targetNote, targetNotePath, "target", latestTarget);
       }
 
-      if (/\S/u.test(sourceBody)) {
+      if (mergeHeading !== null) {
         const expectedBefore = latestTarget;
-        const appended = `${expectedBefore}\n\n## Merged from ${source.name}\n\n${sourceBody}`;
+        const appended = `${expectedBefore}\n\n${mergeHeading}\n\n${sourceBody}`;
         const receipt = await this.applyClosedMergeFileChange(
           targetNote,
           targetNotePath,

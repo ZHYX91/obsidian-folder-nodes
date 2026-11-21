@@ -81,6 +81,64 @@ describe("NodeService structural safety", () => {
   );
 
 
+  it.each(["  > ", "    > ", "  >  "])("preserves a literal definition in a quoted list paragraph: %j", async (prefix) => {
+    const text = "- > Text\n" + prefix + "[ref]: ../Reference.md\n\n[open][ref]";
+    const fake = new FakeObsidian();
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", text);
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    await service(fake).mergeNode(source, target);
+    expect(fake.trashed).toEqual(["Source"]);
+    expect(fake.contents.get("Target/Target.md")).toContain(text);
+  });
+
+  it.each(["- > Text\n  >\n  > [ref]:", "- > Text\n  > > [ref]:", "- > Text\n- > [ref]:"])(
+    "still refuses a real definition in the same nested containers: %j", async (definition) => {
+      const fake = new FakeObsidian();
+      const source = fake.addFolder("Source");
+      fake.addFile("Source/Source.md", definition + " ../Reference.md\n\n[open][ref]");
+      const target = fake.addFolder("Target");
+      fake.addFile("Target/Target.md", "target");
+      await expect(service(fake).mergeNode(source, target)).rejects.toThrow("relative reference definition");
+      expect(fake.contents.get("Target/Target.md")).toBe("target");
+      expect(fake.trashed).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['<span title="<code>">example</span>', "[k]: local.md\n\n[go][k]"],
+    ['<span title="%%">example</span>', "[k]: local.md\n\n![photo][k]"],
+    ['<span title="<pre>">example</span>', "[go](local.md)"],
+    ['<span title="<!--">example</span>', "[go](local.md)"],
+    ["`a\n%%\nb`", "[k]: local.md\n\n[go][k]"],
+    ["> `a\n> %%\n> b`", "[go](local.md)"],
+  ])("preserves link semantics after literal delimiters in %j", async (prefix, link) => {
+    for (const external of [false, true]) {
+      const fake = new FakeObsidian();
+      const source = fake.addFolder("Source");
+      const target = fake.addFolder("Target");
+      const sourceText = prefix + "\n\n" + (external ? link.replace("local.md", "https://example.com") : link);
+      fake.addFile("Source/Source.md", sourceText);
+      fake.addFile("Target/Target.md", "target");
+      fake.addFolder("Elsewhere");
+      const original = fake.addFile("Elsewhere/Original.md", "original");
+      const other = fake.addFile("Elsewhere/Other.md", "different");
+      fake.app.metadataCache.getFirstLinkpathDest = (_link, from) => from.startsWith("Source/") ? original : other;
+      const before = new Map(fake.contents);
+      const result = service(fake).mergeNode(source, target);
+      if (external) {
+        await result;
+        expect(fake.contents.get("Target/Target.md")).toContain(sourceText);
+      } else {
+        await expect(result).rejects.toThrow(/reference definition|Markdown link target/u);
+        expect(fake.contents).toEqual(before);
+        expect(fake.renames).toEqual([]);
+        expect(fake.trashed).toEqual([]);
+      }
+    }
+  });
+
   it.each(["1.\n[ref]:", "-\n    [ref]:", "1)\n    [ref]:"])("checks definitions after empty list items: %s", async (definition) => {
     const fake = new FakeObsidian();
     const source = fake.addFolder("Source");
