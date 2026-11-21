@@ -383,7 +383,7 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "만드는 동안 원본 노트가 변경되어 중단했습니다.",
   "errorSelectionTableChanged": "만드는 동안 표 구조가 변경되어 중단했습니다.",
   "errorSelectionEditorChanged": "만드는 동안 원본 편집기가 변경되어 중단했습니다.",
-  "errorSelectionLinkNotApplied": "표 편집기에서 링크로 바꾸기가 적용되지 않았습니다.",
+  "errorSelectionLinkNotApplied": "표 편집기에서 선택 내용이 링크로 바뀌었는지 확인할 수 없습니다.",
   "errorSelectionWikiLinkLabelUnsafe": "선택한 텍스트를 안전하게 WikiLink로 표현할 수 없습니다. Obsidian 링크 형식을 Markdown으로 바꾼 뒤 다시 시도하세요.",
   "errorMissingNote": "노드 노트가 없습니다: {path}",
   "errorMergeConflict": "병합 충돌: {detail}",

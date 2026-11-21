@@ -383,7 +383,7 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "建立過程中來源筆記已變化，建立已停止。",
   "errorSelectionTableChanged": "建立過程中表格結構已變化，建立已停止。",
   "errorSelectionEditorChanged": "建立過程中來源編輯器已變化，建立已停止。",
-  "errorSelectionLinkNotApplied": "表格編輯器未將選取內容替換為連結。",
+  "errorSelectionLinkNotApplied": "無法確認表格編輯器已將選取內容替換為連結。",
   "errorSelectionWikiLinkLabelUnsafe": "所選文字無法安全用 WikiLink 表示；可切換 Obsidian 的 Markdown 連結格式後重試。",
   "errorMissingNote": "缺少節點筆記：{path}",
   "errorMergeConflict": "合併衝突：{detail}",

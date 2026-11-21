@@ -383,7 +383,7 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "La nota de origen cambió durante la creación y se detuvo la operación.",
   "errorSelectionTableChanged": "La tabla cambió durante la creación y se detuvo la operación.",
   "errorSelectionEditorChanged": "El editor de origen cambió durante la creación y se detuvo la operación.",
-  "errorSelectionLinkNotApplied": "El editor de tablas no aplicó la sustitución por el enlace.",
+  "errorSelectionLinkNotApplied": "No se pudo confirmar la sustitución por el enlace en el editor de tablas.",
   "errorSelectionWikiLinkLabelUnsafe": "El texto seleccionado no se puede representar de forma segura como WikiLink. Cambia Obsidian a enlaces Markdown y vuelve a intentarlo.",
   "errorMissingNote": "Falta la nota de nodo: {path}",
   "errorMergeConflict": "Conflicto de fusión: {detail}",

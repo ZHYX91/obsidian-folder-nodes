@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.2 - 2026-11-21
+
+- Allow table selection link edits to settle before saving the source note. Keep the new node if the link edit cannot be confirmed.
+
 ## 0.13.1 - 2026-11-21
 
 - Verify and save the source link before opening a node created from a table selection.

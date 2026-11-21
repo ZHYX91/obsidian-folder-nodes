@@ -160,17 +160,53 @@ describe("selection creation through the plugin", () => {
     expect(f.view.save).toHaveBeenCalledOnce();
   });
 
-  it("rolls back the new node if the bound table editor silently ignores the edit", async () => {
+  it("waits for delayed table editor and view readback before saving, without dispatching again", async () => {
+    const f = fixture({ confirm: false, table: true, label: "Alpha" });
+    f.generate.mockReturnValue("[[Alpha|Alpha]]");
+    const expected = "| before | [[Alpha\\|Alpha]] | after |\n| --- | --- | --- |";
+    let savable = f.editor.getValue();
+    f.view.getViewData = () => savable;
+    const apply = f.editor.transaction.getMockImplementation()!;
+    f.editor.transaction.mockImplementationOnce((change) => {
+      window.setTimeout(() => apply(change), 0);
+    });
+    f.trigger();
+    await vi.waitFor(() => expect(f.editor.getValue()).toBe(expected));
+    expect(f.view.save).not.toHaveBeenCalled();
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
+    savable = expected;
+    await vi.waitFor(() => expect(f.fake.opened).toEqual(["Parent/Alpha/Alpha.md"]));
+    expect(f.editor.transaction).toHaveBeenCalledOnce();
+    expect(f.view.save).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the new node if the bound table editor never acknowledges the edit", async () => {
     const f = fixture({ confirm: false, table: true, label: "Alpha" });
     const before = f.editor.getValue();
     f.generate.mockReturnValue("[[Alpha|Alpha]]");
     f.editor.transaction.mockImplementationOnce(() => undefined);
     f.trigger();
-    await vi.waitFor(() => expect(notices.at(-1)).toContain("The table editor did not apply the link replacement"));
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("Could not verify the link replacement in the table editor"));
     expect(f.editor.getValue()).toBe(before);
-    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(false);
+    expect(notices.at(-1)).toContain("Parent/Alpha/Alpha.md");
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
     expect(f.fake.opened).toEqual([]);
     expect(f.view.save).not.toHaveBeenCalled();
+  });
+
+  it("keeps the new node and leaves a concurrent table edit untouched", async () => {
+    const f = fixture({ confirm: false, table: true, label: "Alpha" });
+    f.generate.mockReturnValue("[[Alpha|Alpha]]");
+    f.editor.transaction.mockImplementationOnce(() => {
+      f.lines[0] = "| before | Alpha | edited |";
+    });
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("The source note changed during creation"));
+    expect(f.editor.getValue()).toBe("| before | Alpha | edited |\n| --- | --- | --- |");
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
+    expect(f.editor.transaction).toHaveBeenCalledOnce();
+    expect(f.view.save).not.toHaveBeenCalled();
+    expect(f.fake.opened).toEqual([]);
   });
 
   it("keeps the new node when the link is in the editor but saving fails", async () => {

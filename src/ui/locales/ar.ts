@@ -383,7 +383,7 @@ export const ar: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "تغيرت الملاحظة المصدر أثناء الإنشاء، لذا أُوقفت العملية.",
   "errorSelectionTableChanged": "تغيرت بنية الجدول أثناء الإنشاء، لذا أُوقفت العملية.",
   "errorSelectionEditorChanged": "تغير المحرر المصدر أثناء الإنشاء، لذا أُوقفت العملية.",
-  "errorSelectionLinkNotApplied": "لم يطبّق محرر الجدول الاستبدال بالرابط.",
+  "errorSelectionLinkNotApplied": "تعذّر التحقق من استبدال التحديد برابط في محرر الجدول.",
   "errorSelectionWikiLinkLabelUnsafe": "لا يمكن تمثيل النص المحدد بأمان كرابط WikiLink. غيّر أسلوب روابط Obsidian إلى Markdown ثم حاول مجددًا.",
   "errorMissingNote": "ملاحظة العقدة مفقودة: {path}",
   "errorMergeConflict": "تعارض أثناء الدمج: {detail}",
