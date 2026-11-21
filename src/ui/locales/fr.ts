@@ -383,6 +383,7 @@ export const fr: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "La note source a changé pendant la création. L’opération a été arrêtée.",
   "errorSelectionTableChanged": "Le tableau a changé pendant la création. L’opération a été arrêtée.",
   "errorSelectionEditorChanged": "L’éditeur source a changé pendant la création. L’opération a été arrêtée.",
+  "errorSelectionLinkNotApplied": "L’éditeur de tableau n’a pas appliqué le remplacement par le lien.",
   "errorSelectionWikiLinkLabelUnsafe": "Le texte sélectionné ne peut pas être représenté sans risque comme WikiLink. Choisissez les liens Markdown dans Obsidian, puis réessayez.",
   "errorMissingNote": "Note de nœud manquante : {path}",
   "errorMergeConflict": "Conflit de fusion : {detail}",

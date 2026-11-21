@@ -383,6 +383,7 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "作成中に元のノートが変更されたため中止しました。",
   "errorSelectionTableChanged": "作成中にテーブル構造が変わったため中止しました。",
   "errorSelectionEditorChanged": "作成中に元のエディターが変わったため中止しました。",
+  "errorSelectionLinkNotApplied": "テーブルエディターでリンクへの置き換えが反映されませんでした。",
   "errorSelectionWikiLinkLabelUnsafe": "選択テキストを安全に WikiLink にできません。Obsidian のリンク形式を Markdown に切り替えてから再試行してください。",
   "errorMissingNote": "ノードノートがありません：{path}",
   "errorMergeConflict": "統合で競合しました：{detail}",

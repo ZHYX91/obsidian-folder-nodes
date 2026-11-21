@@ -1111,6 +1111,13 @@ export default class FolderNodesPlugin extends Plugin {
       new Notice(t("selectionCrossesTableCells"), 8000);
       return;
     }
+    const tableSelection = tableContext === "single-cell" ? {
+      source: editor.getValue(), from: editor.posToOffset(from), to: editor.posToOffset(to),
+    } : null;
+    if (tableSelection !== null && tableSelection.source.slice(tableSelection.from, tableSelection.to) !== selection) {
+      new Notice(t("errorSelectionEditorChanged"), 8000);
+      return;
+    }
     const folder = this.service.folderForFile(file) ?? this.app.vault.getRoot();
     const cursorLine = from.line;
     const heading = this.app.metadataCache.getFileCache(file)?.headings
@@ -1132,26 +1139,55 @@ export default class FolderNodesPlugin extends Plugin {
     const parentPath = normalizeVaultPath(folder.path);
     const alias = this.settings.addSelectionAlias ? selection.trim() : null;
     const label = selection.trim().replace(/\s+/gu, " ");
+    const findSourceView = (): MarkdownView | undefined => this.app.workspace.getLeavesOfType("markdown")
+      .map((leaf) => leaf.view)
+      .find((view): view is MarkdownView => view instanceof MarkdownView && view.file === file && view.editor === editor);
     const create = async (nodeName = name): Promise<void> => {
-      const assertSelectionCurrent = (): void => {
+      const assertSelectionCurrent = (): MarkdownView => {
         if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
         if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
         const currentFrom = editor.getCursor("from");
         const currentTo = editor.getCursor("to");
         if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
         if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
-        const liveEditor = this.app.workspace.getLeavesOfType("markdown").some((leaf) =>
-          leaf.view instanceof MarkdownView && leaf.view.file === file && leaf.view.editor === editor);
-        if (!liveEditor) throw new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview");
+        const view = findSourceView();
+        if (view === undefined) throw new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview");
+        if (tableSelection !== null && (editor.getValue() !== tableSelection.source || view.getViewData() !== tableSelection.source)) {
+          throw new FolderNodesError("selection_source_changed", {}, "Table source changed after preview");
+        }
+        return view;
       };
-      assertSelectionCurrent();
+      const sourceView = assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, nodeName, options);
+      let mayHaveWrittenLink = false;
       try {
         const link = prepareSelectionLink(this.app.fileManager.generateMarkdownLink(note, sourcePath, undefined, label), label, tableContext);
-        assertSelectionCurrent();
-        editor.replaceSelection(link);
+        if (assertSelectionCurrent() !== sourceView) throw new FolderNodesError("selection_editor_changed");
+        if (tableSelection === null) {
+          editor.replaceSelection(link);
+        } else {
+          const { source, from: start, to: end } = tableSelection;
+          const expected = source.slice(0, start) + link + source.slice(end);
+          // The active selection can belong to the native cell editor. Send a
+          // bounded change to the verified Markdown editor and read it back.
+          mayHaveWrittenLink = true;
+          editor.transaction({ changes: [{ from, to, text: link }] }, "folder-nodes-selection-link");
+          const viewStillBound = (): boolean => findSourceView() === sourceView && file.path === sourcePath
+            && this.app.vault.getAbstractFileByPath(sourcePath) === file;
+          if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
+          const actual = editor.getValue();
+          const savable = sourceView.getViewData();
+          if (actual === source && savable === source) mayHaveWrittenLink = false;
+          if (actual !== expected || savable !== expected) throw new FolderNodesError("selection_link_not_applied");
+          await sourceView.save();
+          if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
+          if (editor.getValue() !== expected) throw new FolderNodesError("selection_source_changed");
+        }
       } catch (error) {
+        if (mayHaveWrittenLink) {
+          throw new FolderNodesError("created_node_retained", { paths: note.path }, "The source may still link to the new node", { cause: error });
+        }
         if (note.parent !== null) {
           try { await this.service.rollbackCreatedNode(note); }
           catch (rollbackError) {

@@ -172,6 +172,7 @@ const zh = {
   errorMergeNoteOpen: "请先保存并关闭来源与目标节点笔记的所有标签页，再从文件列表重试合并：{path}",
   errorStructuralNoteMultipleEditors: "笔记「{path}」已在多个标签页打开。请只保留一个标签页，然后重试。",
   errorSelectionSourceChanged: "创建过程中来源笔记已变化，创建已停止。", errorSelectionTableChanged: "创建过程中表格结构已变化，创建已停止。", errorSelectionEditorChanged: "创建过程中来源编辑器已变化，创建已停止。",
+  errorSelectionLinkNotApplied: "表格编辑器未将选中内容替换为链接。",
   errorSelectionWikiLinkLabelUnsafe: "所选文字无法安全用 WikiLink 表示；可切换 Obsidian 的 Markdown 链接格式后重试。",
   errorMissingNote: "缺少节点笔记：{path}", errorMergeConflict: "合并冲突：{detail}",
   errorMigrationConflict: "迁移存在阻塞冲突。", errorSelectionChanged: "创建过程中选区已改变，创建已停止。",
@@ -348,6 +349,7 @@ const en: typeof zh = {
   errorMergeNoteOpen: "Save and close all tabs for the source and target node notes, then retry merging from the file explorer: {path}",
   errorStructuralNoteMultipleEditors: "The note “{path}” is open in multiple tabs. Close the extra tabs, then try again.",
   errorSelectionSourceChanged: "The source note changed during creation; creation stopped.", errorSelectionTableChanged: "The table structure changed during creation; creation stopped.", errorSelectionEditorChanged: "The source editor changed during creation; creation stopped.",
+  errorSelectionLinkNotApplied: "The table editor did not apply the link replacement.",
   errorSelectionWikiLinkLabelUnsafe: "The selected text cannot be represented safely as a WikiLink. Switch Obsidian to Markdown links and try again.",
   errorMissingNote: "Missing Node Note: {path}", errorMergeConflict: "Merge conflict: {detail}",
   errorMigrationConflict: "Migration contains blocking conflicts.", errorSelectionChanged: "The selection changed during creation; creation stopped.",
@@ -420,6 +422,7 @@ export function formatError(error: unknown): string {
       case "selection_source_changed": return t("errorSelectionSourceChanged");
       case "selection_table_changed": return t("errorSelectionTableChanged");
       case "selection_editor_changed": return t("errorSelectionEditorChanged");
+      case "selection_link_not_applied": return t("errorSelectionLinkNotApplied");
       case "selection_wikilink_label_unsafe": return t("errorSelectionWikiLinkLabelUnsafe");
     }
   }

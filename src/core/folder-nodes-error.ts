@@ -12,6 +12,7 @@ export type FolderNodesErrorCode =
   | "root_cannot_rename"
   | "selection_changed"
   | "selection_editor_changed"
+  | "selection_link_not_applied"
   | "selection_source_changed"
   | "selection_table_changed"
   | "selection_wikilink_label_unsafe"

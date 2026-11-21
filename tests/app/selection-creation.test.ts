@@ -1,4 +1,4 @@
-import type { App, Command, Editor, PluginManifest, WorkspaceLeaf } from "obsidian";
+import type { App, Command, Editor, EditorPosition, EditorTransaction, PluginManifest, WorkspaceLeaf } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const host = vi.hoisted(() => ({ modals: [] as Array<{ contentEl: HTMLElement; closeCount: number }> }));
@@ -42,13 +42,25 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
   let selection = label;
   let from = { line: 0, ch: table ? 11 : 0 };
   let to = { line: table ? 0 : lines.length - 1, ch: table ? 11 + label.length : (lines.at(-1)?.length ?? 0) };
+  const getValue = () => lines.join("\n");
   const editor = {
+    getValue,
     getSelection: () => selection,
     getCursor: (end: string) => end === "from" ? from : to,
     getLine: (line: number) => lines[line] ?? "",
+    posToOffset: ({ line, ch }: EditorPosition) => lines.slice(0, line).reduce((offset, text) => offset + text.length + 1, ch),
     replaceSelection: vi.fn((link: string) => { selection = link; }),
+    transaction: vi.fn(({ changes }: EditorTransaction) => {
+      const change = changes?.[0];
+      if (change === undefined || change.to === undefined) throw new Error("Expected a bounded edit");
+      const source = editor.getValue();
+      const result = source.slice(0, editor.posToOffset(change.from)) + change.text + source.slice(editor.posToOffset(change.to));
+      lines.splice(0, lines.length, ...result.split("\n"));
+      selection = change.text;
+    }),
   };
-  const view = Object.assign(new MarkdownView({} as WorkspaceLeaf), { file, editor });
+  const save = vi.fn(async () => undefined);
+  const view = Object.assign(new MarkdownView({} as WorkspaceLeaf), { file, editor, getViewData: getValue, save });
   let leaves = [{ view }] as unknown as WorkspaceLeaf[];
   const events = new Map<string, (...args: unknown[]) => void>();
   Object.assign(fake.app.workspace, {
@@ -128,6 +140,73 @@ describe("selection creation through the plugin", () => {
     expect(f.fake.contents.get(note.path)).toContain(original);
     expect(f.fake.frontmatters.get(note.path)?.aliases).toEqual([original]);
     expect(f.generate).toHaveBeenCalledExactlyOnceWith(note, f.file.path, undefined, original);
+  });
+
+  it("saves one bounded table-cell replacement before opening the new note", async () => {
+    const f = fixture({ table: true, label: "Alpha" });
+    f.generate.mockReturnValue("[[Alpha|Alpha]]");
+    f.view.save.mockImplementationOnce(async () => {
+      expect(f.editor.getValue()).toBe("| before | [[Alpha\\|Alpha]] | after |\n| --- | --- | --- |");
+      expect(f.fake.opened).toEqual([]);
+      return undefined;
+    });
+    f.trigger();
+    f.submit();
+    await vi.waitFor(() => expect(f.fake.opened).toEqual(["Parent/Alpha/Alpha.md"]));
+    expect(f.editor.transaction).toHaveBeenCalledWith({
+      changes: [{ from: { line: 0, ch: 11 }, to: { line: 0, ch: 16 }, text: "[[Alpha\\|Alpha]]" }],
+    }, "folder-nodes-selection-link");
+    expect(f.editor.replaceSelection).not.toHaveBeenCalled();
+    expect(f.view.save).toHaveBeenCalledOnce();
+  });
+
+  it("rolls back the new node if the bound table editor silently ignores the edit", async () => {
+    const f = fixture({ confirm: false, table: true, label: "Alpha" });
+    const before = f.editor.getValue();
+    f.generate.mockReturnValue("[[Alpha|Alpha]]");
+    f.editor.transaction.mockImplementationOnce(() => undefined);
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("The table editor did not apply the link replacement"));
+    expect(f.editor.getValue()).toBe(before);
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(false);
+    expect(f.fake.opened).toEqual([]);
+    expect(f.view.save).not.toHaveBeenCalled();
+  });
+
+  it("keeps the new node when the link is in the editor but saving fails", async () => {
+    const f = fixture({ confirm: false, table: true, label: "Alpha" });
+    f.generate.mockReturnValue("[[Alpha|Alpha]]");
+    f.view.save.mockRejectedValueOnce(new Error("Save refused"));
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("Save refused"));
+    expect(notices.at(-1)).toContain("Parent/Alpha/Alpha.md");
+    expect(f.editor.getValue()).toContain("[[Alpha\\|Alpha]]");
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
+    expect(f.fake.opened).toEqual([]);
+  });
+
+  it("keeps the new node if the table transaction throws after it applies the link", async () => {
+    const f = fixture({ confirm: false, table: true, label: "Alpha" });
+    f.generate.mockReturnValue("[[Alpha|Alpha]]");
+    const apply = f.editor.transaction.getMockImplementation()!;
+    f.editor.transaction.mockImplementationOnce((change) => {
+      apply(change);
+      throw new Error("The host did not finish the edit");
+    });
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("The host did not finish the edit"));
+    expect(f.editor.getValue()).toContain("[[Alpha\\|Alpha]]");
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
+    expect(f.view.save).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cell selection that does not match the full source range", () => {
+    const f = fixture({ table: true, label: "Alpha" });
+    f.lines[0] = "| before | Other | after |";
+    f.trigger();
+    expect(host.modals).toHaveLength(0);
+    expect(notices.at(-1)).toContain("The source editor changed during creation");
+    expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(false);
   });
 
   // The boundary returns prescribed host strings: this fake does not choose paths or syntax.
@@ -212,15 +291,14 @@ describe("selection creation through the plugin", () => {
     expect(f.fake.opened).toEqual([]);
   });
 
-  it.each(["selection", "range", "source", "table", "editor", "replacement"] as const)("rolls back when %s changes during creation", async (drift) => {
+  it.each(["selection", "range", "source", "table", "editor"] as const)("rolls back when %s changes during creation", async (drift) => {
     const f = fixture({ confirm: false, table: true });
     f.generate.mockImplementation(() => {
       if (drift === "selection") f.changeSelection("changed");
       else if (drift === "range") f.moveRange();
       else if (drift === "source") f.fake.remove(f.file.path);
       else if (drift === "table") f.lines[1] = "no longer a delimiter";
-      else if (drift === "editor") f.closeEditor();
-      else f.editor.replaceSelection.mockImplementation(() => { throw new Error("replacement failed"); });
+      else f.closeEditor();
       return "[[Selected text|Selected text]]";
     });
     f.trigger();

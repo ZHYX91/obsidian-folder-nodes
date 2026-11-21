@@ -383,6 +383,7 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "Die Quellnotiz hat sich während des Erstellens geändert. Der Vorgang wurde angehalten.",
   "errorSelectionTableChanged": "Die Tabellenstruktur hat sich während des Erstellens geändert. Der Vorgang wurde angehalten.",
   "errorSelectionEditorChanged": "Der Quelleditor hat sich während des Erstellens geändert. Der Vorgang wurde angehalten.",
+  "errorSelectionLinkNotApplied": "Der Tabelleneditor hat die Link-Ersetzung nicht übernommen.",
   "errorSelectionWikiLinkLabelUnsafe": "Der ausgewählte Text kann nicht sicher als WikiLink dargestellt werden. Wechseln Sie in Obsidian zu Markdown-Links und versuchen Sie es erneut.",
   "errorMissingNote": "Knotennotiz fehlt: {path}",
   "errorMergeConflict": "Konflikt bei Zusammenführung: {detail}",
