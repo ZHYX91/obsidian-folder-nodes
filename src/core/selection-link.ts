@@ -61,18 +61,25 @@ function unescapedPipeIndices(line: string): number[] {
 }
 
 function isMarkdownTableLine(line: number, getLine: (line: number) => string): boolean {
-  return tableDelimiterInDirection(line, -1, getLine) || tableDelimiterInDirection(line + 1, 1, getLine);
+  const quoteDepth = tableQuotePrefix(getLine(line)).split(">").length - 1;
+  return tableDelimiterInDirection(line, -1, quoteDepth, getLine) || tableDelimiterInDirection(line + 1, 1, quoteDepth, getLine);
 }
 
-function tableDelimiterInDirection(start: number, direction: -1 | 1, getLine: (line: number) => string): boolean {
+function tableDelimiterInDirection(start: number, direction: -1 | 1, quoteDepth: number, getLine: (line: number) => string): boolean {
   const maximumScan = 512;
   let count = 0;
   for (let line = start; count < maximumScan && line >= 0; count += 1, line += direction) {
     const source = safeGetLine(line, getLine);
     if (source === null || unescapedPipeIndices(source).length === 0) return false;
-    if (isTableDelimiterRow(source)) return true;
+    const prefix = tableQuotePrefix(source);
+    if (prefix.split(">").length - 1 !== quoteDepth) return false;
+    if (isTableDelimiterRow(source.slice(prefix.length))) return true;
   }
   return count === maximumScan;
+}
+
+function tableQuotePrefix(line: string): string {
+  return /^(?: {0,3}>[ \t]?)+/u.exec(line)?.[0] ?? "";
 }
 
 function safeGetLine(line: number, getLine: (line: number) => string): string | null {
@@ -96,5 +103,5 @@ function isTableDelimiterRow(line: string): boolean {
   cells.push(trimmed.slice(start).trim());
   if (cells[0] === "") cells.shift();
   if (cells.at(-1) === "") cells.pop();
-  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/u.test(cell));
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/u.test(cell));
 }

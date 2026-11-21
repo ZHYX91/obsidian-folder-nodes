@@ -150,6 +150,27 @@ describe("selection creation through the plugin", () => {
     }
   });
 
+  it.each(["| -- | -- | -- |", "> | :-- | --: | :--: |", "> > | --- | --- | --- |"])(
+    "escapes aliases in a single cell and stops cross-cell creation with %s", async (delimiter) => {
+      const quote = delimiter.slice(0, delimiter.indexOf("|"));
+      for (const [label, crosses] of [["Alpha", false], ["Alpha | Beta", true]] as const) {
+        const f = fixture({ confirm: false, table: true, label });
+        f.lines[0] = quote + "|" + " ".repeat(8 - quote.length) + "| " + label + " |";
+        f.lines[1] = crosses ? delimiter : delimiter.replace(/\|[^|]+\|$/u, "|");
+        f.generate.mockReturnValue("[[Somewhere|Alpha]]");
+        f.trigger();
+        if (crosses) {
+          expect(notices.at(-1)).toContain("crosses Markdown table cells");
+          expect(f.fake.opened).toEqual([]);
+          expect(f.generate).not.toHaveBeenCalled();
+        } else {
+          await vi.waitFor(() => expect(f.fake.opened).toHaveLength(1));
+          expect(f.selection()).toBe("[[Somewhere\\|Alpha]]");
+        }
+      }
+    },
+  );
+
   it("leaves duplicate-basename disambiguation to the host and keeps aliases off independent of the label", async () => {
     const f = fixture({ confirm: false, label: "  Selected\n text  " });
     f.fake.addFolder("Elsewhere");

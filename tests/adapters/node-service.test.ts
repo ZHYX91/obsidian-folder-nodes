@@ -1795,6 +1795,7 @@ describe("NodeService structural safety", () => {
   it.each([
     ["source", "inline"], ["child", "inline"],
     ["source", "reference"], ["child", "reference"],
+    ["source", "quoted-reference"], ["child", "quoted-reference"],
     ["source", "entity"], ["child", "entity"],
     ["source", "html-decimal"], ["child", "html-decimal"],
     ["source", "html-named"], ["child", "html-named"],
@@ -1805,6 +1806,7 @@ describe("NodeService structural safety", () => {
     const reference = fake.addFile("Reference.md", "the original reference");
     const source = fake.addFolder("Source");
     const link = (path: string) => {
+      if (syntax === "quoted-reference") return `> [open][ref]\n>\n> [ref]: ${path}`;
       if (syntax === "entity") return `[ref](${path.replaceAll(".", "&#46;")})`;
       if (syntax === "html-decimal") return `<a href="${path.replaceAll(".", "&#46;")}">ref</a>`;
       if (syntax === "html-named") return `<a href="${path.replaceAll("/", "&sol;")}">ref</a>`;
