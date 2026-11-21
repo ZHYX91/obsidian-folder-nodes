@@ -14,7 +14,7 @@ import { formatObsidianTimestamp } from "../adapters/obsidian-timestamp-formatte
 import { configuredEmojiFontStack } from "../core/emoji-font";
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { isCanonicalNodeNote, normalizeVaultPath, sanitizeNodeName } from "../core/paths";
-import { classifySelectionTableContext, prepareSelectionLink } from "../core/selection-link";
+import { classifySelectionTableContext, matchesTableLinkWriteback, prepareSelectionLink } from "../core/selection-link";
 import { aliasFromLinkDisplay, planUnresolvedNode, type LinkAliasCandidate } from "../core/unresolved-link";
 import type { FolderNodesSettings } from "../core/types";
 import {
@@ -1171,6 +1171,8 @@ export default class FolderNodesPlugin extends Plugin {
         } else {
           const { source, from: start, to: end } = tableSelection;
           const expected = source.slice(0, start) + link + source.slice(end);
+          const matchesExpected = (value: string): boolean => value === expected
+            || (value !== source && matchesTableLinkWriteback(expected, value, from.line));
           // The active selection can belong to the native cell editor. Send a
           // bounded change to the verified Markdown editor and read it back.
           dispatchedTableLink = true;
@@ -1184,8 +1186,10 @@ export default class FolderNodesPlugin extends Plugin {
             if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
             const actual = editor.getValue();
             const savable = sourceView.getViewData();
-            if (actual === expected && savable === expected) break;
-            if ((actual !== source && actual !== expected) || (savable !== source && savable !== expected)) {
+            const editorMatches = matchesExpected(actual);
+            const viewMatches = savable === actual ? editorMatches : matchesExpected(savable);
+            if (editorMatches && viewMatches) break;
+            if ((!editorMatches && actual !== source) || (!viewMatches && savable !== source)) {
               throw new FolderNodesError("selection_source_changed");
             }
             const remaining = deadline - performance.now();
@@ -1194,7 +1198,9 @@ export default class FolderNodesPlugin extends Plugin {
           }
           await sourceView.save();
           if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
-          if (editor.getValue() !== expected || sourceView.getViewData() !== expected) throw new FolderNodesError("selection_source_changed");
+          if (!matchesExpected(editor.getValue()) || !matchesExpected(sourceView.getViewData())) {
+            throw new FolderNodesError("selection_source_changed");
+          }
         }
       } catch (error) {
         if (dispatchedTableLink) {

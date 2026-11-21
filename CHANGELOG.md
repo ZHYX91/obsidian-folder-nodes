@@ -2,7 +2,7 @@
 
 ## 0.13.2 - 2026-11-21
 
-- Allow table selection link edits to settle before saving the source note. Keep the new node if the link edit cannot be confirmed.
+- Allow table selection link edits to settle, including Obsidian’s column width adjustments, before saving the source note. Keep the new node if the link edit cannot be confirmed.
 
 ## 0.13.1 - 2026-11-21
 

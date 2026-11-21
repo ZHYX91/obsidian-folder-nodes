@@ -49,6 +49,66 @@ export function prepareSelectionLink(generated: string, label: string, context: 
   return link;
 }
 
+/** Obsidian can recalculate the column widths when its native cell editor applies a link. */
+export function matchesTableLinkWriteback(expected: string, actual: string, selectionLine: number): boolean {
+  if (expected === actual) return true;
+  // Keep every physical line ending in the comparison, even inside the table.
+  const expectedParts = expected.split(/(\r\n|\r|\n)/u);
+  const actualParts = actual.split(/(\r\n|\r|\n)/u);
+  if (expectedParts.length !== actualParts.length) return false;
+  const rowAt = (parts: readonly string[], line: number) => fullPipeRow(parts[line * 2] ?? "");
+  const selected = rowAt(expectedParts, selectionLine);
+  if (selected === null) return false;
+
+  let first = selectionLine;
+  let last = selectionLine;
+  while (rowAt(expectedParts, first - 1)?.prefix === selected.prefix) first -= 1;
+  while (rowAt(expectedParts, last + 1)?.prefix === selected.prefix) last += 1;
+  const delimiter = first + 1;
+  const alignments = delimiterAlignments(rowAt(expectedParts, delimiter)?.cells ?? []);
+  if (delimiter > last || delimiter === selectionLine || alignments === null) return false;
+
+  for (let index = 0; index < expectedParts.length; index += 1) {
+    const line = index / 2;
+    if (index % 2 !== 0 || line < first || line > last) {
+      if (expectedParts[index] !== actualParts[index]) return false;
+      continue;
+    }
+    const before = rowAt(expectedParts, line);
+    const after = rowAt(actualParts, line);
+    if (before?.prefix !== selected.prefix || after?.prefix !== selected.prefix
+      || before.cells.length !== alignments.length || after.cells.length !== before.cells.length) return false;
+    if (line === delimiter) {
+      const actualAlignments = delimiterAlignments(after.cells);
+      if (actualAlignments === null || alignments.some((alignment, i) => alignment !== actualAlignments[i])) return false;
+    } else {
+      // A second delimiter-shaped row makes the table boundary ambiguous.
+      if (line > delimiter && delimiterAlignments(before.cells) !== null) return false;
+      if (before.cells.some((cell, i) => cell !== after.cells[i])) return false;
+    }
+  }
+  return true;
+}
+
+function fullPipeRow(line: string): { prefix: string; cells: string[] } | null {
+  const quote = tableQuotePrefix(line);
+  const indent = /^[ \t]*/u.exec(line.slice(quote.length))?.[0] ?? "";
+  const prefix = quote + indent;
+  const body = line.slice(prefix.length);
+  const pipes = unescapedPipeIndices(body);
+  const last = pipes.at(-1);
+  // Limit the padding exception to fully delimited rows. An omitted outer
+  // separator would make cell padding indistinguishable from other Markdown.
+  if (pipes.length < 2 || pipes[0] !== 0 || last === undefined || !/^[ \t]*$/u.test(body.slice(last + 1))) return null;
+  const cells = pipes.slice(1).map((pipe, i) => body.slice(pipes[i]! + 1, pipe).replace(/^[ \t]+|[ \t]+$/gu, ""));
+  return { prefix, cells };
+}
+
+function delimiterAlignments(cells: readonly string[]): string[] | null {
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/u.test(cell))
+    ? cells.map((cell) => cell.replace(/-+/u, "-")) : null;
+}
+
 function unescapedPipeIndices(line: string): number[] {
   const result: number[] = [];
   for (let index = 0; index < line.length; index += 1) {
@@ -103,5 +163,5 @@ function isTableDelimiterRow(line: string): boolean {
   cells.push(trimmed.slice(start).trim());
   if (cells[0] === "") cells.shift();
   if (cells.at(-1) === "") cells.pop();
-  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/u.test(cell));
+  return delimiterAlignments(cells) !== null;
 }

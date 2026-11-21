@@ -100,9 +100,21 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
   return { fake, plugin, file, editor, view, lines, generate, trigger, submit,
     selection: () => selection,
     changeSelection: (value: string) => { selection = value; },
+    selectRange: (start: EditorPosition, end: EditorPosition) => { from = start; to = end; },
     moveRange: () => { from = { line: 0, ch: from.ch + 1 }; to = { line: 0, ch: to.ch + 1 }; },
     closeEditor: () => { leaves = []; },
   };
+}
+
+function nativeTableFixture() {
+  const f = fixture({ confirm: false, table: true, label: "Saffron" });
+  f.lines.splice(0, f.lines.length, "Before.", "", "| Name    | Value   |     |     |",
+    "| ------- | ------- | --- | --- |", "| Saffron | Beta \\| |     |     |", "", "After.");
+  f.selectRange({ line: 4, ch: 2 }, { line: 4, ch: 9 });
+  f.generate.mockReturnValue("[[Saffron]]");
+  const normalized = ["Before.", "", "| Name        | Value   |     |     |",
+    "| ----------- | ------- | --- | --- |", "| [[Saffron]] | Beta \\| |     |     |", "", "After."];
+  return { f, normalized };
 }
 
 describe("selection creation through the plugin", () => {
@@ -158,6 +170,44 @@ describe("selection creation through the plugin", () => {
     }, "folder-nodes-selection-link");
     expect(f.editor.replaceSelection).not.toHaveBeenCalled();
     expect(f.view.save).toHaveBeenCalledOnce();
+  });
+
+  it("accepts native column width normalization around the exact inserted link", async () => {
+    const { f, normalized } = nativeTableFixture();
+    f.editor.transaction.mockImplementationOnce(() => { f.lines.splice(0, f.lines.length, ...normalized); });
+    f.view.save.mockImplementationOnce(async () => {
+      expect(f.editor.getValue()).toBe(normalized.join("\n"));
+      expect(f.fake.opened).toEqual([]);
+      return undefined;
+    });
+    f.trigger();
+    await vi.waitFor(() => expect(f.fake.opened).toEqual(["Parent/Saffron/Saffron.md"]));
+    expect(notices).toHaveLength(0);
+    expect(f.editor.transaction).toHaveBeenCalledExactlyOnceWith({
+      changes: [{ from: { line: 4, ch: 2 }, to: { line: 4, ch: 9 }, text: "[[Saffron]]" }],
+    }, "folder-nodes-selection-link");
+    expect(f.view.save).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["neighboring cell", 4, "| [[Saffron]] | Gamma \\| |     |     |"],
+    ["internal cell whitespace", 4, "| [[Saffron]] | Beta  \\| |     |     |"],
+    ["link in wrong cell", 4, "| Saffron | [[Saffron]] |     |     |"],
+    ["missing column", 4, "| [[Saffron]] | Beta \\| |     |"],
+    ["column alignment", 3, "| :----------- | ------- | --- | --- |"],
+    ["quote prefix", 2, "> | Name        | Value   |     |     |"],
+    ["file content outside the table", 6, "After. "],
+  ] as const)("rejects a change in %s during native width normalization", async (_kind, line, replacement) => {
+    const { f, normalized } = nativeTableFixture();
+    normalized[line] = replacement;
+    f.editor.transaction.mockImplementationOnce(() => { f.lines.splice(0, f.lines.length, ...normalized); });
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("The source note changed during creation"));
+    expect(f.fake.files.has("Parent/Saffron/Saffron.md")).toBe(true);
+    expect(f.editor.getValue()).toBe(normalized.join("\n"));
+    expect(f.editor.transaction).toHaveBeenCalledOnce();
+    expect(f.view.save).not.toHaveBeenCalled();
+    expect(f.fake.opened).toEqual([]);
   });
 
   it("waits for delayed table editor and view readback before saving, without dispatching again", async () => {

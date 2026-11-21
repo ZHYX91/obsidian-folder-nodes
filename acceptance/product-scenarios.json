@@ -146,12 +146,14 @@
         "Preview leaf-note and missing-node organization before committing it",
         "Preview legacy Folder Nodes properties, confirm the conflict blocks writes, resolve it, then explicitly migrate",
         "Create a child node from the selected fixture text after confirming creation location, short node name, and alias policy",
+        "Open Table selection normalization.md in Live Preview without retyping the table. Select Saffron in the first body cell, run Create Folder Node from selection, and confirm the default name and alias. Reopen the source in Source mode and retain both notes for readback.",
         "Exercise before, into, and after placement using the available platform interaction"
       ],
       "expected": [
         "No Vault write occurs before either explicit preview confirmation",
         "Legacy tokens migrate to one folder-nodes list while unrelated YAML stays unchanged",
         "The modal omits the full Node Note path and raw wikilink while selection replacement still uses the correct Vault-relative wikilink",
+        "The completed table edit opens Saffron/Saffron.md without an error, and the saved source link resolves to it. The node retains the Saffron body and alias. Obsidian may adjust column widths, while the neighboring Beta pipe, table shape, and surrounding prose remain unchanged.",
         "Manual order uses only order=manual on the parent and child-owned sparse rank tokens"
       ]
     },
