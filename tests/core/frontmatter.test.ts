@@ -10,6 +10,20 @@ import {
 } from "../../src/core/frontmatter";
 
 describe("source-preserving frontmatter patches", () => {
+  it("retains attached comments, quotes and each surviving separator inside managed lists", () => {
+    const source = "---\r\nfolder-nodes: # controls\n  - hidden=true\r# comment\r\n  - 'rank=10' # keep\r---";
+    expect(patchFolderNodesFrontmatter(source, { hidden: false })).toBe(source.replace("  - hidden=true\r", ""));
+  });
+
+  it("preserves unrelated mixed line endings when inserting or updating properties", () => {
+    const body = "one\r\ntwo\nthree\rfour";
+    const source = "\uFEFF---\nname: A\r\naliases: [B]\r---\n" + body;
+    expect(patchFrontmatterScalar(source, "name", "X")).toBe(source.replace("name: A", 'name: "X"'));
+    expect(patchFolderNodesFrontmatter(body, { hidden: false })).toBe(body);
+    expect(patchFolderNodesFrontmatter(body, { hidden: true })).toBe(
+      "---\r\nfolder-nodes:\r\n  - hidden=true\r\n---\r\n" + body);
+  });
+
   it.each([
     "future=Bob's # preserve this comment",
     'future=inch"wide # preserve this comment',

@@ -1875,6 +1875,17 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("Source")).toBe(false);
   });
 
+  it.each(["\n", "\r\n", "\r"])("changes only the hidden entry with %j metadata and mixed body endings", async (eol) => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Node");
+    const body = "一\r\ntwo\rthree\nlast";
+    const initial = ["\uFEFF---", "title: keep", "folder-nodes:", "  - hidden=true",
+      "  - rank=10", "---"].join(eol) + eol + body;
+    const file = fake.addFile("Node/Node.md", initial);
+    await service(fake).setNodeHidden(folder, false);
+    expect(fake.contents.get(file.path)).toBe(initial.replace("  - hidden=true" + eol, ""));
+  });
+
   it("unhides one node without moving commented list entries into a neighboring property", async () => {
     const fake = new FakeObsidian();
     const folder = fake.addFolder("Node");
