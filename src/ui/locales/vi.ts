@@ -383,7 +383,7 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "Ghi chú nguồn đã thay đổi khi đang tạo; thao tác đã dừng.",
   "errorSelectionTableChanged": "Cấu trúc bảng đã thay đổi khi đang tạo; thao tác đã dừng.",
   "errorSelectionEditorChanged": "Trình soạn thảo nguồn đã thay đổi khi đang tạo; thao tác đã dừng.",
-  "errorSelectionLinkNotApplied": "Không thể xác nhận vùng chọn đã được thay bằng liên kết trong trình chỉnh sửa bảng.",
+  "errorSelectionLinkNotApplied": "Không thể xác nhận vùng chọn đã được thay bằng liên kết trong trình chỉnh sửa.",
   "errorSelectionWikiLinkLabelUnsafe": "Không thể biểu diễn an toàn văn bản đã chọn dưới dạng WikiLink. Chuyển định dạng liên kết của Obsidian sang Markdown rồi thử lại.",
   "errorMissingNote": "Thiếu ghi chú nút: {path}",
   "errorMergeConflict": "Xung đột khi hợp nhất: {detail}",

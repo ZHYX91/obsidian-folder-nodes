@@ -1162,12 +1162,23 @@ export default class FolderNodesPlugin extends Plugin {
       const sourceView = assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, nodeName, options);
-      let dispatchedTableLink = false;
+      let linkDispatched = false;
       try {
         const link = prepareSelectionLink(this.app.fileManager.generateMarkdownLink(note, sourcePath, undefined, label), label, tableContext);
         if (assertSelectionCurrent() !== sourceView) throw new FolderNodesError("selection_editor_changed");
+        const viewStillBound = (): boolean => !this.unloaded && findSourceView() === sourceView && file.path === sourcePath
+          && this.app.vault.getAbstractFileByPath(sourcePath) === file;
         if (tableSelection === null) {
+          const source = editor.getValue();
+          const start = editor.posToOffset(from);
+          const end = editor.posToOffset(to);
+          if (source.slice(start, end) !== selection) throw new FolderNodesError("selection_changed");
+          const expected = source.slice(0, start) + link + source.slice(end);
+          // A host extension can apply the change and then throw, or filter the edit.
+          linkDispatched = true;
           editor.replaceSelection(link);
+          if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
+          if (editor.getValue() !== expected) throw new FolderNodesError("selection_link_not_applied");
         } else {
           const { source, from: start, to: end } = tableSelection;
           const expected = source.slice(0, start) + link + source.slice(end);
@@ -1175,10 +1186,8 @@ export default class FolderNodesPlugin extends Plugin {
             || (value !== source && matchesTableLinkWriteback(expected, value, from.line));
           // The active selection can belong to the native cell editor. Send a
           // bounded change to the verified Markdown editor and read it back.
-          dispatchedTableLink = true;
+          linkDispatched = true;
           editor.transaction({ changes: [{ from, to, text: link }] }, "folder-nodes-selection-link");
-          const viewStillBound = (): boolean => !this.unloaded && findSourceView() === sourceView && file.path === sourcePath
-            && this.app.vault.getAbstractFileByPath(sourcePath) === file;
           // The embedded cell editor can update the source editor and saveable
           // view at different times. An old readback does not reject the write.
           const deadline = performance.now() + TABLE_LINK_READBACK_TIMEOUT_MS;
@@ -1203,7 +1212,7 @@ export default class FolderNodesPlugin extends Plugin {
           }
         }
       } catch (error) {
-        if (dispatchedTableLink) {
+        if (linkDispatched) {
           throw new FolderNodesError("created_node_retained", { paths: note.path }, "The source may still link to the new node", { cause: error });
         }
         if (note.parent !== null) {

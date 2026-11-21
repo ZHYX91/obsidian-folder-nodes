@@ -383,7 +383,7 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "A nota de origem mudou durante a criação; a operação foi interrompida.",
   "errorSelectionTableChanged": "A estrutura da tabela mudou durante a criação; a operação foi interrompida.",
   "errorSelectionEditorChanged": "O editor de origem mudou durante a criação; a operação foi interrompida.",
-  "errorSelectionLinkNotApplied": "Não foi possível confirmar a substituição pelo link no editor de tabelas.",
+  "errorSelectionLinkNotApplied": "Não foi possível confirmar a substituição pelo link no editor.",
   "errorSelectionWikiLinkLabelUnsafe": "O texto selecionado não pode ser representado com segurança como WikiLink. Mude o formato de links do Obsidian para Markdown e tente novamente.",
   "errorMissingNote": "Nota do nó ausente: {path}",
   "errorMergeConflict": "Conflito na mesclagem: {detail}",

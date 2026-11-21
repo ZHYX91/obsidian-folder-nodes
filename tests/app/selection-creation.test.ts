@@ -49,7 +49,12 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
     getCursor: (end: string) => end === "from" ? from : to,
     getLine: (line: number) => lines[line] ?? "",
     posToOffset: ({ line, ch }: EditorPosition) => lines.slice(0, line).reduce((offset, text) => offset + text.length + 1, ch),
-    replaceSelection: vi.fn((link: string) => { selection = link; }),
+    replaceSelection: vi.fn((link: string) => {
+      const text = getValue();
+      const next = text.slice(0, editor.posToOffset(from)) + link + text.slice(editor.posToOffset(to));
+      lines.splice(0, lines.length, ...next.split("\n"));
+      selection = link;
+    }),
     transaction: vi.fn(({ changes }: EditorTransaction) => {
       const change = changes?.[0];
       if (change === undefined || change.to === undefined) throw new Error("Expected a bounded edit");
@@ -154,6 +159,21 @@ describe("selection creation through the plugin", () => {
     expect(f.generate).toHaveBeenCalledExactlyOnceWith(note, f.file.path, undefined, original);
   });
 
+  it.each(["throw after applying", "silently decline", "detach after applying"])("keeps the new note if plain text writeback can %s", async (outcome) => {
+    const f = fixture({ confirm: false });
+    f.editor.replaceSelection.mockImplementationOnce(link => {
+      if (outcome === "silently decline") return;
+      f.lines.splice(0, f.lines.length, link);
+      if (outcome === "detach after applying") f.closeEditor();
+      else throw new Error("host reported failure after applying the edit");
+    });
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("Parent/Selected text/Selected text.md"));
+    expect(f.fake.files.has("Parent/Selected text/Selected text.md")).toBe(true);
+    expect(f.editor.getValue()).toBe(outcome === "silently decline" ? "Selected text" : "[[Selected text|Selected text]]");
+    expect(f.fake.opened).toEqual([]);
+  });
+
   it("saves one bounded table-cell replacement before opening the new note", async () => {
     const f = fixture({ table: true, label: "Alpha" });
     f.generate.mockReturnValue("[[Alpha|Alpha]]");
@@ -236,7 +256,7 @@ describe("selection creation through the plugin", () => {
     f.generate.mockReturnValue("[[Alpha|Alpha]]");
     f.editor.transaction.mockImplementationOnce(() => undefined);
     f.trigger();
-    await vi.waitFor(() => expect(notices.at(-1)).toContain("Could not verify the link replacement in the table editor"));
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("Could not verify the link replacement in the editor"));
     expect(f.editor.getValue()).toBe(before);
     expect(notices.at(-1)).toContain("Parent/Alpha/Alpha.md");
     expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);

@@ -383,7 +383,7 @@ export const ru: Readonly<Record<TranslationKey, string>> = {
   "errorSelectionSourceChanged": "Исходная заметка изменилась во время создания, действие остановлено.",
   "errorSelectionTableChanged": "Структура таблицы изменилась во время создания, действие остановлено.",
   "errorSelectionEditorChanged": "Исходный редактор изменился во время создания, действие остановлено.",
-  "errorSelectionLinkNotApplied": "Не удалось подтвердить замену выделения ссылкой в редакторе таблицы.",
+  "errorSelectionLinkNotApplied": "Не удалось подтвердить замену выделения ссылкой в редакторе.",
   "errorSelectionWikiLinkLabelUnsafe": "Нельзя безопасно представить выделенный текст в виде WikiLink. Выберите в Obsidian формат ссылок Markdown и повторите попытку.",
   "errorMissingNote": "Отсутствует заметка узла: {path}",
   "errorMergeConflict": "Конфликт объединения: {detail}",
