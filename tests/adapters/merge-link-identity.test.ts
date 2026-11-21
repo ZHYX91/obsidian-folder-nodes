@@ -8,6 +8,33 @@ const service = (fake: FakeObsidian) => new NodeService(fake.app, () => structur
 
 describe("Merge link target identity", () => {
   it.each([
+    ["[[Target/Σ]]", "ς.md", false],
+    ["[reference](Target/Σ.MD)", "ς.md", false],
+    ["[[Target/Sale]]", "ſale.md", false],
+    ["[[Target/Σ]]", "ς.md", true],
+  ] as const)("refuses a projected Unicode best-match competitor before moving it: %s, %s, delayed cache %s", async (link, name, delayed) => {
+    const fake = new FakeObsidian();
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", link);
+    const moving = fake.addFile("Source/" + name, "moving");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    fake.addFolder("Elsewhere");
+    fake.addFolder("Elsewhere/Target");
+    const fixed = fake.addFile("Elsewhere/Target/" + name, "original");
+    fake.app.metadataCache.getFirstLinkpathDest = () => {
+      const moveIndexed = delayed ? fake.trashed.includes("Source") : moving.parent === target;
+      return moveIndexed ? moving : fixed;
+    };
+    const before = new Map(fake.contents);
+
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("Cannot prove");
+    expect(fake.renames).toEqual([]);
+    expect(fake.contents).toEqual(before);
+    expect(fake.trashed).toEqual([]);
+  });
+
+  it.each([
     "[self](Source/Source.md)", "[self](<Source/Source.md>)", "[self](Source/Source.md#Heading)",
     "![self](Source/Source.md#^block)", "[self](Source)", "[self](/Source/Source.md)",
     "[[Source/Source]]", "![[Source/Source#Heading|Alias]]",

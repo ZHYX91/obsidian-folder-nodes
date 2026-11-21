@@ -1,3 +1,4 @@
+import { isSameVaultName } from "./paths";
 import { assertNoNewReferenceBindings, mergeWikiLinks, scanMergeMarkdown } from "./merge-markdown";
 import type { MergeMarkdownReferences } from "./merge-markdown-blocks";
 
@@ -131,8 +132,11 @@ function assertMergeLinkTarget(
     if (kind !== "Markdown link" || resolve(oldNote, path) !== destination.path || resolve(newNote, path) !== relocation.to) {
       throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
     }
-  } else if (movingFiles.some(({ from, to }) => selectorMatches(path, from) || selectorMatches(path, to))) {
-    throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+  } else if (movingFiles.length > 0) {
+    const selector = path.replace(/^\/+|\.md$/giu, "").normalize("NFC").split("/");
+    if (movingFiles.some(({ from, to }) => selectorMatches(selector, from) || selectorMatches(selector, to))) {
+      throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+    }
   }
   const check: MergeLinkCheck = (phase) => {
     const next = resolveLink(path, relocation !== undefined && phase === "before" ? oldNote : newNote);
@@ -145,10 +149,18 @@ function assertMergeLinkTarget(
   return check;
 }
 
-function selectorMatches(selector: string, path: string): boolean {
-  const key = selector.replace(/^\/+|\.md$/giu, "").normalize("NFC").toLocaleLowerCase();
-  const candidate = path.replace(/\.md$/iu, "").normalize("NFC").toLocaleLowerCase();
-  return candidate === key || candidate.endsWith("/" + key);
+function selectorMatches(selector: readonly string[], path: string): boolean {
+  const components = path.replace(/\.md$/iu, "").normalize("NFC").split("/");
+  const offset = components.length - selector.length;
+  if (offset < 0) return false;
+  return selector.every((name, index) => {
+    const candidate = components[offset + index];
+    // Retain lowercase collisions under both default and host-locale rules.
+    // These are possible competitors; only the host resolver binds a file.
+    return candidate !== undefined && (isSameVaultName(name, candidate)
+      || name.toLowerCase() === candidate.toLowerCase()
+      || name.toLocaleLowerCase() === candidate.toLocaleLowerCase());
+  });
 }
 
 function absolute(path: string): boolean {

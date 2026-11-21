@@ -2,6 +2,7 @@ const WINDOWS_FORBIDDEN = /[<>:"/\\|?*#[\]^]/gu;
 const TRAILING_DOTS_OR_SPACES = /[. ]+$/u;
 const MULTIPLE_SPACES = /\s+/gu;
 const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
+const NON_ASCII = /[\u0080-\u{10FFFF}]/u;
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const UTF8 = new TextEncoder();
 const NODE_NAME_BYTE_LIMIT = 255 - UTF8.encode(".md").length;
@@ -36,7 +37,14 @@ export function isCanonicalNodeNote(notePath: string): boolean {
 }
 
 export function isSameVaultName(left: string, right: string): boolean {
-  return left.normalize("NFC").localeCompare(right.normalize("NFC"), undefined, { sensitivity: "accent" }) === 0;
+  if (left === right) return true;
+  if (!NON_ASCII.test(left) && !NON_ASCII.test(right)) return left.toLowerCase() === right.toLowerCase();
+  const first = left.normalize("NFC");
+  const second = right.normalize("NFC");
+  if (first === second) return true;
+  // Unicode regex matching uses simple case folding without expanding names such as ß into ss.
+  const literal = first.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`^${literal}$`, "iu").test(second);
 }
 
 export function isSameVaultPath(left: string, right: string): boolean {

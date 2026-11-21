@@ -17,6 +17,29 @@ describe("folder node paths", () => {
     expect(isSameVaultName("Cafe\u0301", "Café")).toBe(true);
     expect(isSameVaultPath("Folder\\Note.md", "folder/note.md")).toBe(true);
   });
+  it.each([
+    ["Office", "OFFICE", true],
+    ["Cafe\u0301", "CAFÉ", true],
+    ["ΟΣ", "ος", true],
+    ["Σ", "ς", true],
+    ["Straße", "STRAẞE", true],
+    ["Straße", "STRASSE", false],
+    ["ſ", "S", true],
+    ["K", "k", true],
+    ["İ", "i", false],
+    ["ı", "I", false],
+    ["Cafe", "Café", false],
+    ["Ａ", "A", false],
+    ["✈", "✈\uFE0F", false],
+    ["ab", "a\u200Bb", false],
+    ["ab", "a\u00ADb", false],
+    ["Σ.*[x]($)|+", "σ.*[X]($)|+", true],
+    ["Σ.*", "σxyz", false],
+    ["Σ", "σ\n", false],
+  ] as const)("matches %j and %j by NFC and Unicode simple case folding", (left, right, same) => {
+    expect(isSameVaultName(left, right)).toBe(same);
+    expect(isSameVaultName(right, left)).toBe(same);
+  });
   it("sanitizes names and checks path relations", () => {
     expect(sanitizeNodeName("  Report:*?  ")).toBe("Report---");
     expect(sanitizeNodeName(". ")).toBe("Untitled");

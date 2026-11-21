@@ -52,6 +52,21 @@ describe("Node merge link preflight", () => {
       () => ({ path: "A/asset.md", identity }), [{ from: "A/asset.md", to: "B/asset.md" }])).toThrow("Cannot prove");
     expect(() => assertMergeLinksKeepDestinations("[[#Heading]] ![[#^block]]", "A/child.md", "B/child.md", "A/A.md", resolve)).not.toThrow();
   });
+  it("preserves lowercase candidate matches beyond Unicode simple folding", () => {
+    const fixed = { path: "Elsewhere/Target/İ.md", identity: {} };
+    expect(() => assertMergeLinksKeepDestinations("[[Target/İ]]", "A/A.md", "Target/Target.md", "A/A.md",
+      () => fixed, [{ from: "A/i\u0307.md", to: "Target/i\u0307.md" }])).toThrow("Cannot prove");
+  });
+
+  it.each([["Work/σ", "OtherWork/ς"], ["Ａ", "A"], ["XY", "X\u200bY"], ["Café", "Cafe"]])(
+    "keeps a stable target when %s and the projected %s have distinct suffixes", (selector, candidate) => {
+      const fixed = { path: "Fixed/" + selector + ".md", identity: {} };
+      const check = assertMergeLinksKeepDestinations(`[[${selector}]]`, "A/A.md", "B/B.md", "A/A.md",
+        () => fixed, [{ from: "A/" + candidate + ".md", to: "B/" + candidate + ".md" }]);
+      expect(() => check("after")).not.toThrow();
+    },
+  );
+
   it("retains the original identity for final validation instead of resolving the old context again", () => {
     const original = {};
     let changed = false;
