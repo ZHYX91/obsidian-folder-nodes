@@ -1,6 +1,6 @@
 {
   "name": "obsidian-folder-nodes",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Organize folders as same-named nodes with visual navigation and scalable ordering.",
   "type": "module",
   "main": "dist/main.js",
@@ -38,8 +38,8 @@
     "prelint": "node scripts/check-shared-tools.mjs && node scripts/prepare-lint-dependencies.mjs && node scripts/check-lint-dependencies.mjs",
     "check:tools": "node scripts/check-shared-tools.mjs",
     "test:tools": "vitest run tests/scripts/shared-maintenance-tools.test.ts",
-    "prebuild": "node scripts/check-runtime.mjs",
-    "prebuild:bundle": "node scripts/check-runtime.mjs"
+    "prebuild": "node scripts/check-runtime.mjs --build",
+    "prebuild:bundle": "node scripts/check-runtime.mjs --build"
   },
   "keywords": [
     "obsidian",

@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.13.1 - 2026-11-21
 
 - Keep cell boundaries intact when creating nodes from selections in quoted tables and tables with short column separators.
 - Refuse node merges that would relocate a relative reference definition inside a blockquote.
+- Make the three expandable settings guides easier to find with the theme accent.
 
 ## 0.13.0 - 2026-11-20
 
