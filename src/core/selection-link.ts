@@ -28,7 +28,9 @@ export function classifySelectionTableContext(
   if (table?.map) {
     if (from.line !== to.line) return "cross-cell";
     const row = lines[from.line] ?? "";
-    if (from.line === table.map[0] + 1 || from.ch < tableQuotePrefix(row).length) return "table-structure";
+    if (from.line === table.map[0] + 1 || from.ch < tableContainerPrefixLength(row, from.line === table.map[0])) {
+      return "table-structure";
+    }
     return unescapedPipeIndices(row).some((index) => index >= from.ch && index < to.ch) ? "cross-cell" : "single-cell";
   }
   // Retain the existing cross-cell safeguard for an incomplete table whose
@@ -159,6 +161,17 @@ function tableDelimiterInDirection(start: number, direction: -1 | 1, quoteDepth:
 
 function tableQuotePrefix(line: string): string {
   return /^(?: {0,3}>[ \t]?)+/u.exec(line)?.[0] ?? "";
+}
+
+function tableContainerPrefixLength(line: string, header: boolean): number {
+  // A list can start on the header itself. On subsequent rows only the
+  // surrounding quote markers can precede the cells.
+  const marker = header ? /^[ \t]*(?:>[ \t]?|(?:[-+*]|[0-9]{1,9}[.)])[ \t]+)/u : /^[ \t]*>[ \t]?/u;
+  let length = 0;
+  for (let prefix = marker.exec(line); prefix !== null; prefix = marker.exec(line.slice(length))) {
+    length += prefix[0].length;
+  }
+  return length;
 }
 
 function safeGetLine(line: number, getLine: (line: number) => string): string | null {

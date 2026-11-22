@@ -62,6 +62,17 @@ describe("selection link safety", () => {
   });
 
   it.each([
+    ["- A | B", "  --- | ---", 0],
+    ["1. > A | B", "   > --- | ---", 3],
+  ])("protects the list and quote markers before a parsed table (%s)", (header, separator, marker) => {
+    const source = [header, separator].join("\n");
+    const content = header.indexOf("A");
+    const classify = (ch: number) => classifySelectionTableContext({ line: 0, ch }, { line: 0, ch: ch + 1 }, source);
+    expect(classify(marker)).toBe("table-structure");
+    expect(classify(content)).toBe("single-cell");
+  });
+
+  it.each([
     [["A | B", "| --- |"], 1],
     [["A | B", "--- | --- | ---"], 1],
     [["A | B", ":---:"], 1],

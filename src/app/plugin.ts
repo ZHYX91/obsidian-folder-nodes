@@ -1177,9 +1177,9 @@ export default class FolderNodesPlugin extends Plugin {
           const end = editor.posToOffset(to);
           if (source.slice(start, end) !== selection) throw new FolderNodesError("selection_changed");
           const expected = source.slice(0, start) + link + source.slice(end);
-          // A host extension can apply the change and then throw, or filter the edit.
+          // Change only the validated range, even when the editor has other selections.
           linkDispatched = true;
-          editor.replaceSelection(link);
+          editor.replaceRange(link, from, to);
           if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
           if (editor.getValue() !== expected) throw new FolderNodesError("selection_link_not_applied");
         } else {
