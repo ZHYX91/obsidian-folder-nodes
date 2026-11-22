@@ -1,11 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.13.3 - 2026-11-22
 
 - Preserve managed node metadata and comments when changing visibility or rank. Keep the original line endings of untouched properties and note text, including mixed or CR-only files.
 - Refuse merges that would change reference link destinations across empty or nested lists or when the two notes define the same label differently. Allow reference-looking text that continues an existing paragraph inside nested lists and quotes.
 - Preserve visible links around inline code and HTML when merging notes, and refuse to append a note inside an open fence or comment. A definition in either note can no longer turn previously literal text in the other note into a link or image.
 - Preserve both notes’ original body line endings when merging. Verify that transferred YAML values retain their types, and keep HTML-like prose and quoted attribute examples from blocking a safe merge.
+- Recheck the moving subtree and link destinations before merging nodes, including merges into the Vault root.
+- Keep differently spelled folders and their notes separate in bulk organization. Use each note’s previewed destination and refuse to overwrite an existing file even when the Obsidian cache has not indexed it yet.
+- Protect lists and table separators when creating a node from a selection. Update only the verified selection and keep the new note when an editor write cannot be confirmed.
+- Preserve keyboard focus across graph updates, clear stale node selections, and show feedback when a node action fails. Give settings tabs consistent accessibility relationships.
 
 ## 0.13.2 - 2026-11-21
 
