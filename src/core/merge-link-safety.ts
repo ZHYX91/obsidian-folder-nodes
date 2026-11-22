@@ -1,3 +1,7 @@
+import { isSameVaultName } from "./paths";
+import { assertNoNewReferenceBindings, mergeWikiLinks, scanMergeMarkdown } from "./merge-markdown";
+import type { MergeMarkdownReferences } from "./merge-markdown-blocks";
+
 export interface MergeLinkTarget {
   readonly path: string;
   readonly identity: unknown;
@@ -11,9 +15,6 @@ export interface MergeFileRelocation {
 export type MergeLinkResolver = (path: string, sourcePath: string) => MergeLinkTarget | null;
 export type MergeLinkCheck = (phase: "before" | "after") => void;
 
-const quoteMarker = / {0,3}>[ \t]?/u.source;
-const quotePrefixPattern = new RegExp(`^(?:${quoteMarker})+`, "u");
-
 /**
  * Reject location-sensitive link syntax before a Node merge moves any files.
  * Bind Markdown and WikiLinks to their actual host-resolved file identities.
@@ -26,72 +27,26 @@ export function assertMergeLinksKeepDestinations(
   retiredNote: string,
   resolveLink: MergeLinkResolver = () => null,
   movingFiles: readonly MergeFileRelocation[] = [],
+  targetMarkdown?: MergeMarkdownReferences,
 ): MergeLinkCheck {
   if (oldNote === newNote) return () => undefined;
   const checks: MergeLinkCheck[] = [];
-  let fence: { mark: string; width: number; quoteDepth: number; listIndent: number } | null = null;
-  let comment: LiteralBlock | null = null;
-  let previousBlank = true;
-  let indentedCode = false;
-  let listIndents: number[] = [];
-  let listQuoteDepth = 0;
-  for (const [lineIndex, line] of source.split(/\r\n|\r|\n/u).entries()) {
-    const quotePrefix = quotePrefixPattern.exec(line)?.[0] ?? "";
-    const quoteDepth = quotePrefix.split(">").length - 1;
-    const fenceLine = line.slice(quotePrefix.length);
-    if (fence !== null && quoteDepth < fence.quoteDepth) fence = null;
-    if (fence !== null) {
-      const boundPrefix = fence.quoteDepth === 0 ? "" : new RegExp(`^(?:${quoteMarker}){${fence.quoteDepth}}`, "u").exec(line)?.[0] ?? "";
-      const content = line.slice(boundPrefix.length).replaceAll("\t", "    ");
-      const indentation = /^[ ]*/u.exec(content)?.[0].length ?? 0;
-      if (content.trim() !== "" && indentation < fence.listIndent) fence = null;
-      else {
-        const close = new RegExp("^ {0,3}" + fence.mark + "{" + fence.width + ",}[ \\t]*$", "u");
-        if (close.test(content.slice(fence.listIndent))) fence = null;
-        continue;
-      }
-    }
-    const blank = /^\s*$/u.test(fenceLine);
-    const indentation = /^[ \t]*/u.exec(fenceLine)?.[0].replaceAll("\t", "    ").length ?? 0;
-    if (quoteDepth !== listQuoteDepth) listIndents = [];
-    listQuoteDepth = quoteDepth;
-    const listCandidate = /^([ \t]*)(?:[-+*]|(\d{1,9})[.)])[ \t]+/u.exec(fenceLine);
-    if (comment === null && listCandidate?.[2] !== undefined && listCandidate[2] !== "1"
-      && /^(?:\x60{3,}|~{3,})/u.test(fenceLine.slice(listCandidate[0].length))) {
-      throw new Error("Cannot safely merge an ambiguous numbered-list fence");
-    }
-    const list = listCandidate?.[2] !== undefined && listCandidate[2] !== "1" && !previousBlank && listIndents.length === 0
-      ? null : listCandidate;
-    if (!blank) {
-      while ((listIndents.at(-1) ?? 0) > indentation) listIndents.pop();
-      if (list !== null) listIndents.push(list[0].replaceAll("\t", "    ").length);
-    }
-    const listIndent = listIndents.at(-1) ?? 0;
-    if (comment === null && indentation >= listIndent + 4 && (previousBlank || indentedCode)) {
-      indentedCode = true;
-      previousBlank = blank;
-      continue;
-    }
-    if (!blank) indentedCode = false;
-    previousBlank = blank;
-    const listContent = fenceLine.replaceAll("\t", "    ").slice(listIndent);
-    if (comment === null && list !== null && /^(?:(?:[-+*]|\d+[.)])[ \t]+|>[ \t]*)+(?:\x60{3,}|~{3,})/u.test(listContent)) {
-      throw new Error("Cannot safely merge a fence with mixed list and quote openers");
-    }
-    const opening = comment === null ? /^ {0,3}(\x60{3,}|~{3,})(.*)$/u.exec(listContent) : null;
-    if (opening?.[1] != null && !(opening[1][0] === "\x60" && (opening[2] ?? "").includes("\x60"))) {
-      fence = { mark: opening[1][0] ?? "~", width: opening[1].length, quoteDepth, listIndent };
-      continue;
-    }
-    const masked = maskInlineLiterals(line, comment);
-    comment = masked.comment;
-    const visible = masked.text;
-    const matches = /!?\[[^\]\r\n]*\]\(([^)\r\n]*)\)/gu;
+  const sourceMarkdown = scanMergeMarkdown(source, (visible, lineIndex) => {
     const covered = new Set<number>();
-    for (const link of visible.matchAll(matches)) {
-      if (link.index === undefined || link[1] === undefined) continue;
-      covered.add(link.index + link[0].indexOf("]("));
-      const content = link[1].trim();
+    // All openings before the next ] share that label boundary. If it cannot
+    // start a destination, retrying those openings only rescans the same text.
+    for (let cursor = 0; cursor < visible.length;) {
+      const open = visible.indexOf("[", cursor);
+      if (open < 0) break;
+      const close = visible.indexOf("]", open + 1);
+      if (close < 0) break;
+      cursor = close + 1;
+      if (visible[cursor] !== "(") continue;
+      const end = visible.indexOf(")", cursor + 1);
+      if (end < 0) break;
+      const content = visible.slice(cursor + 1, end).trim();
+      covered.add(close);
+      cursor = end + 1;
       const raw = content.startsWith("<") && content.endsWith(">") ? content.slice(1, -1) : content;
       if (external(raw)) continue;
       // Markdown decodes character references in destinations before resolving
@@ -102,26 +57,33 @@ export function assertMergeLinksKeepDestinations(
       if (/[%\\()\s]/u.test(raw)) throw new Error("Cannot safely merge an ambiguous relative Markdown link");
       if (raw.includes("?")) throw new Error("Cannot safely merge a relative query");
       const path = raw.split("#", 1)[0] ?? "";
+      const start = visible[open - 1] === "!" ? open - 1 : open;
       checks.push(assertMergeLinkTarget(path, oldNote, newNote, retiredNote, resolveLink, movingFiles,
-        `${oldNote} body line ${lineIndex + 1} ${link[0]}`, "Markdown link"));
+        `${oldNote} body line ${lineIndex + 1} ${visible.slice(start, cursor)}`, "Markdown link"));
     }
     for (let index = visible.indexOf("]("); index >= 0; index = visible.indexOf("](", index + 2)) {
       if (!covered.has(index)) throw new Error("Cannot safely merge an unsupported Markdown link");
     }
-    // An empty first line can continue its destination on the next line.
-    // Refuse that unsupported form at the opener, before any merge effects.
-    const definition = /^ {0,3}\[[^\]\r\n]+\]:[ \t]*(\S*)/u.exec(visible.slice(quotePrefix.length));
-    if (definition?.[1] != null && !external(definition[1])) {
-      throw new Error("Cannot safely merge a relative reference definition");
-    }
     checks.push(assertMergeWikiLinksKeepDestinations(visible, oldNote, newNote, retiredNote, resolveLink, movingFiles, `${oldNote} body line ${lineIndex + 1}`));
-    for (const attribute of visible.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]*))/giu)) {
-      const raw = attribute[1] ?? attribute[2] ?? attribute[3] ?? "";
-      // HTML decodes references (including some without a semicolon) and
-      // resolves local paths from the containing note. Only explicit absolute
-      // destinations are proven stable here; never rewrite authored bytes.
-      if (!absolute(raw)) throw new Error("Cannot safely merge a relative HTML link");
+  });
+  for (const target of sourceMarkdown.htmlTargets) {
+    if (!absolute(target)) throw new Error("Cannot safely merge a relative HTML link");
+  }
+  const definitions = sourceMarkdown.references;
+  for (const candidates of definitions.values()) {
+    for (const destination of candidates) if (!external(destination)) throw new Error("Cannot safely merge a relative reference definition");
+  }
+  if (targetMarkdown !== undefined) {
+    // The destination note appears first in the merged document. Its first
+    // definition of a normalized label would shadow the source definition.
+    for (const [label, earlier] of targetMarkdown.references) {
+      const incoming = definitions.get(label);
+      if (incoming !== undefined && (earlier.size !== 1 || [...incoming].some((destination) => !earlier.has(destination)))) {
+        throw new Error("Cannot merge conflicting reference definitions");
+      }
     }
+    assertNoNewReferenceBindings(sourceMarkdown, targetMarkdown);
+    assertNoNewReferenceBindings(targetMarkdown, sourceMarkdown);
   }
   return (phase) => { for (const check of checks) check(phase); };
 }
@@ -134,21 +96,17 @@ export function assertMergeWikiLinksKeepDestinations(
   location = oldNote,
 ): MergeLinkCheck {
   const checks: MergeLinkCheck[] = [];
-  for (const wiki of source.matchAll(/!?\[\[([^\]\r\n]+)\]\]/gu)) {
-    let escapes = 0;
-    const opener = wiki.index + wiki[0].indexOf("[[");
-    for (let index = opener - 1; index >= 0 && source[index] === "\\"; index -= 1) escapes += 1;
-    if (escapes % 2 !== 0) continue;
-    const path = ((wiki[1] ?? "").split(/#|\\?\|/u, 1)[0] ?? "").trim();
+  for (const { raw, label } of mergeWikiLinks(source)) {
+    const path = (label.split(/#|\\?\|/u, 1)[0] ?? "").trim();
     if (path === "." || path === ".." || path.startsWith("./") || path.startsWith("../")) {
       throw new Error("Cannot safely merge a relative WikiLink");
     }
-    if ((path === "" && !(wiki[1] ?? "").trim().startsWith("#"))
+    if ((path === "" && !label.trim().startsWith("#"))
       || /[%\\]|\/{2,}|\/$|(?:^|\/)\.{1,2}(?:\/|$)/u.test(path)) {
-      throw new Error(`Cannot prove a WikiLink target survives merge: ${location} ${wiki[0]}`);
+      throw new Error(`Cannot prove a WikiLink target survives merge: ${location} ${raw}`);
     }
     checks.push(assertMergeLinkTarget(path, oldNote, newNote, retiredNote, resolveLink, movingFiles,
-      `${location} ${wiki[0]}`, "WikiLink"));
+      `${location} ${raw}`, "WikiLink"));
   }
   // Retain original identities; never re-resolve old contexts after moving.
   return (phase) => { for (const check of checks) check(phase); };
@@ -174,8 +132,11 @@ function assertMergeLinkTarget(
     if (kind !== "Markdown link" || resolve(oldNote, path) !== destination.path || resolve(newNote, path) !== relocation.to) {
       throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
     }
-  } else if (movingFiles.some(({ from, to }) => selectorMatches(path, from) || selectorMatches(path, to))) {
-    throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+  } else if (movingFiles.length > 0) {
+    const selector = path.replace(/^\/+|\.md$/giu, "").normalize("NFC").split("/");
+    if (movingFiles.some(({ from, to }) => selectorMatches(selector, from) || selectorMatches(selector, to))) {
+      throw new Error(`Cannot prove a ${kind} target survives merge: ${location}`);
+    }
   }
   const check: MergeLinkCheck = (phase) => {
     const next = resolveLink(path, relocation !== undefined && phase === "before" ? oldNote : newNote);
@@ -188,10 +149,18 @@ function assertMergeLinkTarget(
   return check;
 }
 
-function selectorMatches(selector: string, path: string): boolean {
-  const key = selector.replace(/^\/+|\.md$/giu, "").normalize("NFC").toLocaleLowerCase();
-  const candidate = path.replace(/\.md$/iu, "").normalize("NFC").toLocaleLowerCase();
-  return candidate === key || candidate.endsWith("/" + key);
+function selectorMatches(selector: readonly string[], path: string): boolean {
+  const components = path.replace(/\.md$/iu, "").normalize("NFC").split("/");
+  const offset = components.length - selector.length;
+  if (offset < 0) return false;
+  return selector.every((name, index) => {
+    const candidate = components[offset + index];
+    // Retain lowercase collisions under both default and host-locale rules.
+    // These are possible competitors; only the host resolver binds a file.
+    return candidate !== undefined && (isSameVaultName(name, candidate)
+      || name.toLowerCase() === candidate.toLowerCase()
+      || name.toLocaleLowerCase() === candidate.toLocaleLowerCase());
+  });
 }
 
 function absolute(path: string): boolean {
@@ -212,63 +181,4 @@ function resolve(filePath: string, relative: string): string {
     } else result.push(part);
   }
   return result.join("/");
-}
-
-type LiteralBlock = "html" | "obsidian" | "pre" | "code";
-
-function maskInlineLiterals(line: string, initial: LiteralBlock | null) {
-  const chars = line.split("");
-  let cursor = 0;
-  let comment = initial;
-  while (cursor < line.length) {
-    if (comment !== null) {
-      const ending = comment === "html" ? /-->/u : comment === "obsidian" ? /%%/u : new RegExp(`</${comment}\\s*>`, "iu");
-      const end = ending.exec(line.slice(cursor));
-      const stop = end === null ? line.length : cursor + end.index + end[0].length;
-      for (let i = cursor; i < stop; i += 1) chars[i] = " ";
-      if (end !== null) comment = null;
-      cursor = stop;
-      continue;
-    }
-    let escapes = 0;
-    for (let i = cursor - 1; i >= 0 && line[i] === "\\"; i -= 1) escapes += 1;
-    const escaped = escapes % 2 !== 0;
-    const rawCode = escaped ? null : /^<(pre|code)\b[^>]*>/iu.exec(line.slice(cursor));
-    if (rawCode !== null) {
-      comment = rawCode[1]!.toLowerCase() as "pre" | "code";
-      for (let i = cursor; i < cursor + rawCode[0].length; i += 1) chars[i] = " ";
-      cursor += rawCode[0].length;
-      continue;
-    }
-    if (!escaped && (line.startsWith("<!--", cursor) || line.startsWith("%%", cursor))) {
-      const isHtml = line.startsWith("<!--", cursor);
-      comment = isHtml ? "html" : "obsidian";
-      const openingLength = isHtml ? 4 : 2;
-      for (let i = cursor; i < cursor + openingLength; i += 1) chars[i] = " ";
-      cursor += openingLength;
-      continue;
-    }
-    if (line[cursor] === "\x60") {
-      if (escaped) { cursor += 1; continue; }
-      let width = 1;
-      while (line[cursor + width] === "\x60") width += 1;
-      let close = -1;
-      for (let i = cursor + width; i < line.length;) {
-        if (line[i] !== "\x60") { i += 1; continue; }
-        let length = 1;
-        while (line[i + length] === "\x60") length += 1;
-        if (length === width) { close = i + length; break; }
-        i += length;
-      }
-      if (close >= 0) {
-        for (let i = cursor; i < close; i += 1) chars[i] = " ";
-        cursor = close;
-        continue;
-      }
-      cursor += width;
-      continue;
-    }
-    cursor += 1;
-  }
-  return { text: chars.join(""), comment };
 }

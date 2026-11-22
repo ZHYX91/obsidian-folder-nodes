@@ -23,6 +23,8 @@ interface ParsedSource {
   readonly bom: string;
   readonly closingBoundary: number;
   readonly eol: string;
+  readonly endings: readonly string[];
+  readonly tail: string;
   readonly frontmatter: Record<string, unknown>;
   readonly hasFrontmatter: boolean;
   readonly issues: FolderNodesPropertyIssue[];
@@ -84,7 +86,7 @@ export function patchFolderNodesFrontmatter(source: string, patch: FolderNodesFr
   } else {
     for (const field of touched) legacyToRemove.add(legacyPropertyFor(field));
   }
-  return patchParsedSource(parsed, nextEntries, legacyToRemove, current.unknownEntries);
+  return patchParsedSource(parsed, nextEntries, legacyToRemove);
 }
 
 export function patchFrontmatterScalar(source: string, key: string, value: string | number | boolean | null): string {
@@ -96,7 +98,7 @@ export function patchFrontmatterScalar(source: string, key: string, value: strin
     const rendered = `${key}: ${renderScalar(value)}`;
     return `${parsed.bom}---${parsed.eol}${rendered}${parsed.eol}---${parsed.eol}${source.slice(parsed.bom.length)}`;
   }
-  const rendered = value === null ? [] : [`${key}: ${renderScalar(value)}`];
+  const rendered = value === null ? [] : [`${key}: ${renderScalar(value)}${range === undefined ? parsed.eol : parsed.endings[range.start]}`];
   const insertion = range?.start ?? parsed.closingBoundary;
   return rebuildSource(parsed, range === undefined ? [] : [range], insertion, rendered);
 }
@@ -106,37 +108,60 @@ export function createNodeDocument(alias: string | null, body: string): string {
   return `---\naliases:\n  - ${JSON.stringify(alias.trim())}\n---\n${body}`;
 }
 
-function patchParsedSource(parsed: ParsedSource, entries: readonly string[], legacyToRemove: ReadonlySet<string>, unknownEntries: readonly string[]): string {
+function patchParsedSource(parsed: ParsedSource, entries: readonly string[], legacyToRemove: ReadonlySet<string>): string {
   if (!parsed.hasFrontmatter) {
-    if (entries.length === 0) return `${parsed.bom}${parsed.lines.join(parsed.eol)}`;
+    if (entries.length === 0) return `${parsed.bom}${parsed.tail}`;
     const rendered = renderFolderNodes(entries, parsed.eol);
-    return `${parsed.bom}---${parsed.eol}${rendered}${parsed.eol}---${parsed.eol}${parsed.lines.join(parsed.eol)}`;
+    return `${parsed.bom}---${parsed.eol}${rendered}${parsed.eol}---${parsed.eol}${parsed.tail}`;
   }
   const ranges = [
     parsed.ranges.get(FOLDER_NODES_PROPERTY),
     ...[...legacyToRemove].map((key) => parsed.ranges.get(key)),
   ].filter((range): range is SourceRange => range !== undefined);
   const insertion = ranges.reduce((minimum, range) => Math.min(minimum, range.start), parsed.closingBoundary);
-  const preserved = unknownBlockItems(parsed, new Set(unknownEntries));
-  const rendered = entries.length === 0 ? [] : [FOLDER_NODES_PROPERTY + ":", ...entries.map((entry) =>
-    preserved.get(entry)?.shift() ?? `  - ${renderListItem(entry)}`)];
+  const rendered = renderCanonicalBlock(parsed, entries);
   return rebuildSource(parsed, ranges, insertion, rendered);
 }
 
-function unknownBlockItems(parsed: ParsedSource, unknown: ReadonlySet<string>): Map<string, string[]> {
-  const preserved = new Map<string, string[]>();
+function renderCanonicalBlock(parsed: ParsedSource, entries: readonly string[]): string[] {
+  const retained = new Set(entries);
+  const originalRows = new Map<string, string[][]>();
+  let pending: string[] = [];
   const range = parsed.ranges.get(FOLDER_NODES_PROPERTY);
-  if (range === undefined || stripYamlComment(valueAfterColon(parsed.lines[range.start] ?? "")).trim() !== "") return preserved;
-  for (const line of parsed.lines.slice(range.start + 1, range.end)) {
-    const match = /^\s+-\s+(.+)$/u.exec(line);
-    if (match === null) continue;
-    const value = parseYamlScalar(match[1]!);
-    if (typeof value !== "string" || !unknown.has(value)) continue;
-    const rows = preserved.get(value) ?? [];
-    rows.push(`  ${line.trimStart()}`);
-    preserved.set(value, rows);
+  let header = FOLDER_NODES_PROPERTY + ":" + parsed.eol;
+  let headerComment = "";
+  const line = range === undefined ? "" : parsed.lines[range.start]!;
+  const rawValue = valueAfterColon(line);
+  const value = stripYamlComment(rawValue);
+  if (range !== undefined && rawValue.length !== value.length) {
+    const ending = parsed.endings[range.start]!;
+    headerComment = rawValue.slice(value.length) + ending;
+    // A flow sequence becomes a block, but its comment still describes the property.
+    header = line.slice(0, line.indexOf(":") + 1) + (/[ \t]*$/u.exec(value)?.[0] || " ") + headerComment;
   }
-  return preserved;
+  if (range !== undefined && value.trim() === "") {
+    header = parsed.lines[range.start]! + parsed.endings[range.start]!;
+    for (let index = range.start + 1; index < range.end; index += 1) {
+      const line = parsed.lines[index]!;
+      if (/^[ \t]*(?:#.*)?$/u.test(line)) {
+        pending.push(line + parsed.endings[index]!);
+        continue;
+      }
+      const match = /^\s+-\s+(.+)$/u.exec(line);
+      const value = match === null ? null : parseYamlScalar(match[1]!);
+      if (typeof value !== "string" || !retained.has(value)) continue;
+      // Preserve standalone comments with the next surviving list item, even
+      // when a removed item preceded them or canonical ordering changes.
+      const groups = originalRows.get(value) ?? [];
+      pending.push(`  ${line.trimStart()}${parsed.endings[index]}`);
+      groups.push(pending);
+      originalRows.set(value, groups);
+      pending = [];
+    }
+  }
+  const rendered = entries.length > 0 ? [header] : headerComment ? [headerComment] : [];
+  for (const entry of entries) rendered.push(...(originalRows.get(entry)?.shift() ?? [`  - ${renderListItem(entry)}${parsed.eol}`]));
+  return [...rendered, ...pending];
 }
 
 function rebuildSource(parsed: ParsedSource, removedRanges: readonly SourceRange[], insertion: number, rendered: readonly string[]): string {
@@ -145,10 +170,10 @@ function rebuildSource(parsed: ParsedSource, removedRanges: readonly SourceRange
   const lines: string[] = [];
   for (let index = 0; index < parsed.lines.length; index += 1) {
     if (index === insertion) lines.push(...rendered);
-    if (!removed.has(index)) lines.push(parsed.lines[index] ?? "");
+    if (!removed.has(index)) lines.push(parsed.lines[index]! + parsed.endings[index]!);
   }
   if (insertion === parsed.lines.length) lines.push(...rendered);
-  return `${parsed.bom}${lines.join(parsed.eol)}`;
+  return parsed.bom + lines.join("") + parsed.tail;
 }
 
 function parseSource(source: string): ParsedSource {
@@ -162,23 +187,39 @@ function parseGenericSource(source: string, key: string): ParsedSource {
 function parseKnownSource(source: string, keys: readonly string[]): ParsedSource {
   const bom = source.startsWith("\uFEFF") ? "\uFEFF" : "";
   const body = source.slice(bom.length);
-  const eol = body.includes("\r\n") ? "\r\n" : "\n";
-  const lines = body.split(/\r\n|\n/u);
-  const hasFrontmatter = FRONTMATTER_BOUNDARY.test(lines[0] ?? "");
+  const breaks = /\r\n|\r|\n/gu;
+  let next = breaks.exec(body);
+  const eol = next?.[0] ?? "\n";
+  const lines = [body.slice(0, next?.index ?? body.length)];
+  const endings = [next?.[0] ?? ""];
+  const hasFrontmatter = FRONTMATTER_BOUNDARY.test(lines[0]!);
   const issues: FolderNodesPropertyIssue[] = [];
-  if (!hasFrontmatter) {
-    return { bom, closingBoundary: -1, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
+  const empty = { bom, closingBoundary: -1, eol, endings, tail: body, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map<string, SourceRange>() };
+  if (!hasFrontmatter) return empty;
+  // Track the original separator for each header line. The note body never
+  // passes through the formatter, even if it uses a different mix of endings.
+  let closingBoundary = -1;
+  let tail = "";
+  while (next !== null) {
+    const start = breaks.lastIndex;
+    next = breaks.exec(body);
+    const line = body.slice(start, next?.index ?? body.length);
+    lines.push(line);
+    endings.push(next?.[0] ?? "");
+    if (FRONTMATTER_BOUNDARY.test(line)) {
+      closingBoundary = lines.length - 1;
+      tail = next === null ? "" : body.slice(breaks.lastIndex);
+      break;
+    }
   }
-  const relativeEnd = lines.slice(1).findIndex((line) => FRONTMATTER_BOUNDARY.test(line));
-  if (relativeEnd < 0) {
+  if (closingBoundary < 0) {
     issues.push({ code: "source-ambiguous", field: "all", message: "Cannot update malformed frontmatter without a closing boundary" });
-    return { bom, closingBoundary: -1, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
+    return empty;
   }
-  const closingBoundary = relativeEnd + 1;
   const structure = inspectTopLevelStructure(lines, closingBoundary);
   if (structure === null) {
     issues.push({ code: "source-ambiguous", field: "all", message: "Unsupported top-level frontmatter structure; use a block mapping" });
-    return { bom, closingBoundary, eol, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
+    return { bom, closingBoundary, eol, endings, tail, frontmatter: {}, hasFrontmatter, issues, lines, ranges: new Map() };
   }
   const occurrences = new Map<string, SourceRange[]>();
   const frontmatter: Record<string, unknown> = {};
@@ -199,7 +240,7 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     // Unicode spaces belong to the authored key, not YAML separation.
     const key = line.slice(0, separator).replace(/[ \t]+$/u, "");
     if (!keys.includes(key)) continue;
-    const range = { start: index, end: structure.valueEnds.get(index) ?? continuationEnd(lines, index, closingBoundary) };
+    const range = { start: index, end: structure.valueEnds.get(index) ?? continuationEnd(lines, index, closingBoundary, key) };
     const existing = occurrences.get(key) ?? [];
     existing.push(range);
     occurrences.set(key, existing);
@@ -220,7 +261,7 @@ function parseKnownSource(source: string, keys: readonly string[]): ParsedSource
     const candidate = candidates[0];
     if (candidate !== undefined) ranges.set(key, candidate);
   }
-  return { bom, closingBoundary, eol, frontmatter, hasFrontmatter, issues, lines, ranges };
+  return { bom, closingBoundary, eol, endings, tail, frontmatter, hasFrontmatter, issues, lines, ranges };
 }
 
 /**
@@ -366,8 +407,20 @@ function parseFolderNodesValue(lines: readonly string[], range: SourceRange): un
   return values;
 }
 
-function continuationEnd(lines: readonly string[], start: number, closingBoundary: number): number {
+function continuationEnd(lines: readonly string[], start: number, closingBoundary: number, key: string): number {
   const after = stripYamlComment(valueAfterColon(lines[start] ?? "")).trim();
+  if (key === FOLDER_NODES_PROPERTY && after === "") {
+    // Standalone YAML comments can be unindented inside a block sequence.
+    // Its range ends after the last value, leaving trailing comments untouched.
+    let end = start + 1;
+    for (let index = start + 1; index < closingBoundary; index += 1) {
+      const line = lines[index] ?? "";
+      if (/^[ \t]*(?:#.*)?$/u.test(line)) continue;
+      if (!/^[ \t]/u.test(line)) break;
+      end = index + 1;
+    }
+    return end;
+  }
   let index = start + 1;
   let hasContent = after === "" || /^[|>]/u.test(after);
   while (index < closingBoundary) {

@@ -1,3 +1,4 @@
+import * as obsidian from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { NodeService } from "../../src/adapters/node-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
@@ -6,6 +7,33 @@ import { FakeObsidian } from "../helpers/fake-obsidian";
 const service = (fake: FakeObsidian) => new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
 
 describe("Merge link target identity", () => {
+  it.each([
+    ["[[Target/Σ]]", "ς.md", false],
+    ["[reference](Target/Σ.MD)", "ς.md", false],
+    ["[[Target/Sale]]", "ſale.md", false],
+    ["[[Target/Σ]]", "ς.md", true],
+  ] as const)("refuses a projected Unicode best-match competitor before moving it: %s, %s, delayed cache %s", async (link, name, delayed) => {
+    const fake = new FakeObsidian();
+    const source = fake.addFolder("Source");
+    fake.addFile("Source/Source.md", link);
+    const moving = fake.addFile("Source/" + name, "moving");
+    const target = fake.addFolder("Target");
+    fake.addFile("Target/Target.md", "target");
+    fake.addFolder("Elsewhere");
+    fake.addFolder("Elsewhere/Target");
+    const fixed = fake.addFile("Elsewhere/Target/" + name, "original");
+    fake.app.metadataCache.getFirstLinkpathDest = () => {
+      const moveIndexed = delayed ? fake.trashed.includes("Source") : moving.parent === target;
+      return moveIndexed ? moving : fixed;
+    };
+    const before = new Map(fake.contents);
+
+    await expect(service(fake).mergeNode(source, target)).rejects.toThrow("Cannot prove");
+    expect(fake.renames).toEqual([]);
+    expect(fake.contents).toEqual(before);
+    expect(fake.trashed).toEqual([]);
+  });
+
   it.each([
     "[self](Source/Source.md)", "[self](<Source/Source.md>)", "[self](Source/Source.md#Heading)",
     "![self](Source/Source.md#^block)", "[self](Source)", "[self](/Source/Source.md)",
@@ -64,6 +92,32 @@ describe("Merge link target identity", () => {
       await service(fake).mergeNode(source, target);
       expect(fake.contents.get("Target/Target.md")).toContain(link);
       expect(fake.requireFile("Library/Reference.md")).toBe(original);
+      expect(fake.trashed).toEqual(["Source"]);
+    },
+  );
+
+  it.each([["Cafe\u0301", "Café"], ["Project\u00a0Notes", "Project Notes"]])(
+    "keeps the exact path of the host-resolved file when merging: %s", async (actualName, normalizedName) => {
+      const fake = new FakeObsidian();
+      const source = fake.addFolder("Source");
+      const target = fake.addFolder("Target");
+      fake.addFile("Source/Source.md", `[[${actualName}]]`);
+      fake.addFile("Target/Target.md", "target");
+      const original = fake.addFile(`${actualName}.md`, "original");
+      fake.addFile(`${normalizedName}.md`, "other");
+      fake.app.metadataCache.getFirstLinkpathDest = () => original;
+
+      // The SDK normalizes user-entered paths to NFC and replaces nonbreaking spaces.
+      const normalize = obsidian.normalizePath;
+      const sdk = vi.spyOn(obsidian, "normalizePath").mockImplementation((path) =>
+        normalize(path).normalize("NFC").replace(/[\u00a0\u202f]/gu, " "));
+      try {
+        await service(fake).mergeNode(source, target);
+      } finally {
+        sdk.mockRestore();
+      }
+      expect(fake.contents.get("Target/Target.md")).toContain(`[[${actualName}]]`);
+      expect(fake.requireFile(original.path)).toBe(original);
       expect(fake.trashed).toEqual(["Source"]);
     },
   );

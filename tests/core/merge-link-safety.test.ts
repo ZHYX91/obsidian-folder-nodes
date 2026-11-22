@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { assertMergeLinksKeepDestinations } from "../../src/core/merge-link-safety";
 
+import { scanMergeMarkdown } from "../../src/core/merge-markdown";
+
 const assertSafe = (source: string) => assertMergeLinksKeepDestinations(
   source, "A/A.md", "Deep/B/B.md", "A/A.md",
 );
@@ -32,6 +34,13 @@ describe("Node merge link preflight", () => {
       if (mode !== "unresolved-old") expect(resolve).toHaveBeenCalledWith("Reference", "B/B.md");
     },
   );
+  it("keeps a host-resolved WikiLink independent of a new Markdown definition", () => {
+    const identity = {};
+    const resolve = () => ({ path: "Elsewhere/Guide.md", identity });
+    for (const wiki of ["[[Guide]]", "![[Guide]]"]) {
+      expect(() => assertMergeLinksKeepDestinations(wiki, "A/A.md", "B/B.md", "A/A.md", resolve, [], scanMergeMarkdown("[guide]: https://example.com"))).not.toThrow();
+    }
+  });
   it("rejects moving targets and future best-match competitors without rewriting", () => {
     const identity = {};
     const resolve = () => ({ path: "Elsewhere/Reference.md", identity });
@@ -43,6 +52,21 @@ describe("Node merge link preflight", () => {
       () => ({ path: "A/asset.md", identity }), [{ from: "A/asset.md", to: "B/asset.md" }])).toThrow("Cannot prove");
     expect(() => assertMergeLinksKeepDestinations("[[#Heading]] ![[#^block]]", "A/child.md", "B/child.md", "A/A.md", resolve)).not.toThrow();
   });
+  it("preserves lowercase candidate matches beyond Unicode simple folding", () => {
+    const fixed = { path: "Elsewhere/Target/İ.md", identity: {} };
+    expect(() => assertMergeLinksKeepDestinations("[[Target/İ]]", "A/A.md", "Target/Target.md", "A/A.md",
+      () => fixed, [{ from: "A/i\u0307.md", to: "Target/i\u0307.md" }])).toThrow("Cannot prove");
+  });
+
+  it.each([["Work/σ", "OtherWork/ς"], ["Ａ", "A"], ["XY", "X\u200bY"], ["Café", "Cafe"]])(
+    "keeps a stable target when %s and the projected %s have distinct suffixes", (selector, candidate) => {
+      const fixed = { path: "Fixed/" + selector + ".md", identity: {} };
+      const check = assertMergeLinksKeepDestinations(`[[${selector}]]`, "A/A.md", "B/B.md", "A/A.md",
+        () => fixed, [{ from: "A/" + candidate + ".md", to: "B/" + candidate + ".md" }]);
+      expect(() => check("after")).not.toThrow();
+    },
+  );
+
   it("retains the original identity for final validation instead of resolving the old context again", () => {
     const original = {};
     let changed = false;
@@ -70,6 +94,23 @@ describe("Node merge link preflight", () => {
       "", "    [[A/A]]", "", "<pre>[[A/A]]</pre>", "<code>[[A/A]]</code>",
       "<!--", "2. ~~~", "[[A/A]]", "-->",
     ].join("\n"))).not.toThrow();
+  });
+  it("considers links after Obsidian literals and preserves Markdown definition destinations", () => {
+    expect(() => assertSafe("%%\n~~~\n%%\n[[A/A]]")).toThrow("removed Node Note");
+    expect(() => assertSafe("~~~\n%%\n~~~\n[[A/A]]")).toThrow("removed Node Note");
+    expect(() => assertSafe("[ok]: https://example/%%open\n\n[[A/A]]")).toThrow("removed Node Note");
+    expect(() => assertSafe("\\``[[A/A]]`")).not.toThrow();
+    expect(() => assertSafe("\\`[[A/A]]`")).toThrow("removed Node Note");
+  });
+  it("checks rendered HTML destinations and Markdown links inside inline HTML code", () => {
+    expect(() => assertSafe("<code>[go](local.md)</code>")).toThrow("Markdown link target");
+    expect(() => assertSafe('<pre><a href="local.md">go</a></pre>')).toThrow("relative HTML link");
+    expect(() => assertSafe('<pre><img src="local.png"></pre>')).toThrow("relative HTML link");
+    expect(() => assertSafe("<pre>![photo](local.png)</pre>")).not.toThrow();
+    expect(() => assertSafe("<code>`[go](local.md)`</code>")).not.toThrow();
+    expect(() => assertSafe("<code-widget>[[A/A]]</code-widget>")).toThrow("removed Node Note");
+    expect(() => assertSafe('[go](https://example.com/%% "<code>")\n\n[ref]: local.md')).toThrow("relative reference definition");
+    expect(() => assertSafe('<pre><span title="</pre> %%">sample</span></pre>\n\n[go](local.md)')).toThrow("Markdown link target");
   });
   it("ends a quoted code fence when its quote ends and still checks list continuations", () => {
     expect(() => assertSafe("> ~~~\n> example\n\n[[A/A]]")).toThrow("removed Node Note");
@@ -149,6 +190,78 @@ describe("Node merge link preflight", () => {
       "%% [hidden](../Reference.md) %%",
     ].join("\n"))).not.toThrow();
   });
+  it.each([
+    "- [ref]: ../Reference.md",
+    "2) [ref]: ../Reference.md",
+    "A paragraph\n01. [ref]: ../Reference.md",
+    "# Heading\n2. [ref]: ../Reference.md",
+    "- paragraph\n- [ref]: ../Reference.md",
+    "paragraph\n> [ref]: ../Reference.md",
+    "~~~\ncode\n~~~\n2. [ref]: ../Reference.md",
+    "- \t[ref]: ../Reference.md",
+    "> - [ref]: ../Reference.md",
+    "- > [ref]: ../Reference.md",
+    "- - [ref]:\n    ../Reference.md",
+    "- -\n      [ref]: ../Reference.md",
+    "> paragraph\n-\n    [ref]: ../Reference.md",
+    ">\n    > [ref]: ../Reference.md",
+    "[ref]: https://example.com invalid trailing title\n\n[ref]: ../Reference.md",
+    "10. A list item\n\n    [ref]: ../Reference.md",
+  ])("checks reference definitions inside Markdown containers: %s", (source) => {
+    expect(() => assertSafe(source)).toThrow("reference definition");
+  });
+
+  it.each([
+    "- [ref]: https://example.com",
+    "- [ref]: <https://example.com/a>",
+    "- [ref]:\n  <https://example.com/a>",
+    "- [multi\n  line]:\n  https://example.com/a",
+    "A paragraph\n2. [ref]: ../Reference.md",
+    "- paragraph\n  [ref]: ../Reference.md",
+    "- - - example\n\n          [ref]: ../Reference.md",
+    "- `[ref]: ../Reference.md`",
+    "-     [ref]: ../Reference.md",
+    "-\n\n    [ref]: ../Reference.md",
+    "1)\n\n    - [ref]: ../Reference.md",
+    "    - [ref]: ../Reference.md",
+    "- ~~~\n  [ref]: ../Reference.md\n  ~~~",
+  ])("allows external or literal reference text in lists: %s", (source) => {
+    expect(() => assertSafe(source)).not.toThrow();
+  });
+
+  it.each([
+    ["-\n  \n    [ref]: ../local.md", false],
+    ["1.\n    \n      [ref]: ../local.md", false],
+    ["1.\n  \n      [ref]: ../local.md", true],
+    ["-\n  \n      [ref]: ../local.md", true],
+    ["[guide]: https://example.com\n    [ref]: ../local.md", false],
+    ["[guide]: https://example.com\n    > [ref]: ../local.md", true],
+    ["[guide]: https://example.com\n    [GUIDE]: ../shadowed.md", true],
+    ["[guide]: https://example.com\n    [ref]: https://example.com/other", true],
+  ])("preserves the possible first definitions across differing CommonMark indentation interpretations: %j", (body, safe) => {
+    if (safe) expect(() => assertSafe(body)).not.toThrow();
+    else expect(() => assertSafe(body)).toThrow("relative reference definition");
+  });
+
+  it.each([
+    ["[Guide   to\n  Straße]: https://one.example", "[guide TO STRASSE]: https://two.example", false],
+    ["[Guide]: https://site.example/%%one%%", "[guide]: https://site.example/%%two%%", false],
+    ["[Guide]: https://site.example/%%one%%", "[guide]: https://site.example/%%one%%", true],
+    ["%%\n\n[guide]: ../hidden.md\n\n%%\n\n[guide]: https://site.example", "[guide]: https://site.example", true],
+    ["[Guide]: https://site.example/`one`", "[guide]: https://site.example/`two`", false],
+    ["[Guide]: https://one.example", "[guide]: ../unrelated.md", false],
+    ["[Guide]: https://one.example", "[other]: ../unrelated.md", true],
+    ["[guide]: https://one.example", "[GUIDE]: https://one.example\n[Guide]: https://shadowed.example", true],
+    ["[guide]: https://one.example\n[Guide]: ../shadowed.md", "[GUIDE]: https://one.example", true],
+    ["[guide]: https://one.example", "[guide]: https://one.example bad title\n\n[guide]: https://changed.example", false],
+    ["[guide]: https://one.example", "[guide]: https://one.example \"valid title\"\n\n[guide]: https://shadowed.example", true],
+    ["[Guide]: https://one.example", "`[guide]: https://two.example`", true],
+  ])("checks normalized labels against the destination body: %s", (source, target, safe) => {
+    const preflight = () => assertMergeLinksKeepDestinations(source, "A/A.md", "B/B.md", "A/A.md", undefined, [], scanMergeMarkdown(target));
+    if (safe) expect(preflight).not.toThrow();
+    else expect(preflight).toThrow("conflicting reference definitions");
+  });
+
   it("fails closed on ambiguous reference and hyperlink syntax", () => {
     expect(() => assertSafe("[ref]: ../Reference.md")).toThrow("reference definition");
     expect(() => assertSafe("[[../Reference]]")).toThrow("relative WikiLink");

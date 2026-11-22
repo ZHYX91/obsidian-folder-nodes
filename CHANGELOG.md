@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Preserve managed node metadata and comments when changing visibility or rank. Keep the original line endings of untouched properties and note text, including mixed or CR-only files.
+- Refuse merges that would change reference link destinations across empty or nested lists or when the two notes define the same label differently. Allow reference-looking text that continues an existing paragraph inside nested lists and quotes.
+- Preserve visible links around inline code and HTML when merging notes, and refuse to append a note inside an open fence or comment. A definition in either note can no longer turn previously literal text in the other note into a link or image.
+- Preserve both notes’ original body line endings when merging. Verify that transferred YAML values retain their types, and keep HTML-like prose and quoted attribute examples from blocking a safe merge.
+
 ## 0.13.2 - 2026-11-21
 
 - Allow table selection link edits to settle, including Obsidian’s column width adjustments, before saving the source note. Keep the new node if the link edit cannot be confirmed.
