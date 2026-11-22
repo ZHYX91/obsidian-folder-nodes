@@ -592,39 +592,62 @@ describe("Node Graph plugin integration", () => {
     expect(view.refreshCalls).toBe(3);
   });
 
-  it.each(["new conflict", "removed root note", "renamed root note"])("refreshes a cached graph after %s with variant spelling", async (change) => {
+  it("keeps graph state while duplicate Node Notes are removed or renamed", async () => {
+    const fixture = pluginFixture();
+    const plugin = fixture.createPlugin();
+    await plugin.onload();
+    const view = createRegisteredView(plugin);
+    fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
+    const notePath = () => {
+      const snapshot = view.options?.getIndexSnapshot?.() as { records: ReadonlyMap<string, { notePath: string | null }> };
+      return snapshot.records.get("A")?.notePath;
+    };
+    expect(notePath()).toBe("A/A.md");
+
+    const duplicate = fixture.vault.addFile("A/a.MD");
+    fixture.emit("create", duplicate);
+    const third = fixture.vault.addFile("A/a.md");
+    fixture.emit("create", third);
+    expect(notePath()).toBeUndefined();
+    fixture.vault.remove(third.path);
+    fixture.emit("delete", third);
+    expect(notePath()).toBeUndefined();
+    expect(view.pathRemovalCalls).toEqual([]);
+
+    fixture.vault.remove(duplicate.path);
+    fixture.emit("delete", duplicate);
+    expect(notePath()).toBe("A/A.md");
+    expect(view.pathRemovalCalls).toEqual([]);
+
+    const replacement = fixture.vault.addFile("A/a.MD");
+    fixture.emit("create", replacement);
+    const renamed = await fixture.renameNote("A/A.md", "A/Other.md");
+    fixture.emit("rename", renamed.file, renamed.oldPath);
+    expect(notePath()).toBe(replacement.path);
+    expect(view.pathRemovalCalls).toEqual([]);
+
+    fixture.vault.remove(replacement.path);
+    fixture.emit("delete", replacement);
+    expect(notePath()).toBeUndefined();
+    expect(view.pathRemovalCalls).toEqual(["A"]);
+  });
+
+  it.each(["delete", "rename"])("refreshes a variant-spelled root note on %s", async (event) => {
     const fixture = pluginFixture();
     fixture.removeCanonical("");
     const rootNote = fixture.vault.addFile("test vault.MD");
-    const { service } = fixture;
     const plugin = fixture.createPlugin();
     await plugin.onload();
     const view = createRegisteredView(plugin);
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     const snapshot = () => view.options?.getIndexSnapshot?.() as { records: ReadonlyMap<string, { notePath: string | null }> };
     expect(snapshot().records.get("")?.notePath).toBe(rootNote.path);
-    expect(snapshot().records.has("A")).toBe(true);
-
-    if (change === "new conflict") {
-      const duplicate = fixture.vault.addFile("A/a.MD");
-      expect(service.nodeNoteRole(duplicate)).toBe("conflict");
-      fixture.emit("create", duplicate);
-      expect(snapshot().records.has("A")).toBe(false);
-      const renamed = await fixture.renameNote("A/A.md", "A/Other.md");
-      fixture.emit("rename", renamed.file, renamed.oldPath);
-      expect(snapshot().records.get("A")?.notePath).toBe(duplicate.path);
-    } else {
-      const oldPath = rootNote.path;
-      if (change === "removed root note") {
-        fixture.vault.remove(oldPath);
-        fixture.emit("delete", rootNote);
-      } else {
-        await fixture.vault.rename(rootNote, "other.md");
-        fixture.emit("rename", rootNote, oldPath);
-      }
-      expect(service.getCanonicalFile("")).toBeNull();
-      expect(snapshot().records.get("")?.notePath).toBeNull();
-    }
+    const oldPath = rootNote.path;
+    if (event === "delete") fixture.vault.remove(oldPath);
+    else await fixture.vault.rename(rootNote, "other.md");
+    fixture.emit(event, rootNote, oldPath);
+    expect(fixture.service.getCanonicalFile("")).toBeNull();
+    expect(snapshot().records.get("")?.notePath).toBeNull();
   });
 
   it("preserves leaf state until a note-driven external rename remaps the folder", async () => {

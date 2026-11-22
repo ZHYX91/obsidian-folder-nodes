@@ -78,15 +78,13 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     }));
     this.registerEvent(this.app.vault.on("delete", (entry) => {
       if (entry instanceof TFolder) {
-        for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
-          if (leaf.view instanceof FolderNodeGraphView) leaf.view.removePathState(entry.path);
-        }
+        this.removeNodeGraphPathState(entry.path);
         this.invalidateNodeGraphStructure();
         return;
       }
       if (!(entry instanceof TFile) || !this.nodeGraphCanonicalNotePath(entry.path)) return;
       const folder = dirname(entry.path);
-      this.removeNodeGraphPathState(folder);
+      if (folder !== "" && this.service.nodeNoteCandidates(folder).length === 0) this.removeNodeGraphPathState(folder);
       this.invalidateNodeGraphPaths([folder]);
     }));
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.nodeGraphIndex.invalidateLinks()));
@@ -201,7 +199,6 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   }
 
   private removeNodeGraphPathState(path: string): void {
-    if (path === "") return;
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeGraphView) leaf.view.removePathState(path);
     }
