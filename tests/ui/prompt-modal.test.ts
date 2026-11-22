@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NodeActionsModal } from "../../src/ui/node-actions-modal";
 import { ConfirmModal, PromptModal } from "../../src/ui/prompt-modal";
 import { setLanguage } from "../../src/ui/i18n";
 import { Notice as MockNotice } from "../mocks/obsidian";
@@ -122,5 +123,19 @@ describe("ConfirmModal actions", () => {
     expect(modal.contentEl.isConnected).toBe(true);
     cancel!.click();
     expect(modal.contentEl.isConnected).toBe(false);
+  });
+});
+
+describe("Node Actions feedback", () => {
+  it.each([false, true])("reports a failed action after closing its menu (async: %s)", async (asyncFailure) => {
+    const report = vi.fn();
+    const error = new Error("Action failed");
+    const action = () => { if (asyncFailure) return Promise.reject(error); throw error; };
+    const modal = new NodeActionsModal({} as App, "Node", [{ group: "open", id: "open", icon: "file", title: "Open", run: action }], report);
+    modal.open();
+    modal.contentEl.querySelector<HTMLButtonElement>("button")!.click();
+    await Promise.resolve();
+    expect(modal.modalEl.isConnected).toBe(false);
+    expect(report).toHaveBeenCalledExactlyOnceWith(error);
   });
 });

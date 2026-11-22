@@ -22,6 +22,20 @@ afterEach(async () => {
 });
 
 describe("Node Graph progressive view", () => {
+  it("keeps keyboard focus on graph controls when their actions redraw the scene", async () => {
+    const { view } = await graphViewFixture();
+    document.body.append(view.contentEl);
+    try {
+      const links = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!;
+      const dimension = [...view.contentEl.querySelectorAll<HTMLButtonElement>(".folder-nodes-node-graph-switch-button")].find((button) => button.textContent === "3D")!;
+      for (const button of [links, dimension]) {
+        button.focus();
+        button.click();
+        expect(document.activeElement).toBe(button);
+      }
+      expect(view.getState()).toMatchObject({ dimension: "3d", showLinks: true });
+    } finally { view.contentEl.remove(); }
+  });
   it("refreshes the host tab title without resetting search, scope or the viewport", async () => {
     const { view } = await graphViewFixture();
     view.setGraphScope({ mode: "subtree", rootPath: "Work" });
@@ -486,6 +500,27 @@ describe("Node Graph progressive view", () => {
     expect(emptySummary?.textContent).toBe("No visible links in the current scope");
   });
 
+  it.each(["toggle", "unlink"] as const)("reconciles selection when a local link-only card disappears on %s", async (change) => {
+    const { view, snapshot } = await graphViewFixture();
+    view.setGraphScope({ mode: "local", rootPath: "Work/A" });
+    const toggle = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")!;
+    toggle.click();
+    nodeBody(view, "Personal/Home").click();
+    expect(view.getState().focus).toBe("Personal/Home");
+    if (change === "toggle") toggle.click();
+    else {
+      snapshot.links.clear();
+      (snapshot as { revision: number }).revision += 1;
+      view.refresh();
+    }
+    await vi.waitFor(() => expect(view.contentEl.querySelector("[data-node-path='Personal/Home']")).toBeNull());
+    expect(view.getState().focus).toBeNull();
+    expect(scopeButton(view, "subtree").disabled).toBe(true);
+
+    view.setFocus("removed");
+    expect(view.getState().focus).toBeNull();
+  });
+
   it("temporarily reveals a hidden search result and restores focus and expansion on Escape", async () => {
     const fixture = await graphViewFixture();
     expandHandle(fixture.view, "Personal").click();
@@ -580,6 +615,17 @@ describe("Node Graph progressive view", () => {
     fixture.view.setFocus("Work/A/One/Deep");
     expect(graphNode(fixture.view, "Work/A/One/Deep").classList.contains("is-focused")).toBe(true);
     expect(fixture.view.getState().scope).toEqual({ mode: "global" });
+  });
+
+  it("reveals a newly indexed target before the graph's scheduled refresh", async () => {
+    const { view, snapshot } = await graphViewFixture();
+    const parent = snapshot.records.get("Work/A/One")!;
+    const path = "Work/A/One/New";
+    snapshot.records.set(path, { ...parent, path, label: "New", parentPath: parent.path, notePath: path + "/New.md" });
+    (snapshot as { revision: number }).revision += 1;
+    view.setFocus(path);
+    expect(nodeBody(view, path)).toBeDefined();
+    expect(view.getState().focus).toBe(path);
   });
 
   it("remaps persisted leaf paths on folder rename and prunes them on delete", async () => {

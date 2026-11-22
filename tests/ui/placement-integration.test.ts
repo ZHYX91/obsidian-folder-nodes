@@ -206,6 +206,39 @@ describe("Placement and identity integration", () => {
       expect(target.classList.contains("folder-nodes-content-drop-into")).toBe(false);
     } finally { await view.onClose(); }
   });
+  it("keeps other panes' selections when Escape closes the active Contents selection", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFile("item.txt");
+    const nodes = new NodeService(fake.app, () => structuredClone(DEFAULT_SETTINGS));
+    const left = makeView(fake, nodes);
+    const right = makeView(fake, nodes);
+    const editor = document.body.createEl("textarea");
+    const selected = (view: FolderNodeContentsView) => view.contentEl.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='file:item.txt']")!;
+    const escape = (target: HTMLElement) => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    try {
+      for (const view of [left, right]) {
+        document.body.append(view.containerEl);
+        await view.onOpen();
+        view.contentEl.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='header:selection']")!.click();
+        selected(view).click();
+      }
+      escape(editor);
+      expect(selected(left).getAttribute("aria-pressed")).toBe("true");
+      expect(selected(right).getAttribute("aria-pressed")).toBe("true");
+      escape(selected(left));
+      expect(selected(left).hasAttribute("aria-pressed")).toBe(false);
+      expect(selected(right).getAttribute("aria-pressed")).toBe("true");
+    } finally {
+      editor.remove();
+      for (const view of [left, right]) {
+        await view.onClose();
+        view.unload();
+        view.containerEl.remove();
+      }
+    }
+  });
+
   it("keeps a multi-selection drag as link copy without moving any item", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");

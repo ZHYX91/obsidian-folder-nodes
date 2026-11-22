@@ -188,7 +188,7 @@ export class FolderNodeGraphView extends ItemView {
   private refreshTimer: number | null = null;
   private searchQuery = "";
   private searchPreviewPath: string | null = null;
-  private pendingPersistedFocusReveal = false;
+  private pendingFocusReveal = false;
   private disconnectDomViewport: (() => void) | null = null;
   private disconnectViewportButtons: (() => void) | null = null;
   private searchResultsCache: {
@@ -238,7 +238,7 @@ export class FolderNodeGraphView extends ItemView {
       this.focusPath = typeof input.focus === "string"
         ? normalizeVaultPath(input.focus)
         : this.graphScope.mode === "global" ? null : this.graphScope.rootPath;
-      this.pendingPersistedFocusReveal = this.focusPath !== null;
+      this.pendingFocusReveal = this.focusPath !== null;
     }
     if (this.contentEl.isConnected) this.render();
   }
@@ -284,7 +284,7 @@ export class FolderNodeGraphView extends ItemView {
     this.searchResultsCache = null;
     this.searchQuery = "";
     this.searchPreviewPath = null;
-    this.pendingPersistedFocusReveal = false;
+    this.pendingFocusReveal = false;
     this.contentEl.empty();
   }
 
@@ -293,16 +293,10 @@ export class FolderNodeGraphView extends ItemView {
     const focusChanged = nextFocus !== this.focusPath;
     this.focusPath = nextFocus;
     if (focusChanged) this.markWorkspaceStateDirty();
-    if (this.focusPath !== null && this.topology?.nodes.has(this.focusPath) === true
-      && this.displayGraphData?.records.has(this.focusPath) === false) {
-      const expansion = expandNodeGraphAncestors(this.topology, this.graphScope, this.currentExpansion, [this.focusPath]);
-      this.currentExpansion = expansion;
-      this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expansion);
+    if (nextFocus !== null && !this.displayGraphData?.records.has(nextFocus)) {
+      this.pendingFocusReveal = true;
+      if (this.displayGraphData === null) return;
       this.render();
-      if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
-      else if (this.dimension === "3d") this.center3DOnFocus();
-      else this.applyFocus(true);
-      return;
     }
     if (this.canvasRenderer !== null) this.canvasRenderer.setFocus(this.focusPath, true);
     else if (this.dimension === "3d" && this.focusPath !== null) this.center3DOnFocus();
@@ -435,13 +429,13 @@ export class FolderNodeGraphView extends ItemView {
       const viewport = this.captureViewportState();
       this.indexSnapshot = null;
       this.displayGraphData = null;
-      this.render(this.searchEditorFocused());
+      this.render();
       this.restoreViewportState(viewport);
     }, 50);
   }
 
-  private render(preserveSearchEditor = false): void {
-    const retainedToolbar = preserveSearchEditor
+  private render(): void {
+    const retainedToolbar = this.settings().enabled
       ? this.contentEl.querySelector<HTMLElement>(":scope > .folder-nodes-node-graph-toolbar")
       : null;
     this.disconnectViewportButtons?.();
@@ -497,11 +491,6 @@ export class FolderNodeGraphView extends ItemView {
     this.highlightSearch(this.searchQuery);
     this.applyNeighborhood();
     if (this.searchQuery.trim() !== "") this.centerSearchPreview();
-  }
-
-  private searchEditorFocused(): boolean {
-    const input = this.contentEl.querySelector<HTMLInputElement>(".folder-nodes-node-graph-search input");
-    return input !== null && input === this.contentEl.ownerDocument.activeElement;
   }
 
   private graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
@@ -629,22 +618,6 @@ export class FolderNodeGraphView extends ItemView {
       || active.classList.contains("folder-nodes-node-graph-focus-overlay-toggle")
     );
     this.currentExpansion = expansion;
-    if (this.topology !== null && this.focusPath !== null) {
-      const visible = new Set(buildNodeGraphVisibleScene(
-        this.topology,
-        this.graphScope,
-        expansion,
-        { showLinks: this.showLinks },
-      ).nodes.map(({ id }) => id));
-      let nextFocus: string | null = this.focusPath;
-      while (nextFocus !== null && !visible.has(nextFocus)) {
-        nextFocus = this.topology.nodes.get(nextFocus)?.parentId ?? null;
-      }
-      if (nextFocus !== this.focusPath) {
-        this.focusPath = nextFocus;
-        this.markWorkspaceStateDirty();
-      }
-    }
     this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expansion);
     this.displayGraphData = null;
     this.render();
@@ -771,7 +744,7 @@ export class FolderNodeGraphView extends ItemView {
       this.focusPath = restored.focusId;
       this.currentExpansion = restored.expansion;
       this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, restored.expansion);
-      this.render(true);
+      this.render();
       this.restoreViewportState(restored.camera);
       if (focusChanged) this.markWorkspaceStateDirty();
       return;
@@ -787,7 +760,7 @@ export class FolderNodeGraphView extends ItemView {
     if (changed) {
       this.currentExpansion = expanded;
       this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, expanded);
-      this.render(true);
+      this.render();
     } else {
       this.highlightSearch(value);
       this.centerSearchPreview();
@@ -924,19 +897,14 @@ export class FolderNodeGraphView extends ItemView {
       this.graphScope = GLOBAL_NODE_GRAPH_SCOPE;
       reconciledPersistedState = true;
     }
-    if (this.focusPath !== null && !topology.nodes.has(this.focusPath)) {
-      this.focusPath = null;
-      reconciledPersistedState = true;
-    }
-    if (reconciledPersistedState) this.markWorkspaceStateDirty();
     const structuralScopeIdentity = `${snapshot.revision}\u0000${nodeGraphScopeKey(this.graphScope)}`;
     if (structuralScopeIdentity !== this.structuralScopeIdentity) {
       this.structuralScopeIds = nodeGraphStructuralScopeIds(topology, this.graphScope);
       this.structuralScopeIdentity = structuralScopeIdentity;
     }
     this.currentExpansion = nodeGraphExpansionForScope(this.expansionSession, topology, this.graphScope);
-    if (this.pendingPersistedFocusReveal) {
-      this.pendingPersistedFocusReveal = false;
+    if (this.pendingFocusReveal) {
+      this.pendingFocusReveal = false;
       if (this.focusPath !== null) {
         this.currentExpansion = expandNodeGraphAncestors(
           topology,
@@ -948,6 +916,11 @@ export class FolderNodeGraphView extends ItemView {
     }
     this.expansionSession = withNodeGraphExpansion(this.expansionSession, this.graphScope, this.currentExpansion);
     const scene = buildNodeGraphVisibleScene(topology, this.graphScope, this.currentExpansion, { showLinks: this.showLinks });
+    while (this.focusPath !== null && !scene.nodeIds.has(this.focusPath)) {
+      this.focusPath = topology.nodes.get(this.focusPath)?.parentId ?? null;
+      reconciledPersistedState = true;
+    }
+    if (reconciledPersistedState) this.markWorkspaceStateDirty();
     const records = new Map<string, GraphRecord>();
     for (const node of scene.nodes) {
       const record = snapshot.records.get(node.id);
