@@ -11,6 +11,7 @@ import {
   renderSettingsPersistenceStatus,
 } from "./settings-persistence-status";
 import { PromptModal } from "../ui/prompt-modal";
+import { addSettingsTabArrows } from "../ui/settings-tab-arrows";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { formatError, interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
 import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
@@ -28,6 +29,7 @@ const ENABLE_DECLARATIVE_SETTINGS = false;
 const PANEL_ID = "folder-nodes-settings-panel";
 
 export class FolderNodesSettingTab extends PluginSettingTab {
+  private removeTabArrows?: () => void;
   private activeTab: TabId = "general";
   private readonly expandedGuides = new Set<TabId>();
   private currentGuide: { tab: TabId; element: HTMLDetailsElement } | null = null;
@@ -143,6 +145,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public override hide(): void {
+    this.removeTabArrows?.();
+    delete this.removeTabArrows;
     this.expandedGuides.clear();
     this.currentGuide = null;
     this.plugin.setSettingsDocument(null);
@@ -156,6 +160,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       else this.expandedGuides.delete(tab);
       this.currentGuide = null;
     }
+    this.removeTabArrows?.();
     this.plugin.setSettingsDocument(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
@@ -166,6 +171,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       attr: { role: "tablist", "aria-label": t("settings"), "aria-orientation": "horizontal" },
     });
     for (const id of TABS) this.addTabButton(tabs, id, this.tabLabel(id));
+    this.removeTabArrows = addSettingsTabArrows(tabs, interfaceTextDirection(), t("showEarlierTabs"), t("showMoreTabs"));
     const panel = this.containerEl.createDiv({
       cls: "folder-nodes-tab-panel",
       attr: { id: PANEL_ID, role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },

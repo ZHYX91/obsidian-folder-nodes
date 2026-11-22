@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const es: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "Mostrar pestañas anteriores",
+  "showMoreTabs": "Mostrar las pestañas siguientes",
   "finalNodeName": "Nombre final del nodo",
   "deleteFileConfirm": "Eliminar el archivo «{path}» según la configuración de eliminación de Obsidian. Si se elimina permanentemente, no se podrá restaurar desde la papelera.",
   "deleteNodeConfirm": "Eliminar toda la carpeta del nodo «{path}», incluida su nota, todas las subcarpetas y archivos, según la configuración de eliminación de Obsidian. Si se eliminan permanentemente, no se podrán restaurar desde la papelera.",

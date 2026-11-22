@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const ko: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "이전 탭 표시",
+  "showMoreTabs": "다음 탭 표시",
   "finalNodeName": "최종 노드 이름",
   "deleteFileConfirm": "Obsidian의 삭제 설정에 따라 파일 “{path}”을(를) 삭제합니다. 영구 삭제로 설정되어 있으면 휴지통에서 복원할 수 없습니다.",
   "deleteNodeConfirm": "Obsidian의 삭제 설정에 따라 노드 폴더 “{path}” 전체를 삭제합니다. 노드 노트, 모든 하위 폴더와 파일이 포함됩니다. 영구 삭제로 설정되어 있으면 휴지통에서 복원할 수 없습니다.",

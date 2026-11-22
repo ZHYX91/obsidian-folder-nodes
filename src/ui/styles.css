@@ -25,6 +25,44 @@ body {
   font-family: var(--font-interface);
 }
 
+.folder-nodes-tab-frame {
+  display: flex;
+  align-items: stretch;
+  min-inline-size: 0;
+  container: folder-nodes-tab-frame / inline-size;
+}
+
+.folder-nodes-tab-frame > .folder-nodes-tabs {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.folder-nodes-tab-frame > button.folder-nodes-tab-arrow {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 min(32px, 20%);
+  min-inline-size: 0;
+  block-size: auto;
+  min-block-size: 34px;
+  padding: 0;
+  color: var(--text-accent);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: var(--cursor, default);
+}
+
+.folder-nodes-tab-frame.has-overflow > button.folder-nodes-tab-arrow { display: inline-flex; }
+.folder-nodes-tab-frame > button.folder-nodes-tab-arrow:disabled { visibility: hidden; }
+.folder-nodes-tab-arrow:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.folder-nodes-tab-arrow > svg { width: 16px; height: 16px; }
+
+@media (pointer: coarse) {
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-block-size: 44px; }
+  .folder-nodes-tab-frame > button.folder-nodes-tab-arrow { flex-basis: min(44px, 20%); min-block-size: 44px; }
+}
+
 .folder-nodes-tabs {
   align-items: stretch;
   border-block-end: 1px solid var(--background-modifier-border);
@@ -1214,7 +1252,6 @@ button.folder-nodes-current:focus-visible {
   .folder-nodes-more,
   .folder-nodes-action { min-height: 44px; }
 
-  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-block-size: 44px; }
   .folder-nodes-explorer-root { min-block-size: 52px; }
   .folder-nodes-explorer-root.has-hidden-visibility {
     grid-template-columns: 22px minmax(0, 1fr) max-content 44px !important;
@@ -1235,4 +1272,8 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-settings-guide-brief {
   color: var(--text-muted); font-size: var(--font-ui-small);
   line-height: 1.45; margin-block: var(--size-4-2);
+}
+
+@container folder-nodes-tab-frame (max-width: 480px) {
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { padding-inline: 8px !important; }
 }

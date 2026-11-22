@@ -5,6 +5,8 @@ import { isInterfaceLanguage, type AvailableInterfaceLocale } from "../core/inte
 import type { InterfaceLanguage } from "../core/types";
 
 const zh = {
+  "showEarlierTabs": "显示前面的选项卡",
+  "showMoreTabs": "显示后面的选项卡",
   finalNodeName: "最终节点名称",
   deleteFileConfirm: "按 Obsidian 的删除设置删除文件“{path}”。若设置为永久删除，将无法从回收站恢复。",
   deleteNodeConfirm: "按 Obsidian 的删除设置删除节点“{path}”的整个文件夹，包括节点笔记、全部子文件夹和文件。若设置为永久删除，将无法从回收站恢复。",
@@ -183,6 +185,8 @@ const zh = {
 };
 
 const en: typeof zh = {
+  "showEarlierTabs": "Show earlier tabs",
+  "showMoreTabs": "Show more tabs",
   finalNodeName: "Final node name",
   deleteFileConfirm: "Delete the file “{path}” using Obsidian’s deletion setting. If set to permanently delete, it cannot be restored from the trash.",
   deleteNodeConfirm: "Delete the entire node folder “{path}”, including its Node Note, all subfolders and files, using Obsidian’s deletion setting. If set to permanently delete, it cannot be restored from the trash.",
