@@ -1,6 +1,8 @@
 import { Notice, TFile, TFolder } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NodeService } from "../../src/adapters/node-service";
+import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import type { NodeVisual } from "../../src/core/types";
 import { setLanguage } from "../../src/ui/i18n";
 
@@ -577,6 +579,47 @@ describe("Node Graph plugin integration", () => {
     expect(view.refreshCalls).toBe(3);
   });
 
+  it.each(["new conflict", "removed root note", "renamed root note"])("refreshes a cached graph after %s with variant spelling", async (change) => {
+    const fixture = pluginFixture();
+    Object.assign(fixture.app.vault, { configDir: ".obsidian" });
+    Object.assign(fixture.app.metadataCache, { getFileCache: () => ({}) });
+    fixture.removeCanonical("");
+    const rootNote = fixture.addOrdinary("test vault.MD");
+    const service = new NodeService(fixture.app as never, () => DEFAULT_SETTINGS);
+    const plugin = fixture.createPlugin();
+    plugin.service = service;
+    await plugin.onload();
+    const view = createRegisteredView(plugin);
+    fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
+    const snapshot = () => view.options?.getIndexSnapshot?.() as { records: ReadonlyMap<string, { notePath: string | null }> };
+    expect(snapshot().records.get("")?.notePath).toBe(rootNote.path);
+    expect(snapshot().records.has("A")).toBe(true);
+
+    if (change === "new conflict") {
+      const duplicate = fixture.addOrdinary("A/a.MD");
+      expect(service.nodeNoteRole(duplicate)).toBe("conflict");
+      fixture.emit("create", duplicate);
+      expect(snapshot().records.has("A")).toBe(false);
+      const renamed = fixture.renameCanonical("A", "Other.md");
+      fixture.emit("rename", renamed.file, renamed.oldPath);
+      expect(snapshot().records.get("A")?.notePath).toBe(duplicate.path);
+    } else {
+      const parent = fixture.app.vault.getRoot();
+      const oldPath = rootNote.path;
+      fixture.entries.delete(oldPath);
+      if (change === "removed root note") {
+        parent.children.splice(parent.children.indexOf(rootNote), 1);
+        fixture.emit("delete", rootNote);
+      } else {
+        Object.assign(rootNote, { path: "other.md", name: "other.md", basename: "other", extension: "md" });
+        fixture.entries.set(rootNote.path, rootNote);
+        fixture.emit("rename", rootNote, oldPath);
+      }
+      expect(service.getCanonicalFile("")).toBeNull();
+      expect(snapshot().records.get("")?.notePath).toBeNull();
+    }
+  });
+
   it("preserves leaf state until a note-driven external rename remaps the folder", async () => {
     const fixture = pluginFixture();
     const plugin = fixture.createPlugin();
@@ -791,6 +834,7 @@ function pluginFixture() {
       .map((childPath) => ({ childPath }));
   });
   const service = {
+    withCanonicalFileCache: <T>(read: () => T) => read(),
     children,
     folderForFile: (file: TFile | null) => file?.parent ?? null,
     getCanonicalFile: (path: string) => notes.get(path) ?? null,
