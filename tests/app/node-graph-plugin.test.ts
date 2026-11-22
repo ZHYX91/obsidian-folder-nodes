@@ -1,9 +1,11 @@
-import { Notice, TFile, TFolder } from "obsidian";
+import { Notice, type TFile, type TFolder } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NodeService } from "../../src/adapters/node-service";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
 import type { NodeVisual } from "../../src/core/types";
+import { VisualService } from "../../src/adapters/visual-service";
+import { FakeObsidian } from "../helpers/fake-obsidian";
 import { setLanguage } from "../../src/ui/i18n";
 
 const doubles = vi.hoisted(() => {
@@ -233,7 +235,7 @@ describe("Node Graph plugin integration", () => {
 
   it("rejects current-note graph commands for ordinary, unmanaged, or incomplete contexts and keeps canonical Root eligible", async () => {
     const fixture = pluginFixture();
-    const ordinary = fixture.addOrdinary("A/Notes.md");
+    const ordinary = fixture.vault.addFile("A/Notes.md");
     fixture.setActiveFile(ordinary);
     const plugin = fixture.createPlugin();
     await plugin.onload();
@@ -248,9 +250,12 @@ describe("Node Graph plugin integration", () => {
       "The current note is not in a visible Folder Node.",
     ]);
 
-    fixture.ignorePath("A");
+    fixture.setActiveFile(fixture.vault.requireFile("A/A.md"));
+    expect(check()).toEqual([true, true]);
+    fixture.settings.ignoredFolders = ["A"];
     expect(check()).toEqual([false, false]);
-    fixture.managePath("A");
+    fixture.settings.ignoredFolders = [];
+    expect(check()).toEqual([true, true]);
     fixture.removeCanonical("A");
     expect(check()).toEqual([false, false]);
     await callOpenCurrent(plugin, "local");
@@ -259,9 +264,9 @@ describe("Node Graph plugin integration", () => {
       "The current note is not in a visible Folder Node.",
     ]);
 
-    fixture.setActiveFile(fixture.notes.get("") ?? null);
+    fixture.setActiveFile(fixture.vault.requireFile("Test Vault.md"));
     expect(check()).toEqual([true, true]);
-    const rootOrdinary = fixture.addOrdinary("Root notes.md");
+    const rootOrdinary = fixture.vault.addFile("Root notes.md");
     fixture.setActiveFile(rootOrdinary);
     expect(check()).toEqual([false, false]);
   });
@@ -269,7 +274,7 @@ describe("Node Graph plugin integration", () => {
   it("only offers scoped graph actions for nodes reachable in the current visibility session", async () => {
     const fixture = pluginFixture();
     const child = fixture.addNode("A/Child");
-    fixture.setActiveFile(fixture.notes.get(child.path)!);
+    fixture.setActiveFile(fixture.vault.requireFile("A/Child/Child.md"));
     const plugin = fixture.createPlugin();
     await plugin.onload();
     const commands = plugin.commands.filter(({ id }) =>
@@ -280,13 +285,17 @@ describe("Node Graph plugin integration", () => {
       Reflect.get(plugin, "contributeNodeActions").call(plugin, actions, child, "contents");
       return actions;
     };
-    const visible = vi.spyOn(fixture.service, "isNodeVisible");
-    visible.mockImplementation((path) => !path.startsWith("A/") && path !== "A");
+    await fixture.service.setNodeHidden(fixture.vault.requireFolder("A"), true);
     expect(available()).toEqual([false, false]);
     expect(menuActions()).toHaveLength(0);
-    visible.mockReturnValue(true);
+    fixture.revealHidden();
     expect(available()).toEqual([true, true]);
     expect(menuActions()).toHaveLength(3);
+    const duplicate = fixture.vault.addFile("A/a.MD");
+    expect(available()).toEqual([false, false]);
+    expect(menuActions()).toHaveLength(0);
+    fixture.vault.remove(duplicate.path);
+    expect(available()).toEqual([true, true]);
     fixture.removeCanonical("A");
     expect(available()).toEqual([false, false]);
     expect(menuActions()).toHaveLength(0);
@@ -310,11 +319,11 @@ describe("Node Graph plugin integration", () => {
     expect(view.refreshCalls).toBe(1);
 
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
+    fixture.resolveVisual.mockClear();
     callRefresh(plugin, { full: true, paths: new Set(), reasons: new Set(["full"]) });
     view.options?.getIndexSnapshot?.();
     expect(fixture.children).not.toHaveBeenCalled();
-    expect(fixture.visuals.resolve).toHaveBeenCalledTimes(3);
+    expect(fixture.resolveVisual).toHaveBeenCalledTimes(3);
     expect(view.refreshCalls).toBe(2);
 
     plugin.settings.nodeGraph.enabled = false;
@@ -350,16 +359,16 @@ describe("Node Graph plugin integration", () => {
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     const first = view.options?.getIndexSnapshot?.() as { revision: number };
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
+    fixture.resolveVisual.mockClear();
 
     callRefresh(plugin, { full: true, paths: new Set(), reasons: new Set(["active-leaf"]) });
     const afterLeaf = view.options?.getIndexSnapshot?.() as { revision: number };
     expect(afterLeaf.revision).toBe(first.revision);
     expect(view.refreshCalls).toBe(0);
     expect(fixture.children).not.toHaveBeenCalled();
-    expect(fixture.visuals.resolve).not.toHaveBeenCalled();
+    expect(fixture.resolveVisual).not.toHaveBeenCalled();
 
-    fixture.addOrdinary("A/Notes.md");
+    fixture.vault.addFile("A/Notes.md");
     callRefresh(plugin, {
       full: false,
       pathReasons: new Map<string, ReadonlySet<TestRefreshReason>>([
@@ -372,7 +381,7 @@ describe("Node Graph plugin integration", () => {
     expect(afterOrdinary.revision).toBe(first.revision);
     expect(view.refreshCalls).toBe(0);
     expect(fixture.children).not.toHaveBeenCalled();
-    expect(fixture.visuals.resolve).not.toHaveBeenCalled();
+    expect(fixture.resolveVisual).not.toHaveBeenCalled();
   });
 
   it("refreshes graph links for a canonical reference-only batch without traversing structure", async () => {
@@ -383,7 +392,7 @@ describe("Node Graph plugin integration", () => {
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     const first = view.options?.getIndexSnapshot?.() as { revision: number };
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
+    fixture.resolveVisual.mockClear();
     fixture.app.metadataCache.resolvedLinks = { "A/A.md": { "Test Vault.md": 1 } };
 
     callRefresh(plugin, {
@@ -400,7 +409,7 @@ describe("Node Graph plugin integration", () => {
     expect(refreshed.revision).toBe(first.revision + 1);
     expect(refreshed.links.get("A")).toEqual(new Set([""]));
     expect(fixture.children).not.toHaveBeenCalled();
-    expect(fixture.visuals.resolve).not.toHaveBeenCalled();
+    expect(fixture.resolveVisual).not.toHaveBeenCalled();
     expect(view.refreshCalls).toBe(1);
   });
 
@@ -412,8 +421,8 @@ describe("Node Graph plugin integration", () => {
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     const first = view.options?.getIndexSnapshot?.() as { revision: number };
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
-    fixture.setVisual("A", "🚀");
+    fixture.resolveVisual.mockClear();
+    await fixture.visualService.set(fixture.vault.requireFolder("A"), ["#ff0000"]);
     fixture.app.metadataCache.resolvedLinks = { "A/A.md": { "Test Vault.md": 1 } };
 
     callRefresh(plugin, {
@@ -429,10 +438,10 @@ describe("Node Graph plugin integration", () => {
     };
 
     expect(refreshed.revision).toBe(first.revision + 2);
-    expect(refreshed.records.get("A")?.visual).toMatchObject({ kind: "emoji", value: "🚀" });
+    expect(refreshed.records.get("A")?.visual).toMatchObject({ kind: "color", value: "#ff0000" });
     expect(refreshed.links.get("A")).toEqual(new Set([""]));
     expect(fixture.children).not.toHaveBeenCalled();
-    expect(fixture.visuals.resolve).toHaveBeenCalledTimes(1);
+    expect(fixture.resolveVisual).toHaveBeenCalledTimes(1);
     expect(view.refreshCalls).toBe(1);
   });
 
@@ -446,10 +455,12 @@ describe("Node Graph plugin integration", () => {
     const view = createRegisteredView(plugin);
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     view.options?.getIndexSnapshot?.();
-    fixture.setChildOrder("", ["B", "A"]);
-    fixture.setChildOrder("A", ["A/Two", "A/One"]);
+    await fixture.service.setChildOrderMode("", "manual");
+    await fixture.service.reorder(fixture.vault.requireFolder("B"), -1);
+    await fixture.service.setChildOrderMode("A", "manual");
+    await fixture.service.reorder(fixture.vault.requireFolder("A/Two"), -1);
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
+    fixture.resolveVisual.mockClear();
 
     callRefresh(plugin, {
       full: false,
@@ -467,7 +478,7 @@ describe("Node Graph plugin integration", () => {
     expect(directChildren("")).toEqual(["B", "A"]);
     expect(directChildren("A")).toEqual(["A/Two", "A/One"]);
     expect(new Set(fixture.children.mock.calls.map(([path]) => path))).toEqual(new Set(["", "A"]));
-    expect(fixture.visuals.resolve).toHaveBeenCalledTimes(1);
+    expect(fixture.resolveVisual).toHaveBeenCalledTimes(1);
   });
 
   it("re-resolves cached descendants when an ancestor's canonical visual changes", async () => {
@@ -478,9 +489,9 @@ describe("Node Graph plugin integration", () => {
     const view = createRegisteredView(plugin);
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     view.options?.getIndexSnapshot?.();
-    fixture.setVisual("A", "🚀");
+    await fixture.visualService.set(fixture.vault.requireFolder("A"), ["#ff0000"]);
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
+    fixture.resolveVisual.mockClear();
 
     callRefresh(plugin, {
       full: false,
@@ -492,10 +503,10 @@ describe("Node Graph plugin integration", () => {
       records: ReadonlyMap<string, { visual: NodeVisual }>;
     };
 
-    expect(refreshed.records.get("A")?.visual).toMatchObject({ inheritedFrom: null, kind: "emoji", value: "🚀" });
-    expect(refreshed.records.get("A/Child")?.visual).toMatchObject({ inheritedFrom: "A", kind: "emoji", value: "🚀" });
+    expect(refreshed.records.get("A")?.visual).toMatchObject({ inheritedFrom: null, kind: "color", value: "#ff0000" });
+    expect(refreshed.records.get("A/Child")?.visual).toMatchObject({ inheritedFrom: "A", kind: "color", value: "#ff0000" });
     expect(fixture.children).not.toHaveBeenCalled();
-    expect(fixture.visuals.resolve).toHaveBeenCalledTimes(2);
+    expect(fixture.resolveVisual).toHaveBeenCalledTimes(2);
   });
 
   it("honors full visual and structural path invalidation when they share one batch", async () => {
@@ -506,7 +517,7 @@ describe("Node Graph plugin integration", () => {
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     view.options?.getIndexSnapshot?.();
     fixture.children.mockClear();
-    fixture.visuals.resolve.mockClear();
+    fixture.resolveVisual.mockClear();
 
     callRefresh(plugin, {
       full: true,
@@ -516,7 +527,7 @@ describe("Node Graph plugin integration", () => {
     view.options?.getIndexSnapshot?.();
 
     expect(fixture.children).toHaveBeenCalled();
-    expect(fixture.visuals.resolve).toHaveBeenCalledTimes(3);
+    expect(fixture.resolveVisual).toHaveBeenCalledTimes(3);
     expect(view.refreshCalls).toBe(1);
   });
 
@@ -535,14 +546,16 @@ describe("Node Graph plugin integration", () => {
     expect(afterCreate.records.has("Created")).toBe(true);
     expect(afterCreate.revision).toBeGreaterThan(first.revision);
 
-    const moved = fixture.moveNode("A", "Created");
+    const moved = fixture.vault.requireFolder("A");
+    await fixture.vault.rename(moved, "Created/A");
     fixture.emit("rename", moved, "A");
     const afterRename = view.options?.getIndexSnapshot?.() as typeof first;
     expect(afterRename.records.has("A")).toBe(false);
     expect(afterRename.records.has("Created/A")).toBe(true);
     expect(view.pathRemapCalls).toEqual([{ newPath: "Created/A", oldPath: "A" }]);
 
-    const deleted = fixture.removeNode("Created/A");
+    const deleted = fixture.vault.requireFolder("Created/A");
+    fixture.vault.remove(deleted.path);
     fixture.emit("delete", deleted);
     const afterDelete = view.options?.getIndexSnapshot?.() as typeof first;
     expect(afterDelete.records.has("Created/A")).toBe(false);
@@ -571,7 +584,7 @@ describe("Node Graph plugin integration", () => {
     const afterCreate = view.options?.getIndexSnapshot?.() as typeof first;
     expect(afterCreate.records.has("A")).toBe(true);
 
-    const renamed = fixture.renameCanonical("A", "Other.md");
+    const renamed = await fixture.renameNote("A/A.md", "A/Other.md");
     fixture.emit("rename", renamed.file, renamed.oldPath);
     const afterRename = view.options?.getIndexSnapshot?.() as typeof first;
     expect(afterRename.records.has("A")).toBe(false);
@@ -581,13 +594,10 @@ describe("Node Graph plugin integration", () => {
 
   it.each(["new conflict", "removed root note", "renamed root note"])("refreshes a cached graph after %s with variant spelling", async (change) => {
     const fixture = pluginFixture();
-    Object.assign(fixture.app.vault, { configDir: ".obsidian" });
-    Object.assign(fixture.app.metadataCache, { getFileCache: () => ({}) });
     fixture.removeCanonical("");
-    const rootNote = fixture.addOrdinary("test vault.MD");
-    const service = new NodeService(fixture.app as never, () => DEFAULT_SETTINGS);
+    const rootNote = fixture.vault.addFile("test vault.MD");
+    const { service } = fixture;
     const plugin = fixture.createPlugin();
-    plugin.service = service;
     await plugin.onload();
     const view = createRegisteredView(plugin);
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
@@ -596,23 +606,20 @@ describe("Node Graph plugin integration", () => {
     expect(snapshot().records.has("A")).toBe(true);
 
     if (change === "new conflict") {
-      const duplicate = fixture.addOrdinary("A/a.MD");
+      const duplicate = fixture.vault.addFile("A/a.MD");
       expect(service.nodeNoteRole(duplicate)).toBe("conflict");
       fixture.emit("create", duplicate);
       expect(snapshot().records.has("A")).toBe(false);
-      const renamed = fixture.renameCanonical("A", "Other.md");
+      const renamed = await fixture.renameNote("A/A.md", "A/Other.md");
       fixture.emit("rename", renamed.file, renamed.oldPath);
       expect(snapshot().records.get("A")?.notePath).toBe(duplicate.path);
     } else {
-      const parent = fixture.app.vault.getRoot();
       const oldPath = rootNote.path;
-      fixture.entries.delete(oldPath);
       if (change === "removed root note") {
-        parent.children.splice(parent.children.indexOf(rootNote), 1);
+        fixture.vault.remove(oldPath);
         fixture.emit("delete", rootNote);
       } else {
-        Object.assign(rootNote, { path: "other.md", name: "other.md", basename: "other", extension: "md" });
-        fixture.entries.set(rootNote.path, rootNote);
+        await fixture.vault.rename(rootNote, "other.md");
         fixture.emit("rename", rootNote, oldPath);
       }
       expect(service.getCanonicalFile("")).toBeNull();
@@ -628,11 +635,12 @@ describe("Node Graph plugin integration", () => {
     fixture.leaves.set(GRAPH_VIEW_TYPE, [{ view }]);
     view.options?.getIndexSnapshot?.();
 
-    const noteRename = fixture.renameCanonical("A", "Other.md");
+    const noteRename = await fixture.renameNote("A/A.md", "A/Other.md");
     fixture.emit("rename", noteRename.file, noteRename.oldPath);
     expect(view.pathRemovalCalls).toEqual([]);
 
-    const folderRename = fixture.renameNode("A", "Other");
+    const folderRename = fixture.vault.requireFolder("A");
+    await fixture.vault.rename(folderRename, "Other");
     fixture.emit("rename", folderRename, "A");
     const renamed = view.options?.getIndexSnapshot?.() as { records: ReadonlyMap<string, unknown> };
     expect(renamed.records.has("A")).toBe(false);
@@ -667,229 +675,53 @@ async function callOpenCurrent(plugin: FakeBasePluginInstance, mode: "local" | "
 }
 
 function pluginFixture() {
-  const root = Object.assign(new TFolder(), { children: [] as Array<TFile | TFolder>, name: "", path: "" });
-  const entries = new Map<string, TFile | TFolder>([["", root]]);
-  const notes = new Map<string, TFile>();
-  const childOrder = new Map<string, readonly string[]>();
-  const ignoredPaths = new Set<string>();
-  const ownVisuals = new Map<string, string>();
-  let activeFile: TFile | null = null;
+  const vault = new FakeObsidian("Test Vault");
+  const settings = structuredClone(DEFAULT_SETTINGS);
+  let showHidden = false;
+  const service = new NodeService(vault.app, () => settings, () => showHidden);
+  const visualService = new VisualService(vault.app, service, () => true);
+  const children = vi.spyOn(service, "children");
+  const resolveVisual = vi.spyOn(visualService, "resolve");
+  const addCanonical = (path: string): TFile => vault.addFile(service.notePathForFolder(path));
   const addNode = (path: string): TFolder => {
-    const parentPath = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-    const parent = entries.get(parentPath);
-    if (!(parent instanceof TFolder)) throw new Error(`Missing parent: ${parentPath}`);
-    const name = path.slice(path.lastIndexOf("/") + 1) || "Test Vault";
-    const folder = path === "" ? root : Object.assign(new TFolder(), {
-      children: [] as Array<TFile | TFolder>, name, parent, path,
-    });
-    if (path !== "") {
-      parent.children.push(folder);
-      entries.set(path, folder);
-    }
-    const notePath = path === "" ? "Test Vault.md" : `${path}/${name}.md`;
-    const note = Object.assign(new TFile(), {
-      basename: name, extension: "md", name: `${name}.md`, parent: folder, path: notePath,
-    });
-    folder.children.push(note);
-    entries.set(notePath, note);
-    notes.set(path, note);
+    const folder = vault.addFolder(path);
+    addCanonical(path);
     return folder;
+  };
+  const removeCanonical = (path: string): TFile => {
+    const note = vault.requireFile(service.notePathForFolder(path));
+    vault.remove(note.path);
+    return note;
+  };
+  const renameNote = async (oldPath: string, path: string): Promise<{ file: TFile; oldPath: string }> => {
+    const file = vault.requireFile(oldPath);
+    await vault.rename(file, path);
+    return { file, oldPath };
   };
   addNode("");
   addNode("A");
-  activeFile = notes.get("A") ?? null;
-
-  const addOrdinary = (path: string): TFile => {
-    const slash = path.lastIndexOf("/");
-    const parent = entries.get(slash < 0 ? "" : path.slice(0, slash));
-    if (!(parent instanceof TFolder)) throw new Error(`Missing parent for: ${path}`);
-    const name = path.slice(slash + 1);
-    const dot = name.lastIndexOf(".");
-    const file = Object.assign(new TFile(), {
-      basename: dot < 0 ? name : name.slice(0, dot),
-      extension: dot < 0 ? "" : name.slice(dot + 1),
-      name,
-      parent,
-      path,
-    });
-    parent.children.push(file);
-    entries.set(path, file);
-    return file;
-  };
-
-  const addCanonical = (path: string): TFile => {
-    const folder = entries.get(path);
-    if (!(folder instanceof TFolder)) throw new Error(`Missing folder: ${path}`);
-    const name = path === "" ? "Test Vault" : folder.name;
-    const notePath = path === "" ? "Test Vault.md" : `${path}/${name}.md`;
-    const note = Object.assign(new TFile(), {
-      basename: name, extension: "md", name: `${name}.md`, parent: folder, path: notePath,
-    });
-    folder.children.push(note);
-    entries.set(notePath, note);
-    notes.set(path, note);
-    return note;
-  };
-
-  const removeCanonical = (path: string): TFile => {
-    const note = notes.get(path);
-    if (note === undefined) throw new Error(`Missing canonical note: ${path}`);
-    note.parent?.children.splice(note.parent.children.indexOf(note), 1);
-    entries.delete(note.path);
-    notes.delete(path);
-    return note;
-  };
-
-  const renameCanonical = (path: string, name: string): { file: TFile; oldPath: string } => {
-    const file = notes.get(path);
-    if (file === undefined) throw new Error(`Missing canonical note: ${path}`);
-    const oldPath = file.path;
-    entries.delete(oldPath);
-    notes.delete(path);
-    file.path = path === "" ? name : `${path}/${name}`;
-    file.name = name;
-    const dot = name.lastIndexOf(".");
-    file.basename = dot < 0 ? name : name.slice(0, dot);
-    file.extension = dot < 0 ? "" : name.slice(dot + 1);
-    entries.set(file.path, file);
-    return { file, oldPath };
-  };
-
-  const moveNode = (path: string, parentPath: string): TFolder => {
-    const folder = entries.get(path);
-    const nextParent = entries.get(parentPath);
-    if (!(folder instanceof TFolder) || !(nextParent instanceof TFolder)) throw new Error(`Cannot move node: ${path}`);
-    const nextPath = parentPath === "" ? folder.name : `${parentPath}/${folder.name}`;
-    folder.parent?.children.splice(folder.parent.children.indexOf(folder), 1);
-    nextParent.children.push(folder);
-    folder.parent = nextParent;
-    const affectedEntries = [...entries.entries()]
-      .filter(([candidate]) => candidate === path || candidate.startsWith(`${path}/`));
-    for (const [candidate] of affectedEntries) entries.delete(candidate);
-    for (const [candidate, entry] of affectedEntries) {
-      const target = candidate === path ? nextPath : `${nextPath}${candidate.slice(path.length)}`;
-      entry.path = target;
-      entries.set(target, entry);
-    }
-    const affectedNotes = [...notes.entries()]
-      .filter(([candidate]) => candidate === path || candidate.startsWith(`${path}/`));
-    for (const [candidate] of affectedNotes) notes.delete(candidate);
-    for (const [candidate, note] of affectedNotes) {
-      const target = candidate === path ? nextPath : `${nextPath}${candidate.slice(path.length)}`;
-      notes.set(target, note);
-    }
-    return folder;
-  };
-
-  const removeNode = (path: string): TFolder => {
-    const folder = entries.get(path);
-    if (!(folder instanceof TFolder)) throw new Error(`Missing node: ${path}`);
-    folder.parent?.children.splice(folder.parent.children.indexOf(folder), 1);
-    for (const candidate of [...entries.keys()]) {
-      if (candidate === path || candidate.startsWith(`${path}/`)) entries.delete(candidate);
-    }
-    for (const candidate of [...notes.keys()]) {
-      if (candidate === path || candidate.startsWith(`${path}/`)) notes.delete(candidate);
-    }
-    return folder;
-  };
-
-  const renameNode = (path: string, name: string): TFolder => {
-    const folder = entries.get(path);
-    if (!(folder instanceof TFolder)) throw new Error(`Missing node: ${path}`);
-    const parentPath = folder.parent?.path ?? "";
-    const nextPath = parentPath === "" ? name : `${parentPath}/${name}`;
-    const affectedEntries = [...entries.entries()]
-      .filter(([candidate]) => candidate === path || candidate.startsWith(`${path}/`));
-    for (const [candidate] of affectedEntries) entries.delete(candidate);
-    for (const [candidate, entry] of affectedEntries) {
-      const target = candidate === path ? nextPath : `${nextPath}${candidate.slice(path.length)}`;
-      entry.path = target;
-      if (entry === folder) entry.name = name;
-      entries.set(target, entry);
-    }
-    for (const [candidate, note] of [...notes.entries()]) {
-      if (candidate !== path && !candidate.startsWith(`${path}/`)) continue;
-      notes.delete(candidate);
-      const target = candidate === path ? nextPath : `${nextPath}${candidate.slice(path.length)}`;
-      notes.set(target, note);
-    }
-    const canonical = folder.children.find((entry): entry is TFile =>
-      entry instanceof TFile && entry.basename === name && entry.extension.toLocaleLowerCase() === "md");
-    if (canonical !== undefined) notes.set(nextPath, canonical);
-    return folder;
-  };
-
+  let activeFile: TFile | null = vault.requireFile("A/A.md");
   const leaves = new Map<string, Array<{ detach?: () => void; view: unknown }>>();
   const events: Array<{ callback: (...args: never[]) => unknown; name: string }> = [];
-  const children = vi.fn((path: string) => {
-    const folder = entries.get(path);
-    if (!(folder instanceof TFolder)) return [];
-    const available = folder.children.flatMap((entry) =>
-      entry instanceof TFolder && notes.has(entry.path) ? [entry.path] : []);
-    const ordered = childOrder.get(path);
-    if (ordered === undefined) return available.map((childPath) => ({ childPath }));
-    const configured = ordered.filter((childPath) => available.includes(childPath));
-    return [...configured, ...available.filter((childPath) => !configured.includes(childPath))]
-      .map((childPath) => ({ childPath }));
-  });
-  const service = {
-    withCanonicalFileCache: <T>(read: () => T) => read(),
-    children,
-    folderForFile: (file: TFile | null) => file?.parent ?? null,
-    getCanonicalFile: (path: string) => notes.get(path) ?? null,
-    getFolder: (path: string) => {
-      const entry = entries.get(path);
-      return entry instanceof TFolder ? entry : null;
-    },
-    isCanonicalFile: (file: TFile) => notes.get(file.parent?.path ?? "") === file,
-    isIgnoredPath: (path: string) => ignoredPaths.has(path),
-    isNodeVisible: (_path: string) => true,
-    rootNotePath: () => "Test Vault.md",
+  const observe = (name: string, callback: (...args: never[]) => unknown) => {
+    events.push({ callback, name });
+    return () => undefined;
   };
-  const visuals = { resolve: vi.fn<(folder: TFolder) => NodeVisual>((folder) => {
-    let current: TFolder | null = folder;
-    while (current !== null) {
-      const value = ownVisuals.get(current.path);
-      if (value !== undefined) {
-        return { accent: null, inheritedFrom: current === folder ? null : current.path, kind: "emoji", value };
-      }
-      current = current.parent;
-    }
-    return { accent: null, inheritedFrom: null, kind: "fallback", value: "folder" };
-  }) };
   const app = {
-    metadataCache: {
-      on: (name: string, callback: (...args: never[]) => unknown) => {
-        events.push({ callback, name });
-        return () => undefined;
-      },
-      resolvedLinks: {},
-    },
-    vault: {
-      getAbstractFileByPath: (path: string) => entries.get(path) ?? null,
-      getName: () => "Test Vault",
-      getRoot: () => root,
-      on: (name: string, callback: (...args: never[]) => unknown) => {
-        events.push({ callback, name });
-        return () => undefined;
-      },
-    },
+    metadataCache: { ...vault.app.metadataCache, on: observe, resolvedLinks: {} as Record<string, Record<string, number>> },
+    vault: { ...vault.app.vault, on: observe },
     workspace: {
       getActiveFile: () => activeFile,
       getLeaf: () => ({ setViewState: async () => undefined, view: null }),
       getLeavesOfType: (type: string) => leaves.get(type) ?? [],
-      on: (name: string, callback: (...args: never[]) => unknown) => {
-        events.push({ callback, name });
-        return () => undefined;
-      },
+      on: observe,
       revealLeaf: async () => undefined,
     },
   };
   const createPlugin = () => {
     const plugin = new FolderNodesWithNodeGraphPlugin(app as never, {} as never);
-    plugin.service = service as never;
-    plugin.visuals = visuals as never;
+    plugin.service = service;
+    plugin.visuals = visualService;
     return plugin as unknown as FolderNodesWithNodeGraphPlugin & FakeBasePluginInstance;
   };
   const emit = (name: string, ...args: unknown[]): void => {
@@ -898,28 +730,9 @@ function pluginFixture() {
     }
   };
   return {
-    addCanonical,
-    addNode,
-    addOrdinary,
-    app,
-    children,
-    createPlugin,
-    emit,
-    entries,
-    events,
-    ignorePath: (path: string) => { ignoredPaths.add(path); },
-    leaves,
-    managePath: (path: string) => { ignoredPaths.delete(path); },
-    moveNode,
-    notes,
-    removeCanonical,
-    removeNode,
-    renameCanonical,
-    renameNode,
+    addCanonical, addNode, app, children, createPlugin, emit, events, leaves, removeCanonical,
+    renameNote, resolveVisual, service, settings, vault, visualService,
+    revealHidden: () => { showHidden = true; },
     setActiveFile: (file: TFile | null) => { activeFile = file; },
-    setChildOrder: (path: string, ordered: readonly string[]) => { childOrder.set(path, ordered); },
-    setVisual: (path: string, value: string) => { ownVisuals.set(path, value); },
-    service,
-    visuals,
   };
 }
