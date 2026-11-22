@@ -49,7 +49,12 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
     getCursor: (end: string) => end === "from" ? from : to,
     getLine: (line: number) => lines[line] ?? "",
     posToOffset: ({ line, ch }: EditorPosition) => lines.slice(0, line).reduce((offset, text) => offset + text.length + 1, ch),
-    replaceSelection: vi.fn((link: string) => { selection = link; }),
+    replaceRange: vi.fn((link: string, start: EditorPosition, end: EditorPosition) => {
+      const text = getValue();
+      const next = text.slice(0, editor.posToOffset(start)) + link + text.slice(editor.posToOffset(end));
+      lines.splice(0, lines.length, ...next.split("\n"));
+      selection = link;
+    }),
     transaction: vi.fn(({ changes }: EditorTransaction) => {
       const change = changes?.[0];
       if (change === undefined || change.to === undefined) throw new Error("Expected a bounded edit");
@@ -64,7 +69,7 @@ function fixture({ confirm = true, table = false, label = "Selected text" } = {}
   let leaves = [{ view }] as unknown as WorkspaceLeaf[];
   const events = new Map<string, (...args: unknown[]) => void>();
   Object.assign(fake.app.workspace, {
-    getLeavesOfType: () => leaves,
+    getLeavesOfType: (type: string) => type === "markdown" ? leaves : [],
     getActiveFile: () => file,
     on: (event: string, callback: (...args: unknown[]) => void) => { events.set(event, callback); return {}; },
   });
@@ -134,7 +139,7 @@ describe("selection creation through the plugin", () => {
       expect(f.generate).toHaveBeenCalledExactlyOnceWith(note, "Parent/Source.md", undefined, "Selected text");
       expect(f.fake.contents.get(note.path)).toContain("Selected text");
     expect(parseYaml(f.fake.contents.get(note.path)!.split("---")[1]!)).toMatchObject({ aliases: ["Selected text"] });
-      expect(f.editor.replaceSelection).toHaveBeenCalledExactlyOnceWith("[[Selected text|Selected text]]");
+      expect(f.editor.replaceRange).toHaveBeenCalledExactlyOnceWith("[[Selected text|Selected text]]", { line: 0, ch: 0 }, { line: 0, ch: 13 });
     });
   }
 
@@ -154,6 +159,21 @@ describe("selection creation through the plugin", () => {
     expect(f.generate).toHaveBeenCalledExactlyOnceWith(note, f.file.path, undefined, original);
   });
 
+  it.each(["throw after applying", "silently decline", "detach after applying"])("keeps the new note if plain text writeback can %s", async (outcome) => {
+    const f = fixture({ confirm: false });
+    f.editor.replaceRange.mockImplementationOnce(link => {
+      if (outcome === "silently decline") return;
+      f.lines.splice(0, f.lines.length, link);
+      if (outcome === "detach after applying") f.closeEditor();
+      else throw new Error("host reported failure after applying the edit");
+    });
+    f.trigger();
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("Parent/Selected text/Selected text.md"));
+    expect(f.fake.files.has("Parent/Selected text/Selected text.md")).toBe(true);
+    expect(f.editor.getValue()).toBe(outcome === "silently decline" ? "Selected text" : "[[Selected text|Selected text]]");
+    expect(f.fake.opened).toEqual([]);
+  });
+
   it("saves one bounded table-cell replacement before opening the new note", async () => {
     const f = fixture({ table: true, label: "Alpha" });
     f.generate.mockReturnValue("[[Alpha|Alpha]]");
@@ -168,7 +188,7 @@ describe("selection creation through the plugin", () => {
     expect(f.editor.transaction).toHaveBeenCalledWith({
       changes: [{ from: { line: 0, ch: 11 }, to: { line: 0, ch: 16 }, text: "[[Alpha\\|Alpha]]" }],
     }, "folder-nodes-selection-link");
-    expect(f.editor.replaceSelection).not.toHaveBeenCalled();
+    expect(f.editor.replaceRange).not.toHaveBeenCalled();
     expect(f.view.save).toHaveBeenCalledOnce();
   });
 
@@ -236,7 +256,7 @@ describe("selection creation through the plugin", () => {
     f.generate.mockReturnValue("[[Alpha|Alpha]]");
     f.editor.transaction.mockImplementationOnce(() => undefined);
     f.trigger();
-    await vi.waitFor(() => expect(notices.at(-1)).toContain("Could not verify the link replacement in the table editor"));
+    await vi.waitFor(() => expect(notices.at(-1)).toContain("Could not verify the link replacement in the editor"));
     expect(f.editor.getValue()).toBe(before);
     expect(notices.at(-1)).toContain("Parent/Alpha/Alpha.md");
     expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
@@ -284,6 +304,23 @@ describe("selection creation through the plugin", () => {
     expect(f.editor.getValue()).toContain("[[Alpha\\|Alpha]]");
     expect(f.fake.files.has("Parent/Alpha/Alpha.md")).toBe(true);
     expect(f.view.save).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["command", "| Left | Right |", "| :--- | ---: |", 1, 3, "---"],
+    ["editor-menu", "> Left | Right", "> :--- | ---:", 0, 0, ">"],
+    ["command", "| Name |", ":---:", 1, 1, "---"],
+  ] as const)("protects Markdown table syntax through the %s", (entry, header, separator, line, ch, label) => {
+    const f = fixture({ confirm: false, label });
+    f.lines.splice(0, f.lines.length, header, separator);
+    f.selectRange({ line, ch }, { line, ch: ch + label.length });
+    const before = f.editor.getValue();
+    f.trigger(entry);
+    expect(notices).toEqual([t("selectionTableSyntax")]);
+    expect(f.editor.getValue()).toBe(before);
+    expect(f.generate).not.toHaveBeenCalled();
+    expect(f.editor.transaction).not.toHaveBeenCalled();
+    expect([...f.fake.files.keys()]).toEqual(["", "Parent", "Parent/Parent.md", "Parent/Source.md"]);
   });
 
   it("refuses a cell selection that does not match the full source range", () => {
@@ -363,7 +400,7 @@ describe("selection creation through the plugin", () => {
     await vi.waitFor(() => expect(notices).toHaveLength(1));
     expect(f.fake.files.has("Parent/Selected text")).toBe(false);
     expect(f.generate).not.toHaveBeenCalled();
-    expect(f.editor.replaceSelection).not.toHaveBeenCalled();
+    expect(f.editor.replaceRange).not.toHaveBeenCalled();
   });
 
   it.each([true, false])("rolls back real node creation when host generation fails, confirmation %s", async (confirm) => {
@@ -393,6 +430,24 @@ describe("selection creation through the plugin", () => {
     expect(f.fake.opened).toEqual([]);
   });
 
+  it.each([false, true])("stops before editor dispatch when unloaded after creating the node, table %s", async (table) => {
+    const f = fixture({ confirm: false, table });
+    const create = f.plugin.service.createNode.bind(f.plugin.service);
+    vi.spyOn(f.plugin.service, "createNode").mockImplementationOnce(async (...args) => {
+      const note = await create(...args);
+      f.plugin.onunload();
+      return note;
+    });
+    const before = f.editor.getValue();
+    f.trigger();
+    await vi.waitFor(() => expect(notices).toHaveLength(1));
+    expect(f.editor.getValue()).toBe(before);
+    expect(f.editor.replaceRange).not.toHaveBeenCalled();
+    expect(f.editor.transaction).not.toHaveBeenCalled();
+    expect(f.fake.files.has("Parent/Selected text")).toBe(false);
+    expect(f.fake.opened).toEqual([]);
+  });
+
   it("reports rollback failure and preserves a node whose content changed", async () => {
     const f = fixture({ confirm: false });
     f.generate.mockImplementation((note) => {
@@ -406,7 +461,7 @@ describe("selection creation through the plugin", () => {
     expect(notices[0]).toContain("host generation failed");
     expect(notices[0]).toContain("concurrently modified created file");
     expect(f.fake.contents.get("Parent/Selected text/Selected text.md")).toBe("user-owned edit");
-    expect(f.editor.replaceSelection).not.toHaveBeenCalled();
+    expect(f.editor.replaceRange).not.toHaveBeenCalled();
   });
 
   it.each([true, false])("rolls back an unsafe WikiLink display label with confirmation %s", async (confirm) => {
@@ -416,7 +471,7 @@ describe("selection creation through the plugin", () => {
     if (confirm) f.submit();
     await vi.waitFor(() => expect(notices).toEqual([t("errorSelectionWikiLinkLabelUnsafe")]));
     expect(f.fake.opened).toEqual([]);
-    expect(f.editor.replaceSelection).not.toHaveBeenCalled();
+    expect(f.editor.replaceRange).not.toHaveBeenCalled();
     expect([...f.fake.files.keys()]).toEqual(["", "Parent", "Parent/Parent.md", "Parent/Source.md"]);
   });
 
@@ -451,7 +506,7 @@ describe("selection creation through the plugin", () => {
     await vi.waitFor(() => expect(repeated.fake.opened).toHaveLength(1));
     await vi.waitFor(() => expect(notices).toHaveLength(1));
     expect(repeated.generate).toHaveBeenCalledOnce();
-    expect(repeated.editor.replaceSelection).toHaveBeenCalledOnce();
+    expect(repeated.editor.replaceRange).toHaveBeenCalledOnce();
   });
 
   it("persists the imperative confirmation toggle without enabling declarative settings", async () => {

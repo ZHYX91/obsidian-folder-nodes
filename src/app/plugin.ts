@@ -1108,13 +1108,14 @@ export default class FolderNodesPlugin extends Plugin {
     const sourcePath = file.path;
     const from = { ...editor.getCursor("from") };
     const to = { ...editor.getCursor("to") };
-    const tableContext = classifySelectionTableContext(from, to, (line) => editor.getLine(line));
-    if (tableContext === "cross-cell") {
-      new Notice(t("selectionCrossesTableCells"), 8000);
+    const originalSource = editor.getValue();
+    const tableContext = classifySelectionTableContext(from, to, originalSource);
+    if (tableContext === "cross-cell" || tableContext === "table-structure") {
+      new Notice(t(tableContext === "cross-cell" ? "selectionCrossesTableCells" : "selectionTableSyntax"), 8000);
       return;
     }
     const tableSelection = tableContext === "single-cell" ? {
-      source: editor.getValue(), from: editor.posToOffset(from), to: editor.posToOffset(to),
+      source: originalSource, from: editor.posToOffset(from), to: editor.posToOffset(to),
     } : null;
     if (tableSelection !== null && tableSelection.source.slice(tableSelection.from, tableSelection.to) !== selection) {
       new Notice(t("errorSelectionEditorChanged"), 8000);
@@ -1146,15 +1147,17 @@ export default class FolderNodesPlugin extends Plugin {
       .find((view): view is MarkdownView => view instanceof MarkdownView && view.file === file && view.editor === editor);
     const create = async (nodeName = name): Promise<void> => {
       const assertSelectionCurrent = (): MarkdownView => {
+        if (this.unloaded) throw new FolderNodesError("selection_editor_changed");
         if (editor.getSelection() !== selection) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
         if (file.path !== sourcePath || this.app.vault.getAbstractFileByPath(sourcePath) !== file) throw new FolderNodesError("selection_source_changed", {}, "Source note changed after preview");
         const currentFrom = editor.getCursor("from");
         const currentTo = editor.getCursor("to");
         if (currentFrom.line !== from.line || currentFrom.ch !== from.ch || currentTo.line !== to.line || currentTo.ch !== to.ch) throw new FolderNodesError("selection_changed", {}, "Selection changed after preview");
-        if (classifySelectionTableContext(currentFrom, currentTo, (line) => editor.getLine(line)) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
+        const currentSource = editor.getValue();
+        if (currentSource !== originalSource && classifySelectionTableContext(currentFrom, currentTo, currentSource) !== tableContext) throw new FolderNodesError("selection_table_changed", {}, "Table structure changed after preview");
         const view = findSourceView();
         if (view === undefined) throw new FolderNodesError("selection_editor_changed", {}, "Source editor changed after preview");
-        if (tableSelection !== null && (editor.getValue() !== tableSelection.source || view.getViewData() !== tableSelection.source)) {
+        if (tableSelection !== null && (currentSource !== tableSelection.source || view.getViewData() !== tableSelection.source)) {
           throw new FolderNodesError("selection_source_changed", {}, "Table source changed after preview");
         }
         return view;
@@ -1162,12 +1165,23 @@ export default class FolderNodesPlugin extends Plugin {
       const sourceView = assertSelectionCurrent();
       const options = alias === null ? { body: selection } : { alias, body: selection };
       const note = await this.service.createNode(parentPath, nodeName, options);
-      let dispatchedTableLink = false;
+      let linkDispatched = false;
       try {
         const link = prepareSelectionLink(this.app.fileManager.generateMarkdownLink(note, sourcePath, undefined, label), label, tableContext);
         if (assertSelectionCurrent() !== sourceView) throw new FolderNodesError("selection_editor_changed");
+        const viewStillBound = (): boolean => !this.unloaded && findSourceView() === sourceView && file.path === sourcePath
+          && this.app.vault.getAbstractFileByPath(sourcePath) === file;
         if (tableSelection === null) {
-          editor.replaceSelection(link);
+          const source = editor.getValue();
+          const start = editor.posToOffset(from);
+          const end = editor.posToOffset(to);
+          if (source.slice(start, end) !== selection) throw new FolderNodesError("selection_changed");
+          const expected = source.slice(0, start) + link + source.slice(end);
+          // Change only the validated range, even when the editor has other selections.
+          linkDispatched = true;
+          editor.replaceRange(link, from, to);
+          if (!viewStillBound()) throw new FolderNodesError("selection_editor_changed");
+          if (editor.getValue() !== expected) throw new FolderNodesError("selection_link_not_applied");
         } else {
           const { source, from: start, to: end } = tableSelection;
           const expected = source.slice(0, start) + link + source.slice(end);
@@ -1175,10 +1189,8 @@ export default class FolderNodesPlugin extends Plugin {
             || (value !== source && matchesTableLinkWriteback(expected, value, from.line));
           // The active selection can belong to the native cell editor. Send a
           // bounded change to the verified Markdown editor and read it back.
-          dispatchedTableLink = true;
+          linkDispatched = true;
           editor.transaction({ changes: [{ from, to, text: link }] }, "folder-nodes-selection-link");
-          const viewStillBound = (): boolean => !this.unloaded && findSourceView() === sourceView && file.path === sourcePath
-            && this.app.vault.getAbstractFileByPath(sourcePath) === file;
           // The embedded cell editor can update the source editor and saveable
           // view at different times. An old readback does not reject the write.
           const deadline = performance.now() + TABLE_LINK_READBACK_TIMEOUT_MS;
@@ -1203,7 +1215,7 @@ export default class FolderNodesPlugin extends Plugin {
           }
         }
       } catch (error) {
-        if (dispatchedTableLink) {
+        if (linkDispatched) {
           throw new FolderNodesError("created_node_retained", { paths: note.path }, "The source may still link to the new node", { cause: error });
         }
         if (note.parent !== null) {

@@ -1,3 +1,4 @@
+import MarkdownIt from "markdown-it";
 import { FolderNodesError } from "./folder-nodes-error";
 
 export interface SourcePosition {
@@ -5,27 +6,47 @@ export interface SourcePosition {
   readonly ch: number;
 }
 
-export type SelectionTableContext = "outside-table" | "single-cell" | "cross-cell";
+export type SelectionTableContext = "outside-table" | "single-cell" | "cross-cell" | "table-structure";
+
+const tableParser = new MarkdownIt({ html: true });
+tableParser.core.ruler.enableOnly(["normalize", "block"]);
 
 export function classifySelectionTableContext(
   from: SourcePosition,
   to: SourcePosition,
-  getLine: (line: number) => string,
+  source: string,
 ): SelectionTableContext {
-  const tableLines: { line: number; pipes: number[] }[] = [];
-  for (let line = from.line; line <= to.line; line += 1) {
-    const source = getLine(line);
-    const pipes = unescapedPipeIndices(source);
-    if (pipes.length > 0 && isMarkdownTableLine(line, getLine)) tableLines.push({ line, pipes });
+  if (!source.includes("|")) return "outside-table";
+  const lines = source.split(/\r\n|[\r\n]/u);
+  // A table's header must contain a pipe and there can be no blank line
+  // between it and a selected cell. Skip parsing unrelated prose.
+  let first = from.line;
+  while (first > 0 && lines[first - 1]?.trim() !== "") first -= 1;
+  if (!lines.slice(first, to.line + 1).some((line) => line.includes("|"))) return "outside-table";
+  const table = tableParser.parse(source, {}).find((token) => token.type === "table_open"
+    && token.map !== null && token.map[0] <= to.line && from.line < token.map[1]);
+  if (table?.map) {
+    if (from.line !== to.line) return "cross-cell";
+    const row = lines[from.line] ?? "";
+    if (from.line === table.map[0] + 1 || from.ch < tableContainerPrefixLength(row, from.line === table.map[0])) {
+      return "table-structure";
+    }
+    return unescapedPipeIndices(row).some((index) => index >= from.ch && index < to.ch) ? "cross-cell" : "single-cell";
   }
-  if (tableLines.length === 0) return "outside-table";
-  if (from.line !== to.line) return "cross-cell";
-  const pipes = tableLines[0]?.pipes ?? [];
-  return pipes.some((index) => index >= from.ch && index < to.ch) ? "cross-cell" : "single-cell";
+  // Retain the existing cross-cell safeguard for an incomplete table whose
+  // header and separator currently disagree on the number of cells.
+  const getLine = (line: number): string => lines[line] ?? "";
+  for (let line = from.line; line <= to.line; line += 1) {
+    const pipes = unescapedPipeIndices(getLine(line));
+    if (pipes.length > 0 && (from.line !== to.line || pipes.some((index) => index >= from.ch && index < to.ch))
+      && isMarkdownTableLine(line, getLine)) return "cross-cell";
+  }
+  return "outside-table";
 }
 
 export function prepareSelectionLink(generated: string, label: string, context: SelectionTableContext): string {
   if (context === "cross-cell") throw new Error("A cross-cell selection cannot be converted into one link");
+  if (context === "table-structure") throw new Error("Table syntax cannot be converted into a link");
   let link = generated;
   if (generated.startsWith("[[") && generated.endsWith("]]")) {
     // Obsidian's WikiLink renderer treats display text literally. Backslashes
@@ -140,6 +161,17 @@ function tableDelimiterInDirection(start: number, direction: -1 | 1, quoteDepth:
 
 function tableQuotePrefix(line: string): string {
   return /^(?: {0,3}>[ \t]?)+/u.exec(line)?.[0] ?? "";
+}
+
+function tableContainerPrefixLength(line: string, header: boolean): number {
+  // A list can start on the header itself. On subsequent rows only the
+  // surrounding quote markers can precede the cells.
+  const marker = header ? /^[ \t]*(?:>[ \t]?|(?:[-+*]|[0-9]{1,9}[.)])[ \t]+)/u : /^[ \t]*>[ \t]?/u;
+  let length = 0;
+  for (let prefix = marker.exec(line); prefix !== null; prefix = marker.exec(line.slice(length))) {
+    length += prefix[0].length;
+  }
+  return length;
 }
 
 function safeGetLine(line: number, getLine: (line: number) => string): string | null {
