@@ -54,9 +54,8 @@ body {
   cursor: var(--cursor, default);
 }
 
-.folder-nodes-tab-frame.has-overflow > button.folder-nodes-tab-arrow { display: inline-flex; }
+.folder-nodes-tab-frame.has-overflow > button.folder-nodes-tab-arrow:not(:disabled) { display: inline-flex; }
 .folder-nodes-tab-frame > button.folder-nodes-tab-arrow:hover { background: var(--background-modifier-hover); }
-.folder-nodes-tab-frame > button.folder-nodes-tab-arrow:disabled { visibility: hidden; }
 .folder-nodes-tab-arrow:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 .folder-nodes-tab-arrow::before {
   content: "";
