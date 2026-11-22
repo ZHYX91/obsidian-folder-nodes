@@ -7,7 +7,7 @@ describe("migration scan", () => {
     const progress: number[] = [];
 
     expect(await scanMigrationAsync(inventory, {}, (completed) => progress.push(completed))).toEqual({
-      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: ["Loose.md"], missingNodeNotes: ["B"],
+      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMoves: [{ sourcePath: "Loose.md", targetPath: "Loose/Loose.md", existingFolder: false }], missingNodeNotes: ["B"],
     });
     expect(progress.at(-1)).toBeGreaterThan(0);
   });
@@ -60,7 +60,7 @@ describe("migration scan", () => {
     });
     expect(yielded).toBe(true);
     await tick;
-    expect(scan).toEqual({ conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: [], missingNodeNotes: [] });
+    expect(scan).toEqual({ conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMoves: [], missingNodeNotes: [] });
     expect(progress.length).toBeGreaterThan(1);
     expect(progress.every(([completed, total], index) => completed <= total && completed >= (progress[index - 1]?.[0] ?? 0)))
       .toBe(true);
@@ -71,7 +71,7 @@ describe("migration scan", () => {
     expect(await scanMigrationAsync({
       folders: ["A", "B"], markdown: ["A/A.md", "Loose.md"],
     })).toEqual({
-      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: ["Loose.md"], missingNodeNotes: ["B"],
+      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMoves: [{ sourcePath: "Loose.md", targetPath: "Loose/Loose.md", existingFolder: false }], missingNodeNotes: ["B"],
     });
   });
 
@@ -79,7 +79,7 @@ describe("migration scan", () => {
     expect(await scanMigrationAsync({
       folders: ["A"], markdown: ["A.md"],
     })).toEqual({
-      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: ["A.md"], missingNodeNotes: [],
+      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMoves: [{ sourcePath: "A.md", targetPath: "A/A.md", existingFolder: true }], missingNodeNotes: [],
     });
   });
   it("keeps exact leaf notes and ignored folder subtrees out of the write plan", async () => {
@@ -93,7 +93,7 @@ describe("migration scan", () => {
       conflicts: [],
       exemptLeafMarkdown: ["AGENTS.md"],
       ignoredFolders: ["Generated"],
-      leafMarkdown: ["Loose.md"],
+      leafMoves: [{ sourcePath: "Loose.md", targetPath: "Loose/Loose.md", existingFolder: false }],
       missingNodeNotes: ["A"],
     });
   });
@@ -108,34 +108,34 @@ describe("migration scan", () => {
       conflicts: [],
       exemptLeafMarkdown: ["_draft.md"],
       ignoredFolders: [".git", "_views"],
-      leafMarkdown: ["Loose.md"],
+      leafMoves: [{ sourcePath: "Loose.md", targetPath: "Loose/Loose.md", existingFolder: false }],
       missingNodeNotes: ["A"],
     });
   });
   it("blocks collisions", async () => {
     const scan = await scanMigrationAsync({ folders: ["A"], markdown: ["A.md", "A/A.md"] });
     expect(scan.conflicts).toHaveLength(1);
-    expect(scan.leafMarkdown).toEqual([]);
+    expect(scan.leafMoves).toEqual([]);
   });
   it("blocks a leaf-note move into an unmanaged target folder", async () => {
     const scan = await scanMigrationAsync({ folders: ["Generated"], markdown: ["Generated.md"] }, { folders: ["Generated"] });
-    expect(scan.leafMarkdown).toEqual([]);
+    expect(scan.leafMoves).toEqual([]);
     expect(scan.conflicts).toEqual([{ path: "Generated.md", reason: "Target belongs to an unmanaged folder: Generated" }]);
   });
   it("treats one case-only name variant as canonical and blocks ambiguous variants", async () => {
     expect(await scanMigrationAsync({ folders: ["Folder"], markdown: ["Folder/folder.md"] })).toEqual({
-      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: [], missingNodeNotes: [],
+      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMoves: [], missingNodeNotes: [],
     });
     const ambiguous = await scanMigrationAsync({ folders: ["Folder"], markdown: ["Folder/Folder.md", "Folder/folder.md"] });
     expect(ambiguous.conflicts[0]?.reason).toContain("Multiple canonical Node Notes");
-    expect(ambiguous.leafMarkdown).toEqual([]);
+    expect(ambiguous.leafMoves).toEqual([]);
     expect(ambiguous.missingNodeNotes).toEqual([]);
   });
 
   it("fails closed when a leaf target differs only by folder case", async () => {
     const scan = await scanMigrationAsync({ folders: ["A"], markdown: ["a.md"] });
 
-    expect(scan.leafMarkdown).toEqual([]);
+    expect(scan.leafMoves).toEqual([]);
     expect(scan.missingNodeNotes).toEqual(["A"]);
     expect(scan.conflicts).toEqual([{ path: "a.md", reason: "Target folder differs only by case: A" }]);
   });
@@ -148,9 +148,33 @@ describe("migration scan", () => {
     };
 
     const scan = await scanMigrationAsync(inventory);
-    expect(scan.leafMarkdown).toEqual([]);
+    expect(scan.leafMoves).toEqual([]);
     expect(scan.conflicts).toHaveLength(2);
     expect(scan.conflicts.every(({ reason }) => reason.includes("same target: A B/A B.md"))).toBe(true);
+  });
+
+  it.each([["A", "a"], ["Café", "Cafe\u0301"], ["Σ", "ς"]])(
+    "blocks two equivalent new folders that do not exist yet (%s, %s)", async (first, second) => {
+      const scan = await scanMigrationAsync({ folders: [], markdown: [`${first}.md`, `${second}.md`] });
+      expect(scan.leafMoves).toEqual([]);
+      expect(scan.conflicts).toHaveLength(2);
+    },
+  );
+
+  it("plans independent leaf moves under distinct parent folders with equivalent names", async () => {
+    const scan = await scanMigrationAsync({
+      folders: ["Case", "case", "case/Topic"],
+      markdown: ["Case/Case.md", "case/case.md", "Case/Topic.md", "case/topic.md"],
+    });
+    expect(scan.conflicts).toEqual([{ path: "case/topic.md", reason: "Target folder differs only by case: case/Topic" }]);
+    expect(scan.leafMoves.map(({ sourcePath }) => sourcePath)).toEqual(["Case/Topic.md"]);
+
+    const siblings = await scanMigrationAsync({
+      folders: ["Case", "case"],
+      markdown: ["Case/Case.md", "case/case.md", "Case/Topic.md", "case/Topic.md"],
+    });
+    expect(siblings.conflicts).toEqual([]);
+    expect(siblings.leafMoves.map(({ sourcePath }) => sourcePath)).toEqual(["Case/Topic.md", "case/Topic.md"]);
   });
 
   it("keeps canonical notes structural even when a leaf exemption matches them", async () => {
@@ -158,7 +182,7 @@ describe("migration scan", () => {
       { folders: ["A"], markdown: ["A/A.md"] },
       { leafMarkdown: ["A/A.md"] },
     )).toEqual({
-      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMarkdown: [], missingNodeNotes: [],
+      conflicts: [], exemptLeafMarkdown: [], ignoredFolders: [], leafMoves: [], missingNodeNotes: [],
     });
   });
 });

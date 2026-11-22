@@ -1,4 +1,4 @@
-import { basename, normalizeVaultPath, sanitizeNewNodeName } from "./paths";
+import { basename, childVaultPath, normalizeVaultPath, sanitizeNewNodeName } from "./paths";
 
 export interface UnresolvedNodePlan {
   nodeName: string;
@@ -29,13 +29,32 @@ export function planUnresolvedNode(linkPath: string, defaultParentPath: string):
 
   const explicitPath = parts.length > 1;
   const parentPath = explicitPath ? parts.slice(0, -1).join("/") : normalizeVaultPath(defaultParentPath);
-  const nodePath = normalizeVaultPath(parentPath === "" ? nodeName : `${parentPath}/${nodeName}`);
+  const nodePath = childVaultPath(parentPath, nodeName);
   return {
     nodeName,
     nodePath,
     notePath: `${nodePath}/${nodeName}.md`,
     leafPath: parentPath === "" ? `${nodeName}.md` : `${parentPath}/${nodeName}.md`,
   };
+}
+
+/** Existing Vault entries keep their spelling. Only genuinely new segments
+ * use the NFC spelling accepted by the creation path. */
+export function projectUnresolvedNode(plan: UnresolvedNodePlan, lookupPath: (path: string) => string | null) {
+  let nodePath = "";
+  let conflict: string | null = null;
+  for (const name of plan.nodePath.split("/")) {
+    const prefix = nodePath === "" ? "" : nodePath + "/";
+    const requested = prefix + name;
+    const generated = prefix + name.normalize("NFC");
+    nodePath = requested;
+    if (requested === generated) continue;
+    const existing = lookupPath(requested);
+    if (existing === requested) continue;
+    nodePath = generated;
+    if (existing !== null || lookupPath(generated) !== null) conflict ??= generated;
+  }
+  return { nodePath, leafPath: nodePath + ".md", conflict };
 }
 
 export function aliasFromLinkDisplay(

@@ -7,7 +7,7 @@ import { PropertyMigrationModal } from "../../src/ui/property-migration-modal";
 
 const app = { vault: { getName: () => "Vault" } } as App;
 const structure: MigrationScan = {
-  leafMarkdown: ["Inbox.md"], missingNodeNotes: ["", "Projects"], exemptLeafMarkdown: [], ignoredFolders: [], conflicts: [],
+  leafMoves: [{ sourcePath: "Inbox.md", targetPath: "Inbox/Inbox.md", existingFolder: true }], missingNodeNotes: ["", "Projects"], exemptLeafMarkdown: [], ignoredFolders: [], conflicts: [],
 };
 const properties: PropertyMigrationScan = {
   scannedNotes: 1, canonicalPropertyNotes: 0, legacyPropertyNotes: 0, redundantLegacyNotes: 0,
@@ -27,11 +27,12 @@ it("describes current files and folders in both read-only health views", () => {
 });
 
 it("keeps the action headings and target note paths in the organization preview", () => {
-  const modal = new MigrationModal(app, structure, async () => {});
+  const move = { sourcePath: "Cafe\u0301.md", targetPath: "Cafe\u0301/Cafe\u0301.md", existingFolder: true };
+  const modal = new MigrationModal(app, { ...structure, leafMoves: [move] }, async () => {});
   modal.onOpen();
   const [notes, folders] = modal.contentEl.querySelectorAll("details");
   expect(notes?.querySelector("summary")?.textContent).toBe(`${t("moveLeafNotes")} (1)`);
-  expect(notes?.querySelector("code")?.textContent).toBe("Inbox.md → Inbox/Inbox.md");
+  expect(notes?.querySelector("code")?.textContent).toBe(`${move.sourcePath} → ${move.targetPath}`);
   expect(folders?.querySelector("summary")?.textContent).toBe(`${t("createNodeNotes")} (2)`);
   expect(Array.from(folders!.querySelectorAll("code"), (item) => item.textContent)).toEqual(["Vault.md", "Projects/Projects.md"]);
 });

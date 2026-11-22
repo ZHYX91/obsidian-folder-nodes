@@ -15,9 +15,10 @@ import { matchesFolderExemption, matchesLeafNoteExemption } from "../core/exempt
 import { FolderNodesError } from "../core/folder-nodes-error";
 import { classifyFileIdentity, classifyFolderIdentity, type FileIdentity, type FolderIdentity } from "../core/identity";
 import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatter, type FolderNodesFrontmatterPatch } from "../core/frontmatter";
+import { resolveLeafTarget } from "../core/leaf-target";
 import { scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planInsert } from "../core/ordering";
-import { basename, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
+import { basename, childVaultPath, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
 import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import {
   FOLDER_NODES_PROPERTY,
@@ -126,12 +127,12 @@ export class NodeService {
   public getFolder(path: string): TFolder | null {
     const normalized = normalizeVaultPath(path);
     if (normalized === "") return this.app.vault.getRoot();
-    const file = this.app.vault.getAbstractFileByPath(normalizePath(normalized));
+    const file = this.app.vault.getAbstractFileByPath(normalized);
     return file instanceof TFolder ? file : null;
   }
 
   public getFile(path: string): TFile | null {
-    const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+    const file = this.app.vault.getAbstractFileByPath(normalizeVaultPath(path));
     return file instanceof TFile ? file : null;
   }
 
@@ -297,37 +298,39 @@ export class NodeService {
   }
 
   public createMissingNodeNote(folder: TFolder): Promise<TFile> {
-    return this.exclusive(async () => {
-      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
-      const notePath = this.notePathForFolder(folder.path);
-      const existing = this.getCanonicalFile(folder.path);
-      if (existing !== null) return existing;
-      await this.assertAvailable(notePath);
-      this.assertActive();
-      this.expectEvent("create", notePath);
-      return this.app.vault.create(notePath, "");
-    });
+    return this.exclusive(() => this.createMissingNodeNoteUnlocked(folder));
+  }
+
+  private async createMissingNodeNoteUnlocked(folder: TFolder): Promise<TFile> {
+    const folderPath = folder.path;
+    if (this.isIgnoredPath(folderPath)) throw new FolderNodesError("folder_unmanaged", { path: folderPath }, `Folder is unmanaged: ${folderPath}`);
+    this.assertEntryIdentity(folder, folderPath, TFolder);
+    const existing = this.repairNoteOwner(folder);
+    if (existing !== null) return existing;
+    const notePath = this.notePathForFolder(folderPath);
+    await this.assertAvailable(notePath);
+    this.assertActive();
+    this.assertEntryIdentity(folder, folderPath, TFolder);
+    const current = this.repairNoteOwner(folder);
+    if (current !== null) return current;
+    this.expectEvent("create", notePath);
+    return this.app.vault.create(notePath, "");
   }
 
   public completeFolder(folder: TFolder): Promise<TFile> {
     return this.exclusive(async () => {
       if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
-      const existing = this.getCanonicalFile(folder.path);
+      this.assertEntryIdentity(folder, folder.path, TFolder);
+      const existing = this.repairNoteOwner(folder);
       if (existing !== null) return existing;
-      const parent = folder.parent;
-      const candidates = parent === null ? [] : parent.children.filter((entry): entry is TFile =>
-        entry instanceof TFile &&
-        entry.extension.toLocaleLowerCase() === "md" &&
-        !this.isLeafNoteExempt(entry.path) &&
-        isSameVaultName(entry.basename, folder.name));
-      if (candidates.length > 1) throw new Error(`Multiple leaf Markdown candidates for folder: ${folder.path}`);
-      const candidate = candidates[0];
-      if (candidate !== undefined) return this.convertLeafNoteUnlocked(candidate);
-      const notePath = this.notePathForFolder(folder.path);
-      await this.assertAvailable(notePath);
-      this.assertActive();
-      this.expectEvent("create", notePath);
-      return this.app.vault.create(notePath, "");
+      const candidates = folder.parent?.children.filter((entry): entry is TFile =>
+        entry instanceof TFile && entry.extension.toLowerCase() === "md" &&
+        isSameVaultName(entry.basename, folder.name) && !this.isLeafNoteExempt(entry.path) && !this.isCanonicalNameMatch(entry)) ?? [];
+      const exact = candidates.filter((entry) => entry.basename === folder.name);
+      const matching = exact.length > 0 ? exact : candidates;
+      if (matching.length > 1) throw new Error(`Multiple leaf Markdown candidates for folder: ${folder.path}`);
+      const candidate = matching[0];
+      return candidate === undefined ? this.createMissingNodeNoteUnlocked(folder) : this.convertLeafNoteUnlocked(candidate, folder);
     });
   }
 
@@ -336,11 +339,21 @@ export class NodeService {
   public useAsNodeNote(folder: TFolder, file: TFile): Promise<TFile> {
     return this.exclusive(async () => {
       if (file.parent !== folder) throw new Error("The note is not inside the selected folder");
-      if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
-      const notePath = this.notePathForFolder(folder.path);
-      if (await this.pathExists(notePath)) throw new Error(`Node Note already exists: ${notePath}`);
+      if (file.extension.toLowerCase() !== "md") throw new Error(`Not a Markdown note: ${file.path}`);
+      const folderPath = folder.path;
+      const originalPath = file.path;
+      if (this.isIgnoredPath(folderPath)) throw new FolderNodesError("folder_unmanaged", { path: folderPath }, `Folder is unmanaged: ${folderPath}`);
+      this.assertEntryIdentity(folder, folderPath, TFolder);
+      this.assertEntryIdentity(file, originalPath, TFile);
+      if (this.isCanonicalNameMatch(file)) return this.requireCanonicalNote(folder);
+      this.assertMissingCanonicalNote(folder);
+      const notePath = this.notePathForFolder(folderPath);
+      await this.assertAvailable(notePath);
       this.assertActive();
-      this.expectEvent("rename", notePath, file.path);
+      this.assertEntryIdentity(folder, folderPath, TFolder);
+      this.assertEntryIdentity(file, originalPath, TFile);
+      this.assertMissingCanonicalNote(folder);
+      this.expectEvent("rename", notePath, originalPath);
       await this.app.fileManager.renameFile(file, notePath);
       this.assertEntryIdentity(file, notePath, TFile);
       return file;
@@ -357,10 +370,11 @@ export class NodeService {
       const note = noteCandidates[0] ?? null;
       const sourceNotePath = note?.path ?? null;
       const oldName = folder.name;
+      if (rawName === oldName) return folder;
       const name = sanitizeNodeName(rawName) === oldName ? oldName : sanitizeNewNodeName(rawName);
       if (name === oldName) return folder;
       const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
-      const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
+      const nextPath = childVaultPath(parentPath, name);
       const nextNotePath = `${nextPath}/${name}.md`;
       const conflictingNoteBeforeMove = `${sourcePath}/${name}.md`;
       await this.assertAvailable(nextPath, folder);
@@ -479,7 +493,7 @@ export class NodeService {
     return this.exclusive(async () => {
       this.assertEntryIdentity(file, sourcePath, TFile);
       assertTarget();
-      const nextPath = normalizePath(normalizedTarget === "" ? file.name : `${normalizedTarget}/${file.name}`);
+      const nextPath = childVaultPath(normalizedTarget, file.name);
       if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
       this.assertEntryIdentity(file, sourcePath, TFile);
@@ -493,9 +507,10 @@ export class NodeService {
   public renameFile(file: TFile, rawName: string): Promise<void> {
     return this.exclusive(async () => {
       const sourcePath = file.path;
-      const name = validateFileName(rawName);
+      if (rawName === file.name) return;
+      const name = normalizePath(validateFileName(rawName));
       const parentPath = normalizeVaultPath(file.parent?.path ?? "");
-      const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
+      const nextPath = childVaultPath(parentPath, name);
       if (nextPath === sourcePath) return;
       await this.assertAvailable(nextPath, file);
       this.assertEntryIdentity(file, sourcePath, TFile);
@@ -528,10 +543,10 @@ export class NodeService {
       if (file instanceof TFolder && normalizeVaultPath(file.path) !== "") folders.push(normalizeVaultPath(file.path));
       if (file instanceof TFile) {
         files.push(file.path);
-        if (file.extension.toLocaleLowerCase() === "md" && !(normalizeVaultPath(file.parent?.path ?? "") === "" && this.isCanonicalFile(file))) markdown.push(file.path);
+        if (file.extension.toLocaleLowerCase() === "md") markdown.push(file.path);
       }
     }
-    return { files, folders, markdown };
+    return { files, folders, markdown, rootNotePath: this.rootNotePath(), configDir: this.app.vault.configDir };
   }
 
   public async scanAsync(onProgress?: (completed: number, total: number) => void, externalSignal?: AbortSignal): Promise<MigrationScan> {
@@ -544,14 +559,7 @@ export class NodeService {
       leafMarkdownPrefixes: this.getSettings().leafNotePrefixes,
     }, onProgress, signal);
     throwIfAborted(signal);
-    const rootCandidates = this.canonicalFiles("");
-    if (rootCandidates.length > 1) {
-      return {
-        ...result,
-        conflicts: [{ path: "", reason: `Multiple Root Node Notes: ${rootCandidates.map(({ path }) => path).join(", ")}` }, ...result.conflicts],
-      };
-    }
-    return rootCandidates.length === 0 ? { ...result, missingNodeNotes: ["", ...result.missingNodeNotes] } : result;
+    return result;
   }
 
   public migrate(expected: MigrationScan, onStep?: (completed: number, total: number) => void): Promise<void> {
@@ -749,14 +757,19 @@ export class NodeService {
 
   public reconcileRenamed(entry: TAbstractFile, oldPath: string): Promise<void> {
     return this.exclusive(async () => {
-      const oldRoot = isSameVaultPath(oldPath, this.rootNotePath());
+      const oldRoot = dirname(oldPath) === "" && isSameVaultName(basename(oldPath), this.rootNotePath());
       const oldCanonical = oldRoot || isCanonicalNodeNote(oldPath);
       const entryScope = entry instanceof TFolder ? entry.path : dirname(entry.path);
       const oldScope = entry instanceof TFolder ? oldPath : dirname(oldPath);
       if (this.isIgnoredPath(entryScope)) return;
       if (entry instanceof TFolder) {
         if (this.isIgnoredPath(oldScope)) return;
-        const parentChanged = !isSameVaultPath(dirname(entry.path), dirname(oldPath));
+        const oldParentPath = dirname(oldPath);
+        const parentPath = dirname(entry.path);
+        const oldParent = oldParentPath === "" ? this.app.vault.getRoot() : this.app.vault.getAbstractFileByPath(oldParentPath);
+        // A spelling-only rename of an ancestor can also change a descendant's reported path.
+        const parentChanged = oldParentPath !== parentPath
+          && (oldParent instanceof TFolder ? oldParent !== entry.parent : !isSameVaultPath(oldParentPath, parentPath));
         const canonicalPath = nodeNotePath(entry.path);
         const previousName = basename(oldPath);
         const candidates = [...new Set([
@@ -818,8 +831,8 @@ export class NodeService {
     if (intent.kind === "move-into" && oldParentPath === parentPath) return null;
 
     if (oldParentPath !== parentPath) {
-      const destination = normalizeVaultPath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
-      if (targetParent.children.some((entry) => isSameVaultPath(entry.path, destination))) {
+      const destination = childVaultPath(parentPath, folder.name);
+      if (targetParent.children.some((entry) => isSameVaultName(entry.name, folder.name))) {
         throw new Error(`Path already exists: ${destination}`);
       }
     }
@@ -869,7 +882,7 @@ export class NodeService {
     const targetParent = parentPath === "" ? null : this.getFolder(parentPath);
     if (parentPath !== "" && targetParent === null) throw new Error(`Unknown target folder: ${parentPath}`);
     const oldParentPath = normalizeVaultPath(folder.parent?.path ?? "");
-    const nextPath = normalizePath(parentPath === "" ? folder.name : `${parentPath}/${folder.name}`);
+    const nextPath = childVaultPath(parentPath, folder.name);
     if (oldParentPath !== parentPath) await this.assertAvailable(nextPath);
     this.assertEntryIdentity(folder, sourcePath, TFolder);
     this.assertEntryIdentity(sourceNote, sourceNotePath, TFile);
@@ -924,7 +937,7 @@ export class NodeService {
     try {
       for (const [index, part] of parts.entries()) {
         this.assertActive();
-        const folderPath = normalizePath(parentPath === "" ? part : `${parentPath}/${part}`);
+        const folderPath = childVaultPath(parentPath, part);
         if (this.isIgnoredPath(folderPath)) throw new FolderNodesError("folder_unmanaged", { path: folderPath }, `Folder is unmanaged: ${folderPath}`);
         const existing = this.app.vault.getAbstractFileByPath(folderPath);
         const isTarget = index === parts.length - 1;
@@ -932,12 +945,15 @@ export class NodeService {
           if (!(existing instanceof TFolder)) throw new Error(`Path already exists: ${folderPath}`);
           if (isTarget) throw new Error(`Path already exists: ${folderPath}`);
           this.requireCanonicalNote(existing);
+          parentPath = folderPath;
         } else {
-          result = await this.createNodeStepUnlocked(parentPath, part, isTarget ? options : {}, undos);
+          const name = sanitizeNewNodeName(part);
+          if (name !== part.normalize("NFC")) throw new Error(`Node creation failed structural validation: ${normalized}`);
+          result = await this.createNodeStepUnlocked(parentPath, name, isTarget ? options : {}, undos);
+          parentPath = dirname(result.path);
         }
-        parentPath = folderPath;
       }
-      if (result === null || result.path !== this.notePathForFolder(normalized)) throw new Error(`Node creation failed structural validation: ${normalized}`);
+      if (result === null || result.path !== this.notePathForFolder(parentPath)) throw new Error(`Node creation failed structural validation: ${normalized}`);
       return result;
     } catch (error) { return this.rollback(undos, error); }
   }
@@ -952,7 +968,8 @@ export class NodeService {
     if (this.isIgnoredPath(normalizedParent)) throw new FolderNodesError("folder_unmanaged", { path: normalizedParent }, `Folder is unmanaged: ${normalizedParent}`);
     if (normalizedParent !== "" && this.getFolder(normalizedParent) === null) throw new Error(`Unknown parent folder: ${normalizedParent}`);
     const name = sanitizeNewNodeName(rawName);
-    const folderPath = normalizePath(normalizedParent === "" ? name : `${normalizedParent}/${name}`);
+    this.assertChildFolderNameAllowed(normalizedParent, name);
+    const folderPath = childVaultPath(normalizedParent, name);
     const notePath = `${folderPath}/${name}.md`;
     await this.assertAvailable(folderPath);
     await this.assertAvailable(notePath);
@@ -980,32 +997,46 @@ export class NodeService {
     return note;
   }
 
-  private async convertLeafNoteUnlocked(file: TFile): Promise<TFile> {
-    if (file.extension.toLocaleLowerCase() !== "md") throw new Error(`Not a Markdown note: ${file.path}`);
-    if (this.isCanonicalFile(file)) return file;
+  private async convertLeafNoteUnlocked(file: TFile, selectedFolder?: TFolder): Promise<TFile> {
+    if (file.extension.toLowerCase() !== "md") throw new Error(`Not a Markdown note: ${file.path}`);
     const originalPath = file.path;
-    const parentPath = normalizeVaultPath(file.parent?.path ?? "");
+    this.assertEntryIdentity(file, originalPath, TFile);
+    const parent = file.parent;
+    if (parent === null) throw new Error(`The note has no parent folder: ${originalPath}`);
+    if (this.isCanonicalNameMatch(file)) return this.requireCanonicalNote(parent);
+    const parentPath = normalizeVaultPath(parent.path);
     const name = sanitizeNodeName(file.basename);
-    const desiredFolderPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
-    const existingFolder = file.parent?.children.find((entry): entry is TFolder =>
-      entry instanceof TFolder && isSameVaultName(entry.name, name)) ?? null;
-    const folderPath = existingFolder?.path ?? desiredFolderPath;
-    const noteName = existingFolder?.name ?? name;
-    const notePath = `${folderPath}/${noteName}.md`;
+    this.assertChildFolderNameAllowed(parentPath, selectedFolder?.name ?? name);
+    const occupyingFile = parent.children.find((entry) => entry instanceof TFile && isSameVaultName(entry.name, name));
+    if (occupyingFile !== undefined) throw new Error(`Target folder path is occupied by a file: ${occupyingFile.path}`);
+    const equivalents = parent.children.filter((entry): entry is TFolder => entry instanceof TFolder && isSameVaultName(entry.name, name));
+    if (selectedFolder !== undefined && selectedFolder.name !== file.basename && equivalents.length > 1) {
+      throw new Error(`Ambiguous folder for leaf Markdown: ${originalPath}`);
+    }
+    const target = selectedFolder === undefined
+      ? resolveLeafTarget(originalPath, equivalents.map((entry) => entry.path))
+      : { folderPath: selectedFolder.path, notePath: this.notePathForFolder(selectedFolder.path) };
+    if (target === null) throw new Error(`Target folder differs in spelling: ${equivalents.map((entry) => entry.path).join(", ")}`);
+    const { folderPath, notePath } = target;
+    const folder = selectedFolder ?? equivalents.find((entry) => entry.path === folderPath);
     if (this.isIgnoredPath(folderPath)) throw new Error(`Target belongs to an unmanaged folder: ${folderPath}`);
-    const target = existingFolder ?? this.app.vault.getAbstractFileByPath(folderPath);
-    if (target !== null && !(target instanceof TFolder)) throw new Error(`Path already exists: ${folderPath}`);
-    if (target === null) await this.assertAvailable(folderPath);
-    await this.assertAvailable(notePath, file);
+    if (folder === undefined) await this.assertAvailable(folderPath);
+    else this.assertMissingCanonicalNote(folder);
+    await this.assertAvailable(notePath);
     const undos: Undo[] = [];
     try {
-      if (target === null) {
+      let destination = folder;
+      if (destination === undefined) {
         this.assertActive();
         this.expectEvent("create", folderPath);
         const createdFolder = await this.app.vault.createFolder(folderPath);
         undos.push(() => this.trashCreatedFolder(createdFolder, folderPath));
+        destination = createdFolder;
       }
       this.assertActive();
+      this.assertEntryIdentity(file, originalPath, TFile);
+      this.assertEntryIdentity(destination, folderPath, TFolder);
+      this.assertMissingCanonicalNote(destination);
       this.expectEvent("rename", notePath, originalPath);
       await this.app.fileManager.renameFile(file, notePath);
       undos.push(async () => {
@@ -1026,7 +1057,7 @@ export class NodeService {
     if (sourcePath === "") return;
     const renamedNotePath = renamedNote.path;
     const parentPath = normalizeVaultPath(folder.parent?.path ?? "");
-    const nextPath = normalizePath(parentPath === "" ? name : `${parentPath}/${name}`);
+    const nextPath = childVaultPath(parentPath, name);
     await this.assertAvailable(nextPath);
     this.assertActive();
     this.assertEntryIdentity(folder, sourcePath, TFolder);
@@ -1210,28 +1241,50 @@ export class NodeService {
     onStep?: (completed: number, total: number) => void,
   ): Promise<void> {
     if (scan.conflicts.length > 0) throw new Error(`Migration contains blocking conflicts: ${scan.conflicts[0]?.reason ?? "unknown conflict"}`);
-    const total = scan.leafMarkdown.length + scan.missingNodeNotes.length;
+    const total = scan.leafMoves.length + scan.missingNodeNotes.length;
     const undos: Undo[] = [];
     let completed = 0;
+    const moves = scan.leafMoves.map(({ sourcePath, targetPath, existingFolder }) => {
+      const note = this.getFile(sourcePath);
+      if (note === null || note.parent === null) throw new Error(`Migration source disappeared: ${sourcePath}`);
+      this.assertEntryIdentity(note, sourcePath, TFile);
+      const parent = note.parent;
+      this.assertEntryIdentity(parent, dirname(sourcePath), TFolder);
+      const folderPath = dirname(targetPath);
+      const folder = this.getFolder(folderPath);
+      if ((folder !== null) !== existingFolder || (folder !== null && folder.parent !== parent)) throw new Error(`Migration target changed: ${targetPath}`);
+      if (folder !== null) this.assertEntryIdentity(folder, folderPath, TFolder);
+      return { note, path: sourcePath, targetNotePath: targetPath, parent, folderPath, folder };
+    });
+    const missing = scan.missingNodeNotes.map((folderPath) => {
+      const folder = this.getFolder(folderPath);
+      if (folder === null) throw new Error(`Migration folder disappeared: ${folderPath}`);
+      this.assertEntryIdentity(folder, folderPath, TFolder);
+      const notePath = this.notePathForFolder(folderPath);
+      return { folder, folderPath, notePath };
+    });
     try {
-      for (const path of scan.leafMarkdown) {
+      for (const move of moves) {
         throwIfAborted(signal);
-        const note = this.getFile(path);
-        if (note === null) throw new Error(`Migration source disappeared: ${path}`);
-        const parent = dirname(path);
-        const name = sanitizeNodeName(basename(path).slice(0, -3));
-        const folderPath = normalizePath(parent === "" ? name : `${parent}/${name}`);
-        const targetNotePath = `${folderPath}/${name}.md`;
-        if (this.getFolder(folderPath) === null) {
+        const { path, note, parent, folderPath, targetNotePath } = move;
+        let folder = move.folder;
+        this.assertEntryIdentity(note, path, TFile);
+        this.assertEntryIdentity(parent, dirname(path), TFolder);
+        if (folder === null) {
           await this.assertAvailable(folderPath);
           throwIfAborted(signal);
+          this.assertEntryIdentity(parent, dirname(path), TFolder);
           this.expectEvent("create", folderPath);
           const createdFolder = await this.app.vault.createFolder(folderPath);
           undos.push(() => this.trashCreatedFolder(createdFolder, folderPath));
-          throwIfAborted(signal);
+          folder = createdFolder;
         }
-        await this.assertAvailable(targetNotePath, note);
+        await this.assertAvailable(targetNotePath);
         throwIfAborted(signal);
+        this.assertEntryIdentity(note, path, TFile);
+        this.assertEntryIdentity(folder, folderPath, TFolder);
+        this.assertMissingCanonicalNote(folder);
+        if (folder.parent !== parent || note.parent !== parent) throw new Error(`Migration target changed: ${targetNotePath}`);
         this.expectEvent("rename", targetNotePath, path);
         await this.app.fileManager.renameFile(note, targetNotePath);
         undos.push(async () => {
@@ -1239,19 +1292,25 @@ export class NodeService {
           this.expectEvent("rename", path, targetNotePath);
           await this.app.fileManager.renameFile(note, path);
         });
+        this.assertEntryIdentity(note, targetNotePath, TFile);
+        if (note.parent !== folder) throw new Error(`Migration target changed: ${targetNotePath}`);
         throwIfAborted(signal);
         onStep?.(++completed, total);
         throwIfAborted(signal);
       }
-      for (const folderPath of scan.missingNodeNotes) {
+      for (const { folder, folderPath, notePath } of missing) {
         throwIfAborted(signal);
-        const notePath = this.notePathForFolder(folderPath);
+        this.assertEntryIdentity(folder, folderPath, TFolder);
         if (this.getFile(notePath) === null) {
           await this.assertAvailable(notePath);
           throwIfAborted(signal);
+          this.assertEntryIdentity(folder, folderPath, TFolder);
+          this.assertMissingCanonicalNote(folder);
           this.expectEvent("create", notePath);
           const created = await this.app.vault.create(notePath, "");
           undos.push(() => this.trashCreatedFile(created, notePath, ""));
+          this.assertEntryIdentity(created, notePath, TFile);
+          if (created.parent !== folder) throw new Error(`Migration target changed: ${notePath}`);
           throwIfAborted(signal);
         }
         onStep?.(++completed, total);
@@ -1259,15 +1318,40 @@ export class NodeService {
       }
       throwIfAborted(signal);
       const post = await this.scanAsync();
-      if (post.conflicts.length > 0 || post.leafMarkdown.length > 0 || post.missingNodeNotes.length > 0) throw new Error("Structural validation failed after bulk organization");
+      for (const { note, targetNotePath } of moves) this.assertEntryIdentity(note, targetNotePath, TFile);
+      if (post.conflicts.length > 0 || post.leafMoves.length > 0 || post.missingNodeNotes.length > 0) throw new Error("Structural validation failed after bulk organization");
     } catch (error) { await this.rollback(undos, error); }
   }
 
-  private requireCanonicalNote(folder: TFolder): TFile {
+  private uniqueCanonicalNote(folder: TFolder): TFile | null {
     const candidates = this.canonicalFiles(folder.path);
-    if (candidates.length === 0) throw new Error(`Missing canonical Node Note: ${folder.path}`);
-    if (candidates.length > 1) throw new Error(`Multiple canonical Node Notes: ${folder.path}`);
-    return candidates[0]!;
+    if (candidates.length > 1) throw new FolderNodesError("multiple_canonical_notes", { path: folder.path }, `Multiple canonical Node Notes: ${folder.path}`);
+    return candidates[0] ?? null;
+  }
+
+  private assertChildFolderNameAllowed(parentPath: string, name: string): void {
+    const notePath = this.notePathForFolder(parentPath);
+    if (isSameVaultName(name, basename(notePath))) throw new Error(`Target folder path is required for a Node Note: ${notePath}`);
+  }
+
+  private repairNoteOwner(folder: TFolder): TFile | null {
+    const owner = this.uniqueCanonicalNote(folder);
+    if (owner !== null) return owner;
+    const wanted = basename(this.notePathForFolder(folder.path));
+    const occupant = folder.children.find((child) => child instanceof TFolder && isSameVaultName(child.name, wanted));
+    if (occupant !== undefined) throw new Error(`Node Note path is occupied by a folder: ${occupant.path}`);
+    return null;
+  }
+
+  private assertMissingCanonicalNote(folder: TFolder): void {
+    const existing = this.repairNoteOwner(folder);
+    if (existing !== null) throw new Error(`Node Note already exists: ${existing.path}`);
+  }
+
+  private requireCanonicalNote(folder: TFolder): TFile {
+    const note = this.uniqueCanonicalNote(folder);
+    if (note === null) throw new Error(`Missing canonical Node Note: ${folder.path}`);
+    return note;
   }
 
   private canonicalFiles(folderPath: string): TFile[] {
@@ -1282,16 +1366,22 @@ export class NodeService {
     return isSameVaultName(file.basename, expectedName);
   }
 
-  private async pathExists(path: string): Promise<boolean> {
-    return this.app.vault.getAbstractFileByPath(normalizePath(path)) !== null || await this.app.vault.adapter.exists(normalizePath(path));
-  }
-
   private async assertAvailable(path: string, allowed: TAbstractFile | null = null): Promise<void> {
-    const normalized = normalizePath(path);
+    const normalized = normalizeVaultPath(path);
     const cached = this.app.vault.getAbstractFileByPath(normalized);
     if (cached !== null && cached !== allowed) throw new Error(`Path already exists: ${normalized}`);
-    const sameCaseInsensitiveEntry = allowed !== null && isSameVaultPath(allowed.path, normalized);
-    if (cached === null && await this.app.vault.adapter.exists(normalized) && !sameCaseInsensitiveEntry) throw new Error(`Path already exists: ${normalized}`);
+    if (cached?.path === normalized) return;
+    const adapter = this.app.vault.adapter;
+    if (cached === null && !await adapter.exists(normalized)) return;
+    if (allowed !== null) {
+      const sourcePath = allowed.path;
+      const parentPath = dirname(normalized);
+      if (dirname(sourcePath) === parentPath && isSameVaultName(basename(sourcePath), basename(normalized))
+        && await adapter.exists(sourcePath, true) && !await adapter.exists(normalized, true)
+        && allowed.path === sourcePath && this.app.vault.getAbstractFileByPath(sourcePath) === allowed
+        && allowed.parent !== null && this.getFolder(parentPath) === allowed.parent) return;
+    }
+    throw new Error(`Path already exists: ${normalized}`);
   }
 
   private expectEvent(kind: VaultEventKind, newPath: string, oldPath: string | null = null, recursive = false): void {
@@ -1474,7 +1564,7 @@ export class NodeService {
   ): void {
     // The host exposes the Vault root through getRoot(); its path can be "/" while our ordering paths use "".
     const root = path === "" || path === "/";
-    const current = root ? this.app.vault.getRoot() : this.app.vault.getAbstractFileByPath(normalizePath(path));
+    const current = root ? this.app.vault.getRoot() : this.app.vault.getAbstractFileByPath(normalizeVaultPath(path));
     const samePath = root ? entry.path === "" || entry.path === "/" : entry.path === path;
     if (!(entry instanceof kind) || !samePath || current !== entry) {
       throw new Error(`Vault entry identity changed during operation: ${path}`);
@@ -1544,7 +1634,7 @@ function scanSignature(scan: MigrationScan): string {
     conflicts: scan.conflicts.map(({ path, reason }) => [path, reason]),
     exemptLeafMarkdown: scan.exemptLeafMarkdown,
     ignoredFolders: scan.ignoredFolders,
-    leafMarkdown: scan.leafMarkdown,
+    leafMoves: scan.leafMoves,
     missingNodeNotes: scan.missingNodeNotes,
   });
 }

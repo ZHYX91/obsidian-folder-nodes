@@ -2,7 +2,7 @@ import { App, Notice, Setting } from "obsidian";
 
 import { formatError, t } from "./i18n";
 import { SubmittingModal } from "./submitting-modal";
-import { basename, dirname, nodeNotePath, sanitizeNodeName } from "../core/paths";
+import { nodeNotePath, sanitizeNodeName } from "../core/paths";
 import type { MigrationScan } from "../core/types";
 
 export class MigrationModal extends SubmittingModal {
@@ -18,7 +18,7 @@ export class MigrationModal extends SubmittingModal {
     if (this.healthMode) this.contentEl.createEl("p", { cls: "setting-item-description", text: t("readOnlyHealth") });
     const summary = this.contentEl.createDiv({ cls: "folder-nodes-migration-summary" });
     this.pathSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"),
-      this.healthMode ? this.scan.leafMarkdown : this.scan.leafMarkdown.map((path) => `${path} → ${this.target(path)}`));
+      this.scan.leafMoves.map(({ sourcePath, targetPath }) => this.healthMode ? sourcePath : `${sourcePath} → ${targetPath}`));
     this.pathSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
       this.scan.missingNodeNotes.map((path) => this.healthMode ? path || "/" : this.notePath(path)));
     this.pathSection(summary, t("skippedLeafNotes"), this.scan.exemptLeafMarkdown);
@@ -86,18 +86,11 @@ export class MigrationModal extends SubmittingModal {
     }
   }
 
-  private target(path: string): string {
-    const parent = dirname(path);
-    const name = sanitizeNodeName(basename(path).slice(0, -3));
-    const folder = parent === "" ? name : `${parent}/${name}`;
-    return `${folder}/${name}.md`;
-  }
-
   private notePath(folderPath: string): string {
     return folderPath === ""
       ? `${sanitizeNodeName(this.app.vault.getName())}.md`
       : nodeNotePath(folderPath);
   }
 
-  private total(): number { return this.scan.leafMarkdown.length + this.scan.missingNodeNotes.length; }
+  private total(): number { return this.scan.leafMoves.length + this.scan.missingNodeNotes.length; }
 }

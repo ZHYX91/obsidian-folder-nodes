@@ -12,7 +12,7 @@ it("scans a large complete Folder Node inventory in near-linear time", async () 
   const scan = await scanMigrationAsync({ folders, markdown });
 
   expect(scan.conflicts).toEqual([]);
-  expect(scan.leafMarkdown).toEqual([]);
+  expect(scan.leafMoves).toEqual([]);
   expect(scan.missingNodeNotes).toEqual([]);
   expect(performance.now() - started).toBeLessThan(import.meta.env.MODE === "large" ? 10_000 : 2_000);
 });

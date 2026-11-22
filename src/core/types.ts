@@ -81,8 +81,14 @@ export interface MigrationConflict {
   reason: string;
 }
 
+export interface LeafMove {
+  sourcePath: string;
+  targetPath: string;
+  existingFolder: boolean;
+}
+
 export interface MigrationScan {
-  leafMarkdown: string[];
+  leafMoves: LeafMove[];
   missingNodeNotes: string[];
   exemptLeafMarkdown: string[];
   ignoredFolders: string[];

@@ -10,6 +10,8 @@ translation_status: synced
 
 A complete Folder Node is a folder with exactly one same-named Node Note, `A/A.md`; its structural identity remains that current normalized pair. A managed folder or Markdown without its counterpart is an incomplete node that the user may complete or mark unmanaged. Root may have its optional Node Note at the Vault root. Folder Nodes writes no permanent ID, `_pkwf`, path, parent, name, node type, or complete child list.
 
+Within the same parent folder, Folder Nodes compares names using Unicode NFC normalization and simple case folding. For example, `Σ`, `σ`, and `ς` match, as do `ß` and `ẞ`. The two letters `SS` form a separate name. Accents, character width, and invisible characters such as a zero-width space remain significant. Each physical parent folder has its own set of names.
+
 ## Folder Nodes property and ordering
 
 Folder Nodes owns one flat Text List named `folder-nodes`. It contains only non-default `key=value` tokens: `order=manual` on a parent Node Note, a sparse positive `rank=1024`-style token on each direct Child Node Note, and `hidden=true` on a hidden subtree root. Token order is canonical—order, rank, hidden—while syntactically valid unknown future tokens are preserved. Natural name order, absent rank, and visible state write nothing; an empty list is removed. Natural ordering uses normalized names. Manual ordering is enabled explicitly per parent. A normal manual placement writes only the moved child when a safe rank gap exists; otherwise the desired sequence is preserved while that parent is fully re-ranked. Missing or duplicate ranks remain deterministic for reads but are repaired only by an explicit ordering action. Rename retains an existing active rank, and a new child in manual mode appends by default.
@@ -59,6 +61,10 @@ The complete graph catalog is built once and refreshed incrementally from node, 
 ## Structural safety
 
 Folder Nodes has no initialization or adoption state. Once enabled, it immediately classifies complete, incomplete, unmanaged, and conflicting structures, and automatic rename synchronization applies only to unambiguous complete pairs. Native creation never auto-completes or moves content. Missing folder and Markdown halves both use an orange Incomplete state with explicit complete and Set as unmanaged actions; true pair conflicts use a red Conflict state and fail closed. Optional bulk organization uses a cancellable batched read-only scan, lists every create, move, skip, and block path, revalidates before commit, validates afterward, and attempts exact compensation for failed steps without overwriting later user changes. Property migration is a separate explicit preview-and-confirm operation. Health combines structure, Folder Nodes property, and icon-declaration findings and remains strictly read-only with no write button. Complete-node deletion follows Obsidian’s configured file-deletion setting. The plugin makes no network requests.
+
+When completing a folder explicitly, Folder Nodes uses the leaf with the same spelling first. A sole case or Unicode variant is accepted when it belongs unambiguously to the selected folder. The parent’s own Node Note stays in place. When converting a leaf alone, a differently spelled existing folder requires the user to select that folder to complete it. Repair actions preserve an existing Node Note, including a differently spelled name or extension, and stop on ambiguous candidates.
+
+Bulk organization counts each Node Note in its own parent folder. Its preview reports a conflict when a required note path, including the Root Node Note, would also be used as a folder. The Vault configuration directory is reserved even when Obsidian omits it from the file listing.
 
 ## Scope limits
 

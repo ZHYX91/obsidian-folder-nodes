@@ -649,14 +649,38 @@ describe("NodeService structural safety", () => {
     }
   });
 
+  it.each([["Café", "Cafe\u0301"], ["A B", "A\u00a0B"]])(
+    "uses the actual directory spelling for moves and explicit node paths: %s / %s", async (alias, actual) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder(alias);
+      fake.addFile(`${alias}/${alias}.md`, "other folder");
+      fake.addFolder(actual);
+      fake.addFile(`${actual}/${actual}.md`, "chosen folder");
+      const attachment = fake.addFile("input.txt", "keep");
+      const nodes = service(fake);
+
+      const chosen = fake.requireFolder(actual);
+      expect(await nodes.renameNode(chosen, chosen.name)).toBe(chosen);
+      const canonical = fake.requireFile(`${actual}/${actual}.md`);
+      await nodes.renameFile(canonical, canonical.name);
+      expect(fake.renames).toEqual([]);
+      await nodes.moveFile(attachment, actual);
+      expect(attachment.path).toBe(`${actual}/input.txt`);
+      const note = await nodes.createNodePath(`${actual}/Re\u0301sume\u0301`);
+      expect(note.path).toBe(`${actual}/Résumé/Résumé.md`);
+      expect(fake.requireFolder(alias).children).toEqual([fake.requireFile(`${alias}/${alias}.md`)]);
+    },
+  );
+
   it("supports case-only node and file renames on a case-insensitive adapter", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     const source = fake.addFolder("Alpha");
     fake.addFile("Alpha/Alpha.md");
     fake.addFile("Document.pdf");
-    fake.app.vault.adapter.exists = async (path: string) =>
-      [...fake.files.keys()].some((candidate) => candidate.toLocaleLowerCase() === path.toLocaleLowerCase());
+    fake.app.vault.adapter.exists = async (path, sensitive) => sensitive ? fake.files.has(path)
+      : [...fake.files.keys()].some((candidate) => candidate.toLowerCase() === path.toLowerCase());
     const nodes = service(fake);
 
     expect((await nodes.renameNode(source, "alpha")).path).toBe("alpha");
@@ -669,6 +693,50 @@ describe("NodeService structural safety", () => {
     expect(await nodes.convertLeafNote(mixedNote)).toBe(mixedNote);
     await nodes.deleteFile(mixedNote);
     expect(fake.files.has("Mixed/mixed.md")).toBe(false);
+  });
+
+  it.each(["folder", "note", "file"] as const)("rejects an on-disk-only %s collision before a case-only rename", async (kind) => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Alpha");
+    fake.addFile("Alpha/Alpha.md");
+    const file = fake.addFile("Report.pdf");
+    const diskOnly = kind === "folder" ? "alpha" : kind === "note" ? "Alpha/alpha.md" : "report.pdf";
+    fake.app.vault.adapter.exists = async (path) => fake.files.has(path) || path === diskOnly;
+    const nodes = service(fake);
+
+    await expect(kind === "file" ? nodes.renameFile(file, "report.pdf") : nodes.renameNode(folder, "alpha"))
+      .rejects.toThrow(`Path already exists: ${diskOnly}`);
+    expect(fake.renames).toEqual([]);
+  });
+
+  it("does not use a cached alias to authorize an exact destination found on disk", async () => {
+    const fake = new FakeObsidian();
+    const file = fake.addFile("Report.pdf");
+    const getEntry = fake.app.vault.getAbstractFileByPath;
+    fake.app.vault.getAbstractFileByPath = (path) => path === "report.pdf" ? file : getEntry(path);
+    fake.app.vault.adapter.exists = async (path) => fake.files.has(path) || path === "report.pdf";
+    await expect(service(fake).renameFile(file, "report.pdf")).rejects.toThrow("Path already exists: report.pdf");
+    expect(fake.renames).toEqual([]);
+  });
+
+  it("requires the source spelling on disk before accepting a case-insensitive alias", async () => {
+    const fake = new FakeObsidian();
+    const file = fake.addFile("Report.pdf");
+    fake.app.vault.adapter.exists = async (path, sensitive) =>
+      sensitive ? path === "REPORT.pdf" : path.toLowerCase() === "report.pdf";
+    await expect(service(fake).renameFile(file, "report.pdf")).rejects.toThrow("Path already exists: report.pdf");
+    expect(fake.renames).toEqual([]);
+  });
+
+  it("rejects a disk-only destination alias under a different, similarly spelled parent", async () => {
+    const fake = new FakeObsidian();
+    fake.addFolder("A");
+    fake.addFolder("a");
+    const file = fake.addFile("A/Report.pdf");
+    fake.app.vault.adapter.exists = async (path, sensitive) =>
+      fake.files.has(path) || (sensitive ? path === "a/REPORT.pdf" : path === "a/Report.pdf");
+    await expect(service(fake).moveFile(file, "a")).rejects.toThrow("Path already exists: a/Report.pdf");
+    expect(fake.renames).toEqual([]);
   });
 
   it("rolls back only an unchanged newly created node after a later workflow failure", async () => {
@@ -979,7 +1047,7 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("A/C/C.md")).toBe(false);
     expect(fake.requireFile("A/Leaf.md")).toBeDefined();
     expect(scan.missingNodeNotes).toEqual(["A", "A/C"]);
-    expect(scan.leafMarkdown).toEqual(["A/Leaf.md"]);
+    expect(scan.leafMoves.map(({ sourcePath }) => sourcePath)).toEqual(["A/Leaf.md"]);
   });
 
   it.each(["user", "unload"])("cancels a %s preview without changing the Vault", async (reason) => {
@@ -1013,7 +1081,7 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("FolderOnly/FolderOnly.md")).toBe(false);
     expect(fake.requireFile("Loose.md")).toBeDefined();
     expect((await nodes.scanAsync()).missingNodeNotes).toEqual(["FolderOnly"]);
-    expect((await nodes.scanAsync()).leafMarkdown).toEqual(["Loose.md"]);
+    expect((await nodes.scanAsync()).leafMoves.map(({ sourcePath }) => sourcePath)).toEqual(["Loose.md"]);
   });
 
   it("rejects queued structural writes and rolls back an in-flight create after dispose", async () => {
@@ -1114,7 +1182,7 @@ describe("NodeService structural safety", () => {
     expect(fake.files.has("First")).toBe(false);
     expect(fake.files.has("Second")).toBe(false);
     expect(fake.renames).toEqual([]);
-    expect(scan.leafMarkdown).toEqual(["First.md", "Second.md"]);
+    expect(scan.leafMoves.map(({ sourcePath }) => sourcePath)).toEqual(["First.md", "Second.md"]);
   });
 
   it("rolls back moved merge entries when target writing fails", async () => {
@@ -1517,11 +1585,132 @@ describe("NodeService structural safety", () => {
     expect((await service(fake).scanAsync()).conflicts[0]?.reason).toContain("occupied by a file");
   });
 
+  it.each(["already present", "planned by a leaf move"])(
+    "blocks a folder occupying a canonical note path in the preview: %s", async (collision) => {
+      for (const parent of ["", "A"]) {
+        const fake = new FakeObsidian();
+        if (parent !== "") {
+          fake.addFile("Vault.md");
+          fake.addFolder(parent);
+        }
+        const target = parent === "" ? "Vault.md" : "A/A.md";
+        if (collision === "already present") {
+          fake.addFolder(target);
+          if (parent !== "") fake.addFile("A.md", "leaf targeting occupied note path");
+        } else fake.addFile(`${target}.md`, "keep");
+        fake.addFile("Loose.md", "keep this too");
+        const nodes = service(fake);
+        const before = new Map(fake.files);
+        const preview = await nodes.scanAsync();
+        expect(preview.conflicts.some(({ reason }) => reason.includes(target))).toBe(true);
+        expect(preview.leafMoves.map(({ sourcePath }) => sourcePath)).toEqual(["Loose.md"]);
+        if (collision === "already present") expect(preview.missingNodeNotes).not.toContain(parent);
+        await expect(nodes.migrate(preview)).rejects.toThrow("blocking conflicts");
+        expect(fake.files).toEqual(before);
+        expect(fake.renames).toEqual([]);
+        expect(fake.trashed).toEqual([]);
+      }
+    },
+  );
+
+  it("keeps the configuration directory reserved when it is absent from the file inventory", async () => {
+    const fake = new FakeObsidian();
+    fake.app.vault.configDir = "Vault.md";
+    fake.addFile("Vault.md.md", "leave in place");
+    const nodes = service(fake);
+    const scan = await nodes.scanAsync();
+    expect(scan.missingNodeNotes).toEqual([]);
+    expect(scan.leafMoves).toEqual([]);
+    expect(scan.conflicts).toHaveLength(2);
+    await expect(nodes.migrate(scan)).rejects.toThrow("blocking conflicts");
+    expect(fake.renames).toEqual([]);
+    expect(fake.trashed).toEqual([]);
+
+    fake.app.vault.configDir = "Settings";
+    fake.addFile("Settings.md");
+    const next = await nodes.scanAsync();
+    expect(next.conflicts).toContainEqual({ path: "Settings.md", reason: "Target belongs to an unmanaged folder: Settings" });
+  });
+
+  it.each([["Case", "case"], ["Café", "Cafe\u0301"]])(
+    "counts canonical notes in their actual parent folders: %s and %s", async (first, second) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder(first);
+      fake.addFolder(second);
+      const original = fake.addFile(`${first}/${first}.MD`, "original");
+      const nodes = service(fake);
+
+      const preview = await nodes.scanAsync();
+      expect(preview.missingNodeNotes).toEqual([second]);
+      expect(preview.conflicts).toEqual([]);
+      await nodes.migrate(preview);
+      expect(fake.requireFile(original.path)).toBe(original);
+      expect(fake.contents.get(original.path)).toBe("original");
+      expect(nodes.getCanonicalFile(second)?.path).toBe(`${second}/${second}.md`);
+      expect((await nodes.scanAsync()).conflicts).toEqual([]);
+    },
+  );
+
+  it.each([["A", "a"], ["Café", "Cafe\u0301"]])(
+    "organizes each leaf into its exact existing sibling folder: %s and %s", async (first, second) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      const entries = [first, second].map((name) => ({
+        name, folder: fake.addFolder(name), note: fake.addFile(`${name}.MD`, `body of ${name}`),
+      }));
+      const nodes = service(fake);
+      const preview = await nodes.scanAsync();
+      expect(preview.conflicts).toEqual([]);
+      expect(preview.missingNodeNotes).toEqual([]);
+      expect(preview.leafMoves).toHaveLength(2);
+      for (const { name, note } of entries) {
+        expect(preview.leafMoves).toContainEqual({ sourcePath: note.path, targetPath: `${name}/${name}.md`, existingFolder: true });
+      }
+      await nodes.migrate(preview);
+      for (const { name, folder, note } of entries) {
+        expect(note.parent).toBe(folder);
+        expect(fake.requireFile(`${name}/${name}.md`)).toBe(note);
+        expect(fake.contents.get(note.path)).toBe(`body of ${name}`);
+      }
+      expect((await nodes.scanAsync()).leafMoves).toEqual([]);
+    },
+  );
+
+  it("stops before the first move if the host resolves two physical target folders to the same entry", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    for (const name of ["A", "a"]) {
+      fake.addFolder(name);
+      fake.addFile(`${name}.md`, name);
+    }
+    const nodes = service(fake);
+    const preview = await nodes.scanAsync();
+    const lookup = fake.app.vault.getAbstractFileByPath.bind(fake.app.vault);
+    vi.spyOn(fake.app.vault, "getAbstractFileByPath").mockImplementation((path) => lookup(path === "a" ? "A" : path));
+    await expect(nodes.migrate(preview)).rejects.toThrow("identity changed");
+    expect(fake.renames).toEqual([]);
+    expect(fake.trashed).toEqual([]);
+  });
+
+  it("requires a fresh preview when a planned new folder already exists at apply time", async () => {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md");
+    fake.addFile("Topic.md");
+    const nodes = service(fake);
+    const preview = await nodes.scanAsync();
+    fake.addFolder("Topic");
+    await expect(nodes.migrate(preview)).rejects.toThrow("changed after preview");
+    expect(fake.renames).toEqual([]);
+  });
+
   it("reports ambiguous case-only Root Node Notes instead of choosing one", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md");
     fake.addFile("vault.md");
-    expect((await service(fake).scanAsync()).conflicts[0]?.reason).toContain("Multiple Root Node Notes");
+    const preview = await service(fake).scanAsync();
+    expect(preview.conflicts[0]?.reason).toContain("Multiple Root Node Notes");
+    expect(preview.leafMoves).toEqual([]);
   });
 
   it("serializes competing creates and leaves exactly one complete node", async () => {
@@ -1566,14 +1755,158 @@ describe("NodeService structural safety", () => {
     fake.addFile("Vault.md");
     const folder = fake.addFolder("A");
     const leaf = fake.addFile("a.md", "existing body");
-    fake.app.vault.adapter.exists = async (path: string) =>
-      [...fake.files.keys()].some((candidate) => candidate.toLocaleLowerCase() === path.toLocaleLowerCase());
+    fake.app.vault.adapter.exists = async (path, sensitive) => sensitive ? fake.files.has(path)
+      : [...fake.files.keys()].some((candidate) => candidate.toLowerCase() === path.toLowerCase());
 
     const completed = await service(fake).completeFolder(folder);
 
     expect(completed).toBe(leaf);
     expect(completed.path).toBe("A/A.md");
     expect(fake.files.has("a")).toBe(false);
+  });
+
+  it.each(["convert", "complete"])("uses the exact matching sibling regardless of insertion order: %s", async (action) => {
+    const fake = new FakeObsidian();
+    const other = fake.addFolder("case");
+    const selected = fake.addFolder("Case");
+    const leaf = fake.addFile("Case.md", "keep");
+    const nodes = service(fake);
+    const result = action === "convert" ? await nodes.convertLeafNote(leaf) : await nodes.completeFolder(selected);
+    expect(result).toBe(leaf);
+    expect(result.parent).toBe(selected);
+    expect(other.children).toEqual([]);
+  });
+
+  it("requires explicit folder selection for a differently spelled counterpart", async () => {
+    const fake = new FakeObsidian();
+    const selected = fake.addFolder("Case");
+    const leaf = fake.addFile("case.md", "keep");
+    const nodes = service(fake);
+    await expect(nodes.convertLeafNote(leaf)).rejects.toThrow(/spelling|case/iu);
+    expect(fake.renames).toEqual([]);
+    expect(await nodes.completeFolder(selected)).toBe(leaf);
+  });
+
+  it("refuses an ambiguous spelling match during explicit completion", async () => {
+    const fake = new FakeObsidian();
+    const selected = fake.addFolder("Case");
+    fake.addFolder("case");
+    fake.addFile("CASE.md");
+    await expect(service(fake).completeFolder(selected)).rejects.toThrow(/ambiguous/iu);
+    expect(fake.renames).toEqual([]);
+  });
+
+  it.each(["Vault", "Parent/Parent"])("preserves the parent Node Note while completing %s", async (path) => {
+    const fake = new FakeObsidian();
+    const parent = path === "Vault" ? fake.root : fake.addFolder("Parent");
+    const name = parent === fake.root ? "Vault.md" : "Parent/Parent.md";
+    const owner = fake.addFile(name, "parent");
+    const incomplete = fake.addFolder(path);
+    const completed = await service(fake).completeFolder(incomplete);
+    expect(completed.parent).toBe(incomplete);
+    expect(fake.requireFile(name)).toBe(owner);
+    expect(fake.contents.get(name)).toBe("parent");
+    expect(fake.renames).toEqual([]);
+  });
+
+  it.each(["create", "complete", "convert", "adopt"])("rejects ambiguous Node Notes before %s can write", async (action) => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Case");
+    const first = fake.addFile("Case/CASE.MD", "first");
+    fake.addFile("Case/case.md", "second");
+    const leaf = fake.addFile("Case/Other.md", "other");
+    const before = new Map(fake.contents);
+    const nodes = service(fake);
+    const result = action === "create" ? nodes.createMissingNodeNote(folder)
+      : action === "complete" ? nodes.completeFolder(folder)
+        : action === "convert" ? nodes.convertLeafNote(first) : nodes.useAsNodeNote(folder, leaf);
+    await expect(result).rejects.toThrow(/multiple canonical/iu);
+    expect(fake.contents).toEqual(before);
+    expect(fake.renames).toEqual([]);
+  });
+
+  it.each(["convert", "adopt"])("preserves an existing variant of the target Node Note during %s", async (action) => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Case");
+    const owned = fake.addFile("Case/CASE.MD", "owner");
+    const leaf = fake.addFile(action === "convert" ? "Case.md" : "Case/Other.md", "leaf");
+    const nodes = service(fake);
+    await expect(action === "convert" ? nodes.convertLeafNote(leaf) : nodes.useAsNodeNote(folder, leaf))
+      .rejects.toThrow(/already exists/iu);
+    expect(nodes.getCanonicalFile("Case")).toBe(owned);
+    expect(fake.renames).toEqual([]);
+    expect(await nodes.createMissingNodeNote(folder)).toBe(owned);
+    expect(await nodes.completeFolder(folder)).toBe(owned);
+  });
+
+  it.each(["convert", "complete"])("uses the original Unicode sibling when both spellings exist: %s", async (action) => {
+    const fake = new FakeObsidian();
+    const composed = fake.addFolder("Café");
+    const decomposed = fake.addFolder("Cafe\u0301");
+    const a = fake.addFile("Café.md", "one");
+    const b = fake.addFile("Cafe\u0301.md", "two");
+    const nodes = service(fake);
+    expect(await (action === "convert" ? nodes.convertLeafNote(b) : nodes.completeFolder(decomposed))).toBe(b);
+    expect(b.parent).toBe(decomposed);
+    expect(await (action === "convert" ? nodes.convertLeafNote(a) : nodes.completeFolder(composed))).toBe(a);
+    expect(a.parent).toBe(composed);
+  });
+
+  it("keeps both entries when a file already occupies a sibling spelling of the target folder", async () => {
+    const fake = new FakeObsidian();
+    const leaf = fake.addFile("Case.md", "leaf");
+    const other = fake.addFile("CASE", "file");
+    await expect(service(fake).convertLeafNote(leaf)).rejects.toThrow(/occupied by a file/iu);
+    expect(fake.requireFile("Case.md")).toBe(leaf);
+    expect(fake.requireFile("CASE")).toBe(other);
+    expect(fake.renames).toEqual([]);
+  });
+
+  it("rechecks canonical ownership after checking the destination on disk", async () => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Case");
+    const leaf = fake.addFile("Case.md", "leaf");
+    const exists = fake.app.vault.adapter.exists.bind(fake.app.vault.adapter);
+    fake.app.vault.adapter.exists = async (path) => {
+      if (path === "Case/Case.md") fake.addFile("Case/case.MD", "sync");
+      return exists(path);
+    };
+    const nodes = service(fake);
+    await expect(nodes.completeFolder(folder)).rejects.toThrow(/already exists/iu);
+    expect(fake.requireFile("Case.md")).toBe(leaf);
+    expect(nodes.getCanonicalFile(folder.path)?.path).toBe("Case/case.MD");
+    expect(fake.renames).toEqual([]);
+  });
+
+  it.each(["create", "complete", "convert", "adopt"])("blocks a directory occupying the canonical filename during %s", async (action) => {
+    const fake = new FakeObsidian();
+    const folder = fake.addFolder("Case");
+    const occupied = fake.addFolder("Case/case.MD");
+    const leaf = fake.addFile(action === "adopt" ? "Case/other.md" : "Case.md", "keep");
+    const nodes = service(fake);
+    const result = action === "create" ? nodes.createMissingNodeNote(folder)
+      : action === "complete" ? nodes.completeFolder(folder)
+        : action === "convert" ? nodes.convertLeafNote(leaf) : nodes.useAsNodeNote(folder, leaf);
+    await expect(result).rejects.toThrow(/occupied by a folder/iu);
+    expect(occupied.parent).toBe(folder);
+    expect(fake.files.has("Case/Case.md")).toBe(false);
+    expect(fake.renames).toEqual([]);
+  });
+
+  it.each(["create", "convert"])("reserves the parent and Root Node Note path during %s", async (action) => {
+    for (const parent of ["", "Parent"]) {
+      const fake = new FakeObsidian();
+      if (parent !== "") fake.addFolder(parent);
+      const name = parent === "" ? "VAULT.md" : "PARENT.MD";
+      const path = parent === "" ? name : `${parent}/${name}`;
+      const leaf = fake.addFile(`${path}.md`, "keep");
+      const nodes = service(fake);
+      await expect(action === "create" ? nodes.createNode(parent, name) : nodes.convertLeafNote(leaf))
+        .rejects.toThrow(/required for a Node Note/u);
+      expect(fake.requireFile(`${path}.md`)).toBe(leaf);
+      expect(fake.files.has(path)).toBe(false);
+      expect(fake.renames).toEqual([]);
+    }
   });
 
   it("converts and adopts leaf notes with link-safe renames", async () => {
@@ -2085,7 +2418,7 @@ describe("NodeService structural safety", () => {
     expect(fake.requireFile("Vault.md")).toBeDefined();
     expect(fake.requireFile("Folder/Folder.md")).toBeDefined();
     expect(fake.requireFile("Leaf/Leaf.md")).toBeDefined();
-    expect(progress.at(-1)).toBe(preview.leafMarkdown.length + preview.missingNodeNotes.length);
+    expect(progress.at(-1)).toBe(preview.leafMoves.length + preview.missingNodeNotes.length);
   });
 
   it("keeps a natively moved folder subtree and its notes unchanged", async () => {
@@ -2146,6 +2479,41 @@ describe("NodeService structural safety", () => {
       "Parent/Existing",
       "Parent/Child",
     ]);
+  });
+
+  it.each([["Work", "work"], ["Café", "Cafe\u0301"]])(
+    "assigns a trailing rank when native moves cross distinct parents %s and %s", async (sourceParent, targetParent) => {
+      const fake = new FakeObsidian();
+      fake.addFile("Vault.md");
+      fake.addFolder(sourceParent);
+      fake.addFolder(targetParent);
+      fake.addFile(`${targetParent}/${targetParent}.md`, "---\nfolderNodeChildrenSort: manual\n---\n");
+      fake.addFolder(`${targetParent}/Existing`);
+      fake.addFile(`${targetParent}/Existing/Existing.md`, "---\nfolderNodeSiblingRank: 4096\n---\n");
+      const child = fake.addFolder(`${sourceParent}/Child`);
+      const oldPath = child.path;
+      const note = fake.addFile(`${child.path}/Child.md`, "---\nfolderNodeSiblingRank: 1024\n---\n");
+      await fake.rename(child, `${targetParent}/Child`);
+
+      const nodes = service(fake);
+      await nodes.reconcileRenamed(child, oldPath);
+      expect(fake.frontmatters.get(note.path)?.["folder-nodes"]).toEqual(["rank=5120"]);
+      expect(nodes.children(targetParent).map(({ childPath }) => childPath)).toEqual([`${targetParent}/Existing`, child.path]);
+    },
+  );
+
+  it("keeps a child's rank when its parent is renamed with different casing", async () => {
+    const fake = new FakeObsidian();
+    const parent = fake.addFolder("Work");
+    fake.addFile("Work/Work.md", "---\nfolderNodeChildrenSort: manual\n---\n");
+    const child = fake.addFolder("Work/Child");
+    const note = fake.addFile("Work/Child/Child.md", "---\nfolderNodeSiblingRank: 1024\n---\n");
+    const original = fake.contents.get(note.path);
+    await fake.rename(parent, "work");
+
+    const nodes = service(fake);
+    await nodes.reconcileRenamed(child, "Work/Child");
+    expect(fake.contents.get(note.path)).toBe(original);
   });
 
   it("renames an existing Node Note but leaves an incomplete folder note-free", async () => {
