@@ -54,6 +54,7 @@ body {
 }
 
 .folder-nodes-tab-frame.has-overflow > button.folder-nodes-tab-arrow { display: inline-flex; }
+.folder-nodes-tab-frame > button.folder-nodes-tab-arrow:hover { background: var(--background-modifier-hover); }
 .folder-nodes-tab-frame > button.folder-nodes-tab-arrow:disabled { visibility: hidden; }
 .folder-nodes-tab-arrow:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 .folder-nodes-tab-arrow > svg { width: 16px; height: 16px; }
@@ -1274,6 +1275,6 @@ button.folder-nodes-current:focus-visible {
   line-height: 1.45; margin-block: var(--size-4-2);
 }
 
-@container folder-nodes-tab-frame (max-width: 480px) {
+@container folder-nodes-tab-frame (max-width: 600px) {
   .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { padding-inline: 8px !important; }
 }
