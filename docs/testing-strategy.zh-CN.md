@@ -38,6 +38,8 @@ translation_status: source
 
 完整 capture→target 测试区分父级消费、拒绝与无绑定三种状态，覆盖 Shift／Alt／Ctrl+Cmd 混合组合、普通空格与 Alt+空格、替换目标及跨所属文档。`npm run test:browser:keys` 通过受管浏览器端点发送真实 Chromium 键盘输入，让生产 view／renderer 接收 trusted 按键及浏览器默认生成的按钮点击。270 个单次按键用例覆盖主体／Canvas／浮层／把手与同样三种父级状态，不声称原生按钮重复或输入法覆盖；Obsidian 宿主对象使用替身，因此它证明浏览器默认激活链，而非原生 Obsidian 快捷键分派。
 
+Ubuntu CI 在源码检查通过后，使用运行器自带的 Chrome 执行布局、键盘和拖放测试。
+
 运行 `npm run test:browser:drag` 可用 Chromium 鼠标输入验证同级排序。场景覆盖指针从图标进入同一卡片按钮时立即松手、经过隐藏节点的无效间隙，以及取消拖动。
 
 未支持组合的断言拒绝打开及切换，不声称拦截原生主体按钮点击产生的选择。

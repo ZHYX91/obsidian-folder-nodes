@@ -39,6 +39,8 @@ Host key-scope regressions model the host's window-capture shortcut route before
 
 The full capture-to-target tests distinguish a parent that consumes, declines, or has no binding, including Shift/Alt/mixed Ctrl+Cmd combinations, plain Space versus Alt+Space, replaced targets and adopted documents. `npm run test:browser:keys` adds real Chromium keyboard input through the owned browser endpoint: production views and renderers receive trusted key events and browser-generated button clicks. Its 270 single-key cases cover body/Canvas/overlay/handles and the same three parent states, without claiming native-button repeat or IME coverage. Obsidian host objects are simulated there, so this proves browser default activation rather than native Obsidian shortcut dispatch.
 
+The Ubuntu CI job runs the layout, keyboard and drag suites with its installed Chrome after the source checks.
+
 Run `npm run test:browser:drag` to check sibling reordering with Chromium mouse input. It covers releasing the mouse as the target changes from a card icon to its button, a hidden insertion gap, and cancellation.
 
 The unsupported-chord assertions reject opens and toggles; they do not claim to suppress selection from native body-button clicks.
