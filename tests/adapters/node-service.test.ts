@@ -945,6 +945,22 @@ describe("NodeService structural safety", () => {
     expect(fake.contents.get(rootNote.path)).toBe("root body");
   });
 
+  it("keeps existing superscript device spellings and prefixes newly chosen node names", async () => {
+    const fake = new FakeObsidian("COM¹");
+    const rootNote = fake.addFile("COM¹.md", "root body");
+    const legacy = fake.addFolder("LPT²");
+    const note = fake.addFile("LPT²/LPT².md", "existing body");
+    const nodes = service(fake);
+    expect(nodes.getCanonicalFile("")).toBe(rootNote);
+    await nodes.renameNode(legacy, "LPT²");
+    expect(nodes.getCanonicalFile("LPT²")).toBe(note);
+    expect(fake.renames).toEqual([]);
+    expect((await nodes.createNode("", "LPT³.notes")).path).toBe("_LPT³.notes/_LPT³.notes.md");
+    await nodes.renameNode(legacy, "COM²");
+    expect(note.path).toBe("_COM²/_COM².md");
+    expect(fake.contents.get(note.path)).toBe("existing body");
+  });
+
   it("keeps a deleted Root Node Note deleted", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "root body");
