@@ -2,7 +2,7 @@ const WINDOWS_FORBIDDEN = /[<>:"/\\|?*#[\]^]/gu;
 const TRAILING_DOTS_OR_SPACES = /[. ]+$/u;
 const MULTIPLE_SPACES = /\s+/gu;
 const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
-const WINDOWS_SUPERSCRIPT_DEVICE = /^(?:com|lpt)[¹²³](?:\.|$)/iu;
+const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|conin\$|conout\$|(?:com|lpt)[1-9¹²³]) *(?:\.|$)/iu;
 // eslint-disable-next-line no-control-regex -- Win32 forbids each ASCII control in a filename.
 const WINDOWS_CONTROL = /[\u0000-\u001f]/gu;
 const NON_ASCII = /[\u0080-\u{10FFFF}]/u;
@@ -67,7 +67,7 @@ export function sanitizeNodeName(input: string): string {
 export function sanitizeNewNodeName(input: string): string {
   const name = limitName(cleanName(input).replace(WINDOWS_CONTROL, "-"), NODE_NAME_BYTE_LIMIT);
   // Truncating a long grapheme can expose a device name at the end of the component.
-  return isWindowsDeviceName(name)
+  return WINDOWS_DEVICE_NAME.test(name)
     ? limitName(`_${name}`, NODE_NAME_BYTE_LIMIT)
     : name;
 }
@@ -101,14 +101,10 @@ export function isDescendantPath(candidate: string, ancestor: string): boolean {
   return child !== parent && child.startsWith(`${parent}/`);
 }
 
-function isWindowsDeviceName(name: string): boolean {
-  return WINDOWS_RESERVED.test(name) || WINDOWS_SUPERSCRIPT_DEVICE.test(name);
-}
-
 export function validateFileName(rawName: string): string {
   const name = rawName.trim();
   if (name === "" || name === "." || name === ".." || /[<>:"/\\|?*]/u.test(name)
-    || /[. ]$/u.test(name) || name.search(WINDOWS_CONTROL) >= 0 || isWindowsDeviceName(name)) {
+    || /[. ]$/u.test(name) || name.search(WINDOWS_CONTROL) >= 0 || WINDOWS_DEVICE_NAME.test(name)) {
     throw new Error(`Invalid file name: ${rawName}`);
   }
   return name;

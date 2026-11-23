@@ -965,7 +965,7 @@ describe("NodeService structural safety", () => {
     const fake = new FakeObsidian();
     const file = fake.addFile("report.pdf", "original data");
     const nodes = service(fake);
-    for (const name of ["CoM².preview.pdf", "bad\u0001name.pdf", "NUL.log"]) {
+    for (const name of ["CoM².preview.pdf", "bad\u0001name.pdf", "NUL .log", "CONIN$.log", "CONOUT$"]) {
       await expect(nodes.renameFile(file, name)).rejects.toThrow("Invalid file name");
     }
     expect(fake.renames).toEqual([]);

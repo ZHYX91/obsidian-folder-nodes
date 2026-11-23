@@ -64,7 +64,7 @@ describe("folder node paths", () => {
     }
   });
   it("makes final new names portable without changing printable neighboring names", () => {
-    for (const name of ["COM¹", "Com².backup", "com³", "lpt¹", "LPT².txt", "LPT³"]) {
+    for (const name of ["COM¹", "Com².backup", "com³", "lpt¹", "LPT².txt", "LPT³", "CONIN$", "conout$.log", "nul .md", "Com1 .log"]) {
       expect(sanitizeNewNodeName(name)).toBe(`_${name}`);
     }
     expect(sanitizeNewNodeName("COM⁴")).toBe("COM⁴");
