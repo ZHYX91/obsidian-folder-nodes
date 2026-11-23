@@ -67,7 +67,7 @@ export function sanitizeNodeName(input: string): string {
 export function sanitizeNewNodeName(input: string): string {
   const name = limitName(cleanName(input).replace(WINDOWS_CONTROL, "-"), NODE_NAME_BYTE_LIMIT);
   // Truncating a long grapheme can expose a device name at the end of the component.
-  return WINDOWS_RESERVED.test(name) || WINDOWS_SUPERSCRIPT_DEVICE.test(name)
+  return isWindowsDeviceName(name)
     ? limitName(`_${name}`, NODE_NAME_BYTE_LIMIT)
     : name;
 }
@@ -99,4 +99,17 @@ export function isDescendantPath(candidate: string, ancestor: string): boolean {
   const child = normalizeVaultPath(candidate);
   const parent = normalizeVaultPath(ancestor);
   return child !== parent && child.startsWith(`${parent}/`);
+}
+
+function isWindowsDeviceName(name: string): boolean {
+  return WINDOWS_RESERVED.test(name) || WINDOWS_SUPERSCRIPT_DEVICE.test(name);
+}
+
+export function validateFileName(rawName: string): string {
+  const name = rawName.trim();
+  if (name === "" || name === "." || name === ".." || /[<>:"/\\|?*]/u.test(name)
+    || /[. ]$/u.test(name) || name.search(WINDOWS_CONTROL) >= 0 || isWindowsDeviceName(name)) {
+    throw new Error(`Invalid file name: ${rawName}`);
+  }
+  return name;
 }
