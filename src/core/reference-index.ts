@@ -61,23 +61,6 @@ export class ReferenceIndex {
     return affected;
   }
 
-  public moveSources(oldPath: string, newPath: string, recursive: boolean, resolved: ResolvedLinks): Set<string> {
-    const from = normalizeVaultPath(oldPath);
-    const to = normalizeVaultPath(newPath);
-    const sources = recursive ? Array.from(this.sources.keys()).filter((source) => source.startsWith(from + "/")) : [from];
-    const affected = new Set<string>();
-    for (const source of sources) {
-      const destination = to + source.slice(from.length);
-      for (const target of this.updateSource(source, {})) affected.add(target);
-      // The host may resolve before or after the rename. Only adopt confirmed targets.
-      const targets = resolved[destination];
-      if (targets !== undefined) {
-        for (const target of this.updateSource(destination, targets)) affected.add(target);
-      }
-    }
-    return affected;
-  }
-
   public isReferenced(path: string): boolean { return (this.counts.get(normalizeVaultPath(path)) ?? 0) > 0; }
   public targetsForSource(path: string): readonly string[] {
     return [...(this.sources.get(normalizeVaultPath(path))?.keys() ?? [])];

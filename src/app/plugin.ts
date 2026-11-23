@@ -45,7 +45,7 @@ import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { DocumentEventRegistry } from "./document-event-registry";
 import { claimPeriodicLink, interceptLinkNavigation, type OpenLinkArgs } from "./link-navigation";
-import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
+import { folderNodesMetadataFingerprint, moveFolderNodesReferences, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { openPluginSettings } from "../adapters/plugin-settings";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
@@ -568,7 +568,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
       this.remapMetadataFingerprints(entry.path, oldPath, entry instanceof TFolder);
       this.remapUnmanagedPaths(entry, oldPath);
-      const affected = this.references.moveSources(oldPath, entry.path, entry instanceof TFolder, this.app.metadataCache.resolvedLinks);
+      const affected = moveFolderNodesReferences(this.references, entry, oldPath, this.app.metadataCache.resolvedLinks);
       for (const path of affected) this.refreshVisuals(path, "reference");
       if (this.service.consumeExpectedEvent("rename", entry.path, oldPath)) {
         this.refreshVisuals(oldPath);
