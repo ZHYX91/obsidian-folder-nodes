@@ -30,6 +30,34 @@ describe("ReferenceIndex", () => {
     expect(index.isReferenced("Shared.md")).toBe(false);
   });
 
+  it("clears descendant contributions on a folder-only delete", () => {
+    const index = new ReferenceIndex();
+    index.rebuild({ "Projects/deep/note.md": { "diagram.png": 1 }, "Projects-old/note.md": { "keep.png": 1 } });
+    expect(index.removeSource("Projects", true)).toEqual(new Set(["diagram.png"]));
+    expect(index.isReferenced("diagram.png")).toBe(false);
+    expect(index.isReferenced("keep.png")).toBe(true);
+  });
+
+  it("drops references for a whole folder and resolves moved sources at their exact new paths", () => {
+    const index = new ReferenceIndex();
+    index.rebuild({
+      "Old/a.md": { "stale.png": 1 }, "Old/nested/b.md": { "shared.png": 2 },
+      "Oldish/c.md": { "shared.png": 1 },
+    });
+    const resolved = { "New/a.md": { "updated.png": 1 } };
+    const affected = index.moveSources("Old", "New", true, resolved);
+    expect(affected).toEqual(new Set(["stale.png", "updated.png", "shared.png"]));
+    expect(index.sourcesForTarget("stale.png")).toEqual([]);
+    expect(index.sourcesForTarget("shared.png")).toEqual(["Oldish/c.md"]);
+    expect(index.sourcesForTarget("updated.png")).toEqual(["New/a.md"]);
+    // A file-level event and late metadata can follow the folder notification.
+    index.moveSources("Old/a.md", "New/a.md", false, resolved);
+    index.updateSource("New/nested/b.md", { "shared.png": 2 });
+    expect(index.removeSource("New", true)).toEqual(new Set(["updated.png", "shared.png"]));
+    expect(index.isReferenced("updated.png")).toBe(false);
+    expect(index.sourcesForTarget("shared.png")).toEqual(["Oldish/c.md"]);
+  });
+
   it("tracks inbound source paths incrementally", () => {
     const index = new ReferenceIndex();
     index.rebuild({
