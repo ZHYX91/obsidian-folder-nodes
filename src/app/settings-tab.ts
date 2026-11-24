@@ -190,7 +190,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     else if (this.activeTab === "naming") this.renderNaming(panel);
     else this.renderNodeGraph(panel);
     lockSettingsPanel(panel, compatibility.status === "incompatible");
-    this.revealActiveTab(tabs);
   }
 
   public refreshPersistenceStatus(): void {
@@ -244,10 +243,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private selectTab(id: TabId, focus: boolean): void {
     if (this.activeTab !== id) { this.activeTab = id; this.display(); }
     if (focus) this.containerEl.querySelector<HTMLElement>(`#${this.tabId(id)}`)?.focus({ preventScroll: true });
-  }
-
-  private revealActiveTab(container: HTMLElement): void {
-    container.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   private tabLabel(id: TabId): string {

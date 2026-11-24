@@ -71,11 +71,6 @@ body {
   transform: rotate(45deg);
 }
 
-@media (pointer: coarse) {
-  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-block-size: 44px; }
-  .folder-nodes-tab-frame > button.folder-nodes-tab-arrow { flex-basis: 44px; min-block-size: 44px; }
-}
-
 .folder-nodes-tabs {
   align-items: stretch;
   border-block-end: 1px solid var(--background-modifier-border);
@@ -111,6 +106,11 @@ body {
   margin: 0 0 -1px !important;
   padding: 7px 12px !important;
   white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-inline-size: 44px; min-block-size: 44px; }
+  .folder-nodes-tab-frame > button.folder-nodes-tab-arrow { flex-basis: 44px; min-block-size: 44px; }
 }
 
 .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab:focus-visible {
