@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, type Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, type DropdownComponent, type ExtraButtonComponent, type Setting, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
@@ -36,7 +36,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private currentGuide: { tab: TabId; element: HTMLDetailsElement } | null = null;
   private installedEmojiFonts: EmojiFontFamily[] | null = null;
   private emojiFontScan: Promise<EmojiFontFamily[]> | null = null;
-  private emojiFontScanGeneration = 0;
 
   public constructor(app: App, private readonly plugin: FolderNodesPlugin) { super(app, plugin); }
 
@@ -439,37 +438,58 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderEmojiFontSetting(panel: HTMLElement): void {
-    const current = this.plugin.settings.emojiFont;
-    const installed = this.installedEmojiFonts;
-    const unavailable = installed !== null && current !== SYSTEM_EMOJI_FONT && !installed.includes(current);
-    const options: Record<string, string> = { [SYSTEM_EMOJI_FONT]: t("systemDefault") };
-    for (const family of installed ?? []) options[family] = family;
-    if (current !== SYSTEM_EMOJI_FONT && options[current] === undefined) {
-      options[current] = `${current} · ${t("fontUnavailable")}`;
-    }
-
-    const description = unavailable
-      ? `${t("emojiFontDesc")} ${t("emojiFontUnavailable")}`
-      : installed === null ? `${t("emojiFontDesc")} ${t("detectingFonts")}` : t("emojiFontDesc");
-    new LabeledSetting(panel)
-      .setName(t("emojiFont"))
-      .setDesc(description)
-      .addDropdown((dropdown) => dropdown
-        .addOptions(options)
-        .setValue(current)
-        .setDisabled(installed === null)
-        .onChange(async (value) => {
-          if (!isEmojiFontPreference(value)) return;
-          this.plugin.settings.emojiFont = value;
-          await this.plugin.saveSettings();
-          this.plugin.applyEmojiFontSetting();
-          this.display();
-        }))
-      .addExtraButton((button) => button
-        .setIcon("refresh-cw")
-        .setTooltip(t("redetectFonts"))
-        .setDisabled(installed === null)
-        .onClick(() => this.restartEmojiFontScan()));
+    const row = new LabeledSetting(panel).setName(t("emojiFont"));
+    let dropdown: DropdownComponent;
+    let refresh: ExtraButtonComponent;
+    const update = (): void => {
+      const installed = this.installedEmojiFonts;
+      const current = this.plugin.settings.emojiFont;
+      const unavailable = installed !== null && current !== SYSTEM_EMOJI_FONT && !installed.includes(current);
+      const options: Record<string, string> = { [SYSTEM_EMOJI_FONT]: t("systemDefault") };
+      for (const family of installed ?? []) options[family] = family;
+      if (current !== SYSTEM_EMOJI_FONT && options[current] === undefined) {
+        options[current] = unavailable ? `${current} · ${t("fontUnavailable")}` : current;
+      }
+      const status = installed === null ? t("detectingFonts") : unavailable ? t("emojiFontUnavailable") : "";
+      row.setDesc([t("emojiFontDesc"), status].filter(Boolean).join(" "));
+      const readOnly = this.plugin.getSettingsCompatibility().status === "incompatible";
+      const disabled = installed === null || readOnly;
+      dropdown.selectEl.replaceChildren();
+      dropdown.addOptions(options).setValue(current).setDisabled(disabled);
+      // The host removes tabindex from disabled icon buttons. Keep keyboard focus
+      // on a rescan already in progress while exposing its unavailable state.
+      refresh.setDisabled(readOnly);
+      refresh.extraSettingsEl.classList.toggle("is-disabled", disabled);
+      refresh.extraSettingsEl.setAttribute("aria-disabled", String(disabled));
+    };
+    const scan = async (): Promise<void> => {
+      if (this.emojiFontScan === null) {
+        this.installedEmojiFonts = null;
+        this.emojiFontScan = detectInstalledEmojiFonts().then((families) => {
+          this.installedEmojiFonts = families;
+          this.emojiFontScan = null;
+          return families;
+        });
+      }
+      update();
+      await this.emojiFontScan;
+      if (this.containerEl.contains(row.settingEl)) update();
+    };
+    row.addDropdown((control) => {
+      dropdown = control;
+      control.onChange(async (value) => {
+        if (!isEmojiFontPreference(value)) return;
+        this.plugin.settings.emojiFont = value;
+        await this.plugin.saveSettings();
+        this.plugin.applyEmojiFontSetting();
+        if (this.containerEl.contains(row.settingEl)) update();
+      });
+    }).addNamedAction(t("redetectFonts"), (button) => {
+      refresh = button;
+      button.setIcon("refresh-cw").onClick(() => {
+        if (this.emojiFontScan === null) void scan();
+      });
+    });
 
     const preview = panel.createDiv({ cls: "folder-nodes-emoji-font-preview" });
     preview.createSpan({ cls: "folder-nodes-emoji-font-preview-label", text: t("emojiFontPreview") });
@@ -479,28 +499,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       attr: { lang: "zxx" },
     });
 
-    if (installed === null) this.startEmojiFontScan(panel);
-  }
-
-  private startEmojiFontScan(panel: HTMLElement): void {
-    if (this.emojiFontScan !== null) return;
-    const generation = ++this.emojiFontScanGeneration;
-    const scan = detectInstalledEmojiFonts();
-    this.emojiFontScan = scan;
-    void scan.then((families) => {
-      if (generation === this.emojiFontScanGeneration) this.installedEmojiFonts = families;
-    }).finally(() => {
-      if (generation !== this.emojiFontScanGeneration) return;
-      this.emojiFontScan = null;
-      if (panel.isConnected && this.activeTab === "icons") this.display();
-    });
-  }
-
-  private restartEmojiFontScan(): void {
-    this.emojiFontScanGeneration += 1;
-    this.emojiFontScan = null;
-    this.installedEmojiFonts = null;
-    this.display();
+    if (this.installedEmojiFonts === null) void scan();
+    else update();
   }
 
   private renderIconGuide(panel: HTMLElement): void {

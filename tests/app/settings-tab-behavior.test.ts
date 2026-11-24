@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import FolderNodesPlugin from "../../src/app/plugin";
 import FolderNodesWithNodeGraphPlugin from "../../src/app/node-graph-plugin";
 import { NODE_GRAPH_VIEW_TYPE } from "../../src/ui/node-graph-view";
+import * as emojiFonts from "../../src/ui/emoji-fonts";
 import { FolderNodesSettingTab } from "../../src/app/settings-tab";
 import { CURRENT_SETTINGS_SCHEMA_VERSION, DEFAULT_SETTINGS, type PersistedFolderNodesSettings, type SettingsCompatibility } from "../../src/shared/settings";
 import type { SettingsSaveState } from "../../src/shared/settings-save-coordinator";
@@ -223,6 +224,53 @@ describe("imperative settings edit state", () => {
       }
     } finally { tab.containerEl.remove(); }
   });
+  it.each([false, true])("updates a pending font scan in the current panel without replacing focus (reopen %s)", async (reopen) => {
+    const { tab, plugin } = fixture();
+    let resolveScan!: (fonts: ["Noto Color Emoji"]) => void;
+    const pending = new Promise<["Noto Color Emoji"]>((resolve) => { resolveScan = resolve; });
+    const scan = vi.spyOn(emojiFonts, "detectInstalledEmojiFonts").mockReturnValue(pending);
+    try {
+      tab.showManagement();
+      const pressRight = () => tab.containerEl.querySelector<HTMLButtonElement>('[aria-selected="true"]')!
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      pressRight();
+      if (reopen) {
+        tab.showManagement();
+        pressRight();
+      }
+      expect(scan).toHaveBeenCalledOnce();
+      const panel = tab.containerEl.querySelector<HTMLElement>('[role="tabpanel"]')!;
+      const selectedTab = tab.containerEl.querySelector<HTMLButtonElement>('[aria-selected="true"]')!;
+      const select = panel.querySelector<HTMLSelectElement>("select")!;
+      const guide = panel.querySelector<HTMLDetailsElement>("details")!;
+      expect(select.disabled).toBe(true);
+      expect(document.activeElement).toBe(selectedTab);
+      guide.open = true;
+      tab.containerEl.scrollTop = 135;
+      resolveScan(["Noto Color Emoji"]);
+      await vi.waitFor(() => expect(select.disabled).toBe(false));
+      expect(tab.containerEl.querySelector('[role="tabpanel"]')).toBe(panel);
+      expect(document.activeElement).toBe(selectedTab);
+      expect(tab.containerEl.scrollTop).toBe(135);
+      expect(guide.isConnected && guide.open).toBe(true);
+      expect(Array.from(select.options, (option) => option.value)).toEqual(["system", "Noto Color Emoji"]);
+      const redetect = select.closest(".setting-item")!.querySelector<HTMLElement>(".clickable-icon")!;
+      redetect.focus();
+      redetect.click();
+      await vi.waitFor(() => expect(select.disabled).toBe(false));
+      expect(scan).toHaveBeenCalledTimes(2);
+      expect(document.activeElement).toBe(redetect);
+      const applyFont = vi.fn();
+      Object.assign(plugin, { applyEmojiFontSetting: applyFont });
+      select.focus();
+      select.value = "Noto Color Emoji";
+      select.dispatchEvent(new Event("change"));
+      await vi.waitFor(() => expect(applyFont).toHaveBeenCalledOnce());
+      expect(plugin.settings.emojiFont).toBe("Noto Color Emoji");
+      expect(document.activeElement).toBe(select);
+    } finally { scan.mockRestore(); tab.hide(); tab.containerEl.remove(); }
+  });
+
   it("retains a guide across tab switches and forgets it when settings close", () => {
     const { tab } = fixture();
     const select = (id: string) => tab.containerEl.querySelector<HTMLButtonElement>(`#folder-nodes-settings-tab-${id}`)!.click();
