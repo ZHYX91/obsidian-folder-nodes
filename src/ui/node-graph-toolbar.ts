@@ -50,6 +50,21 @@ export interface NodeGraphToolbarActions {
   readonly onSubtreeScope: () => void;
 }
 
+let nextGraphLabel = 0;
+
+// Obsidian stores tooltip text in aria-label. Reference the visible caption so
+// voice control and assistive technology keep its name when the tooltip changes.
+function captionButton(button: HTMLElement, text: string): void {
+  const caption = button.createSpan({ text });
+  caption.id = `folder-nodes-graph-caption-${++nextGraphLabel}`;
+  button.setAttribute("aria-labelledby", caption.id);
+}
+
+export function describeGraphButton(button: HTMLElement, description: string): void {
+  setTooltip(button, description);
+  button.setAttribute("aria-description", description);
+}
+
 export function renderNodeGraphToolbar(
   container: HTMLElement,
   model: NodeGraphToolbarModel,
@@ -95,19 +110,19 @@ export function renderNodeGraphToolbar(
       type: "button",
     },
   });
-  linksToggle.createSpan({ text: labels.showLinks });
+  captionButton(linksToggle, labels.showLinks);
   linksToggle.createSpan({
     cls: "folder-nodes-node-graph-toggle-track",
     attr: { "aria-hidden": "true" },
   });
-  setTooltip(linksToggle, labels.showLinksTooltip);
+  describeGraphButton(linksToggle, labels.showLinksTooltip);
   linksToggle.addEventListener("click", actions.onShowLinks);
 
   updateLinkSummary(primary, model, labels);
 
   const scope = toolbar.createDiv({
     cls: "folder-nodes-node-graph-scope",
-    attr: { "aria-label": labels.scope, "data-node-graph-scope": model.scopeMode },
+    attr: { role: "group", "aria-label": labels.scope, "data-node-graph-scope": model.scopeMode },
   });
   secondary.append(scope);
   scope.createSpan({ cls: "folder-nodes-node-graph-scope-path", text: model.scopeLabel });
@@ -119,14 +134,14 @@ export function renderNodeGraphToolbar(
     cls: "folder-nodes-node-graph-range-button",
     attr: { "aria-haspopup": "menu", "aria-label": labels.expandRangeTooltip, type: "button" },
   });
-  range.createSpan({ text: labels.expandRange });
+  captionButton(range, labels.expandRange);
   setIcon(range.createSpan({ cls: "folder-nodes-node-graph-range-chevron" }), "chevron-down");
-  setTooltip(range, labels.expandRangeTooltip);
+  describeGraphButton(range, labels.expandRangeTooltip);
   range.addEventListener("click", () => actions.onExpansionMenu(range));
 
   const dimension = primary.createDiv({
     cls: "folder-nodes-node-graph-switch",
-    attr: { "aria-label": labels.dimension, "data-node-graph-switch": "dimension" },
+    attr: { role: "group", "aria-label": labels.dimension, "data-node-graph-switch": "dimension" },
   });
   for (const mode of ["2d", "3d"] as const) {
     switchButton(dimension, mode.toUpperCase(), model.dimension === mode, labels.dimension, () => actions.onDimension(mode));
@@ -134,7 +149,7 @@ export function renderNodeGraphToolbar(
 
   const viewport = primary.createDiv({
     cls: "folder-nodes-node-graph-viewport-controls",
-    attr: { "aria-label": labels.viewportHelp },
+    attr: { role: "group", "aria-label": labels.viewportHelp },
   });
   const zoomOut = viewport.createEl("button", {
     cls: "clickable-icon",
@@ -197,7 +212,7 @@ export function updateNodeGraphToolbar(
     links.setAttribute("aria-checked", String(model.showLinks));
     links.setAttribute("aria-label", labels.showLinksTooltip);
     links.querySelector<HTMLElement>(":scope > span")?.setText(labels.showLinks);
-    setTooltip(links, labels.showLinksTooltip);
+    describeGraphButton(links, labels.showLinksTooltip);
   }
   const primary = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-toolbar-primary");
   if (primary !== null) updateLinkSummary(primary, model, labels);
@@ -208,19 +223,19 @@ export function updateNodeGraphToolbar(
     scope.querySelector<HTMLElement>(".folder-nodes-node-graph-scope-path")?.setText(model.scopeLabel);
     const global = scope.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-scope-button");
     if (global !== null) {
-      global.setText(labels.globalScope);
+      global.querySelector<HTMLElement>("span")?.setText(labels.globalScope);
       global.disabled = model.scopeMode === "global";
       global.setAttribute("aria-label", labels.globalScopeTooltip);
-      setTooltip(global, labels.globalScopeTooltip);
+      describeGraphButton(global, labels.globalScopeTooltip);
     }
-    scope.querySelector<HTMLElement>("[data-node-graph-scope-action='subtree']")?.setText(labels.subtreeScope);
-    scope.querySelector<HTMLElement>("[data-node-graph-scope-action='local']")?.setText(labels.localScope);
+    scope.querySelector<HTMLElement>("[data-node-graph-scope-action='subtree'] span")?.setText(labels.subtreeScope);
+    scope.querySelector<HTMLElement>("[data-node-graph-scope-action='local'] span")?.setText(labels.localScope);
   }
   const range = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-range-button");
   if (range !== null) {
     range.querySelector<HTMLElement>(":scope > span")?.setText(labels.expandRange);
     range.setAttribute("aria-label", labels.expandRangeTooltip);
-    setTooltip(range, labels.expandRangeTooltip);
+    describeGraphButton(range, labels.expandRangeTooltip);
   }
   const dimension = toolbar.querySelector<HTMLElement>("[data-node-graph-switch='dimension']");
   if (dimension !== null) {
@@ -290,13 +305,13 @@ function scopeButton(
 ): void {
   const button = container.createEl("button", {
     cls: "folder-nodes-node-graph-scope-button",
-    text,
     attr: { type: "button", ...(action === null ? {} : { "data-node-graph-scope-action": action }) },
   });
+  captionButton(button, text);
   button.disabled = disabled;
   const description = disabled && action !== null ? selectNodeFirst : tooltip;
   button.setAttribute("aria-label", description);
   button.title = description;
-  setTooltip(button, description);
+  describeGraphButton(button, description);
   button.addEventListener("click", onClick);
 }

@@ -6,6 +6,16 @@ await withBrowserFixture({
   stylesheet: "src/ui/node-graph.css",
   ready: "Boolean(window.graphKeyboard)",
 }, async ({ send, evaluate }) => {
+  await evaluate('window.graphKeyboard.prepare("dom", "unbound")');
+  const labels = await evaluate(`Array.from(document.querySelectorAll(
+    ".folder-nodes-node-graph-links-toggle, .folder-nodes-node-graph-range-button, .folder-nodes-node-graph-scope-button"
+  ), button => ({ name: button.textContent.trim(), description: button.dataset.tooltip }))`);
+  assert.equal(labels.length, 5);
+  const { nodes } = await send("Accessibility.getFullAXTree");
+  for (const label of labels) {
+    const control = nodes.find((entry) => ["button", "switch"].includes(entry.role.value) && entry.name?.value === label.name);
+    assert.equal(control?.description?.value, label.description, `Missing visible name or help for ${label.name}`);
+  }
   const results = [];
   for (const kind of ["dom", "canvas", "overlay", "dom-handle", "overlay-handle"]) {
     for (const parent of ["handled", "declined", "unbound"]) {
