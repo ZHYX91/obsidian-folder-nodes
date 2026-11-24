@@ -380,6 +380,7 @@ body {
 .folder-nodes-emoji-font-preview-label { color: var(--text-muted); }
 .folder-nodes-emoji-font-preview-sample {
   min-width: 0;
+  max-inline-size: 100%;
   overflow: hidden;
   font-family: var(--folder-nodes-emoji-font);
   font-size: 1.25rem;
@@ -1299,4 +1300,45 @@ button.folder-nodes-current:focus-visible {
 
 @container folder-nodes-tab-frame (max-width: 600px) {
   .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { padding-inline: 8px !important; }
+}
+
+/* Keep Obsidian's intrinsic-width probe out of the panel's scroll area. */
+.folder-nodes-tab-panel select.dropdown.is-measuring {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+}
+
+@container (max-width: 640px) {
+  .folder-nodes-tab-panel .setting-item:has(button, select, input:not([type="checkbox"])) {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--size-2-2);
+  }
+
+  .folder-nodes-tab-panel .setting-item-info {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .folder-nodes-tab-panel .setting-item-control {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    flex-wrap: wrap;
+  }
+
+  .folder-nodes-tab-panel .setting-item-control > :is(button, input, select):not(.is-measuring) {
+    max-inline-size: 100%;
+  }
+
+  .folder-nodes-tab-panel .setting-item-control > button {
+    block-size: auto;
+    min-block-size: var(--input-height);
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+.folder-nodes-settings .checkbox-container:has(input:focus-visible) {
+  outline: var(--toggle-border-width, 2px) solid var(--background-modifier-border-focus);
 }

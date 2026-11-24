@@ -1,6 +1,8 @@
-Object.defineProperty(window, "matchMedia", {
-  value: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
-});
+if (typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    value: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+  });
+}
 
 interface DomOptions { attr?: Record<string, string>; cls?: string | string[]; text?: string; }
 

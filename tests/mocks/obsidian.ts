@@ -79,6 +79,7 @@ export class DropdownComponent {
 export class ToggleComponent {
   public readonly toggleEl: HTMLInputElement;
   public constructor(container: HTMLElement) { this.toggleEl = container.createEl("input", { attr: { type: "checkbox" } }); }
+  public setDisabled(value: boolean): this { this.toggleEl.disabled = value; return this; }
   public setValue(value: boolean): this { this.toggleEl.checked = value; return this; }
   public onChange(callback: (value: boolean) => unknown): this {
     this.toggleEl.addEventListener("change", () => callback(this.toggleEl.checked));

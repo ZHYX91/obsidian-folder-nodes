@@ -1,3 +1,5 @@
+import "../setup/obsidian-dom";
+import { LabeledSetting } from "../../src/ui/labeled-setting";
 import { addSettingsTabArrows } from "../../src/ui/settings-tab-arrows";
 
 function mountTabs(width: number, direction: "ltr" | "rtl", hidden = false) {
@@ -82,4 +84,43 @@ function mountTabPaintSample() {
   });
 }
 
-Object.assign(window, { measureTabs, checkTabReveal, mountTabPaintSample });
+function measureNarrowFields(direction: "ltr" | "rtl") {
+  const root = document.createElement("div");
+  root.className = "folder-nodes-settings";
+  root.style.cssText = "width:260px;font:20px sans-serif";
+  root.dir = direction;
+  const panel = document.createElement("div");
+  panel.className = "folder-nodes-tab-panel";
+  root.append(panel);
+  document.body.append(root);
+  const host = root.createEl("style");
+  host.textContent = `
+    .setting-item,.setting-item-control{display:flex;align-items:center;justify-content:space-between}
+    .setting-item button{font:inherit;white-space:nowrap}
+    .setting-item-control select.is-measuring{position:absolute;visibility:hidden;width:max-content}
+  `;
+  try {
+    const selection = new LabeledSetting(panel).setName("Sprache");
+    selection.addDropdown((dropdown) => dropdown.addOptions({ auto: "Obsidian-Sprache verwenden" }).setValue("auto"));
+    const mirror = selection.controlEl.querySelector("select")!.cloneNode(true) as HTMLSelectElement;
+    mirror.className = "dropdown is-measuring";
+    mirror.style.font = "26px sans-serif";
+    selection.controlEl.append(mirror);
+    new LabeledSetting(panel).setName("Ajouter une règle")
+      .addButton((button) => button.setButtonText("Ajouter un chemin"))
+      .addButton((button) => button.setButtonText("Ajouter une règle de début de nom"));
+    const preview = panel.createDiv({ cls: "folder-nodes-emoji-font-preview" });
+    preview.createSpan({ cls: "folder-nodes-emoji-font-preview-sample", text: "📔🫠🩷👨‍👩‍👧‍👦🏳️‍🌈".repeat(6) });
+    const frame = panel.getBoundingClientRect();
+    return {
+      overflow: panel.scrollWidth - panel.clientWidth,
+      allActionsVisible: Array.from(panel.querySelectorAll("button")).every((button) => {
+        const box = button.getBoundingClientRect();
+        return box.left >= frame.left - 1 && box.right <= frame.right + 1;
+      }),
+      measuredLabel: mirror.offsetWidth,
+    };
+  } finally { root.remove(); }
+}
+
+Object.assign(window, { measureTabs, checkTabReveal, mountTabPaintSample, measureNarrowFields });

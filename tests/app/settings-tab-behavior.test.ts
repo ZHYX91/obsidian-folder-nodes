@@ -54,6 +54,39 @@ function fixture() {
   return { tab, plugin, state };
 }
 
+it("connects each editable field to its translated row and preserves same-tab controls", () => {
+  const { tab } = fixture();
+  try {
+    tab.display();
+    const panel = tab.containerEl.querySelector('[role="tabpanel"]')!;
+    for (const control of panel.querySelectorAll("input, select")) {
+      const name = document.getElementById(control.getAttribute("aria-labelledby")!);
+      const description = document.getElementById(control.getAttribute("aria-describedby")!);
+      expect(name).toBe(control.closest(".setting-item")?.querySelector(".setting-item-name"));
+      expect(name?.textContent).toBeTruthy();
+      expect(description).toBe(control.closest(".setting-item")?.querySelector(".setting-item-description"));
+    }
+    tab.containerEl.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')!.click();
+    expect(tab.containerEl.querySelector('[role="tabpanel"]')).toBe(panel);
+  } finally { tab.containerEl.remove(); }
+});
+
+it("prevents read-only management rule removal through the host icon action", () => {
+  const { tab, plugin } = fixture();
+  plugin.getSettingsCompatibility = () => ({
+    status: "incompatible", reason: "future-schema", storedSchemaVersion: 999,
+    currentSchemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+  });
+  try {
+    tab.showManagement();
+    const remove = tab.containerEl.querySelector<HTMLElement>(".clickable-icon")!;
+    expect(remove.getAttribute("aria-disabled")).toBe("true");
+    expect(remove.tabIndex).toBe(-1);
+    remove.click();
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+  } finally { tab.containerEl.remove(); }
+});
+
 it("keeps settings styles when disabling the last graph leaf in its window", async () => {
   const root = new Window().document as unknown as Document;
   const settings = document;
