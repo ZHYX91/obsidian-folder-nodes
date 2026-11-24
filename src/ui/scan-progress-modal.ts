@@ -1,8 +1,9 @@
-import { App, Modal, Setting } from "obsidian";
+import { LocalizedModal } from "./localized-modal";
+import { App, Setting } from "obsidian";
 
 import { t } from "./i18n";
 
-export class ScanProgressModal extends Modal {
+export class ScanProgressModal extends LocalizedModal {
   private progress: HTMLProgressElement | null = null;
   private completed = false;
 

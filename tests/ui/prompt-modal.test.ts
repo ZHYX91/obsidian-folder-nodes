@@ -28,6 +28,14 @@ beforeEach(() => { setLanguage("en"); MockNotice.messages.length = 0; });
 afterEach(() => { document.body.replaceChildren(); });
 
 describe("PromptModal input events", () => {
+  it("scopes the current interface language and reading direction to the opened dialog", () => {
+    setLanguage("ar");
+    const { modal } = openPrompt();
+    expect([modal.modalEl.lang, modal.modalEl.dir]).toEqual(["ar", "rtl"]);
+    expect(document.documentElement.dir).not.toBe("rtl");
+    modal.close();
+  });
+
   it.each([
     { isComposing: true, compositionStarted: false },
     { isComposing: false, compositionStarted: true },

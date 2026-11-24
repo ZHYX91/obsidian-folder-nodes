@@ -1,8 +1,9 @@
-import { Modal, Notice } from "obsidian";
+import { LocalizedModal } from "./localized-modal";
+import { Notice } from "obsidian";
 
 import { formatError } from "./i18n";
 
-export abstract class SubmittingModal extends Modal {
+export abstract class SubmittingModal extends LocalizedModal {
   private submitting = false;
 
   public override close(): void {
