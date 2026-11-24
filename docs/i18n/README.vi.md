@@ -15,7 +15,7 @@ Bạn cũng có thể đặt `main.js`, `manifest.json` và `styles.css` cùng m
 1. Sao lưu kho ghi chú trước, rồi xem mục “Chung” và “Quản lý” trong cài đặt Folder Nodes.
 2. Kiểm tra thư mục A có ghi chú A/A.md hay chưa. Nếu thiếu, bạn có thể chủ động tạo phần còn thiếu hoặc đặt thành “Không được quản lý”.
 3. Chọn “Nút mới” để tạo thư mục cùng ghi chú. Nhấp tên thư mục để mở ghi chú nút. Trong “Nội dung nút”, bạn có thể xem nút con, ảnh, video và các tệp khác.
-4. Mở Node Graph. “Toàn cục” hiển thị tất cả nút được quản lý, “Cây con” hiển thị nút đã chọn và các nút con, còn “Cục bộ” cho thấy khu vực lân cận. Có thể chuyển 2D/3D và bật liên kết giữa các ghi chú.
+4. Mở đồ thị nút. “Toàn bộ” hiển thị tất cả nút được quản lý, “Cây con” hiển thị nút đã chọn và các nút con, còn “Lân cận” cho thấy khu vực lân cận. Có thể chuyển 2D/3D và bật liên kết giữa các ghi chú.
 
 Trên máy tính, kéo thẻ trong **Nội dung nút** để sắp xếp các nút có cùng nút cha. Để đổi nút cha, thả nút vào thư mục đích trong trình duyệt tệp. Muốn đặt nút ngay trước hoặc sau một nút cùng cấp, hãy bật sắp xếp thủ công cho các nút con của nút cha. Trên Android, dùng menu để di chuyển hoặc sắp xếp nút.
 
@@ -29,13 +29,13 @@ Nếu thao tác thất bại sau khi tạo ghi chú, plugin chỉ dọn các t�
 
 ## Ảnh minh họa
 
-Các hình minh họa nội dung nút, trình duyệt tệp, Node Graph và cài đặt biểu tượng, phần chọn và đặt tên.
+Các hình minh họa nội dung nút, trình duyệt tệp, đồ thị nút và cài đặt biểu tượng, phần chọn và đặt tên.
 
 ![Thanh bên nội dung nút gồm nút con, ảnh và tệp](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
 ![Trình duyệt tệp Obsidian với trạng thái nút](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph hiển thị cây thư mục](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Đồ thị nút hiển thị cây thư mục](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ![Thiết lập biểu tượng và giao diện nút](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
@@ -49,9 +49,9 @@ Ví dụ này minh họa cài đặt tên và bí danh. Trang hiện tại còn 
 
 Folder Nodes kết hợp thư mục Obsidian với ghi chú Markdown cùng tên. Ví dụ, thư mục A và ghi chú A/A.md tạo thành một nút hoàn chỉnh. Nếu thiếu một phần, plugin sẽ báo “Chưa hoàn chỉnh”, chứ không tự ý tạo hoặc di chuyển tệp.
 
-Trình duyệt tệp gốc của Obsidian vẫn được giữ nguyên. Plugin bổ sung thanh bên nội dung nút, Node Graph, biểu tượng và chức năng sắp xếp thủ công các nút cùng cấp.
+Trình duyệt tệp gốc của Obsidian vẫn được giữ nguyên. Plugin bổ sung thanh bên nội dung nút, đồ thị nút, biểu tượng và chức năng sắp xếp thủ công các nút cùng cấp.
 
-Bạn có thể tạo, đổi tên, di chuyển, hợp nhất, sắp xếp và xóa nút hoàn chỉnh. Trình duyệt tệp gốc của Obsidian không bị thay thế. Nội dung nút chia thành nút con, album ảnh tĩnh và tệp khác. GIF chỉ dùng hình thu nhỏ tĩnh; không có phát video hoặc âm thanh trực tiếp. Node Graph giữ nguyên cây thư mục và có thể hiện thêm liên kết giữa các ghi chú.
+Bạn có thể tạo, đổi tên, di chuyển, hợp nhất, sắp xếp và xóa nút hoàn chỉnh. Trình duyệt tệp gốc của Obsidian không bị thay thế. Nội dung nút chia thành nút con, album ảnh tĩnh và tệp khác. GIF chỉ dùng hình thu nhỏ tĩnh; không có phát video hoặc âm thanh trực tiếp. Đồ thị nút giữ nguyên cây thư mục và có thể hiện thêm liên kết giữa các ghi chú.
 
 ## Yêu cầu và tương thích
 
@@ -98,7 +98,7 @@ Nút được nhận dạng bằng đường dẫn hiện tại trong kho, khôn
 
 ## Quyền riêng tư và an toàn
 
-**Ẩn**: hidden=true trong thuộc tính folder-nodes chỉ ẩn nút và các nút con trong các giao diện của Folder Nodes: trình duyệt tệp, nội dung nút và Node Graph. Tìm kiếm hay mở trực tiếp bằng Obsidian vẫn hoạt động. **Không quản lý**: Folder Nodes không thực hiện thao tác thay đổi cấu trúc trên các tệp hoặc thư mục này, nhưng không ẩn hay xóa chúng.
+**Ẩn**: hidden=true trong thuộc tính folder-nodes chỉ ẩn nút và các nút con trong các giao diện của Folder Nodes: trình duyệt tệp, nội dung nút và đồ thị nút. Tìm kiếm hay mở trực tiếp bằng Obsidian vẫn hoạt động. **Không quản lý**: Folder Nodes không thực hiện thao tác thay đổi cấu trúc trên các tệp hoặc thư mục này, nhưng không ẩn hay xóa chúng.
 
 Thao tác di chuyển hoặc xóa thông thường tác động đến tệp hay thư mục được chọn. Tuy nhiên, đổi tên thư mục hoặc ghi chú cùng tên của một nút hoàn chỉnh cũng sẽ đồng bộ tên phần còn lại khi không có xung đột. Thao tác với “nút chứa ghi chú” áp dụng cho cả nút. Sắp xếp hàng loạt và chuyển đổi thuộc tính đều cho xem trước trước khi ghi, còn kiểm tra trạng thái chỉ đọc. Nếu gặp xung đột, plugin dừng thay vì tự đoán cách giải quyết. Xóa nút hoàn chỉnh tuân theo cách xóa tệp được chọn trong Obsidian.
 

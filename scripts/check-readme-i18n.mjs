@@ -109,7 +109,7 @@ export async function checkReadmeI18n(projectRoot = process.cwd()) {
     const navigation = source.split("\n")[2] ?? "";
     if (navigation !== expectedInnerNavigation) throw new Error(`${relativePath} language navigation must match the interface catalog`);
     await assertReadmeRepositoryLinks(projectRoot, relativePath, source);
-    for (const term of ["A/A.md", "hidden=true", "icon", "Node Graph", "Obsidian 1.12.7"]) {
+    for (const term of ["A/A.md", "hidden=true", "icon", "Obsidian 1.12.7"]) {
       if (locale !== "zh-CN" && !source.includes(term)) {
         throw new Error(`${relativePath} lacks essential guidance: ${term}`);
       }

@@ -15,7 +15,7 @@ También puedes colocar `main.js`, `manifest.json` y `styles.css` de la misma ve
 1. Haz una copia de seguridad del almacén y revisa los apartados «General» y «Administración» de Folder Nodes.
 2. Comprueba que dentro de A exista A/A.md. Si falta algo, créalo cuando lo necesites o marca el elemento como «No administrado».
 3. Usa «Nuevo nodo» para crear la carpeta y la nota juntas. Haz clic en el nombre de la carpeta para abrir su nota. En «Contenido del nodo» puedes ver los nodos hijos, las fotos, los vídeos y otros archivos.
-4. Abre Node Graph. «Global» enseña todos los nodos administrados, «Subárbol» enseña un nodo y sus descendientes, y «Local» muestra su entorno. Puedes cambiar entre 2D y 3D y activar los enlaces entre notas.
+4. Abre el gráfico de nodos. «Global» enseña todos los nodos administrados, «Subárbol» enseña un nodo y sus descendientes, y «Local» muestra su entorno. Puedes cambiar entre 2D y 3D y activar los enlaces entre notas.
 
 En el escritorio, arrastra las tarjetas de **Contenido del nodo** para ordenar los nodos que comparten un mismo padre. Para cambiar de padre, suelta el nodo sobre la carpeta de destino en el explorador de archivos. Para colocarlo justo antes o después de otro nodo, activa el orden manual de los hijos en el padre. En Android puedes mover y ordenar los nodos desde el menú.
 
@@ -29,13 +29,13 @@ Si la creación falla después de crear una nota, solo se eliminan los archivos 
 
 ## Capturas de pantalla
 
-Las imágenes muestran el contenido de los nodos, el explorador de archivos, Node Graph y los ajustes de iconos, selección y nombres.
+Las imágenes muestran el contenido de los nodos, el explorador de archivos, el gráfico de nodos y los ajustes de iconos, selección y nombres.
 
 ![Panel de contenido con nodos hijos y archivos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
 ![Explorador de archivos de Obsidian y estados de los nodos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph con la jerarquía de carpetas](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Gráfico de nodos con la jerarquía de carpetas](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ![Opciones de iconos y apariencia de los nodos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
@@ -49,9 +49,9 @@ Este ejemplo muestra los ajustes de nombres y alias. La página actual también 
 
 Folder Nodes une una carpeta de Obsidian con una nota Markdown del mismo nombre. Por ejemplo, la carpeta A y la nota A/A.md forman un nodo completo. Si falta una parte, aparecerá «Incompleto»: el complemento no crea ni mueve archivos por su cuenta.
 
-Seguirás usando el explorador de archivos normal de Obsidian. Se añaden una barra lateral para ver el contenido de los nodos, Node Graph, iconos y la ordenación manual de nodos del mismo nivel.
+Seguirás usando el explorador de archivos normal de Obsidian. Se añaden una barra lateral para ver el contenido de los nodos, el gráfico de nodos, iconos y la ordenación manual de nodos del mismo nivel.
 
-Puedes crear, renombrar, mover, fusionar, ordenar y eliminar nodos completos. Se mantiene el explorador original de Obsidian. El contenido del nodo separa los hijos, el álbum de imágenes estáticas y los demás archivos. Los GIF usan miniaturas fijas; los vídeos y audios no tienen reproductor integrado. Node Graph conserva la jerarquía de carpetas y permite superponer enlaces entre notas.
+Puedes crear, renombrar, mover, fusionar, ordenar y eliminar nodos completos. Se mantiene el explorador original de Obsidian. El contenido del nodo separa los hijos, el álbum de imágenes estáticas y los demás archivos. Los GIF usan miniaturas fijas; los vídeos y audios no tienen reproductor integrado. El gráfico de nodos conserva la jerarquía de carpetas y permite superponer enlaces entre notas.
 
 ## Requisitos y compatibilidad
 
@@ -98,7 +98,7 @@ Los nodos se identifican por la ruta actual del almacén, no por un ID permanent
 
 ## Privacidad y seguridad
 
-**Ocultar**: hidden=true en la propiedad folder-nodes oculta el nodo y sus descendientes solo en las vistas de Folder Nodes del explorador, el contenido y Node Graph. La búsqueda y la apertura directa en Obsidian siguen funcionando. **No administrado**: Folder Nodes deja de realizar acciones estructurales sobre estos elementos, pero no los oculta ni los borra.
+**Ocultar**: hidden=true en la propiedad folder-nodes oculta el nodo y sus descendientes solo en las vistas de Folder Nodes del explorador, el contenido y el gráfico de nodos. La búsqueda y la apertura directa en Obsidian siguen funcionando. **No administrado**: Folder Nodes deja de realizar acciones estructurales sobre estos elementos, pero no los oculta ni los borra.
 
 Mover o eliminar normalmente afecta al archivo o carpeta seleccionados. Sin embargo, renombrar la carpeta o la nota homónima de un nodo completo también sincroniza la otra parte si no hay ambigüedad. Las acciones para el «nodo contenedor» afectan explícitamente al nodo entero. La organización por lotes y la migración de propiedades muestran una vista previa; la comprobación de estado es de solo lectura. Si hay conflictos, la operación se detiene. La eliminación de nodos completos sigue la opción de eliminación de archivos elegida en Obsidian.
 

@@ -15,7 +15,7 @@ Você também pode colocar `main.js`, `manifest.json` e `styles.css` da mesma ve
 1. Faça um backup do cofre e confira as opções "Geral" e "Gerenciamento" do Folder Nodes.
 2. Verifique se a pasta A contém A/A.md. Se faltar alguma parte, crie-a quando desejar ou marque o item como "Não gerenciado".
 3. Use "Novo nó" para criar pasta e nota juntas. Clique no nome da pasta para abrir a nota do nó. Em "Conteúdo do nó", veja os filhos, imagens, vídeos e outros arquivos.
-4. Abra o Node Graph: "Global" mostra todos os nós gerenciados, "Subárvore" mostra o nó selecionado e seus descendentes, e "Local" mostra a vizinhança. Você pode alternar 2D/3D e exibir links entre notas.
+4. Abra o grafo de nós: "Global" mostra todos os nós gerenciados, "Subárvore" mostra o nó selecionado e seus descendentes, e "Local" mostra a vizinhança. Você pode alternar 2D/3D e exibir links entre notas.
 
 No computador, arraste os cartões em **Conteúdo do nó** para reordenar os nós que têm o mesmo pai. Para mudar o pai, solte o nó sobre a pasta de destino no explorador de arquivos. Para posicioná-lo logo antes ou depois de outro nó, ative a ordenação manual dos filhos no nó pai. No Android, use o menu para mover ou reordenar nós.
 
@@ -29,13 +29,13 @@ Se a criação falhar depois de criar uma nota, a limpeza remove apenas arquivos
 
 ## Capturas de tela
 
-As imagens mostram o conteúdo dos nós, o explorador de arquivos, o Node Graph e as configurações de ícones, seleção e nomes.
+As imagens mostram o conteúdo dos nós, o explorador de arquivos, o grafo de nós e as configurações de ícones, seleção e nomes.
 
 ![Painel com nós filhos, mídia e arquivos](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
 ![Explorador de arquivos do Obsidian e estado dos nós](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph com a hierarquia de pastas](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Grafo de nós com a hierarquia de pastas](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ![Configurações de ícones e aparência dos nós](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
@@ -49,9 +49,9 @@ Este exemplo mostra as configurações de nomes e aliases. A página atual tamb�
 
 O Folder Nodes combina uma pasta do Obsidian com uma nota Markdown de mesmo nome. Por exemplo, a pasta A e a nota A/A.md formam um nó completo. Se faltar uma das partes, o plugin mostra "Incompleto" e não cria nem move arquivos por conta própria.
 
-Você continua usando o Explorador de Arquivos do Obsidian. O plugin acrescenta a barra lateral de conteúdo dos nós, o Node Graph, ícones e ordenação manual entre nós irmãos.
+Você continua usando o Explorador de Arquivos do Obsidian. O plugin acrescenta a barra lateral de conteúdo dos nós, o grafo de nós, ícones e ordenação manual entre nós irmãos.
 
-Você pode criar, renomear, mover, mesclar, ordenar e excluir nós completos. O Explorador de Arquivos original do Obsidian continua funcionando. O conteúdo de um nó separa filhos, álbum de imagens estáticas e outros arquivos. GIFs usam miniaturas paradas; vídeos e áudios não têm reprodução embutida. O Node Graph mantém a hierarquia de pastas e pode mostrar links entre notas.
+Você pode criar, renomear, mover, mesclar, ordenar e excluir nós completos. O Explorador de Arquivos original do Obsidian continua funcionando. O conteúdo de um nó separa filhos, álbum de imagens estáticas e outros arquivos. GIFs usam miniaturas paradas; vídeos e áudios não têm reprodução embutida. O grafo de nós mantém a hierarquia de pastas e pode mostrar links entre notas.
 
 ## Requisitos e compatibilidade
 
@@ -98,7 +98,7 @@ A identidade do nó é o caminho atual do cofre, não um ID permanente. README.m
 
 ## Privacidade e segurança
 
-**Ocultar**: hidden=true na propriedade folder-nodes oculta o nó e seus descendentes apenas nas visualizações do Folder Nodes no Explorador, no Conteúdo dos Nós e no Node Graph. A busca e a abertura direta do Obsidian continuam funcionando. **Não gerenciado**: o Folder Nodes não executa operações estruturais nesses itens, mas não os esconde nem apaga.
+**Ocultar**: hidden=true na propriedade folder-nodes oculta o nó e seus descendentes apenas nas visualizações do Folder Nodes no Explorador, no Conteúdo dos Nós e no grafo de nós. A busca e a abertura direta do Obsidian continuam funcionando. **Não gerenciado**: o Folder Nodes não executa operações estruturais nesses itens, mas não os esconde nem apaga.
 
 Mover ou excluir normalmente afeta o arquivo ou pasta selecionados. Já renomear a pasta ou a nota homônima de um nó completo sincroniza a outra parte quando não há ambiguidade. Ações do "nó que contém a nota" afetam explicitamente o nó inteiro. Organização em lote e migração de propriedades mostram uma prévia antes da gravação; a verificação de integridade é somente leitura. Conflitos interrompem a ação, sem tentar adivinhar a solução. A exclusão de um nó completo segue a opção de exclusão de arquivos definida no Obsidian.
 
