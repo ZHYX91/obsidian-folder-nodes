@@ -1,3 +1,5 @@
+import { liveWorkspaceDocuments, workspaceDocumentWindow } from "../shared/workspace-documents";
+
 export class RuntimeStyles {
   private readonly sheets = new Map<Document, CSSStyleSheet>();
   private readonly bodyProperties = new Map<string, string>();
@@ -21,8 +23,8 @@ export class RuntimeStyles {
   }
 
   public install(document: Document): boolean {
-    const view = document.defaultView;
-    if (view === null) throw new Error("Folder Nodes stylesheet requires a document window");
+    const view = workspaceDocumentWindow(document);
+    if (view === null) return false;
 
     const current = this.sheets.get(document);
     if (current !== undefined) {
@@ -43,7 +45,7 @@ export class RuntimeStyles {
   }
 
   public reconcile(documents: Iterable<Document>): void {
-    const live = new Set(documents);
+    const live = liveWorkspaceDocuments(documents);
     for (const document of live) this.install(document);
     for (const [document, sheet] of [...this.sheets]) {
       if (live.has(document)) continue;

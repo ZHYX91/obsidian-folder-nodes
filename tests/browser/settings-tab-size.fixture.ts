@@ -1,4 +1,6 @@
 import "../setup/obsidian-dom";
+import { DocumentEventRegistry } from "../../src/app/document-event-registry";
+import { RuntimeStyles } from "../../src/ui/runtime-styles";
 import { LabeledSetting } from "../../src/ui/labeled-setting";
 import { addSettingsTabArrows } from "../../src/ui/settings-tab-arrows";
 
@@ -130,4 +132,46 @@ function measureNarrowFields(direction: "ltr" | "rtl") {
   } finally { root.remove(); }
 }
 
-Object.assign(window, { measureTabs, checkTabReveal, mountTabPaintSample, measureNarrowFields });
+function checkWorkspaceDocumentLifecycle() {
+  const styles = new RuntimeStyles("body { --folder-nodes-lifecycle-test: active; }");
+  let clicks = 0;
+  const events = new DocumentEventRegistry(() => { clicks += 1; });
+  const frame = document.createElement("iframe");
+  const inert = document.implementation.createHTMLDocument();
+  const click = (target: Document) => target.dispatchEvent(new MouseEvent("click"));
+  try {
+    document.body.append(frame);
+    const original = frame.contentDocument!;
+    styles.reconcile([document, original]);
+    events.reconcile([document, original]);
+    click(original);
+    const owned = original.adoptedStyleSheets.at(-1);
+    frame.remove();
+    document.body.append(frame);
+    const replacement = frame.contentDocument!;
+    const documents = [inert, original, replacement, document];
+    styles.reconcile(documents);
+    events.reconcile(documents);
+    styles.reconcile(documents);
+    events.reconcile(documents);
+    events.add(inert);
+    click(inert);
+    click(original);
+    click(replacement);
+    return {
+      detached: original.defaultView === null && original !== replacement,
+      inertInstalled: styles.install(inert),
+      released: !original.adoptedStyleSheets.some((sheet) => sheet === owned),
+      restored: replacement.defaultView!.getComputedStyle(replacement.body)
+        .getPropertyValue("--folder-nodes-lifecycle-test").trim(),
+      replacementSheets: replacement.adoptedStyleSheets.length,
+      clicks,
+    };
+  } finally {
+    events.clear();
+    styles.removeAll();
+    frame.remove();
+  }
+}
+
+Object.assign(window, { measureTabs, checkTabReveal, mountTabPaintSample, measureNarrowFields, checkWorkspaceDocumentLifecycle });

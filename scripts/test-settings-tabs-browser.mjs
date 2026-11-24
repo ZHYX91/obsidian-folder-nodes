@@ -6,6 +6,9 @@ await withBrowserFixture({
   stylesheet: "src/ui/styles.css",
   ready: "typeof window.measureTabs === 'function'",
 }, async ({ send, evaluate }) => {
+  assert.deepEqual(await evaluate("window.checkWorkspaceDocumentLifecycle()"), {
+    detached: true, inertInstalled: false, released: true, restored: "active", replacementSheets: 1, clicks: 2,
+  });
   for (const touch of [false, true]) {
     await send("Emulation.setTouchEmulationEnabled", { enabled: touch });
     for (const direction of ["ltr", "rtl"]) {
