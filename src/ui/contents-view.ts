@@ -13,7 +13,7 @@ import {
   siblingDropZone,
   type SiblingDropAxis,
 } from "./contents-interactions";
-import { t } from "./i18n";
+import { formatError, interfaceTextDirection, resolvedLanguage, t } from "./i18n";
 import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import type { FileIdentity, FolderIdentity } from "../core/identity";
 import type { ChildOrderRecord, FolderNodeHiddenState, NodeVisual } from "../core/types";
@@ -22,7 +22,6 @@ import { renderVisual } from "../presentation/render-visual";
 import type { ReferenceIndex } from "../core/reference-index";
 import { PlacementSession } from "../core/placement-session";
 import { placementFeedback } from "../presentation/placement-feedback";
-import { formatError } from "./i18n";
 import { renderContentsStatus } from "./contents-status";
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "png", "svg", "webp"]);
@@ -159,6 +158,8 @@ export class FolderNodeContentsView extends ItemView {
     const renderState = this.renderedFolderPath === requestedPath ? this.captureRenderState(container) : null;
     container.empty();
     container.addClass("folder-nodes-contents");
+    container.lang = resolvedLanguage();
+    container.dir = interfaceTextDirection();
     const folder = requestedPath === "" ? this.app.vault.getRoot() : this.service.getFolder(this.folderPath);
     if (folder === null) {
       this.renderStatus(container, requestedPath, t("noCurrentNode"));
