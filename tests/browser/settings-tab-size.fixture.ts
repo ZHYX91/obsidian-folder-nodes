@@ -111,6 +111,12 @@ function measureNarrowFields(direction: "ltr" | "rtl") {
       .addButton((button) => button.setButtonText("Ajouter une règle de début de nom"));
     const preview = panel.createDiv({ cls: "folder-nodes-emoji-font-preview" });
     preview.createSpan({ cls: "folder-nodes-emoji-font-preview-sample", text: "📔🫠🩷👨‍👩‍👧‍👦🏳️‍🌈".repeat(6) });
+    const support = new LabeledSetting(panel).setName("Hilfe und Support").setClass("folder-nodes-settings-support");
+    support.controlEl.style.inlineSize = "150px";
+    const guide = support.controlEl.createEl("a", { text: "Benutzerhandbuch", cls: "external-link" });
+    guide.style.cssText = "font:20px sans-serif;padding-inline-end:.9em";
+    const link = guide.getBoundingClientRect();
+    const area = support.controlEl.getBoundingClientRect();
     const frame = panel.getBoundingClientRect();
     return {
       overflow: panel.scrollWidth - panel.clientWidth,
@@ -119,6 +125,7 @@ function measureNarrowFields(direction: "ltr" | "rtl") {
         return box.left >= frame.left - 1 && box.right <= frame.right + 1;
       }),
       measuredLabel: mirror.offsetWidth,
+      guideFits: link.left >= area.left - 1 && link.right <= area.right + 1 && guide.scrollWidth <= guide.clientWidth + 1,
     };
   } finally { root.remove(); }
 }

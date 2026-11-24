@@ -460,6 +460,9 @@ body {
 }
 
 .folder-nodes-settings-support a {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
   cursor: var(--cursor, default);
 }
 .folder-nodes-leaf-indicator > svg { visibility: hidden; }
@@ -1318,6 +1321,7 @@ button.folder-nodes-current:focus-visible {
 
   .folder-nodes-tab-panel .setting-item-info {
     min-inline-size: 0;
+    max-inline-size: 100%;
     overflow-wrap: anywhere;
   }
 

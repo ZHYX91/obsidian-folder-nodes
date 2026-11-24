@@ -10,7 +10,7 @@ await withBrowserFixture({
     await send("Emulation.setTouchEmulationEnabled", { enabled: touch });
     for (const direction of ["ltr", "rtl"]) {
       const fields = await evaluate(`window.measureNarrowFields("${direction}")`);
-      assert.ok(fields.overflow <= 1 && fields.allActionsVisible, JSON.stringify(fields));
+      assert.ok(fields.overflow <= 1 && fields.allActionsVisible && fields.guideFits, JSON.stringify(fields));
       assert.ok(fields.measuredLabel > 260, "A long dropdown must keep its natural measurement");
       for (const opening of ["wide", "hidden", "overflowing"]) {
         const check = await evaluate(`window.checkTabReveal("${direction}", "${opening}")`);
