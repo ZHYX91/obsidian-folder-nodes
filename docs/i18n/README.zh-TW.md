@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-在節點筆記的 `folder-nodes` 文字清單中，`order=manual` 表示該節點的下級採手動排序，`rank=N` 是儲存的排序位置，`hidden=true` 則隱藏這個節點及受管理下級。預設值不需要寫入；清單沒有內容時會刪除此屬性。舊的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 仍可讀取，但不會在啟動時自動遷移。請先更新所有裝置，再到「管理」預覽遷移結果，確認後才會寫入。
+在節點筆記的 `folder-nodes` 文字清單中，`order=manual` 表示該節點的下級採手動排序，`rank=N` 記錄這個節點在同層節點中的手動排序位置，`hidden=true` 則隱藏這個節點及受管理下級。預設值不需要寫入；清單沒有內容時會刪除此屬性。舊的 `folderNodeChildrenSort`、`folderNodeSiblingRank`、`folderNodeHidden` 仍可讀取，但不會在啟動時自動遷移。請先更新所有裝置，再到「管理」預覽遷移結果，確認後才會寫入。
 
 ## icon 屬性
 

@@ -61,7 +61,7 @@ Funciona en escritorio y Android. En Android, las carpetas se mueven mediante me
 
 ## Ajustes
 
-**General**: idioma, nodos ocultos y página de inicio. **Administración**: exclusiones, organización por lotes, migración y comprobación de solo lectura. **Iconos y apariencia**: herencia, posición y fuente de emojis. **Selección y nombres**: confirmación, alias y reglas de nombres. **Node Graph**: dimensiones, orientación y rendimiento. Cambiar el idioma no modifica las notas.
+**General**: idioma, nodos ocultos y página de inicio. **Administración**: exclusiones, organización por lotes, migración y comprobación de solo lectura. **Iconos y apariencia**: herencia, posición y fuente de emojis. **Selección y nombres**: confirmación, alias y reglas de nombres. **Gráfico de nodos**: dimensiones, orientación y rendimiento. Cambiar el idioma no modifica las notas.
 
 De forma predeterminada, el complemento no gestiona `AGENTS.md` ni `CLAUDE.md` en la raíz de la bóveda, ni los archivos Markdown o carpetas cuyo nombre empiece por `.` o `_`. Puedes cambiar estas reglas en los ajustes de gestión.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-En la nota de cada nodo, la lista de texto `folder-nodes` guarda las opciones no predeterminadas: `order=manual` activa la ordenación manual de hijos, `rank=N` guarda su posición y `hidden=true` oculta el nodo y sus descendientes administrados. No se escriben valores predeterminados; si no quedan opciones se elimina la propiedad. Los campos antiguos `folderNodeChildrenSort`, `folderNodeSiblingRank` y `folderNodeHidden` siguen siendo legibles. No se migran al iniciar. Actualiza el plugin en todos los dispositivos y revisa la vista previa en «Administración» antes de confirmar.
+En la nota de cada nodo, la lista de texto `folder-nodes` guarda las opciones no predeterminadas: `order=manual` activa la ordenación manual de hijos, `rank=N` guarda la posición de ese nodo entre los hijos del mismo nodo superior y `hidden=true` oculta el nodo y sus descendientes administrados. No se escriben valores predeterminados; si no quedan opciones se elimina la propiedad. Los campos antiguos `folderNodeChildrenSort`, `folderNodeSiblingRank` y `folderNodeHidden` siguen siendo legibles. No se migran al iniciar. Actualiza el plugin en todos los dispositivos y revisa la vista previa en «Administración» antes de confirmar.
 
 ## Propiedad icon
 

@@ -61,7 +61,7 @@ Plugin hỗ trợ máy tính và Android. Trên Android, hãy dùng menu để d
 
 ## Thiết lập
 
-**Chung**: ngôn ngữ, nút ẩn và trang chủ. **Quản lý**: quy tắc loại trừ, sắp xếp hàng loạt, chuyển đổi thuộc tính và kiểm tra chỉ đọc. **Biểu tượng và giao diện**: kế thừa, vị trí và phông emoji. **Chọn và đặt tên**: xác nhận, bí danh và quy tắc tên. **Node Graph**: số chiều, hướng và hiệu suất. Đổi ngôn ngữ không sửa ghi chú.
+**Chung**: ngôn ngữ, nút ẩn và trang chủ. **Quản lý**: quy tắc loại trừ, sắp xếp hàng loạt, chuyển đổi thuộc tính và kiểm tra chỉ đọc. **Biểu tượng và giao diện**: kế thừa, vị trí và phông emoji. **Vùng chọn và tên**: xác nhận, bí danh và quy tắc tên. **Đồ thị nút**: số chiều, hướng và hiệu suất. Đổi ngôn ngữ không sửa ghi chú.
 
 Theo mặc định, plugin không quản lý `AGENTS.md` và `CLAUDE.md` ở thư mục gốc của kho, cũng như các tệp Markdown và thư mục có tên bắt đầu bằng `.` hoặc `_`. Bạn có thể đổi các quy tắc này trong phần thiết lập quản lý.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-Danh sách văn bản `folder-nodes` trong ghi chú nút lưu các thiết lập khác mặc định: `order=manual` bật sắp xếp nút con thủ công, `rank=N` lưu vị trí, còn `hidden=true` ẩn nút và các nút con được quản lý. Không ghi giá trị mặc định; danh sách trống thì xóa thuộc tính. Các trường cũ `folderNodeChildrenSort`, `folderNodeSiblingRank` và `folderNodeHidden` vẫn được đọc. Không tự chuyển đổi khi khởi động. Hãy cập nhật mọi thiết bị, xem trước trong mục “Quản lý” rồi mới xác nhận.
+Danh sách văn bản `folder-nodes` trong ghi chú nút lưu các thiết lập khác mặc định: `order=manual` bật sắp xếp nút con thủ công, `rank=N` lưu vị trí của chính nút này trong số các nút cùng cấp, còn `hidden=true` ẩn nút và các nút con được quản lý. Không ghi giá trị mặc định; danh sách trống thì xóa thuộc tính. Các trường cũ `folderNodeChildrenSort`, `folderNodeSiblingRank` và `folderNodeHidden` vẫn được đọc. Không tự chuyển đổi khi khởi động. Hãy cập nhật mọi thiết bị, xem trước trong mục “Quản lý” rồi mới xác nhận.
 
 ## Thuộc tính icon
 

@@ -61,7 +61,7 @@ Das Plugin unterstützt Desktop und Android. Auf Android werden Ordner über Men
 
 ## Einstellungen
 
-**Allgemein:** Sprache, ausgeblendete Knoten und Startseite. **Verwaltung:** Ausnahmen, Sammelorganisation, Eigenschaftsmigration und schreibgeschützte Zustandsprüfung. **Symbole und Aussehen:** vererbte Symbole, Position und Emoji-Schrift. **Auswahl und Namen:** Bestätigung, Aliase und Benennungsregeln. **Node Graph:** Dimension, Richtung und Darstellung großer Graphen. Ein Sprachwechsel verändert keine Notizen.
+**Allgemein:** Sprache, ausgeblendete Knoten und Startseite. **Verwaltung:** Ausnahmen, Sammelorganisation, Eigenschaftsmigration und schreibgeschützte Zustandsprüfung. **Symbole und Darstellung:** vererbte Symbole, Position und Emoji-Schrift. **Auswahl und Benennung:** Bestätigung, Aliase und Benennungsregeln. **Knotengraf:** Dimension, Richtung und Darstellung großer Graphen. Ein Sprachwechsel verändert keine Notizen.
 
 Standardmäßig bleiben `AGENTS.md` und `CLAUDE.md` im Hauptverzeichnis des Vaults unverwaltet, ebenso Markdown-Dateien und Ordner, deren Namen mit `.` oder `_` beginnen. Diese Regeln lassen sich in den Verwaltungseinstellungen ändern.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-Die Textliste `folder-nodes` in einer Knotennotiz enthält nur abweichende Einstellungen: `order=manual` schaltet die manuelle Sortierung der Kinder ein, `rank=N` speichert ihre Position und `hidden=true` blendet den Knoten samt verwalteten Nachkommen aus. Standardwerte werden nicht geschrieben; ohne Einträge wird die Eigenschaft entfernt. Die alten Felder `folderNodeChildrenSort`, `folderNodeSiblingRank` und `folderNodeHidden` bleiben lesbar. Es gibt keine automatische Migration beim Start. Aktualisieren Sie alle Geräte und prüfen Sie die Vorschau unter „Verwaltung“, bevor Sie bestätigen.
+Die Textliste `folder-nodes` in einer Knotennotiz enthält nur abweichende Einstellungen: `order=manual` schaltet die manuelle Sortierung der Kinder ein, `rank=N` speichert die Position dieses Knotens unter seinen Geschwisterknoten und `hidden=true` blendet den Knoten samt verwalteten Nachkommen aus. Standardwerte werden nicht geschrieben; ohne Einträge wird die Eigenschaft entfernt. Die alten Felder `folderNodeChildrenSort`, `folderNodeSiblingRank` und `folderNodeHidden` bleiben lesbar. Es gibt keine automatische Migration beim Start. Aktualisieren Sie alle Geräte und prüfen Sie die Vorschau unter „Verwaltung“, bevor Sie bestätigen.
 
 ## Eigenschaft icon
 

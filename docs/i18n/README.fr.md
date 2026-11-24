@@ -61,7 +61,7 @@ Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements p
 
 ## Paramètres
 
-**Général** : langue, masquage et page d’accueil. **Gestion** : règles d’exclusion, rangement groupé, migration des propriétés et contrôle en lecture seule. **Icônes et apparence** : héritage, position, police des émojis. **Sélection et noms** : confirmation, alias et règles de nommage. **Node Graph** : dimension, orientation et performance. Changer la langue ne modifie pas les notes.
+**Général** : langue, masquage et page d’accueil. **Gestion** : règles d’exclusion, rangement groupé, migration des propriétés et contrôle en lecture seule. **Icônes et apparence** : héritage, position, police des émojis. **Sélection et nommage** : confirmation, alias et règles de nommage. **Graphe des nœuds** : dimension, orientation et performance. Changer la langue ne modifie pas les notes.
 
 Par défaut, le plugin laisse de côté `AGENTS.md` et `CLAUDE.md` à la racine du coffre, ainsi que les fichiers Markdown et les dossiers dont le nom commence par `.` ou `_`. Vous pouvez modifier ces règles dans les paramètres de gestion.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-La liste de textes `folder-nodes` dans la note d’un nœud contient les réglages particuliers : `order=manual` active le tri manuel des enfants, `rank=N` enregistre une position, et `hidden=true` masque le nœud et ses descendants gérés. Les valeurs par défaut ne sont pas écrites ; la propriété disparaît si la liste est vide. Les anciens champs `folderNodeChildrenSort`, `folderNodeSiblingRank` et `folderNodeHidden` restent lisibles. Aucune migration automatique au démarrage : mettez d’abord le plugin à jour sur tous les appareils, puis vérifiez l’aperçu dans « Gestion » avant de confirmer.
+La liste de textes `folder-nodes` dans la note d’un nœud contient les réglages particuliers : `order=manual` active le tri manuel des enfants, `rank=N` enregistre la position de ce nœud parmi les enfants du même parent, et `hidden=true` masque le nœud et ses descendants gérés. Les valeurs par défaut ne sont pas écrites ; la propriété disparaît si la liste est vide. Les anciens champs `folderNodeChildrenSort`, `folderNodeSiblingRank` et `folderNodeHidden` restent lisibles. Aucune migration automatique au démarrage : mettez d’abord le plugin à jour sur tous les appareils, puis vérifiez l’aperçu dans « Gestion » avant de confirmer.
 
 ## Propriété icon
 

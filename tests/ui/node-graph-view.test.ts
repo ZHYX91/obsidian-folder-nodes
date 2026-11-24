@@ -478,7 +478,7 @@ describe("Node Graph progressive view", () => {
     expect(fixture.view.contentEl.querySelector("[data-node-path='Work/B']")?.classList.contains("is-boundary")).toBe(true);
     expect(fixture.view.contentEl.querySelectorAll("path.is-link")).toHaveLength(3);
     expect(fixture.view.contentEl.querySelectorAll("path.is-structure")).toHaveLength(3);
-    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-link-summary")?.textContent).toBe("3 visible links");
+    expect(fixture.view.contentEl.querySelector(".folder-nodes-node-graph-link-summary")?.textContent).toBe("Visible links: 3");
 
     fixture.view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-links-toggle")?.click();
     expect(fixture.view.contentEl.querySelector("[data-node-path='Personal/Home']")).toBeNull();
@@ -676,7 +676,7 @@ describe("Node Graph progressive view", () => {
       "Expand next level",
       "Expand 2 levels",
       "Expand 3 levels",
-      "Expand the entire local scope (5 nodes)",
+      "Expand the entire local scope (nodes: 5)",
       "Collapse to level 1",
     ]);
     menu.items[3]?.click?.();
@@ -1019,7 +1019,7 @@ describe("Node Graph progressive view", () => {
       search.focus();
       search.value = "Deep";
       search.dispatchEvent(new Event("input", { bubbles: true }));
-      expect(summary().textContent).toBe("1 visible links");
+      expect(summary().textContent).toBe("Visible links: 1");
       expect(summary().classList.contains("is-empty")).toBe(false);
       snapshot.links.clear();
       (snapshot as unknown as { revision: number }).revision += 1;

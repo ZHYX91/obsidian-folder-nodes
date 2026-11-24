@@ -61,7 +61,7 @@ O plugin funciona no computador e no Android. No Android, as pastas são movidas
 
 ## Configurações
 
-**Geral**: idioma, nós ocultos e página inicial. **Gerenciamento**: regras de exclusão, organização em lote, migração e verificação somente leitura. **Ícones e aparência**: herança, posição e fontes de emoji. **Seleção e nomes**: confirmação, aliases e regras de nome. **Node Graph**: dimensão, direção e desempenho. Trocar o idioma não modifica as notas.
+**Geral**: idioma, nós ocultos e página inicial. **Gerenciamento**: regras de exclusão, organização em lote, migração e verificação somente leitura. **Ícones e aparência**: herança, posição e fontes de emoji. **Seleção e nomes**: confirmação, aliases e regras de nome. **Grafo de nós**: dimensão, direção e desempenho. Trocar o idioma não modifica as notas.
 
 Por padrão, o plugin não gerencia `AGENTS.md` e `CLAUDE.md` na raiz do cofre, nem arquivos Markdown ou pastas com nomes que começam com `.` ou `_`. Você pode alterar essas regras nas configurações de gerenciamento.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-A lista de texto `folder-nodes` na nota do nó armazena apenas opções diferentes do padrão: `order=manual` ativa a ordem manual dos filhos, `rank=N` guarda a posição e `hidden=true` oculta o nó e seus descendentes gerenciados. Valores padrão não são escritos; sem opções a propriedade é removida. Os campos antigos `folderNodeChildrenSort`, `folderNodeSiblingRank` e `folderNodeHidden` continuam sendo lidos. A migração não ocorre automaticamente. Atualize todos os dispositivos e confira a prévia em “Gerenciamento” antes de confirmar.
+A lista de texto `folder-nodes` na nota do nó armazena apenas opções diferentes do padrão: `order=manual` ativa a ordem manual dos filhos, `rank=N` guarda a posição do próprio nó entre os filhos do mesmo nó pai e `hidden=true` oculta o nó e seus descendentes gerenciados. Valores padrão não são escritos; sem opções a propriedade é removida. Os campos antigos `folderNodeChildrenSort`, `folderNodeSiblingRank` e `folderNodeHidden` continuam sendo lidos. A migração não ocorre automaticamente. Atualize todos os dispositivos e confira a prévia em “Gerenciamento” antes de confirmar.
 
 ## Propriedade icon
 
