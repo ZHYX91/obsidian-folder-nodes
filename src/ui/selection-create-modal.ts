@@ -1,6 +1,6 @@
-import { App, Notice, Setting } from "obsidian";
+import { App, type ButtonComponent, Setting } from "obsidian";
 import { sanitizeNewNodeName } from "../core/paths";
-import { formatError, t } from "./i18n";
+import { t } from "./i18n";
 import { SubmittingModal } from "./submitting-modal";
 
 export interface SelectionPreview {
@@ -31,14 +31,14 @@ export class SelectionCreateModal extends SubmittingModal {
 
   public override onOpen(): void {
     this.setTitle(t("selectionPreview"));
-    let input: HTMLInputElement | null = null;
+    let create: ButtonComponent;
     new Setting(this.contentEl)
       .setName(t("newNode"))
       .addText((text) => {
-        input = text.inputEl;
-        input.setAttribute("aria-label", t("newNode"));
+        text.inputEl.setAttribute("aria-label", t("newNode"));
         text.setValue(this.nodeName).onChange((value) => {
           this.nodeName = value;
+          create.setDisabled(value.trim() === "");
           renderPreview();
         });
       });
@@ -51,22 +51,13 @@ export class SelectionCreateModal extends SubmittingModal {
     renderPreview();
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
-      .addButton((button) => button.setCta().setButtonText(t("create")).onClick(async () => {
-        if (this.submitting || this.nodeName.trim() === "") return;
-        this.submitting = true;
-        button.setDisabled(true);
-        if (input !== null) input.disabled = true;
-        try {
-          await this.onCreate(sanitizeNewNodeName(this.nodeName));
-          this.closeAfterSubmission();
-        } catch (error) {
-          new Notice(formatError(error), 8000);
-        } finally {
-          this.submitting = false;
-          button.setDisabled(false);
-          if (input !== null) input.disabled = false;
-        }
-      }));
+      .addButton((button) => {
+        create = button.setCta().setButtonText(t("create")).setDisabled(this.nodeName.trim() === "");
+        create.onClick(() => {
+          const name = this.nodeName.trim();
+          if (name !== "") void this.submitAndClose(() => this.onCreate(sanitizeNewNodeName(name)));
+        });
+      });
   }
 
   private row(container: HTMLElement, label: string, value: string): void {

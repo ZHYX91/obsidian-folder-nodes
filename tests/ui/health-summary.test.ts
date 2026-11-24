@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { MigrationScan, PropertyMigrationScan } from "../../src/core/types";
 import { t } from "../../src/ui/i18n";
 import { MigrationModal } from "../../src/ui/migration-modal";
@@ -35,4 +35,28 @@ it("keeps the action headings and target note paths in the organization preview"
   expect(notes?.querySelector("code")?.textContent).toBe(`${move.sourcePath} → ${move.targetPath}`);
   expect(folders?.querySelector("summary")?.textContent).toBe(`${t("createNodeNotes")} (2)`);
   expect(Array.from(folders!.querySelectorAll("code"), (item) => item.textContent)).toEqual(["Vault.md", "Projects/Projects.md"]);
+});
+
+it("locks the property migration until its write settles and permits retry after failure", async () => {
+  let fail!: (reason: Error) => void;
+  let currentSignal!: AbortSignal;
+  const commit = vi.fn((signal: AbortSignal) => {
+    currentSignal = signal;
+    return new Promise<void>((_resolve, reject) => { fail = reject; });
+  });
+  const modal = new PropertyMigrationModal(app, {
+    ...properties, changes: [{ path: "Projects/Projects.md", summary: "Update property", sourceFingerprint: "old" }],
+  }, commit, false);
+  modal.open();
+  const [cancel, apply] = [...modal.contentEl.querySelectorAll<HTMLButtonElement>("button")];
+  apply!.click();
+  cancel!.click();
+  modal.close();
+  expect(currentSignal.aborted).toBe(false);
+  expect(cancel!.disabled && apply!.disabled).toBe(true);
+  expect(modal.contentEl.isConnected).toBe(true);
+  fail(new Error("Write failed"));
+  await vi.waitFor(() => expect(cancel!.disabled || apply!.disabled).toBe(false));
+  cancel!.click();
+  expect(modal.contentEl.isConnected).toBe(false);
 });

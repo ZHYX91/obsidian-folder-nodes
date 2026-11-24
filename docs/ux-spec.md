@@ -12,6 +12,8 @@ The interface uses native Obsidian Setting, Menu, Modal, Notice, theme variables
 
 Merge requires the source and target node notes and all Markdown descendants being moved to be closed in every Markdown tab. If any is open, a localized notice asks the user to save and close the affected notes, then retry from the file explorer. No structural writes begin while those editors are open.
 
+While a dialog saves a change, its action buttons and input fields are disabled. If the write fails, the draft stays open and the available controls are restored. A blank name disables Save or Create.
+
 ## Homepage
 
 When enabled, the Root Node Note is the only homepage. The command palette and Home button in the Node Contents header open that note. Open homepage on startup runs after Obsidian restores the Vault layout. A disabled homepage or missing Root Note produces an explicit notice and never creates a file silently.

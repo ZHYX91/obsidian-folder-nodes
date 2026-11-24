@@ -4,8 +4,7 @@ import type { App } from "obsidian";
 import { SubmittingModal } from "../../src/ui/submitting-modal";
 
 class TestSubmittingModal extends SubmittingModal {
-  public begin(): void { this.submitting = true; }
-  public finish(): void { this.closeAfterSubmission(); }
+  public save(write: () => Promise<void>): Promise<void> { return this.submitAndClose(write); }
 }
 
 describe("SubmittingModal", () => {
@@ -15,12 +14,15 @@ describe("SubmittingModal", () => {
     expect((modal as unknown as { closeCount: number }).closeCount).toBe(1);
   });
 
-  it("refuses cancellation while a write is running and closes after it finishes", () => {
+  it("refuses cancellation while a write is running and closes after it finishes", async () => {
     const modal = new TestSubmittingModal({} as App);
-    modal.begin();
+    modal.open();
+    let finish!: () => void;
+    const saving = modal.save(() => new Promise<void>((resolve) => { finish = resolve; }));
     modal.close();
     expect((modal as unknown as { closeCount: number }).closeCount).toBe(0);
-    modal.finish();
+    finish();
+    await saving;
     expect((modal as unknown as { closeCount: number }).closeCount).toBe(1);
   });
 });

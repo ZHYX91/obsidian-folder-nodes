@@ -13,11 +13,4 @@ describe("review regression contracts", () => {
     expect(styles).not.toMatch(/\n\.nav-file-title\s*\{[^}]*align-items:\s*center/gu);
   });
 
-  it("disables property migration cancellation while its write is submitting", () => {
-    const modal = source("src/ui/property-migration-modal.ts");
-    expect(modal).toContain("if (this.submitting) return;");
-    expect(modal).toContain("cancelButton?.setDisabled(true);");
-    expect(modal).toContain("cancelButton?.setDisabled(false);");
-    expect(modal).not.toContain("if (this.controller !== null) this.controller.abort");
-  });
 });

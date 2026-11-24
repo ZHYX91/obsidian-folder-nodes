@@ -37,7 +37,7 @@ describe("selection creation preview", () => {
     const input = modal.contentEl.querySelector<HTMLInputElement>("input")!;
     const button = modal.contentEl.querySelectorAll<HTMLButtonElement>("button")[1]!;
     const edit = (value: string) => { input.value = value; input.dispatchEvent(new Event("input", { bubbles: true })); };
-    edit(" "); button.click();
+    edit(" "); expect(button.disabled).toBe(true); button.click();
     expect(create).not.toHaveBeenCalled();
     edit("First"); button.click();
     await vi.waitFor(() => expect(input.disabled).toBe(false));

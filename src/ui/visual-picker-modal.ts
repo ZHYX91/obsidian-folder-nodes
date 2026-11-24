@@ -1,6 +1,6 @@
-import { App, Notice, Setting, TFolder } from "obsidian";
+import { App, Setting, TFolder } from "obsidian";
 import type { NodeVisual } from "../core/types";
-import { formatError, t } from "./i18n";
+import { t } from "./i18n";
 import { renderVisual } from "../presentation/render-visual";
 import { SubmittingModal } from "./submitting-modal";
 
@@ -26,7 +26,7 @@ export class VisualPickerModal extends SubmittingModal {
   }
 
   public override onOpen(): void {
-    if (this.invalidated) { this.closeAfterSubmission(); return; }
+    if (this.invalidated) { this.closeImmediately(); return; }
     this.setTitle(`${t("editVisual")}: ${this.folder.name}`);
     this.contentEl.createEl("p", { text: t("visualValueDesc") });
 
@@ -48,7 +48,7 @@ export class VisualPickerModal extends SubmittingModal {
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("addCandidate")).onClick(() => {
         this.values.push("");
-        this.renderEditor();
+        this.renderEditor({ index: this.values.length - 1 });
       }));
 
     new Setting(this.contentEl)
@@ -61,7 +61,7 @@ export class VisualPickerModal extends SubmittingModal {
 
   public invalidate(): void {
     this.invalidated = true;
-    this.closeAfterSubmission();
+    this.closeImmediately();
   }
 
   public override onClose(): void {
@@ -135,15 +135,6 @@ export class VisualPickerModal extends SubmittingModal {
   }
 
   private async submit(values: readonly string[] = this.values): Promise<void> {
-    if (this.submitting || this.invalidated) return;
-    this.submitting = true;
-    try {
-      await this.onSave(values);
-      this.closeAfterSubmission();
-    } catch (error) {
-      new Notice(formatError(error), 8000);
-    } finally {
-      this.submitting = false;
-    }
+    if (!this.invalidated) await this.submitAndClose(() => this.onSave([...values]));
   }
 }
