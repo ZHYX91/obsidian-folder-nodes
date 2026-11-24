@@ -103,9 +103,19 @@ body {
   font-weight: inherit;
   block-size: auto;
   min-block-size: 34px;
-  margin: 0 0 -1px !important;
+  margin: 0 !important;
   padding: 7px 12px !important;
   white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .folder-nodes-tabs {
+    --interactive-accent: Highlight;
+  }
+
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab[aria-selected="false"] {
+    border-block-end-color: Canvas !important;
+  }
 }
 
 @media (pointer: coarse) {

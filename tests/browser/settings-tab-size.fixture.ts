@@ -12,6 +12,7 @@ function mountTabs(width: number, direction: "ltr" | "rtl", hidden = false) {
   for (const label of ["General", "Management", "Icons & appearance", "Selection & naming", "Node Graph"]) {
     const tab = document.createElement("button");
     tab.className = "folder-nodes-tab";
+    tab.classList.toggle("is-active", label === "Node Graph");
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-selected", String(label === "Node Graph"));
     tab.textContent = label;
@@ -70,4 +71,15 @@ async function checkTabReveal(direction: "ltr" | "rtl", opening: "hidden" | "wid
   }
 }
 
-Object.assign(window, { measureTabs, checkTabReveal });
+// The browser runner samples the actual two pixel rows of both tab borders.
+function mountTabPaintSample() {
+  const { root, tabs } = mountTabs(900, "ltr");
+  root.style.setProperty("--interactive-accent", "#6242aa");
+  root.style.setProperty("--background-modifier-border", "#bbb");
+  return [".is-active", ":not(.is-active)"].map(state => {
+    const rect = tabs.querySelector(`button${state}`)!.getBoundingClientRect();
+    return { x: Math.floor(rect.left + rect.width / 2), y: Math.floor(rect.bottom) - 2 };
+  });
+}
+
+Object.assign(window, { measureTabs, checkTabReveal, mountTabPaintSample });
