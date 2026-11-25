@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const ru: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "Показать предыдущие вкладки",
+  "showMoreTabs": "Показать следующие вкладки",
   "finalNodeName": "Итоговое имя узла",
   "deleteFileConfirm": "Удалить файл «{path}» согласно настройке удаления Obsidian. При безвозвратном удалении восстановить его из корзины нельзя.",
   "deleteNodeConfirm": "Удалить всю папку узла «{path}», включая заметку узла, все подпапки и файлы, согласно настройке удаления Obsidian. При безвозвратном удалении восстановить их из корзины нельзя.",

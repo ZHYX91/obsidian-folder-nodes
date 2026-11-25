@@ -38,32 +38,40 @@ describe("Node Graph progressive view", () => {
   });
   it("refreshes the host tab title without resetting search, scope or the viewport", async () => {
     const { view } = await graphViewFixture();
-    view.setGraphScope({ mode: "subtree", rootPath: "Work" });
-    const input = searchInput(view);
-    input.value = "Work";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll")!;
-    surface.scrollLeft = 37;
-    surface.scrollTop = 29;
-    const state = view.getState();
-    let hostTitle = view.getDisplayText();
-    Object.assign(view.leaf, {
-      getViewState: () => ({ type: view.getViewType(), state }),
-      getEphemeralState: () => ({}),
-      setViewState: async (value: { state: unknown }) => {
-        await view.setState(value.state, { history: false });
-        hostTitle = view.getDisplayText();
-      },
-    });
-    setLanguage("ru");
-    await view.refreshLocalizedTitle();
-    expect(hostTitle).toBe(view.getDisplayText());
-    expect(hostTitle).toBe("Граф узлов");
-    expect(searchInput(view).value).toBe("Work");
-    expect(view.getState()).toEqual(state);
-    const refreshed = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll")!;
-    expect(refreshed.scrollLeft).toBe(37);
-    expect(refreshed.scrollTop).toBe(29);
+    document.body.append(view.containerEl);
+    try {
+      view.setGraphScope({ mode: "subtree", rootPath: "Work" });
+      const input = searchInput(view);
+      input.value = "Work";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      const surface = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll")!;
+      surface.scrollLeft = 37;
+      surface.scrollTop = 29;
+      const state = view.getState();
+      let hostTitle = view.getDisplayText();
+      Object.assign(view.leaf, {
+        getViewState: () => ({ type: view.getViewType(), state }),
+        getEphemeralState: () => ({}),
+        setViewState: async (value: { state: unknown }) => {
+          await view.setState(value.state, { history: false });
+          hostTitle = view.getDisplayText();
+        },
+      });
+      setLanguage("ru");
+      await view.refreshLocalizedTitle();
+      expect(hostTitle).toBe(view.getDisplayText());
+      expect(hostTitle).toBe("Граф узлов");
+      expect(view.contentEl.lang).toBe("ru");
+      setLanguage("ar");
+      await view.refreshLocalizedTitle();
+      expect(view.contentEl.lang).toBe("ar");
+      expect(view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-toolbar")!.dir).toBe("rtl");
+      expect(searchInput(view).value).toBe("Work");
+      expect(view.getState()).toEqual(state);
+      const refreshed = view.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-scroll")!;
+      expect(refreshed.scrollLeft).toBe(37);
+      expect(refreshed.scrollTop).toBe(29);
+    } finally { view.containerEl.remove(); }
   });
 
   it("keeps the range root independent from selection and names the next scope action", async () => {

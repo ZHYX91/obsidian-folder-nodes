@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const ptBR: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "Mostrar abas anteriores",
+  "showMoreTabs": "Mostrar as próximas abas",
   "finalNodeName": "Nome final do nó",
   "deleteFileConfirm": "Excluir o arquivo “{path}” conforme a configuração de exclusão do Obsidian. Se a exclusão for permanente, não será possível restaurá-lo da lixeira.",
   "deleteNodeConfirm": "Excluir toda a pasta do nó “{path}”, incluindo a nota do nó, todas as subpastas e arquivos, conforme a configuração de exclusão do Obsidian. Se a exclusão for permanente, não será possível restaurá-los da lixeira.",

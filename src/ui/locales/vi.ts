@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const vi: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "Hiện các thẻ trước",
+  "showMoreTabs": "Hiện các thẻ tiếp theo",
   "finalNodeName": "Tên nút cuối cùng",
   "deleteFileConfirm": "Xóa tệp “{path}” theo cài đặt xóa của Obsidian. Nếu đặt là xóa vĩnh viễn, không thể khôi phục từ thùng rác.",
   "deleteNodeConfirm": "Xóa toàn bộ thư mục nút “{path}”, bao gồm ghi chú nút, mọi thư mục con và tệp, theo cài đặt xóa của Obsidian. Nếu đặt là xóa vĩnh viễn, không thể khôi phục từ thùng rác.",

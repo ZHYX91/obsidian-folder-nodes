@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const de: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "Vorherige Tabs anzeigen",
+  "showMoreTabs": "Weitere Tabs anzeigen",
   "finalNodeName": "Endgültiger Knotenname",
   "deleteFileConfirm": "Die Datei „{path}“ wird gemäß der Löscheinstellung von Obsidian gelöscht. Bei dauerhaftem Löschen ist eine Wiederherstellung aus dem Papierkorb nicht möglich.",
   "deleteNodeConfirm": "Der gesamte Knotenordner „{path}“ einschließlich Knotennotiz, aller Unterordner und Dateien wird gemäß der Löscheinstellung von Obsidian gelöscht. Bei dauerhaftem Löschen ist eine Wiederherstellung aus dem Papierkorb nicht möglich.",

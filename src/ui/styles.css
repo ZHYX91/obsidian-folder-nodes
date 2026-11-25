@@ -25,6 +25,52 @@ body {
   font-family: var(--font-interface);
 }
 
+.folder-nodes-tab-frame {
+  display: flex;
+  align-items: stretch;
+  min-inline-size: 0;
+  container: folder-nodes-tab-frame / inline-size;
+}
+
+.folder-nodes-tab-frame > .folder-nodes-tabs {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.folder-nodes-tab-frame > button.folder-nodes-tab-arrow {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  box-sizing: border-box;
+  min-inline-size: 0;
+  block-size: auto;
+  min-block-size: 34px;
+  padding: 0;
+  color: var(--text-accent);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: var(--cursor, default);
+}
+
+.folder-nodes-tab-frame.has-overflow > button.folder-nodes-tab-arrow:not(:disabled) { display: inline-flex; }
+.folder-nodes-tab-frame > button.folder-nodes-tab-arrow:hover { background: var(--background-modifier-hover); }
+.folder-nodes-tab-arrow:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.folder-nodes-tab-arrow::before {
+  content: "";
+  box-sizing: border-box;
+  inline-size: 8px;
+  block-size: 8px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(-135deg);
+}
+
+.folder-nodes-tab-arrow[data-direction="right"]::before {
+  transform: rotate(45deg);
+}
+
 .folder-nodes-tabs {
   align-items: stretch;
   border-block-end: 1px solid var(--background-modifier-border);
@@ -57,9 +103,24 @@ body {
   font-weight: inherit;
   block-size: auto;
   min-block-size: 34px;
-  margin: 0 0 -1px !important;
+  margin: 0 !important;
   padding: 7px 12px !important;
   white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .folder-nodes-tabs {
+    --interactive-accent: Highlight;
+  }
+
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab[aria-selected="false"] {
+    border-block-end-color: Canvas !important;
+  }
+}
+
+@media (pointer: coarse) {
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-inline-size: 44px; min-block-size: 44px; }
+  .folder-nodes-tab-frame > button.folder-nodes-tab-arrow { flex-basis: 44px; min-block-size: 44px; }
 }
 
 .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab:focus-visible {
@@ -319,6 +380,7 @@ body {
 .folder-nodes-emoji-font-preview-label { color: var(--text-muted); }
 .folder-nodes-emoji-font-preview-sample {
   min-width: 0;
+  max-inline-size: 100%;
   overflow: hidden;
   font-family: var(--folder-nodes-emoji-font);
   font-size: 1.25rem;
@@ -398,6 +460,9 @@ body {
 }
 
 .folder-nodes-settings-support a {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
   cursor: var(--cursor, default);
 }
 .folder-nodes-leaf-indicator > svg { visibility: hidden; }
@@ -1214,7 +1279,6 @@ button.folder-nodes-current:focus-visible {
   .folder-nodes-more,
   .folder-nodes-action { min-height: 44px; }
 
-  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-block-size: 44px; }
   .folder-nodes-explorer-root { min-block-size: 52px; }
   .folder-nodes-explorer-root.has-hidden-visibility {
     grid-template-columns: 22px minmax(0, 1fr) max-content 44px !important;
@@ -1235,4 +1299,50 @@ button.folder-nodes-current:focus-visible {
 .folder-nodes-settings-guide-brief {
   color: var(--text-muted); font-size: var(--font-ui-small);
   line-height: 1.45; margin-block: var(--size-4-2);
+}
+
+@container folder-nodes-tab-frame (max-width: 600px) {
+  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { padding-inline: 8px !important; }
+}
+
+/* Keep Obsidian's intrinsic-width probe out of the panel's scroll area. */
+.folder-nodes-tab-panel select.dropdown.is-measuring {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+}
+
+@container (max-width: 640px) {
+  .folder-nodes-tab-panel .setting-item:has(button, select, input:not([type="checkbox"])) {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--size-2-2);
+  }
+
+  .folder-nodes-tab-panel .setting-item-info {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .folder-nodes-tab-panel .setting-item-control {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    flex-wrap: wrap;
+  }
+
+  .folder-nodes-tab-panel .setting-item-control > :is(button, input, select):not(.is-measuring) {
+    max-inline-size: 100%;
+  }
+
+  .folder-nodes-tab-panel .setting-item-control > button {
+    block-size: auto;
+    min-block-size: var(--input-height);
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+.folder-nodes-settings .checkbox-container:has(input:focus-visible) {
+  outline: var(--toggle-border-width, 2px) solid var(--background-modifier-border-focus);
 }

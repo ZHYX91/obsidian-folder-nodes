@@ -82,7 +82,7 @@ import { buildNodeGraphVisibleScene, estimateNodeGraphRangeNodeCount } from "../
 import type { NodeGraphDimension, NodeGraphSettings } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
-import { t } from "./i18n";
+import { interfaceTextDirection, resolvedLanguage, t } from "./i18n";
 import { observeNodeGraphDomViewport } from "./node-graph-dom-viewport";
 import { renderNodeGraphToolbar, updateNodeGraphToolbar, type NodeGraphToolbarLabels, type NodeGraphToolbarModel } from "./node-graph-toolbar";
 import {
@@ -459,13 +459,14 @@ export class FolderNodeGraphView extends ItemView {
     else for (const child of [...this.contentEl.children]) {
       if (child !== retainedToolbar) child.remove();
     }
+    this.contentEl.lang = resolvedLanguage();
     this.contentEl.addClass("folder-nodes-node-graph-view");
     this.contentEl.removeClass("is-canvas-graph");
     this.contentEl.toggleClass("is-3d", this.dimension === "3d");
     this.contentEl.toggleClass("is-top-to-bottom", this.settings().layoutDirection === "top-to-bottom");
 
     if (!this.settings().enabled) {
-      this.contentEl.createDiv({ cls: "folder-nodes-node-graph-disabled", text: label("disabledGraph"), attr: { role: "status" } });
+      this.contentEl.createDiv({ cls: "folder-nodes-node-graph-disabled", text: label("disabledGraph"), attr: { dir: interfaceTextDirection(), role: "status" } });
       return;
     }
 
@@ -475,8 +476,9 @@ export class FolderNodeGraphView extends ItemView {
     this.contentEl.style.setProperty("--folder-nodes-node-graph-card-height", `${data.layout.nodeHeight}px`);
     this.denseThreeD = this.dimension === "3d" && data.model.nodes.length > NODE_GRAPH_DENSE_3D_THRESHOLD;
     this.contentEl.toggleClass("is-dense-3d", this.denseThreeD);
-    if (retainedToolbar === null) this.renderToolbar();
-    else {
+    const toolbar = retainedToolbar ?? this.renderToolbar();
+    toolbar.dir = interfaceTextDirection();
+    if (retainedToolbar !== null) {
       updateNodeGraphToolbar(retainedToolbar, this.toolbarModel(), this.toolbarLabels());
       this.updateScopeControls();
     }

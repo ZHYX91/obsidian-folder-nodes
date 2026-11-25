@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, type DropdownComponent, type ExtraButtonComponent, type Setting, type SettingDefinitionItem } from "obsidian";
 
 import type FolderNodesPlugin from "./plugin";
 import { isEmojiFontPreference, SYSTEM_EMOJI_FONT, type EmojiFontFamily } from "../core/emoji-font";
@@ -10,7 +10,9 @@ import {
   lockSettingsPanel,
   renderSettingsPersistenceStatus,
 } from "./settings-persistence-status";
+import { LabeledSetting } from "../ui/labeled-setting";
 import { PromptModal } from "../ui/prompt-modal";
+import { addSettingsTabArrows } from "../ui/settings-tab-arrows";
 import { detectInstalledEmojiFonts } from "../ui/emoji-fonts";
 import { formatError, interfaceTextDirection, resolvedLanguage, t } from "../ui/i18n";
 import { isInterfaceLanguage, languageOptions } from "../core/interface-languages";
@@ -28,12 +30,12 @@ const ENABLE_DECLARATIVE_SETTINGS = false;
 const PANEL_ID = "folder-nodes-settings-panel";
 
 export class FolderNodesSettingTab extends PluginSettingTab {
+  private removeTabArrows?: () => void;
   private activeTab: TabId = "general";
   private readonly expandedGuides = new Set<TabId>();
   private currentGuide: { tab: TabId; element: HTMLDetailsElement } | null = null;
   private installedEmojiFonts: EmojiFontFamily[] | null = null;
   private emojiFontScan: Promise<EmojiFontFamily[]> | null = null;
-  private emojiFontScanGeneration = 0;
 
   public constructor(app: App, private readonly plugin: FolderNodesPlugin) { super(app, plugin); }
 
@@ -143,6 +145,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public override hide(): void {
+    this.removeTabArrows?.();
+    delete this.removeTabArrows;
     this.expandedGuides.clear();
     this.currentGuide = null;
     this.plugin.setSettingsDocument(null);
@@ -150,12 +154,18 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public override display(): void {
+    const active = this.containerEl.ownerDocument.activeElement;
+    const focusKey = active && this.containerEl.contains(active)
+      ? active.closest<HTMLElement>("[data-folder-nodes-setting-key]")?.dataset.folderNodesSettingKey
+      : undefined;
+    const scrollTop = this.containerEl.scrollTop;
     if (this.currentGuide) {
       const { tab, element } = this.currentGuide;
       if (element.open) this.expandedGuides.add(tab);
       else this.expandedGuides.delete(tab);
       this.currentGuide = null;
     }
+    this.removeTabArrows?.();
     this.plugin.setSettingsDocument(this.containerEl.ownerDocument);
     this.containerEl.empty();
     this.containerEl.addClass("folder-nodes-settings");
@@ -166,11 +176,13 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       attr: { role: "tablist", "aria-label": t("settings"), "aria-orientation": "horizontal" },
     });
     for (const id of TABS) this.addTabButton(tabs, id, this.tabLabel(id));
+    this.removeTabArrows = addSettingsTabArrows(tabs, interfaceTextDirection(), t("showEarlierTabs"), t("showMoreTabs"));
     const panel = this.containerEl.createDiv({
       cls: "folder-nodes-tab-panel",
       attr: { id: PANEL_ID, role: "tabpanel", "aria-labelledby": this.tabId(this.activeTab), tabindex: "0" },
     });
     const compatibility = this.plugin.getSettingsCompatibility();
+    if (compatibility.status === "incompatible") panel.setAttribute("aria-disabled", "true");
     const status = panel.createDiv({ cls: "folder-nodes-settings-persistence-status" });
     renderSettingsPersistenceStatus(
       status,
@@ -184,7 +196,13 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     else if (this.activeTab === "naming") this.renderNaming(panel);
     else this.renderNodeGraph(panel);
     lockSettingsPanel(panel, compatibility.status === "incompatible");
-    this.revealActiveTab(tabs);
+    if (focusKey !== undefined) {
+      const rows = panel.querySelectorAll<HTMLElement>("[data-folder-nodes-setting-key]");
+      const row = Array.from(rows).find((element) => element.dataset.folderNodesSettingKey === focusKey);
+      row?.querySelector<HTMLElement>('select:not(:disabled), input:not(:disabled), [role="switch"]:not([aria-disabled="true"])')
+        ?.focus({ preventScroll: true });
+      this.containerEl.scrollTop = scrollTop;
+    }
   }
 
   public refreshPersistenceStatus(): void {
@@ -238,10 +256,6 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private selectTab(id: TabId, focus: boolean): void {
     if (this.activeTab !== id) { this.activeTab = id; this.display(); }
     if (focus) this.containerEl.querySelector<HTMLElement>(`#${this.tabId(id)}`)?.focus({ preventScroll: true });
-  }
-
-  private revealActiveTab(container: HTMLElement): void {
-    container.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   private tabLabel(id: TabId): string {
@@ -357,27 +371,26 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderGeneral(panel: HTMLElement): void {
-    new Setting(panel).setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
+    new LabeledSetting(panel).setFocusKey("language").setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
       .addOptions(languageOptions(t("auto"))).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value as typeof this.plugin.settings.language;
         await this.plugin.applyLanguageSetting();
         new Notice(t("reloadLanguage"));
         this.display();
       }));
-    new Setting(panel).setName(t("applyHiddenNodes")).setDesc(t("applyHiddenNodesDesc")).addToggle((toggle) => toggle
-      .setValue(this.plugin.settings.hiddenNodesEnabled).onChange(async (value) => {
+    new LabeledSetting(panel).setName(t("applyHiddenNodes")).setDesc(t("applyHiddenNodesDesc")).addSwitch(this.plugin.settings.hiddenNodesEnabled, async (value) => {
         this.plugin.settings.hiddenNodesEnabled = value;
         await this.plugin.saveSettings();
         await this.plugin.reconcileSettingsChange();
-      }));
-    new Setting(panel).setName(t("enableHomepage")).setDesc(t("enableHomepageDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.homepageEnabled).onChange(async (value) => {
+      });
+    new LabeledSetting(panel).setFocusKey("homepageEnabled").setName(t("enableHomepage")).setDesc(t("enableHomepageDesc")).addSwitch(this.plugin.settings.homepageEnabled, async (value) => {
       this.plugin.settings.homepageEnabled = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals(); this.display();
-    }));
-    if (this.plugin.settings.homepageEnabled) new Setting(panel).setName(t("openHomepageOnStartup")).setDesc(t("openHomepageOnStartupDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.openHomepageOnStartup).onChange(async (value) => {
+    });
+    if (this.plugin.settings.homepageEnabled) new LabeledSetting(panel).setName(t("openHomepageOnStartup")).setDesc(t("openHomepageOnStartupDesc")).addSwitch(this.plugin.settings.openHomepageOnStartup, async (value) => {
       this.plugin.settings.openHomepageOnStartup = value; await this.plugin.saveSettings();
-    }));
-    new Setting(panel).setName(t("openHomepage")).setDesc(t("openHomepageDesc")).addButton((button) => button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()));
-    const support = new Setting(panel).setName(t("helpAndSupport")).setClass("folder-nodes-settings-support");
+    });
+    new LabeledSetting(panel).setName(t("openHomepage")).setDesc(t("openHomepageDesc")).addButton((button) => button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()));
+    const support = new LabeledSetting(panel).setName(t("helpAndSupport")).setClass("folder-nodes-settings-support");
     const locale = resolvedLanguage();
     const guide = locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`;
     support.controlEl.createEl("a", {
@@ -405,16 +418,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("managementGuideBoundary") });
     this.renderUnmanagedGroup(panel, "leaf");
     this.renderUnmanagedGroup(panel, "folder");
-    new Setting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
-    new Setting(panel)
+    new LabeledSetting(panel).setName(t("structureMaintenance")).setDesc(t("structureMaintenanceDesc")).setHeading();
+    new LabeledSetting(panel)
       .setName(t("batchOrganize"))
       .setDesc(t("batchOrganizeDesc"))
       .addButton((button) => button.setCta().setButtonText(t("previewOrganizePlan")).onClick(() => this.plugin.openBatchOrganize()));
-    new Setting(panel)
+    new LabeledSetting(panel)
       .setName(t("propertyMigration"))
       .setDesc(t("propertyMigrationDesc"))
       .addButton((button) => button.setButtonText(t("previewPropertyMigration")).onClick(() => this.plugin.openPropertyMigration()));
-    new Setting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
+    new LabeledSetting(panel).setName(t("health")).setDesc(t("healthDesc")).addButton((button) => button.setButtonText(t("health")).onClick(() => this.plugin.showHealth()));
     const body = this.createGuide(panel, t("managementGuideTitle"));
     body.createEl("p", { text: t("managementGuideStructure") });
     body.createEl("p", { text: t("managementGuideActions") });
@@ -424,50 +437,71 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideIntro") });
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("iconGuideRootNote") });
     this.renderEmojiFontSetting(panel);
-    new Setting(panel).setName(t("iconInheritance")).setDesc(t("iconInheritanceDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.iconInheritance).onChange(async (value) => {
+    new LabeledSetting(panel).setName(t("iconInheritance")).setDesc(t("iconInheritanceDesc")).addSwitch(this.plugin.settings.iconInheritance, async (value) => {
       this.plugin.settings.iconInheritance = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
-    }));
-    new Setting(panel).setName(t("explorerIconPosition")).setDesc(t("explorerIconPositionDesc")).addDropdown((dropdown) => dropdown.addOptions({ before: t("beforeName"), after: t("afterName"), hidden: t("hidden") }).setValue(this.plugin.settings.explorerIconPosition).onChange(async (value) => {
+    });
+    new LabeledSetting(panel).setName(t("explorerIconPosition")).setDesc(t("explorerIconPositionDesc")).addDropdown((dropdown) => dropdown.addOptions({ before: t("beforeName"), after: t("afterName"), hidden: t("hidden") }).setValue(this.plugin.settings.explorerIconPosition).onChange(async (value) => {
       this.plugin.settings.explorerIconPosition = value as typeof this.plugin.settings.explorerIconPosition; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
     }));
-    new Setting(panel).setName(t("showIconInNoteTitle")).setDesc(t("showIconInNoteTitleDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.showIconInNoteTitle).onChange(async (value) => {
+    new LabeledSetting(panel).setName(t("showIconInNoteTitle")).setDesc(t("showIconInNoteTitleDesc")).addSwitch(this.plugin.settings.showIconInNoteTitle, async (value) => {
       this.plugin.settings.showIconInNoteTitle = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals();
-    }));
+    });
     this.renderIconGuide(panel);
   }
 
   private renderEmojiFontSetting(panel: HTMLElement): void {
-    const current = this.plugin.settings.emojiFont;
-    const installed = this.installedEmojiFonts;
-    const unavailable = installed !== null && current !== SYSTEM_EMOJI_FONT && !installed.includes(current);
-    const options: Record<string, string> = { [SYSTEM_EMOJI_FONT]: t("systemDefault") };
-    for (const family of installed ?? []) options[family] = family;
-    if (current !== SYSTEM_EMOJI_FONT && options[current] === undefined) {
-      options[current] = `${current} · ${t("fontUnavailable")}`;
-    }
-
-    const description = unavailable
-      ? `${t("emojiFontDesc")} ${t("emojiFontUnavailable")}`
-      : installed === null ? `${t("emojiFontDesc")} ${t("detectingFonts")}` : t("emojiFontDesc");
-    new Setting(panel)
-      .setName(t("emojiFont"))
-      .setDesc(description)
-      .addDropdown((dropdown) => dropdown
-        .addOptions(options)
-        .setValue(current)
-        .setDisabled(installed === null)
-        .onChange(async (value) => {
-          if (!isEmojiFontPreference(value)) return;
-          this.plugin.settings.emojiFont = value;
-          await this.plugin.saveSettings();
-          this.plugin.applyEmojiFontSetting();
-          this.display();
-        }))
-      .addExtraButton((button) => button
-        .setIcon("refresh-cw")
-        .setTooltip(t("redetectFonts"))
-        .setDisabled(installed === null)
-        .onClick(() => this.restartEmojiFontScan()));
+    const row = new LabeledSetting(panel).setName(t("emojiFont"));
+    let dropdown: DropdownComponent;
+    let refresh: ExtraButtonComponent;
+    const update = (): void => {
+      const installed = this.installedEmojiFonts;
+      const current = this.plugin.settings.emojiFont;
+      const unavailable = installed !== null && current !== SYSTEM_EMOJI_FONT && !installed.includes(current);
+      const options: Record<string, string> = { [SYSTEM_EMOJI_FONT]: t("systemDefault") };
+      for (const family of installed ?? []) options[family] = family;
+      if (current !== SYSTEM_EMOJI_FONT && options[current] === undefined) {
+        options[current] = unavailable ? `${current} · ${t("fontUnavailable")}` : current;
+      }
+      const status = installed === null ? t("detectingFonts") : unavailable ? t("emojiFontUnavailable") : "";
+      row.setDesc([t("emojiFontDesc"), status].filter(Boolean).join(" "));
+      const readOnly = this.plugin.getSettingsCompatibility().status === "incompatible";
+      const disabled = installed === null || readOnly;
+      dropdown.selectEl.replaceChildren();
+      dropdown.addOptions(options).setValue(current).setDisabled(disabled);
+      // The host removes tabindex from disabled icon buttons. Keep keyboard focus
+      // on a rescan already in progress while exposing its unavailable state.
+      refresh.setDisabled(readOnly);
+      refresh.extraSettingsEl.classList.toggle("is-disabled", disabled);
+      refresh.extraSettingsEl.setAttribute("aria-disabled", String(disabled));
+    };
+    const scan = async (): Promise<void> => {
+      if (this.emojiFontScan === null) {
+        this.installedEmojiFonts = null;
+        this.emojiFontScan = detectInstalledEmojiFonts().then((families) => {
+          this.installedEmojiFonts = families;
+          this.emojiFontScan = null;
+          return families;
+        });
+      }
+      update();
+      await this.emojiFontScan;
+      if (this.containerEl.contains(row.settingEl)) update();
+    };
+    row.addDropdown((control) => {
+      dropdown = control;
+      control.onChange(async (value) => {
+        if (!isEmojiFontPreference(value)) return;
+        this.plugin.settings.emojiFont = value;
+        await this.plugin.saveSettings();
+        this.plugin.applyEmojiFontSetting();
+        if (this.containerEl.contains(row.settingEl)) update();
+      });
+    }).addNamedAction(t("redetectFonts"), (button) => {
+      refresh = button;
+      button.setIcon("refresh-cw").onClick(() => {
+        if (this.emojiFontScan === null) void scan();
+      });
+    });
 
     const preview = panel.createDiv({ cls: "folder-nodes-emoji-font-preview" });
     preview.createSpan({ cls: "folder-nodes-emoji-font-preview-label", text: t("emojiFontPreview") });
@@ -477,34 +511,14 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       attr: { lang: "zxx" },
     });
 
-    if (installed === null) this.startEmojiFontScan(panel);
-  }
-
-  private startEmojiFontScan(panel: HTMLElement): void {
-    if (this.emojiFontScan !== null) return;
-    const generation = ++this.emojiFontScanGeneration;
-    const scan = detectInstalledEmojiFonts();
-    this.emojiFontScan = scan;
-    void scan.then((families) => {
-      if (generation === this.emojiFontScanGeneration) this.installedEmojiFonts = families;
-    }).finally(() => {
-      if (generation !== this.emojiFontScanGeneration) return;
-      this.emojiFontScan = null;
-      if (panel.isConnected && this.activeTab === "icons") this.display();
-    });
-  }
-
-  private restartEmojiFontScan(): void {
-    this.emojiFontScanGeneration += 1;
-    this.emojiFontScan = null;
-    this.installedEmojiFonts = null;
-    this.display();
+    if (this.installedEmojiFonts === null) void scan();
+    else update();
   }
 
   private renderIconGuide(panel: HTMLElement): void {
     const body = this.createGuide(panel, t("iconGuideTitle"));
     const format = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
-    new Setting(format).setName(t("iconGuideFormatTitle")).setHeading();
+    new LabeledSetting(format).setName(t("iconGuideFormatTitle")).setHeading();
     format.createEl("p", { text: t("iconGuideFormats") });
     const example = format.createDiv({ cls: "folder-nodes-settings-guide-example" });
     example.createSpan({ text: t("iconPropertyExampleLabel") });
@@ -517,11 +531,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     this.renderIconComparisonRow(comparison, t("characterInFilename"), "", "📓 Project", false);
 
     const order = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
-    new Setting(order).setName(t("iconGuideOrderTitle")).setHeading();
+    new LabeledSetting(order).setName(t("iconGuideOrderTitle")).setHeading();
     order.createEl("p", { text: t("iconGuideOrder") });
 
     const color = body.createEl("section", { cls: "folder-nodes-icon-guide-section" });
-    new Setting(color).setName(t("iconGuideColorTitle")).setHeading();
+    new LabeledSetting(color).setName(t("iconGuideColorTitle")).setHeading();
     color.createEl("p", { text: t("iconColorBehavior") });
   }
 
@@ -539,15 +553,15 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private renderNaming(panel: HTMLElement): void {
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideSelection") });
     panel.createEl("p", { cls: "folder-nodes-settings-guide-brief", text: t("creationGuideScope") });
-    new Setting(panel).setName(t("confirmSelectionCreation")).setDesc(t("confirmSelectionCreationDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.confirmSelectionCreation).onChange(async (value) => {
+    new LabeledSetting(panel).setName(t("confirmSelectionCreation")).setDesc(t("confirmSelectionCreationDesc")).addSwitch(this.plugin.settings.confirmSelectionCreation, async (value) => {
       this.plugin.settings.confirmSelectionCreation = value; await this.plugin.saveSettings();
-    }));
-    new Setting(panel).setName(t("createNodesFromLinks")).setDesc(t("createNodesFromLinksDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.createNodesFromLinks).onChange(async (value) => {
+    });
+    new LabeledSetting(panel).setName(t("createNodesFromLinks")).setDesc(t("createNodesFromLinksDesc")).addSwitch(this.plugin.settings.createNodesFromLinks, async (value) => {
       this.plugin.settings.createNodesFromLinks = value; await this.plugin.saveSettings();
-    }));
-    new Setting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.addSelectionAlias).onChange(async (value) => {
+    });
+    new LabeledSetting(panel).setName(t("aliases")).setDesc(t("aliasesDesc")).addSwitch(this.plugin.settings.addSelectionAlias, async (value) => {
       this.plugin.settings.addSelectionAlias = value; await this.plugin.saveSettings();
-    }));
+    });
     this.renderNamingGuide(panel);
     this.renderNamingPart(panel, t("prefix"), this.plugin.settings.prefix);
     this.renderNamingPart(panel, t("suffix"), this.plugin.settings.suffix);
@@ -558,21 +572,22 @@ export class FolderNodesSettingTab extends PluginSettingTab {
 
   private renderNodeGraph(panel: HTMLElement): void {
     const settings = this.plugin.settings.nodeGraph;
-    new Setting(panel)
+    new LabeledSetting(panel)
+      .setFocusKey("nodeGraphEnabled")
       .setName(t("enableNodeGraph"))
       .setDesc(t("enableNodeGraphDesc"))
-      .addToggle((toggle) => toggle.setValue(settings.enabled).onChange(async (value) => {
+      .addSwitch(settings.enabled, async (value) => {
         settings.enabled = value;
         await this.saveNodeGraphSettings(true);
         this.display();
-      }));
+      });
     if (!settings.enabled) {
       panel.createEl("p", { cls: "setting-item-description", text: t("nodeGraphDisabledDesc") });
       return;
     }
 
-    new Setting(panel).setName(t("nodeGraphDefaults")).setDesc(t("nodeGraphDefaultsDesc")).setHeading();
-    new Setting(panel).setName(t("nodeGraphDefaultDimension")).addDropdown((dropdown) => dropdown
+    new LabeledSetting(panel).setName(t("nodeGraphDefaults")).setDesc(t("nodeGraphDefaultsDesc")).setHeading();
+    new LabeledSetting(panel).setName(t("nodeGraphDefaultDimension")).addDropdown((dropdown) => dropdown
       .addOptions({ "2d": "2D", "3d": "3D" })
       .setValue(settings.defaultDimension)
       .onChange(async (value) => {
@@ -580,7 +595,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         settings.defaultDimension = value;
         await this.saveNodeGraphSettings(false);
       }));
-    new Setting(panel).setName(t("nodeGraphLayoutDirection")).setDesc(t("nodeGraphLayoutDirectionDesc")).addDropdown((dropdown) => dropdown
+    new LabeledSetting(panel).setName(t("nodeGraphLayoutDirection")).setDesc(t("nodeGraphLayoutDirectionDesc")).addDropdown((dropdown) => dropdown
       .addOptions({ "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") })
       .setValue(settings.layoutDirection)
       .onChange(async (value) => {
@@ -588,7 +603,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         settings.layoutDirection = value;
         await this.saveNodeGraphSettings(true);
       }));
-    new Setting(panel).setName(t("nodeGraphPerformance")).setDesc(t("nodeGraphPerformanceDesc")).setHeading();
+    new LabeledSetting(panel).setName(t("nodeGraphPerformance")).setDesc(t("nodeGraphPerformanceDesc")).setHeading();
     this.renderGraphNumberSetting(panel, "largeGraphThreshold", t("nodeGraphCanvasThreshold"), t("nodeGraphCanvasThresholdDesc"), 50, 10_000);
     this.renderGraphNumberSetting(panel, "overviewEdgeLimit", t("nodeGraphEdgeLimit"), t("nodeGraphEdgeLimitDesc"), 100, 100_000);
 
@@ -602,7 +617,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     minimum: number,
     maximum: number,
   ): void {
-    const setting = new Setting(panel).setName(name).setDesc(description);
+    const setting = new LabeledSetting(panel).setName(name).setDesc(description);
     setting.addText((text) => {
       const input = text.inputEl;
       input.type = "number";
@@ -667,22 +682,22 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNamingPart(panel: HTMLElement, label: string, part: NamingPart): void {
-    new Setting(panel).setName(label).setHeading();
-    const enabled = new Setting(panel).setName(`${label}: ${t("enabled")}`);
+    new LabeledSetting(panel).setName(label).setHeading();
+    const enabled = new LabeledSetting(panel).setName(`${label}: ${t("enabled")}`);
     const options = panel.createDiv();
-    enabled.addToggle((toggle) => toggle.setValue(part.enabled).onChange((value) => {
+    enabled.addSwitch(part.enabled, (value) => {
       part.enabled = value;
       options.empty();
       if (value) this.renderNamingOptions(panel, options, label, part);
       this.updatePreview(panel);
       return this.plugin.saveSettings();
-    }));
+    });
     if (part.enabled) this.renderNamingOptions(panel, options, label, part);
   }
 
   private renderNamingOptions(panel: HTMLElement, options: HTMLElement, label: string, part: NamingPart): void {
-    const source = new Setting(options).setName(`${label}: ${t("source")}`);
-    new Setting(options).setName(`${label}: ${t("separator")}`).addText((text) => text.setValue(part.separator).onChange((value) => {
+    const source = new LabeledSetting(options).setName(`${label}: ${t("source")}`);
+    new LabeledSetting(options).setName(`${label}: ${t("separator")}`).addText((text) => text.setValue(part.separator).onChange((value) => {
       part.separator = value;
       this.updatePreview(panel);
       return this.plugin.saveSettings();
@@ -701,13 +716,13 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderNamingSourceInput(panel: HTMLElement, fields: HTMLElement, label: string, part: NamingPart): void {
-    if (part.source === "custom") new Setting(fields).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange((value) => {
+    if (part.source === "custom") new LabeledSetting(fields).setName(`${label}: ${t("customText")}`).addText((text) => text.setValue(part.customText).onChange((value) => {
       part.customText = value;
       this.updatePreview(panel);
       return this.plugin.saveSettings();
     }));
     if (part.source === "timestamp") {
-      const setting = new Setting(fields).setName(`${label}: ${t("timestampFormat")}`);
+      const setting = new LabeledSetting(fields).setName(`${label}: ${t("timestampFormat")}`);
       const updateDescription = (value: string) => {
         const valid = isValidMomentTimestampFormat(value);
         setting.setDesc(valid
@@ -740,26 +755,26 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private renderUnmanagedGroup(panel: HTMLElement, kind: ExemptionKind): void {
     const paths = kind === "leaf" ? this.plugin.settings.leafNoteExemptions : this.plugin.settings.ignoredFolders;
     const prefixes = kind === "leaf" ? this.plugin.settings.leafNotePrefixes : this.plugin.settings.ignoredFolderPrefixes;
-    new Setting(panel)
+    new LabeledSetting(panel)
       .setName(kind === "leaf" ? t("leafExemptions") : t("folderExemptions"))
       .setDesc(kind === "leaf" ? t("leafExemptionsDesc") : t("folderExemptionsDesc"))
       .setHeading();
-    for (const path of paths) new Setting(panel)
+    for (const path of paths) new LabeledSetting(panel)
       .setName(path)
       .setDesc(t("exactPathRule"))
-      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
+      .addNamedAction(t("remove"), (button) => button.setIcon("trash-2").onClick(() => {
         button.setDisabled(true);
         void this.removeUnmanagedRule(kind, "path", path);
       }));
-    for (const prefix of prefixes) new Setting(panel)
+    for (const prefix of prefixes) new LabeledSetting(panel)
       .setName(t("nameStartsWith", { prefix }))
       .setDesc(t("nameStartRule"))
-      .addExtraButton((button) => button.setIcon("trash-2").setTooltip(t("remove")).onClick(() => {
+      .addNamedAction(t("remove"), (button) => button.setIcon("trash-2").onClick(() => {
         button.setDisabled(true);
         void this.removeUnmanagedRule(kind, "prefix", prefix);
       }));
     if (paths.length + prefixes.length === 0) panel.createEl("p", { cls: "setting-item-description", text: t("noUnmanagedRules") });
-    new Setting(panel)
+    new LabeledSetting(panel)
       .setName(t("addRule"))
       .setDesc(t("addRuleDesc"))
       .addButton((button) => button.setButtonText(t("addPathRule")).onClick(() => this.promptExemption(kind)))

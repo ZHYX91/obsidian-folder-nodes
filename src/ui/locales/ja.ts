@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const ja: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "前のタブを表示",
+  "showMoreTabs": "次のタブを表示",
   "finalNodeName": "最終ノード名",
   "deleteFileConfirm": "Obsidian の削除設定に従ってファイル「{path}」を削除します。完全に削除する設定の場合、ゴミ箱から復元できません。",
   "deleteNodeConfirm": "Obsidian の削除設定に従ってノードフォルダー「{path}」全体を削除します。ノードノート、すべてのサブフォルダーとファイルが含まれます。完全に削除する設定の場合、ゴミ箱から復元できません。",

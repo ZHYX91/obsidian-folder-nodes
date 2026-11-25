@@ -89,6 +89,10 @@ describe("Node Contents render extension lifecycle", () => {
       view.refresh();
       expect(view.contentEl.textContent).not.toBe(english);
       expect(view.getDisplayText()).toBe(t("nodeContents"));
+      expect(view.contentEl.lang).toBe("zh-CN");
+      setLanguage("ar");
+      view.refresh();
+      expect([view.contentEl.lang, view.contentEl.dir]).toEqual(["ar", "rtl"]);
       setLanguage("en");
       view.refresh();
       expect(view.contentEl.textContent).toBe(english);

@@ -2,6 +2,8 @@
 import type { TranslationKey } from "../i18n";
 
 export const zhTW: Readonly<Record<TranslationKey, string>> = {
+  "showEarlierTabs": "顯示前面的分頁",
+  "showMoreTabs": "顯示後面的分頁",
   "finalNodeName": "最終節點名稱",
   "deleteFileConfirm": "依 Obsidian 的刪除設定刪除檔案「{path}」。若設定為永久刪除，將無法從垃圾桶還原。",
   "deleteNodeConfirm": "依 Obsidian 的刪除設定刪除節點「{path}」的整個資料夾，包括節點筆記、所有子資料夾與檔案。若設定為永久刪除，將無法從垃圾桶還原。",
