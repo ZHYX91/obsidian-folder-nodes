@@ -48,7 +48,8 @@ export class VaultOperationCoordinator {
     if (!expected.recursive) return expected.newPath === newPath && expected.oldPath === oldPath;
     if (newPath !== expected.newPath && !newPath.startsWith(`${expected.newPath}/`)) return false;
     if (expected.oldPath === null) return oldPath === null;
-    return oldPath !== null && (oldPath === expected.oldPath || oldPath.startsWith(`${expected.oldPath}/`));
+    const relativeSuffix = newPath.slice(expected.newPath.length);
+    return oldPath === expected.oldPath + relativeSuffix;
   }
 
   private pruneExpiredEvents(): void {

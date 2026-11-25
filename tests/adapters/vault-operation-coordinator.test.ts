@@ -26,6 +26,11 @@ describe("VaultOperationCoordinator", () => {
     coordinator.expect("rename", "New", "Old", true);
     expect(coordinator.consume("rename", "New/Child.md", "Old/Child.md")).toBe(true);
     expect(coordinator.consume("rename", "New/Other.md", "Elsewhere/Other.md")).toBe(false);
+    expect(coordinator.consume("rename", "New/A/B.md", "Old/B.md")).toBe(false);
+    expect(coordinator.consume("rename", "New/B.md", "Old")).toBe(false);
+    expect(coordinator.consume("rename", "Newer/B.md", "Old/B.md")).toBe(false);
+    expect(coordinator.consume("rename", "New/A.md", "Old/a.md")).toBe(false);
+    expect(coordinator.consume("rename", "New", "Old")).toBe(true);
     vi.advanceTimersByTime(2_000);
     expect(coordinator.consume("rename", "New", "Old")).toBe(false);
   });
