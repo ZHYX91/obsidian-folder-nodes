@@ -145,11 +145,16 @@
   flex: 0 1 auto;
   align-items: center;
   gap: 5px;
-  overflow: hidden;
+  min-inline-size: 0;
+  max-inline-size: 100%;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.folder-nodes-node-graph-link-summary-text {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
 }
 
 .folder-nodes-node-graph-link-swatch {
@@ -159,7 +164,6 @@
 }
 
 .folder-nodes-node-graph-link-summary.is-empty {
-  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -747,10 +751,6 @@
 
   .folder-nodes-node-graph-scope-path {
     max-width: min(180px, 30vw);
-  }
-
-  .folder-nodes-node-graph-link-summary {
-    max-width: 140px;
   }
 }
 

@@ -3,6 +3,8 @@ import { Scope } from "../mocks/obsidian";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../../src/shared/settings";
 import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
 import type { NodeGraphIndexRecord } from "../../src/core/node-graph-index-snapshot";
+import type { InterfaceLanguage } from "../../src/core/types";
+import { setLanguage } from "../../src/ui/i18n";
 
 // Only Obsidian's host objects are simulated. The production views, native
 // buttons and browser input/default-click pipeline remain real.
@@ -26,8 +28,9 @@ document.addEventListener("click", (event) => {
 
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 Object.assign(window, { graphKeyboard: {
-  async prepare(kind: string, parent: "handled" | "declined" | "unbound") {
+  async prepare(kind: string, parent: "handled" | "declined" | "unbound", layout?: { language: InterfaceLanguage; width: number }) {
     if (view !== null) { await view.onClose(); view.containerEl.remove(); }
+    setLanguage(layout?.language ?? "en");
     const records = new Map<string, NodeGraphIndexRecord>([
       ["", null], ["Work", ""], ["Work/A", "Work"], ["Work/A/Deep", "Work/A"],
     ].map(([path, parentPath]) => [path!, { path: path!, label: path || "Vault", parentPath: parentPath ?? null,
@@ -39,7 +42,7 @@ Object.assign(window, { graphKeyboard: {
     const settings = { ...structuredClone(DEFAULT_NODE_GRAPH_SETTINGS), largeGraphThreshold: kind.startsWith("dom") ? 500 : 1 };
     view = new FolderNodeGraphView({ app } as never, { openFolderNode: async (path, newLeaf) => { opens.push({ path, newLeaf: newLeaf === true }); } },
       { getIndexSnapshot: () => ({ records, links: new Map(), revision: 1 }), getSettings: () => settings, onNodeMenu: () => {} });
-    view.containerEl.style.cssText = "width:680px;height:590px";
+    view.containerEl.style.cssText = `width:${layout?.width ?? 680}px;height:590px`;
     view.contentEl.style.height = "590px";
     document.body.append(view.containerEl);
     await view.onOpen(); view.setFocus("Work");

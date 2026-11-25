@@ -6,6 +6,22 @@ await withBrowserFixture({
   stylesheet: "src/ui/node-graph.css",
   ready: "Boolean(window.graphKeyboard)",
 }, async ({ send, evaluate }) => {
+  await send("Emulation.setDeviceMetricsOverride", { width: 360, height: 780, deviceScaleFactor: 1, mobile: false });
+  for (const language of ["ar", "de"]) {
+    await evaluate(`window.graphKeyboard.prepare("dom", "unbound", {language: "${language}", width: 360})`);
+    const summary = await evaluate(`(() => {
+      document.querySelector(".folder-nodes-node-graph-links-toggle").click();
+      const status = document.querySelector(".folder-nodes-node-graph-link-summary");
+      const primary = status.parentElement.getBoundingClientRect();
+      const bounds = status.getBoundingClientRect();
+      const text = document.createRange();
+      text.selectNodeContents(status.querySelector(".folder-nodes-node-graph-link-summary-text"));
+      return { text: status.textContent, insideToolbar: bounds.left >= primary.left - 1 && bounds.right <= primary.right + 1,
+        fits: [...text.getClientRects()].every(rect => rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1) };
+    })()`);
+    assert.ok(summary.text && summary.insideToolbar && summary.fits, `${language} graph status is clipped: ${JSON.stringify(summary)}`);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
   await evaluate('window.graphKeyboard.prepare("dom", "unbound")');
   const labels = await evaluate(`Array.from(document.querySelectorAll(
     ".folder-nodes-node-graph-links-toggle, .folder-nodes-node-graph-range-button, .folder-nodes-node-graph-scope-button"
