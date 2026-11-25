@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { layoutNodeGraph3D } from "../../src/core/node-graph-3d";
 import { nodeGraphSiblingCardWidths } from "../../src/core/node-graph-card-width";
@@ -16,6 +16,13 @@ function fakeContext() {
 }
 
 describe("large Node Graph canvas renderer", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it.each(["2d", "3d"] as const)("uses tall vertical %s cards for drawing and hit testing", (dimension) => {
     const tree: NodeGraphTree = { id: "root", children: [{ id: "child", children: [] }] };
     const model = buildNodeGraphModel(tree);
@@ -115,7 +122,7 @@ describe("large Node Graph canvas renderer", () => {
     }
   });
 
-  it("renders a deterministic 20k graph with constant graph DOM and tears down", async () => {
+  it("renders a deterministic 20k graph with constant graph DOM and tears down", () => {
     const children = Array.from({ length: 19_999 }, (_, index): NodeGraphTree => ({
       id: `N${String(index).padStart(5, "0")}`,
       children: [],
@@ -148,7 +155,7 @@ describe("large Node Graph canvas renderer", () => {
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
 
     expect(model.nodes).toHaveLength(20_000);
     expect(surface.querySelectorAll("canvas")).toHaveLength(1);
@@ -166,7 +173,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("keeps a visible child's structure edge when its parent endpoint is offscreen", async () => {
+  it("keeps a visible child's structure edge when its parent endpoint is offscreen", () => {
     const tree: NodeGraphTree = { id: "", children: [{ id: "A", children: [] }] };
     const model = buildNodeGraphModel(tree);
     const layout = {
@@ -206,14 +213,14 @@ describe("large Node Graph canvas renderer", () => {
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
     context.bezierCurveTo.mockClear();
     renderer.restoreViewportState({
       camera2D: { panX: -590, panY: 0, zoom: 1 },
       camera3D: renderer.captureViewportState().camera3D,
       dimension: "2d",
     });
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
 
     const projected = (renderer as unknown as { projectedById: ReadonlyMap<string, unknown> }).projectedById;
     expect(projected.has("A")).toBe(true);
@@ -226,7 +233,7 @@ describe("large Node Graph canvas renderer", () => {
       camera3D: renderer.captureViewportState().camera3D,
       dimension: "2d",
     });
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
     expect(projected.has("")).toBe(true);
     expect(projected.has("A")).toBe(false);
     expect(context.bezierCurveTo).toHaveBeenCalledTimes(1);
@@ -236,7 +243,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("renders the fitted 20k 3D overview as dots while keeping one full focus control", async () => {
+  it("renders the fitted 20k 3D overview as dots while keeping one full focus control", () => {
     const children = Array.from({ length: 19_999 }, (_, index): NodeGraphTree => ({
       id: `N${String(index).padStart(5, "0")}`,
       children: [],
@@ -269,13 +276,13 @@ describe("large Node Graph canvas renderer", () => {
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
 
     expect(context.arc.mock.calls.length).toBeGreaterThan(0);
     expect(context.arc.mock.calls.length).toBeLessThan(20_000);
     expect(context.fillText).not.toHaveBeenCalled();
     renderer.setFocus("N19998", true);
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
     const overlay = surface.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-focus-overlay");
     expect(overlay?.hidden).toBe(false);
     expect(overlay?.dataset.nodePath).toBe("N19998");
@@ -285,7 +292,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("batches a realistic 125k-edge overview and restores every incident edge on focus", async () => {
+  it("batches a realistic 125k-edge overview and restores every incident edge on focus", () => {
     const children = Array.from({ length: 499 }, (_, index): NodeGraphTree => ({
       id: `N${String(index).padStart(3, "0")}`,
       children: [],
@@ -330,7 +337,7 @@ describe("large Node Graph canvas renderer", () => {
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
 
     expect(model.nodes).toHaveLength(500);
     expect(model.edges).toHaveLength(124_750);
@@ -348,7 +355,7 @@ describe("large Node Graph canvas renderer", () => {
     context.stroke.mockClear();
     context.roundRect.mockClear();
     renderer.setFocus("N000", false);
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
     expect(context.stroke.mock.calls.length - context.roundRect.mock.calls.length).toBeLessThanOrEqual(6);
     expect((renderer as unknown as { drawnLinkEdges: () => readonly unknown[] }).drawnLinkEdges().length).toBeGreaterThan(overviewCount);
     expect((renderer as unknown as { drawnLinkEdges: () => readonly unknown[] }).drawnLinkEdges().length).toBeLessThanOrEqual(overviewCount + 499);
@@ -358,7 +365,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("can update selection focus without recentering the 3D camera", async () => {
+  it("can update selection focus without recentering the 3D camera", () => {
     const tree: NodeGraphTree = {
       id: "",
       children: [{ id: "A", children: [] }, { id: "B", children: [] }],
@@ -548,7 +555,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("draws the 2D icon inside its reserved visual handle", async () => {
+  it("draws the 2D icon inside its reserved visual handle", () => {
     const tree: NodeGraphTree = { id: "", children: [{ id: "A", children: [] }] };
     const model = buildNodeGraphModel(tree);
     const layout = layoutNodeGraph(tree);
@@ -581,7 +588,7 @@ describe("large Node Graph canvas renderer", () => {
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
 
     expect(context.bezierCurveTo).toHaveBeenCalledTimes(1);
     expect(context.arc).toHaveBeenCalled();
@@ -619,7 +626,7 @@ describe("large Node Graph canvas renderer", () => {
     getContext.mockRestore();
   });
 
-  it("uses compact Canvas bounds, ellipsizes the drawn label, and keeps the full accessible title", async () => {
+  it("uses compact Canvas bounds, ellipsizes the drawn label, and keeps the full accessible title", () => {
     const tree: NodeGraphTree = { id: "", children: [] };
     const model = buildNodeGraphModel(tree);
     const layout = layoutNodeGraph(tree, { nodeWidths: new Map([["", 144]]) });
@@ -649,14 +656,14 @@ describe("large Node Graph canvas renderer", () => {
         relationSummary: (structure, links) => `Structure ${structure} · Links ${links}`,
       },
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
 
     expect(context.fillText.mock.calls.some(([text]) => typeof text === "string" && text.endsWith("…"))).toBe(true);
     expect(context.fillText.mock.calls.some(([text]) => text === fullLabel)).toBe(false);
     context.fillText.mockClear();
     context.roundRect.mockClear();
     renderer.setFocus("", false);
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    vi.advanceTimersToNextFrame();
     expect(context.fillText).not.toHaveBeenCalled();
     expect(context.roundRect).not.toHaveBeenCalled();
     const overlay = surface.querySelector<HTMLElement>(".folder-nodes-node-graph-focus-overlay");
