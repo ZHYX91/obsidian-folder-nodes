@@ -30,6 +30,14 @@ describe("ReferenceIndex", () => {
     expect(index.isReferenced("Shared.md")).toBe(false);
   });
 
+  it("clears descendant contributions on a folder-only delete", () => {
+    const index = new ReferenceIndex();
+    index.rebuild({ "Projects/deep/note.md": { "diagram.png": 1 }, "Projects-old/note.md": { "keep.png": 1 } });
+    expect(index.removeSource("Projects", true)).toEqual(new Set(["diagram.png"]));
+    expect(index.isReferenced("diagram.png")).toBe(false);
+    expect(index.isReferenced("keep.png")).toBe(true);
+  });
+
   it("tracks inbound source paths incrementally", () => {
     const index = new ReferenceIndex();
     index.rebuild({

@@ -45,7 +45,7 @@ import { RuntimeStyles } from "../ui/runtime-styles";
 import { onLayoutReadyOnce } from "./layout-ready";
 import { DocumentEventRegistry } from "./document-event-registry";
 import { claimPeriodicLink, interceptLinkNavigation, type OpenLinkArgs } from "./link-navigation";
-import { folderNodesMetadataFingerprint, registerFolderNodesMetadataEvents } from "./metadata-refresh";
+import { folderNodesMetadataFingerprint, moveFolderNodesReferences, registerFolderNodesMetadataEvents } from "./metadata-refresh";
 import { FolderNodesSettingTab } from "./settings-tab";
 import { openPluginSettings } from "../adapters/plugin-settings";
 import { RefreshScheduler, type RefreshBatch, type RefreshReason } from "./refresh-scheduler";
@@ -560,7 +560,7 @@ export default class FolderNodesPlugin extends Plugin {
     }));
     this.registerEvent(this.app.vault.on("delete", (entry) => {
       this.removeMetadataFingerprints(entry.path, entry instanceof TFolder);
-      const affected = this.references.removeSource(entry.path);
+      const affected = this.references.removeSource(entry.path, entry instanceof TFolder);
       for (const path of affected) this.refreshVisuals(path, "reference");
       if (this.service.consumeExpectedEvent("delete", entry.path)) { this.refreshVisuals(entry.path); return; }
       this.scheduleReconcile(entry.path, "delete");
@@ -568,7 +568,7 @@ export default class FolderNodesPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
       this.remapMetadataFingerprints(entry.path, oldPath, entry instanceof TFolder);
       this.remapUnmanagedPaths(entry, oldPath);
-      const affected = this.references.removeSource(oldPath);
+      const affected = moveFolderNodesReferences(this.references, entry, oldPath, this.app.metadataCache.resolvedLinks);
       for (const path of affected) this.refreshVisuals(path, "reference");
       if (this.service.consumeExpectedEvent("rename", entry.path, oldPath)) {
         this.refreshVisuals(oldPath);
@@ -618,16 +618,26 @@ export default class FolderNodesPlugin extends Plugin {
 
   private removeMetadataFingerprints(path: string, recursive: boolean): void {
     const normalized = normalizeVaultPath(path);
-    for (const key of [...this.metadataFingerprints.keys()]) {
-      if (key === normalized || (recursive && key.startsWith(`${normalized}/`))) this.metadataFingerprints.delete(key);
+    this.metadataFingerprints.delete(normalized);
+    if (!recursive) return;
+    for (const key of this.metadataFingerprints.keys()) {
+      if (key.startsWith(`${normalized}/`)) this.metadataFingerprints.delete(key);
     }
   }
 
   private remapMetadataFingerprints(newPath: string, oldPath: string, recursive: boolean): void {
     const normalizedNew = normalizeVaultPath(newPath);
     const normalizedOld = normalizeVaultPath(oldPath);
+    if (!recursive) {
+      const fingerprint = this.metadataFingerprints.get(normalizedOld);
+      if (fingerprint !== undefined) {
+        this.metadataFingerprints.delete(normalizedOld);
+        this.metadataFingerprints.set(normalizedNew, fingerprint);
+      }
+      return;
+    }
     for (const [key, fingerprint] of [...this.metadataFingerprints]) {
-      if (key !== normalizedOld && (!recursive || !key.startsWith(`${normalizedOld}/`))) continue;
+      if (!key.startsWith(`${normalizedOld}/`)) continue;
       this.metadataFingerprints.delete(key);
       const suffix = key.slice(normalizedOld.length);
       this.metadataFingerprints.set(`${normalizedNew}${suffix}`, fingerprint);

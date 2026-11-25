@@ -50,7 +50,17 @@ export class ReferenceIndex {
     return affected;
   }
 
-  public removeSource(sourcePath: string): Set<string> { return this.updateSource(sourcePath, {}); }
+  public removeSource(sourcePath: string, recursive = false): Set<string> {
+    if (!recursive) return this.updateSource(sourcePath, {});
+    const prefix = normalizeVaultPath(sourcePath) + "/";
+    const affected = new Set<string>();
+    for (const source of this.sources.keys()) {
+      if (!source.startsWith(prefix)) continue;
+      for (const target of this.updateSource(source, {})) affected.add(target);
+    }
+    return affected;
+  }
+
   public isReferenced(path: string): boolean { return (this.counts.get(normalizeVaultPath(path)) ?? 0) > 0; }
   public targetsForSource(path: string): readonly string[] {
     return [...(this.sources.get(normalizeVaultPath(path))?.keys() ?? [])];

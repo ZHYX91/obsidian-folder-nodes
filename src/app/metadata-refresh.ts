@@ -3,7 +3,7 @@ import {
   ICON_PROPERTY,
   LEGACY_FOLDER_NODES_PROPERTIES,
 } from "../core/properties";
-import type { MetadataCache } from "obsidian";
+import { TFolder, type MetadataCache, type TAbstractFile } from "obsidian";
 import type { ReferenceIndex } from "../core/reference-index";
 
 export function registerFolderNodesMetadataEvents(
@@ -53,4 +53,23 @@ function stableValue(value: unknown): unknown {
   }
   if (typeof value === "number" && !Number.isFinite(value)) return String(value);
   return value;
+}
+
+export function moveFolderNodesReferences(
+  index: ReferenceIndex, entry: TAbstractFile, oldPath: string, resolved: MetadataCache["resolvedLinks"],
+): Set<string> {
+  const affected = index.removeSource(oldPath, entry instanceof TFolder);
+  const pending = [entry];
+  while (pending.length > 0) {
+    const moved = pending.pop()!;
+    if (moved instanceof TFolder) {
+      for (const child of moved.children) pending.push(child);
+    } else {
+      // A previously unresolved relative link may first acquire a target here.
+      const targets = resolved[moved.path];
+      if (targets === undefined) continue;
+      for (const path of index.updateSource(moved.path, targets)) affected.add(path);
+    }
+  }
+  return affected;
 }

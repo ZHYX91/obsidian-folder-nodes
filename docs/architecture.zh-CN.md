@@ -17,6 +17,8 @@ translation_status: source
 
 Core 只处理路径、命名、不管理边界规则、批量整理计划、反向引用索引、稀疏排序、frontmatter 最小 patch、Visual declaration 解析，以及节点图谱的纯可见性/几何。命名 Core 只验证公开的 Obsidian/Moment 子集并接收注入的时间格式化函数；真正的 `moment(date).format(pattern)` 位于 Obsidian adapter 边界。Adapters 封装 Vault、Metadata Cache、File Explorer、资源 URI 与 Node 操作；VaultOperationCoordinator 独立负责结构写入串行化和内部事件归属。Presentation 放置 Explorer、设置页与 UI 共用的宿主 DOM 渲染器，避免反向跨越各自分层边界。UI/App 提供本地化、设置、命令、菜单、弹窗、Visual Picker、Contents View、节点图谱状态/渲染与批量刷新调度。节点图谱只采用有界的 `GraphIndex → ViewState → VisibleScene → renderer` 流程，不扩展成全插件数据抽象。公开仓库不依赖本地工作区或个人 Vault。
 
+引用计数随文件和文件夹事件更新。删除文件夹会清除其下笔记对引用计数的贡献。移动后，索引按新路径读取宿主已解析的链接，并在其余笔记的元数据就绪后继续更新。
+
 ## 排序引擎
 
 自然模式按 Unicode 规范化 basename 做 numeric-aware 排序且不写 token。手动子节点排序是父节点上的显式模式：把一个完整父节点切换为手动时写入 `order=manual`，并按当时的自然顺序以 1024 间隔为直接 Child Nodes 物化正整数 `rank=N`。存在安全空隙时，普通 placement 只 patch moved Child；若 rank 缺失、重复、间隙耗尽或接近安全整数边界，规划器先确定完整目标序列，再严格按该序列整体重新编号，绝不在重编号阶段按旧 rank 重新排序。普通结构移入不会把自然父节点隐式切换为手动；恢复自然排序只删除父节点模式 token，非活动 rank 被忽略，之后再次开启手动也不会复活旧序列。
