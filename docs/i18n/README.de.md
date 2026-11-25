@@ -15,7 +15,7 @@ Alternativ legen Sie `main.js`, `manifest.json` und `styles.css` aus derselben V
 1. Sichern Sie Ihren Vault und öffnen Sie die Bereiche „Allgemein“ und „Verwaltung“ in den Folder-Nodes-Einstellungen.
 2. Prüfen Sie, ob im Ordner A die gleichnamige Notiz A/A.md liegt. Fehlende Bestandteile erstellen Sie bei Bedarf selbst oder markieren den Eintrag als „Nicht verwaltet“.
 3. Mit „Neuer Knoten“ erstellen Sie Ordner und Notiz zusammen. Ein Klick auf den Ordnernamen öffnet seine Knotennotiz. Unter „Knoteninhalte“ finden Sie Unterknoten, Bilder, Videos und weitere Dateien.
-4. Öffnen Sie den Node Graph: „Global“ zeigt alle verwalteten Knoten, „Unterbaum“ den gewählten Knoten mit Nachkommen und „Lokal“ sein Umfeld. Sie können 2D/3D und die Link-Überlagerung ein- oder ausschalten.
+4. Öffnen Sie den Knotengrafen: „Gesamt“ zeigt alle verwalteten Knoten, „Unterbaum“ den gewählten Knoten mit Nachkommen und „Umgebung“ sein Umfeld. Sie können 2D/3D und die Link-Überlagerung ein- oder ausschalten.
 
 Am Desktop können Sie in **Knoteninhalt** die Karten unter demselben Elternknoten durch Ziehen umsortieren. Soll ein Knoten einen anderen Elternknoten erhalten, ziehen Sie ihn im Datei-Explorer auf den Zielordner. Für eine genaue Position vor oder nach einem Nachbarknoten muss der Elternknoten die manuelle Sortierung verwenden. Unter Android können Sie Knoten über das Menü verschieben oder umsortieren.
 
@@ -29,13 +29,13 @@ Scheitert das Erstellen nach dem Anlegen einer Notiz, werden nur nachweislich un
 
 ## Screenshots
 
-Die Bilder zeigen Knoteninhalte, den Datei-Explorer, den Node Graph sowie die Einstellungen für Symbole, Auswahl und Namen.
+Die Bilder zeigen Knoteninhalte, den Datei-Explorer, den Knotengrafen sowie die Einstellungen für Symbole, Auswahl und Namen.
 
 ![Knoteninhalte mit Kindern, Medien und Dateien](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
 ![Obsidian-Dateiexplorer mit Knotenstatus](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph mit Ordnerhierarchie](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Knotengraf mit Ordnerhierarchie](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ![Einstellungen für Knotensymbole und Darstellung](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
@@ -49,9 +49,9 @@ Dieses Beispiel zeigt die Einstellungen für Namen und Aliase. Die aktuelle Seit
 
 Folder Nodes verbindet einen Obsidian-Ordner mit seiner gleichnamigen Markdown-Notiz. Der Ordner A und die Datei A/A.md ergeben einen vollständigen Knoten. Wenn ein Teil fehlt, zeigt das Plugin „Unvollständig“ an, statt Dateien eigenmächtig anzulegen oder zu verschieben.
 
-Der gewohnte Dateiexplorer bleibt erhalten. Hinzu kommen die Seitenleiste mit Knoteninhalten, der Node Graph, Symbole und eine manuelle Sortierung von Knoten derselben Ebene.
+Der gewohnte Dateiexplorer bleibt erhalten. Hinzu kommen die Seitenleiste mit Knoteninhalten, der Knotengraf, Symbole und eine manuelle Sortierung von Knoten derselben Ebene.
 
-Vollständige Knoten lassen sich anlegen, umbenennen, verschieben, zusammenführen, sortieren und löschen. Der normale Obsidian-Dateiexplorer bleibt erhalten. Knoteninhalte werden nach Unterknoten, statischem Medienalbum und anderen Dateien aufgeteilt. GIFs erscheinen als Standbild; Videos und Tonaufnahmen haben keine eingebettete Wiedergabe. Der Node Graph zeigt immer die Ordnerhierarchie und kann zusätzlich Links zwischen Knotennotizen einblenden.
+Vollständige Knoten lassen sich anlegen, umbenennen, verschieben, zusammenführen, sortieren und löschen. Der normale Obsidian-Dateiexplorer bleibt erhalten. Knoteninhalte werden nach Unterknoten, statischem Medienalbum und anderen Dateien aufgeteilt. GIFs erscheinen als Standbild; Videos und Tonaufnahmen haben keine eingebettete Wiedergabe. Der Knotengraf zeigt immer die Ordnerhierarchie und kann zusätzlich Links zwischen Knotennotizen einblenden.
 
 ## Voraussetzungen und Kompatibilität
 
@@ -61,7 +61,7 @@ Das Plugin unterstützt Desktop und Android. Auf Android werden Ordner über Men
 
 ## Einstellungen
 
-**Allgemein:** Sprache, ausgeblendete Knoten und Startseite. **Verwaltung:** Ausnahmen, Sammelorganisation, Eigenschaftsmigration und schreibgeschützte Zustandsprüfung. **Symbole und Aussehen:** vererbte Symbole, Position und Emoji-Schrift. **Auswahl und Namen:** Bestätigung, Aliase und Benennungsregeln. **Node Graph:** Dimension, Richtung und Darstellung großer Graphen. Ein Sprachwechsel verändert keine Notizen.
+**Allgemein:** Sprache, ausgeblendete Knoten und Startseite. **Verwaltung:** Ausnahmen, Sammelorganisation, Eigenschaftsmigration und schreibgeschützte Zustandsprüfung. **Symbole und Darstellung:** vererbte Symbole, Position und Emoji-Schrift. **Auswahl und Benennung:** Bestätigung, Aliase und Benennungsregeln. **Knotengraf:** Dimension, Richtung und Darstellung großer Graphen. Ein Sprachwechsel verändert keine Notizen.
 
 Standardmäßig bleiben `AGENTS.md` und `CLAUDE.md` im Hauptverzeichnis des Vaults unverwaltet, ebenso Markdown-Dateien und Ordner, deren Namen mit `.` oder `_` beginnen. Diese Regeln lassen sich in den Verwaltungseinstellungen ändern.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-Die Textliste `folder-nodes` in einer Knotennotiz enthält nur abweichende Einstellungen: `order=manual` schaltet die manuelle Sortierung der Kinder ein, `rank=N` speichert ihre Position und `hidden=true` blendet den Knoten samt verwalteten Nachkommen aus. Standardwerte werden nicht geschrieben; ohne Einträge wird die Eigenschaft entfernt. Die alten Felder `folderNodeChildrenSort`, `folderNodeSiblingRank` und `folderNodeHidden` bleiben lesbar. Es gibt keine automatische Migration beim Start. Aktualisieren Sie alle Geräte und prüfen Sie die Vorschau unter „Verwaltung“, bevor Sie bestätigen.
+Die Textliste `folder-nodes` in einer Knotennotiz enthält nur abweichende Einstellungen: `order=manual` schaltet die manuelle Sortierung der Kinder ein, `rank=N` speichert die Position dieses Knotens unter seinen Geschwisterknoten und `hidden=true` blendet den Knoten samt verwalteten Nachkommen aus. Standardwerte werden nicht geschrieben; ohne Einträge wird die Eigenschaft entfernt. Die alten Felder `folderNodeChildrenSort`, `folderNodeSiblingRank` und `folderNodeHidden` bleiben lesbar. Es gibt keine automatische Migration beim Start. Aktualisieren Sie alle Geräte und prüfen Sie die Vorschau unter „Verwaltung“, bevor Sie bestätigen.
 
 ## Eigenschaft icon
 
@@ -100,7 +100,7 @@ Die Knotenidentität ist der aktuelle Vault-Pfad, keine permanente ID. Andere Na
 
 ## Datenschutz und Sicherheit
 
-**Ausblenden**: hidden=true in der Eigenschaft folder-nodes verbirgt einen Knoten samt Nachkommen nur in den Folder-Nodes-Ansichten Dateiexplorer, Knoteninhalte und Node Graph. Die Obsidian-Suche und direkte Dateizugriffe bleiben möglich. **Nicht verwaltet**: Für diese Dateien und Ordner werden keine strukturellen Knotenaktionen ausgeführt. Das bedeutet weder Löschen noch Ausblenden.
+**Ausblenden**: hidden=true in der Eigenschaft folder-nodes verbirgt einen Knoten samt Nachkommen nur in den Folder-Nodes-Ansichten Dateiexplorer, Knoteninhalte und Knotengraf. Die Obsidian-Suche und direkte Dateizugriffe bleiben möglich. **Nicht verwaltet**: Für diese Dateien und Ordner werden keine strukturellen Knotenaktionen ausgeführt. Das bedeutet weder Löschen noch Ausblenden.
 
 Normales Verschieben und Löschen betrifft das ausgewählte Element. Wird jedoch der Ordner oder die gleichnamige Notiz eines vollständigen Knotens umbenannt, synchronisiert das Plugin bei eindeutiger Zuordnung auch den anderen Namen. Aktionen für den „enthaltenden Knoten“ betreffen ausdrücklich den ganzen Knoten. Sammelorganisation und Eigenschaftsmigration bieten vor Änderungen eine Vorschau; die Zustandsprüfung ist schreibgeschützt. Bei Konflikten wird die Aktion gestoppt statt geraten. Für vollständige Knoten gilt die in Obsidian gewählte Einstellung zum Löschen von Dateien.
 

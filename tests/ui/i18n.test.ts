@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { setMockLanguage } from "../mocks/obsidian";
 import { FolderNodesError } from "../../src/core/folder-nodes-error";
@@ -11,6 +12,15 @@ afterEach(() => {
 });
 
 describe("interface language", () => {
+  it.each(AVAILABLE_INTERFACE_LOCALES)("uses the interface's graph and scope labels in the %s user guide", (locale) => {
+    setLanguage(locale);
+    const path = locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`;
+    const guide = readFileSync(path, "utf8").toLocaleLowerCase(locale);
+    for (const key of ["nodeGraph", "nodeGraphGlobalScope", "nodeGraphSubtreeScope", "nodeGraphLocalScope"] as const) {
+      expect(guide).toContain(t(key).toLocaleLowerCase(locale));
+    }
+  });
+
   it("localizes the multiple-editor write refusal and preserves the exact relative note path", () => {
     const path = "资料/$&/$$.md";
     const error = new FolderNodesError("structural_note_multiple_editors", { path });

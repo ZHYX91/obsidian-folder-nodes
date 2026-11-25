@@ -15,7 +15,7 @@ Vous pouvez aussi placer `main.js`, `manifest.json` et `styles.css` d’une mêm
 1. Sauvegardez votre coffre, puis ouvrez les réglages « Général » et « Gestion » de Folder Nodes.
 2. Vérifiez que le dossier A contient A/A.md. Si un élément manque, créez-le volontairement ou marquez-le « Non géré ».
 3. Utilisez « Nouveau nœud » pour créer le dossier et sa note ensemble. Cliquez sur le nom du dossier pour ouvrir la note de nœud. « Contenu du nœud » permet de parcourir les enfants, les images, les vidéos et les autres fichiers.
-4. Ouvrez Node Graph. Le mode « Global » montre tous les nœuds gérés ; « Sous-arbre » montre le nœud choisi et ses descendants ; « Local » montre son entourage. Vous pouvez passer de 2D à 3D et afficher les liens entre notes.
+4. Ouvrez le graphe des nœuds. La portée « Globale » montre tous les nœuds gérés ; « Sous-arbre » montre le nœud choisi et ses descendants ; « Locale » montre son entourage. Vous pouvez passer de 2D à 3D et afficher les liens entre notes.
 
 Sur ordinateur, faites glisser les cartes dans **Contenu du nœud** pour réordonner les enfants d’un même nœud. Pour changer de parent, déposez le nœud sur le dossier de destination dans l’explorateur de fichiers. Pour le placer juste avant ou après un autre enfant, activez le tri manuel sur le parent. Sur Android, utilisez le menu pour déplacer ou réordonner les nœuds.
 
@@ -29,13 +29,13 @@ Si la création échoue après avoir créé une note, le nettoyage ne supprime q
 
 ## Captures d’écran
 
-Les images présentent le contenu des nœuds, l’explorateur de fichiers, le Node Graph ainsi que les réglages des icônes, de la sélection et du nommage.
+Les images présentent le contenu des nœuds, l’explorateur de fichiers, le graphe des nœuds ainsi que les réglages des icônes, de la sélection et du nommage.
 
 ![Volet des nœuds enfants, médias et fichiers](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-contents-en.png)
 
 ![Explorateur Obsidian avec états des nœuds](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-explorer-en.png)
 
-![Node Graph montrant la hiérarchie des dossiers](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
+![Graphe des nœuds montrant la hiérarchie des dossiers](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-graph-en.png)
 
 ![Paramètres des icônes et de l'apparence des nœuds](https://raw.githubusercontent.com/ZHYX91/obsidian-folder-nodes/main/docs/assets/folder-nodes-settings-icons-en.png)
 
@@ -49,9 +49,9 @@ Cet exemple montre les réglages des noms et des alias. La page actuelle compren
 
 Folder Nodes associe un dossier Obsidian à une note Markdown portant le même nom. Par exemple, le dossier A et la note A/A.md forment un nœud complet. Si l’un des éléments manque, le plugin indique « Incomplet » ; il ne crée ni ne déplace de fichiers sans votre action.
 
-L’explorateur de fichiers d’Obsidian reste en place. Le plugin ajoute une barre latérale pour consulter le contenu des nœuds, un Node Graph, des icônes et le tri manuel des nœuds frères.
+L’explorateur de fichiers d’Obsidian reste en place. Le plugin ajoute une barre latérale pour consulter le contenu des nœuds, un graphe des nœuds, des icônes et le tri manuel des nœuds frères.
 
-Vous pouvez créer, renommer, déplacer, fusionner, trier ou supprimer un nœud complet. L’explorateur habituel d’Obsidian reste en place. Le contenu d’un nœud présente séparément les enfants, un album d’images fixes et les autres fichiers. Les GIF ont une miniature fixe ; aucune lecture intégrée des vidéos ou de l’audio. Le Node Graph conserve la hiérarchie des dossiers et permet d’afficher les liens entre notes en complément.
+Vous pouvez créer, renommer, déplacer, fusionner, trier ou supprimer un nœud complet. L’explorateur habituel d’Obsidian reste en place. Le contenu d’un nœud présente séparément les enfants, un album d’images fixes et les autres fichiers. Les GIF ont une miniature fixe ; aucune lecture intégrée des vidéos ou de l’audio. Le graphe des nœuds conserve la hiérarchie des dossiers et permet d’afficher les liens entre notes en complément.
 
 ## Configuration et compatibilité
 
@@ -61,7 +61,7 @@ Le plugin fonctionne sur ordinateur et Android. Sur Android, les déplacements p
 
 ## Paramètres
 
-**Général** : langue, masquage et page d’accueil. **Gestion** : règles d’exclusion, rangement groupé, migration des propriétés et contrôle en lecture seule. **Icônes et apparence** : héritage, position, police des émojis. **Sélection et noms** : confirmation, alias et règles de nommage. **Node Graph** : dimension, orientation et performance. Changer la langue ne modifie pas les notes.
+**Général** : langue, masquage et page d’accueil. **Gestion** : règles d’exclusion, rangement groupé, migration des propriétés et contrôle en lecture seule. **Icônes et apparence** : héritage, position, police des émojis. **Sélection et nommage** : confirmation, alias et règles de nommage. **Graphe des nœuds** : dimension, orientation et performance. Changer la langue ne modifie pas les notes.
 
 Par défaut, le plugin laisse de côté `AGENTS.md` et `CLAUDE.md` à la racine du coffre, ainsi que les fichiers Markdown et les dossiers dont le nom commence par `.` ou `_`. Vous pouvez modifier ces règles dans les paramètres de gestion.
 
@@ -74,7 +74,7 @@ folder-nodes:
   - hidden=true
 ```
 
-La liste de textes `folder-nodes` dans la note d’un nœud contient les réglages particuliers : `order=manual` active le tri manuel des enfants, `rank=N` enregistre une position, et `hidden=true` masque le nœud et ses descendants gérés. Les valeurs par défaut ne sont pas écrites ; la propriété disparaît si la liste est vide. Les anciens champs `folderNodeChildrenSort`, `folderNodeSiblingRank` et `folderNodeHidden` restent lisibles. Aucune migration automatique au démarrage : mettez d’abord le plugin à jour sur tous les appareils, puis vérifiez l’aperçu dans « Gestion » avant de confirmer.
+La liste de textes `folder-nodes` dans la note d’un nœud contient les réglages particuliers : `order=manual` active le tri manuel des enfants, `rank=N` enregistre la position de ce nœud parmi les enfants du même parent, et `hidden=true` masque le nœud et ses descendants gérés. Les valeurs par défaut ne sont pas écrites ; la propriété disparaît si la liste est vide. Les anciens champs `folderNodeChildrenSort`, `folderNodeSiblingRank` et `folderNodeHidden` restent lisibles. Aucune migration automatique au démarrage : mettez d’abord le plugin à jour sur tous les appareils, puis vérifiez l’aperçu dans « Gestion » avant de confirmer.
 
 ## Propriété icon
 
@@ -98,7 +98,7 @@ L’identité d’un nœud dépend de son chemin actuel dans le coffre, pas d’
 
 ## Confidentialité et sécurité
 
-**Masquer** : hidden=true dans la propriété folder-nodes cache le nœud et ses descendants uniquement dans les vues Folder Nodes de l’explorateur, du contenu et de Node Graph. La recherche Obsidian et l’ouverture directe continuent de fonctionner. **Non géré** : Folder Nodes n’effectue plus d’opérations de structure sur ces éléments, mais ne les masque ni ne les supprime.
+**Masquer** : hidden=true dans la propriété folder-nodes cache le nœud et ses descendants uniquement dans les vues Folder Nodes de l’explorateur, du contenu et du graphe des nœuds. La recherche Obsidian et l’ouverture directe continuent de fonctionner. **Non géré** : Folder Nodes n’effectue plus d’opérations de structure sur ces éléments, mais ne les masque ni ne les supprime.
 
 Déplacer ou supprimer un élément agit normalement sur le fichier ou dossier sélectionné. En revanche, renommer le dossier ou la note homonyme d’un nœud complet synchronise aussi l’autre nom lorsque la correspondance est certaine. Les commandes « nœud contenant » visent explicitement tout le nœud. L’organisation par lots et la migration de propriétés montrent une prévisualisation avant écriture ; le bilan de santé reste en lecture seule. Les conflits arrêtent l’opération. La suppression d’un nœud complet suit le mode de suppression des fichiers choisi dans Obsidian.
 
