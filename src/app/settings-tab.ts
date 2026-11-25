@@ -154,6 +154,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   public override display(): void {
+    const active = this.containerEl.ownerDocument.activeElement;
+    const focusKey = active && this.containerEl.contains(active)
+      ? active.closest<HTMLElement>("[data-folder-nodes-setting-key]")?.dataset.folderNodesSettingKey
+      : undefined;
+    const scrollTop = this.containerEl.scrollTop;
     if (this.currentGuide) {
       const { tab, element } = this.currentGuide;
       if (element.open) this.expandedGuides.add(tab);
@@ -191,6 +196,13 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     else if (this.activeTab === "naming") this.renderNaming(panel);
     else this.renderNodeGraph(panel);
     lockSettingsPanel(panel, compatibility.status === "incompatible");
+    if (focusKey !== undefined) {
+      const rows = panel.querySelectorAll<HTMLElement>("[data-folder-nodes-setting-key]");
+      const row = Array.from(rows).find((element) => element.dataset.folderNodesSettingKey === focusKey);
+      row?.querySelector<HTMLElement>('select:not(:disabled), input:not(:disabled), [role="switch"]:not([aria-disabled="true"])')
+        ?.focus({ preventScroll: true });
+      this.containerEl.scrollTop = scrollTop;
+    }
   }
 
   public refreshPersistenceStatus(): void {
@@ -359,7 +371,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   }
 
   private renderGeneral(panel: HTMLElement): void {
-    new LabeledSetting(panel).setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
+    new LabeledSetting(panel).setFocusKey("language").setName(t("language")).setDesc(t("languageDesc")).addDropdown((dropdown) => dropdown
       .addOptions(languageOptions(t("auto"))).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value as typeof this.plugin.settings.language;
         await this.plugin.applyLanguageSetting();
@@ -371,7 +383,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
         await this.plugin.reconcileSettingsChange();
       });
-    new LabeledSetting(panel).setName(t("enableHomepage")).setDesc(t("enableHomepageDesc")).addSwitch(this.plugin.settings.homepageEnabled, async (value) => {
+    new LabeledSetting(panel).setFocusKey("homepageEnabled").setName(t("enableHomepage")).setDesc(t("enableHomepageDesc")).addSwitch(this.plugin.settings.homepageEnabled, async (value) => {
       this.plugin.settings.homepageEnabled = value; await this.plugin.saveSettings(); this.plugin.refreshVisuals(); this.display();
     });
     if (this.plugin.settings.homepageEnabled) new LabeledSetting(panel).setName(t("openHomepageOnStartup")).setDesc(t("openHomepageOnStartupDesc")).addSwitch(this.plugin.settings.openHomepageOnStartup, async (value) => {
@@ -561,6 +573,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private renderNodeGraph(panel: HTMLElement): void {
     const settings = this.plugin.settings.nodeGraph;
     new LabeledSetting(panel)
+      .setFocusKey("nodeGraphEnabled")
       .setName(t("enableNodeGraph"))
       .setDesc(t("enableNodeGraphDesc"))
       .addSwitch(settings.enabled, async (value) => {

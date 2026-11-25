@@ -3,6 +3,11 @@ import { Setting, type DropdownComponent, type ExtraButtonComponent, type TextCo
 let nextFieldId = 0;
 
 export class LabeledSetting extends Setting {
+  public setFocusKey(key: string): this {
+    this.settingEl.dataset.folderNodesSettingKey = key;
+    return this;
+  }
+
   public override addText(configure: (text: TextComponent) => unknown): this {
     return super.addText((text) => { configure(text); this.label(text.inputEl); });
   }

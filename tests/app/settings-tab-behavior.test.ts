@@ -124,9 +124,11 @@ it("keeps settings styles when disabling the last graph leaf in its window", asy
     const workspaceClicks = listen.mock.calls.find(([event]) => event === "auxclick")?.[2] as AddEventListenerOptions;
     expect(workspaceClicks.signal?.aborted).toBe(false);
     const toggle = tab.containerEl.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    toggle.focus();
     toggle.checked = false;
     toggle.dispatchEvent(new Event("change"));
     await vi.waitFor(() => expect(toggle.isConnected).toBe(false));
+    expect(settings.activeElement).toBe(tab.containerEl.querySelector('input[type="checkbox"]'));
     expect(graphOpen).toBe(false);
     handlers.get("layout-change")!();
     expect(settings.adoptedStyleSheets).toContain(sheet);
