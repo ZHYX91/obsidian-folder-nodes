@@ -377,9 +377,10 @@ export class NodeService {
   }
 
   public renameNode(folder: TFolder, rawName: string): Promise<TFolder> {
+    const sourcePath = normalizeVaultPath(folder.path);
     return this.exclusive(async () => {
+      this.assertEntryIdentity(folder, sourcePath, TFolder);
       if (this.isIgnoredPath(folder.path)) throw new FolderNodesError("folder_unmanaged", { path: folder.path }, `Folder is unmanaged: ${folder.path}`);
-      const sourcePath = normalizeVaultPath(folder.path);
       if (sourcePath === "") throw new FolderNodesError("root_cannot_rename", {}, "The Root Node cannot be renamed");
       const noteCandidates = this.canonicalFiles(sourcePath);
       if (noteCandidates.length > 1) throw new FolderNodesError("multiple_canonical_notes", { path: sourcePath }, `Multiple canonical Node Notes: ${sourcePath}`);
@@ -459,7 +460,15 @@ export class NodeService {
   }
 
   public placeNode(folder: TFolder, intent: PlacementIntent): Promise<TFolder> {
-    return this.exclusive(() => this.placeNodeUnlocked(folder, intent));
+    const sourcePath = folder.path;
+    const targetPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
+    const target = this.getFolder(targetPath);
+    return this.exclusive(() => {
+      this.assertEntryIdentity(folder, sourcePath, TFolder);
+      if (target === null) throw new FolderNodesError("target_folder_unknown", { path: targetPath }, `Unknown target folder: ${targetPath}`);
+      this.assertEntryIdentity(target, targetPath, TFolder);
+      return this.placeNodeUnlocked(folder, intent);
+    });
   }
 
   public setChildOrderMode(parentPath: string, mode: "natural" | "manual"): Promise<void> {
@@ -521,8 +530,9 @@ export class NodeService {
   }
 
   public renameFile(file: TFile, rawName: string): Promise<void> {
+    const sourcePath = file.path;
     return this.exclusive(async () => {
-      const sourcePath = file.path;
+      this.assertEntryIdentity(file, sourcePath, TFile);
       if (rawName === file.name) return;
       const name = normalizePath(validateFileName(rawName));
       const parentPath = normalizeVaultPath(file.parent?.path ?? "");
@@ -547,7 +557,13 @@ export class NodeService {
   }
 
   public mergeNode(source: TFolder, target: TFolder): Promise<void> {
-    return this.exclusive(() => this.merge.run(source, target));
+    const sourcePath = source.path;
+    const targetPath = target.path;
+    return this.exclusive(() => {
+      this.assertEntryIdentity(source, sourcePath, TFolder);
+      this.assertEntryIdentity(target, targetPath, TFolder);
+      return this.merge.run(source, target);
+    });
   }
 
   public inventory(): VaultInventory {
@@ -1573,7 +1589,7 @@ export class NodeService {
     return current?.leaf === expected.leaf && current.editor === expected.editor;
   }
 
-  private assertEntryIdentity<T extends TAbstractFile>(
+  public assertEntryIdentity<T extends TAbstractFile>(
     entry: T,
     path: string,
     kind: abstract new (...args: never[]) => T,

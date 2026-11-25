@@ -487,6 +487,42 @@ describe("Merge destination and transaction order safety", () => {
 });
 
 describe("Queued content move bindings", () => {
+  it.each(["rename-file", "rename-node", "move-node", "merge-source", "merge-target", "replace-move-target"] as const)(
+    "checks the original entries at dispatch for %s", async (action) => {
+      const fake = new FakeObsidian();
+      const valid = (name: string) => {
+        const folder = fake.addFolder(name);
+        fake.addFile(`${name}/${name}.md`);
+        return folder;
+      };
+      const source = valid("Source");
+      const target = valid("Target");
+      const file = fake.addFile("original.pdf", "data");
+      const nodes = service(fake);
+      const moves = {
+        "rename-file": { entry: file, run: () => nodes.renameFile(file, "new.pdf") },
+        "rename-node": { entry: source, run: () => nodes.renameNode(source, "New") },
+        "move-node": { entry: source, run: () => nodes.moveNode(source, target.path) },
+        "merge-source": { entry: source, run: () => nodes.mergeNode(source, target) },
+        "merge-target": { entry: target, run: () => nodes.mergeNode(source, target) },
+        "replace-move-target": { entry: target, run: () => nodes.moveNode(source, target.path) },
+      };
+      const { entry, run } = moves[action];
+      const pending = run();
+      // The service dispatches from its serialized promise chain.
+      if (action === "replace-move-target") {
+        fake.remove(target.path);
+        valid("Target");
+      } else {
+        fake.addFolder("Moved");
+        await fake.rename(entry, `Moved/${entry.name}`);
+      }
+      const renames = [...fake.renames];
+      await expect(pending).rejects.toThrow("identity changed");
+      expect(fake.renames).toEqual(renames);
+      expect(fake.trashed).toEqual([]);
+    },
+  );
   it("retains a slash-path Root target while a file move is queued", async () => {
     const fake = new FakeObsidian();
     fake.root.path = "/";

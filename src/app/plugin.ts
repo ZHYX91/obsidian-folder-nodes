@@ -1097,18 +1097,26 @@ export default class FolderNodesPlugin extends Plugin {
     }
   }
 
-  private promptRenameFile(file: TFile): void {
-    new PromptModal(this.app, t("renameFile"), file.name, t("renameFile"), async (name) => {
-      await this.service.renameFile(file, name);
+  private promptEntryAction(
+    entry: TAbstractFile, label: string, initialValue: string, perform: (value: string) => Promise<unknown>,
+  ): void {
+    const sourcePath = entry.path;
+    const generation = this.lifecycleGeneration;
+    new PromptModal(this.app, label, initialValue, label, async (value) => {
+      if (this.unloaded || this.lifecycleGeneration !== generation) throw new FolderNodesError("source_node_changed");
+      this.service.assertEntryIdentity(entry, sourcePath, entry instanceof TFolder ? TFolder : TFile);
+      await perform(value);
       this.refreshVisuals();
     }).open();
   }
 
+  private promptRenameFile(file: TFile): void {
+    this.promptEntryAction(file, t("renameFile"), file.name, (name) => this.service.renameFile(file, name));
+  }
+
   private promptMoveFile(file: TFile): void {
-    new PromptModal(this.app, t("moveFile"), file.parent?.path ?? "", t("moveFile"), async (targetPath) => {
-      await this.service.moveFile(file, targetPath === "/" ? "" : targetPath);
-      this.refreshVisuals();
-    }).open();
+    this.promptEntryAction(file, t("moveFile"), file.parent?.path ?? "",
+      (targetPath) => this.service.moveFile(file, targetPath === "/" ? "" : targetPath));
   }
 
   private confirmDeleteFile(file: TFile): void {
@@ -1259,26 +1267,20 @@ export default class FolderNodesPlugin extends Plugin {
   private promptMergeCurrent(): void { const folder = this.currentFolder(); if (folder !== null && normalizeVaultPath(folder.path) !== "") this.promptMerge(folder); }
 
   private promptRename(folder: TFolder): void {
-    new PromptModal(this.app, t("rename"), folder.name, t("rename"), async (name) => {
-      await this.service.renameNode(folder, name);
-      this.refreshVisuals();
-    }).open();
+    this.promptEntryAction(folder, t("rename"), folder.name, (name) => this.service.renameNode(folder, name));
   }
 
   private promptMove(folder: TFolder): void {
-    new PromptModal(this.app, t("move"), folder.parent?.path ?? "", t("move"), async (targetPath) => {
-      await this.service.moveNode(folder, targetPath === "/" ? "" : targetPath);
-      this.refreshVisuals();
-    }).open();
+    this.promptEntryAction(folder, t("move"), folder.parent?.path ?? "",
+      (targetPath) => this.service.moveNode(folder, targetPath === "/" ? "" : targetPath));
   }
 
   private promptMerge(folder: TFolder): void {
-    new PromptModal(this.app, t("merge"), "", t("merge"), async (targetPath) => {
+    this.promptEntryAction(folder, t("merge"), "", (targetPath) => {
       const target = this.service.getFolder(targetPath === "/" ? "" : targetPath);
       if (target === null) throw new Error(`Unknown target node: ${targetPath}`);
-      await this.service.mergeNode(folder, target);
-      this.refreshVisuals();
-    }).open();
+      return this.service.mergeNode(folder, target);
+    });
   }
 
   private confirmDelete(folder: TFolder): void {

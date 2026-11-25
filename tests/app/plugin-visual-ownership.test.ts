@@ -41,6 +41,31 @@ function fixture() {
   return { fake, folder, note, nodes, plugin, buttons };
 }
 
+describe("entry action prompt ownership", () => {
+  it.each(["promptRenameFile", "promptMoveFile", "promptRename", "promptMove", "promptMerge"] as const)(
+    "refuses a changed source when submitting %s", async (method) => {
+      const f = fixture();
+      const fileAction = method === "promptRenameFile" || method === "promptMoveFile";
+      const entry = fileAction ? f.fake.addFile("attachment.pdf", "attachment") : f.folder;
+      f.fake.addFolder("Target");
+      f.fake.addFile("Target/Target.md", "destination");
+      Reflect.get(f.plugin, method).call(f.plugin, entry);
+      const input = document.querySelector<HTMLInputElement>("input")!;
+      input.value = method.includes("Rename") ? "Other" : "Target";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      f.fake.addFolder("Moved");
+      await f.fake.rename(entry, `Moved/${entry.name}`);
+      const before = [...f.fake.renames];
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      await vi.waitFor(() => expect(Notice.messages.at(-1)).toContain("changed"));
+      expect(f.fake.renames).toEqual(before);
+      expect(f.fake.trashed).toEqual([]);
+      expect(f.fake.requireFile("Target/Target.md")).toBeDefined();
+      f.plugin.onunload();
+    },
+  );
+});
+
 describe("deletion confirmation ownership", () => {
   it.each(["file", "folder"] as const)("explains deletion preferences and rejects a moved %s after confirmation", async (kind) => {
     const f = fixture();
