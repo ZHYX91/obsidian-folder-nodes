@@ -28,6 +28,14 @@ beforeEach(() => { setLanguage("en"); MockNotice.messages.length = 0; });
 afterEach(() => { document.body.replaceChildren(); });
 
 describe("PromptModal input events", () => {
+  it("scopes the current interface language and reading direction to the opened dialog", () => {
+    setLanguage("ar");
+    const { modal } = openPrompt();
+    expect([modal.modalEl.lang, modal.modalEl.dir]).toEqual(["ar", "rtl"]);
+    expect(document.documentElement.dir).not.toBe("rtl");
+    modal.close();
+  });
+
   it.each([
     { isComposing: true, compositionStarted: false },
     { isComposing: false, compositionStarted: true },
@@ -58,7 +66,11 @@ describe("PromptModal input events", () => {
   it("keeps an empty prompt open and allows normal cancellation", () => {
     const onSubmit = vi.fn();
     const { modal, edit, save, cancel } = openPrompt(onSubmit);
+    expect(save.disabled).toBe(true);
+    edit("Valid");
+    expect(save.disabled).toBe(false);
     edit("  ");
+    expect(save.disabled).toBe(true);
     save.click();
     expect(onSubmit).not.toHaveBeenCalled();
     expect(modal.contentEl.isConnected).toBe(true);
@@ -76,6 +88,8 @@ describe("PromptModal input events", () => {
     save.click();
     cancel.click();
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith("Alpha");
+    expect(input.disabled && save.disabled && cancel.disabled).toBe(true);
+    expect(modal.contentEl.getAttribute("aria-busy")).toBe("true");
     expect(modal.contentEl.isConnected).toBe(true);
     pending.resolve();
     await vi.waitFor(() => expect(modal.contentEl.isConnected).toBe(false));
@@ -88,6 +102,8 @@ describe("PromptModal input events", () => {
     save.click();
     await vi.waitFor(() => expect(MockNotice.messages.at(-1)).toContain("Disk unavailable"));
     expect(modal.contentEl.isConnected).toBe(true);
+    expect(input.disabled || save.disabled).toBe(false);
+    expect(modal.contentEl.hasAttribute("aria-busy")).toBe(false);
     expect(input.value).toBe("Alpha");
     save.click();
     await vi.waitFor(() => expect(modal.contentEl.isConnected).toBe(false));
@@ -107,7 +123,7 @@ describe("ConfirmModal actions", () => {
     confirm!.click();
     cancel!.click();
     expect(onConfirm).toHaveBeenCalledOnce();
-    expect(confirm!.disabled).toBe(true);
+    expect(confirm!.disabled && cancel!.disabled).toBe(true);
     expect(modal.contentEl.isConnected).toBe(true);
     pending.resolve();
     await vi.waitFor(() => expect(modal.contentEl.isConnected).toBe(false));

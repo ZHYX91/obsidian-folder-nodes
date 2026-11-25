@@ -1,4 +1,5 @@
-import { App, Modal, setIcon } from "obsidian";
+import { LocalizedModal } from "./localized-modal";
+import { App, setIcon } from "obsidian";
 
 import { t } from "./i18n";
 
@@ -17,7 +18,7 @@ export interface NodeAction {
 
 const GROUPS: readonly NodeActionGroup[] = ["open", "appearance", "structure", "management"];
 
-export class NodeActionsModal extends Modal {
+export class NodeActionsModal extends LocalizedModal {
   public constructor(
     app: App,
     private readonly nodeName: string,

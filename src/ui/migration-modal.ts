@@ -1,6 +1,6 @@
 import { App, Notice, Setting } from "obsidian";
 
-import { formatError, t } from "./i18n";
+import { t } from "./i18n";
 import { SubmittingModal } from "./submitting-modal";
 import { nodeNotePath, sanitizeNodeName } from "../core/paths";
 import type { MigrationScan } from "../core/types";
@@ -26,7 +26,7 @@ export class MigrationModal extends SubmittingModal {
     this.pathSection(summary, t("conflicts"), this.scan.conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`), true);
     if (this.total() === 0 && this.scan.conflicts.length === 0) summary.createEl("p", { text: t("noChanges") });
 
-    const progress = this.contentEl.createEl("progress");
+    const progress = this.contentEl.createEl("progress", { attr: { "aria-label": t("batchOrganize") } });
     progress.max = Math.max(1, this.total());
     progress.value = 0;
     progress.hidden = this.healthMode || this.total() === 0;
@@ -37,24 +37,13 @@ export class MigrationModal extends SubmittingModal {
       .setCta()
       .setDisabled(this.scan.conflicts.length > 0 || this.total() === 0)
       .setButtonText(t("applyChanges"))
-      .onClick(async () => {
-        if (this.submitting) return;
-        this.submitting = true;
-        button.setDisabled(true);
-        try {
-          await this.onCommit((completed, total) => {
-            progress.max = Math.max(1, total);
-            progress.value = completed;
-          });
-          new Notice(`${t("batchOrganize")}: ${t("confirm")}`);
-          this.closeAfterSubmission();
-        } catch (error) {
-          new Notice(formatError(error), 8000);
-          button.setDisabled(false);
-        } finally {
-          this.submitting = false;
-        }
-      }));
+      .onClick(() => void this.submitAndClose(async () => {
+        await this.onCommit((completed, total) => {
+          progress.max = Math.max(1, total);
+          progress.value = completed;
+        });
+        new Notice(`${t("batchOrganize")}: ${t("confirm")}`);
+      })));
   }
 
   private pathSection(container: HTMLElement, label: string, paths: readonly string[], blocking = false): void {

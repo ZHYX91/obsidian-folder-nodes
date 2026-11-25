@@ -1,8 +1,9 @@
-import { App, Modal, Setting } from "obsidian";
+import { LocalizedModal } from "./localized-modal";
+import { App, Setting } from "obsidian";
 
 import { t } from "./i18n";
 
-export class ScanProgressModal extends Modal {
+export class ScanProgressModal extends LocalizedModal {
   private progress: HTMLProgressElement | null = null;
   private completed = false;
 
@@ -13,12 +14,13 @@ export class ScanProgressModal extends Modal {
   ) { super(app); }
 
   public override onOpen(): void {
-    this.setTitle(t(this.mode === "structure" ? "scanningStructure" : this.mode === "properties" ? "scanningProperties" : "scanningHealth"));
+    const title = t(this.mode === "structure" ? "scanningStructure" : this.mode === "properties" ? "scanningProperties" : "scanningHealth");
+    this.setTitle(title);
     this.contentEl.createEl("p", {
       cls: "setting-item-description",
       text: t(this.mode === "structure" ? "scanningStructureDesc" : this.mode === "properties" ? "scanningPropertiesDesc" : "scanningHealthDesc"),
     });
-    this.progress = this.contentEl.createEl("progress");
+    this.progress = this.contentEl.createEl("progress", { attr: { "aria-label": title } });
     this.progress.max = 1;
     this.progress.value = 0;
     new Setting(this.contentEl).addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()));

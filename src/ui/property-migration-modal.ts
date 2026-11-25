@@ -1,7 +1,7 @@
-import { App, type ButtonComponent, Notice, Setting } from "obsidian";
+import { App, Notice, Setting } from "obsidian";
 
 import type { MigrationScan, PropertyHealthFinding, PropertyMigrationScan } from "../core/types";
-import { formatError, t } from "./i18n";
+import { t } from "./i18n";
 import { SubmittingModal } from "./submitting-modal";
 
 export class PropertyMigrationModal extends SubmittingModal {
@@ -50,46 +50,30 @@ export class PropertyMigrationModal extends SubmittingModal {
       && this.scan.invalidIcons.length === 0
     ) summary.createEl("p", { text: t("noPropertyChanges") });
 
-    const progress = this.contentEl.createEl("progress");
+    const progress = this.contentEl.createEl("progress", { attr: { "aria-label": t("propertyMigration") } });
     progress.max = Math.max(1, this.scan.changes.length);
     progress.value = 0;
     progress.hidden = this.healthMode || this.scan.changes.length === 0;
     const controls = new Setting(this.contentEl);
-    let cancelButton: ButtonComponent | null = null;
-    controls.addButton((button) => {
-      cancelButton = button;
-      button.setButtonText(this.healthMode ? t("confirm") : t("cancel")).onClick(() => {
-        if (this.submitting) return;
-        this.close();
-      });
-    });
+    controls.addButton((button) => button.setButtonText(this.healthMode ? t("confirm") : t("cancel")).onClick(() => this.close()));
     if (this.healthMode) return;
     controls.addButton((button) => button
       .setCta()
       .setDisabled(this.scan.conflicts.length > 0 || this.scan.changes.length === 0)
       .setButtonText(t("applyPropertyMigration"))
-      .onClick(async () => {
-        if (this.submitting) return;
-        this.submitting = true;
-        this.controller = new AbortController();
-        button.setDisabled(true);
-        cancelButton?.setDisabled(true);
+      .onClick(() => void this.submitAndClose(async () => {
+        const controller = new AbortController();
+        this.controller = controller;
         try {
-          await this.onCommit(this.controller.signal, (completed, total) => {
+          await this.onCommit(controller.signal, (completed, total) => {
             progress.max = Math.max(1, total);
             progress.value = completed;
           });
-          new Notice(t("propertyMigrationComplete"));
-          this.closeAfterSubmission();
-        } catch (error) {
-          if (!this.controller.signal.aborted) new Notice(formatError(error), 8000);
-          button.setDisabled(false);
-          cancelButton?.setDisabled(false);
+          if (!controller.signal.aborted) new Notice(t("propertyMigrationComplete"));
         } finally {
           this.controller = null;
-          this.submitting = false;
         }
-      }));
+      })));
   }
 
   public override onClose(): void {

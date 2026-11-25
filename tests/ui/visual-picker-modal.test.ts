@@ -52,10 +52,16 @@ describe("Visual Picker ownership and keyboard continuation", () => {
     const confirm = f.buttons(t("confirm"))[0]!;
     confirm.click();
     expect(f.onSave).toHaveBeenCalledOnce();
+    for (const control of f.modal.contentEl.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button")) {
+      expect(control.disabled).toBe(true);
+    }
     f.modal.invalidate();
     confirm.click();
     finish();
     await vi.waitFor(() => expect(f.modal.contentEl.isConnected).toBe(false));
+    await pending;
+    await Promise.resolve();
+    expect(f.onClose).toHaveBeenCalledOnce();
     expect(f.onSave).toHaveBeenCalledOnce();
   });
 });

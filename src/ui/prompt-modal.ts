@@ -1,5 +1,5 @@
-import { App, Notice, Setting } from "obsidian";
-import { formatError, t } from "./i18n";
+import { App, type ButtonComponent, Setting } from "obsidian";
+import { t } from "./i18n";
 import { SubmittingModal } from "./submitting-modal";
 
 export class PromptModal extends SubmittingModal {
@@ -18,12 +18,17 @@ export class PromptModal extends SubmittingModal {
 
   public override onOpen(): void {
     this.setTitle(this.titleText);
+    let save: ButtonComponent;
     new Setting(this.contentEl)
       .setName(this.titleText)
       .addText((text) => {
         let composing = false;
-        text.setValue(this.value).onChange((value) => { this.value = value; });
-        window.setTimeout(() => text.inputEl.focus(), 0);
+        text.inputEl.setAttribute("aria-label", this.titleText);
+        text.setValue(this.value).onChange((value) => {
+          this.value = value;
+          save.setDisabled(value.trim() === "");
+        });
+        text.inputEl.focus();
         text.inputEl.addEventListener("compositionstart", () => { composing = true; });
         text.inputEl.addEventListener("compositionend", () => { composing = false; });
         text.inputEl.addEventListener("keydown", (event) => {
@@ -34,22 +39,15 @@ export class PromptModal extends SubmittingModal {
       });
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
-      .addButton((button) => button.setCta().setButtonText(this.submitText).onClick(() => void this.submit()));
+      .addButton((button) => {
+        save = button.setCta().setButtonText(this.submitText).setDisabled(this.value.trim() === "");
+        save.onClick(() => void this.submit());
+      });
   }
 
   private async submit(): Promise<void> {
-    if (this.submitting) return;
     const value = this.value.trim();
-    if (value === "") return;
-    this.submitting = true;
-    try {
-      await this.onSubmit(value);
-      this.closeAfterSubmission();
-    } catch (error) {
-      new Notice(formatError(error), 8000);
-    } finally {
-      this.submitting = false;
-    }
+    if (value !== "") await this.submitAndClose(() => this.onSubmit(value));
   }
 }
 
@@ -69,20 +67,7 @@ export class ConfirmModal extends SubmittingModal {
     new Setting(this.contentEl)
       .addButton((button) => button.setButtonText(t("cancel")).onClick(() => this.close()))
       .addButton((button) => {
-        button.setButtonText(this.confirmText).setCta().onClick(async () => {
-          if (this.submitting) return;
-          this.submitting = true;
-          button.setDisabled(true);
-          try {
-            await this.onConfirm();
-            this.closeAfterSubmission();
-          } catch (error) {
-            new Notice(formatError(error), 8000);
-          } finally {
-            this.submitting = false;
-            button.setDisabled(false);
-          }
-        });
+        button.setButtonText(this.confirmText).setCta().onClick(() => void this.submitAndClose(this.onConfirm));
         if (this.danger) button.buttonEl.addClass("mod-warning");
       });
   }
