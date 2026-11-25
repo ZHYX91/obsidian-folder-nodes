@@ -84,7 +84,7 @@ import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
 import { interfaceTextDirection, resolvedLanguage, t } from "./i18n";
 import { observeNodeGraphDomViewport } from "./node-graph-dom-viewport";
-import { renderNodeGraphToolbar, updateNodeGraphToolbar, type NodeGraphToolbarLabels, type NodeGraphToolbarModel } from "./node-graph-toolbar";
+import { describeGraphButton, renderNodeGraphToolbar, updateNodeGraphToolbar, type NodeGraphToolbarLabels, type NodeGraphToolbarModel } from "./node-graph-toolbar";
 import {
   NodeGraphCanvasRenderer,
   type NodeGraphCanvasRecord,
@@ -598,7 +598,7 @@ export class FolderNodeGraphView extends ItemView {
         : t(action === "subtree" ? "nodeGraphSubtreeTarget" : "nodeGraphLocalTarget", { name });
       button.setAttribute("aria-label", description);
       button.title = description;
-      setTooltip(button, description);
+      describeGraphButton(button, description);
     }
   }
 
