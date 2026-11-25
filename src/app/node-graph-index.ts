@@ -20,6 +20,7 @@ export interface NodeGraphIndexMetrics {
 }
 
 interface NodeGraphIndexService {
+  withCanonicalFileCache<T>(read: () => T): T;
   children(path: string): readonly { readonly childPath: string }[];
   folderForFile(file: TFile | null): TFolder | null;
   getCanonicalFile(folderPath: string): TFile | null;
@@ -59,8 +60,12 @@ export class NodeGraphIndex {
   ) {}
 
   public snapshot(_settings: NodeGraphSettings): NodeGraphIndexSnapshot {
-    if (this.dirtyAll) this.rebuild();
-    else if (this.dirtyPaths.size > 0) this.refreshDirtyPaths();
+    if (this.dirtyAll || this.dirtyPaths.size > 0) {
+      this.service.withCanonicalFileCache(() => {
+        if (this.dirtyAll) this.rebuild();
+        else this.refreshDirtyPaths();
+      });
+    }
     if (this.dirtyLinks) this.rebuildLinks();
     return { links: this.links, records: this.records, revision: this.revision };
   }
@@ -80,19 +85,25 @@ export class NodeGraphIndex {
   /** Re-resolve visuals from cached folders without traversing child collections. */
   public invalidateVisuals(): void {
     if (this.dirtyAll) return;
-    let changed = false;
-    for (const [path, record] of this.records) {
-      const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
-      if (folder === null) continue;
-      this.records.set(path, { ...record, visual: normalizeIndexVisual(path, this.visuals.resolve(folder)) });
-      changed = true;
-    }
-    if (changed) this.revision += 1;
+    this.service.withCanonicalFileCache(() => {
+      let changed = false;
+      for (const [path, record] of this.records) {
+        const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
+        if (folder === null) continue;
+        this.records.set(path, { ...record, visual: normalizeIndexVisual(path, this.visuals.resolve(folder)) });
+        changed = true;
+      }
+      if (changed) this.revision += 1;
+    });
   }
 
   /** Refresh metadata-derived visuals and direct sibling order without collecting Vault subtrees. */
   public invalidateRecordMetadata(paths: ReadonlySet<string>): boolean {
     if (this.dirtyAll) return false;
+    return this.service.withCanonicalFileCache(() => this.refreshRecordMetadata(paths));
+  }
+
+  private refreshRecordMetadata(paths: ReadonlySet<string>): boolean {
     const requestedPaths = new Set([...paths].map(normalizeVaultPath));
     if (this.service.revealingHiddenNodes?.() ?? false) {
       this.invalidatePaths(requestedPaths);

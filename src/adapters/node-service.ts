@@ -77,6 +77,7 @@ export interface FileMoveBinding {
 }
 
 export class NodeService {
+  private canonicalFileCache: Map<string, TFile | null> | null = null;
   private readonly merge: NodeMerge;
   private readonly operations = new VaultOperationCoordinator();
   private readonly lifecycle = new AbortController();
@@ -136,9 +137,24 @@ export class NodeService {
     return file instanceof TFile ? file : null;
   }
 
+  /** Share lookups only during one synchronous graph read. Vault events between reads stay observable. */
+  public withCanonicalFileCache<T>(read: () => T): T {
+    if (this.canonicalFileCache !== null) return read();
+    this.canonicalFileCache = new Map();
+    try {
+      return read();
+    } finally {
+      this.canonicalFileCache = null;
+    }
+  }
+
   public getCanonicalFile(folderPath: string): TFile | null {
+    const cached = this.canonicalFileCache?.get(folderPath);
+    if (cached !== undefined) return cached;
     const candidates = this.nodeNoteCandidates(folderPath);
-    return candidates.length === 1 ? candidates[0] ?? null : null;
+    const note = candidates.length === 1 ? candidates[0] ?? null : null;
+    this.canonicalFileCache?.set(folderPath, note);
+    return note;
   }
 
   public captureVisualEdit(folder: TFolder): VisualEditBinding {

@@ -41,7 +41,7 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 3. Open **Node Graph** to browse the hierarchy: Global covers the Vault, Subtree anchors one node, and Local adds its parent. Expand branches, search, switch between 2D/3D, or enable **Show links** to overlay references.
 4. On desktop, drag cards in **Node Contents** to reorder nodes under the same parent. To change a node’s parent, drop it on the destination folder in **File Explorer**. Exact placement before or after a sibling requires **Manual** child order on the parent. On Android, use the native folder move or **Move / Move up / Move down**.
 5. Native Move/Delete operates on the selected file or folder; a native rename of a complete node's folder or Node Note also synchronizes the other half when unambiguous. Commands labelled **containing node** explicitly act on the whole Folder Node. Check the target before moving or deleting.
-6. **Batch organize** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Health check** is read-only. Cancel if the proposed scope differs from your intention.
+6. **Organize incomplete nodes** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Check Folder Nodes health** is read-only. Cancel if the proposed scope differs from your intention.
 
 Node Contents shows the current path and explains empty, hidden, unmanaged, or incomplete states. Use the available buttons to open a valid parent, review management rules, run read-only Health, or reveal hidden nodes for this session. In Canvas graphs, arrow keys move toward the nearest node in that screen direction; Home and End select the first and last visible nodes.
 

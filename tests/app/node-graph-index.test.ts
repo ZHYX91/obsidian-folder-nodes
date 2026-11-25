@@ -1,6 +1,8 @@
 import { TFile, TFolder } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
+import { NodeService } from "../../src/adapters/node-service";
+import { VisualService } from "../../src/adapters/visual-service";
 import { NodeGraphIndex } from "../../src/app/node-graph-index";
 import { layoutNodeGraph3D } from "../../src/core/node-graph-3d";
 import { buildNodeGraphModelFromNodes } from "../../src/core/node-graph-model";
@@ -9,7 +11,7 @@ import { nodeGraphDefaultExpansion, setNodeGraphRangeDepth } from "../../src/cor
 import { createNodeGraphTopology } from "../../src/core/node-graph-topology";
 import { buildNodeGraphVisibleScene } from "../../src/core/node-graph-visible";
 import type { NodeGraphSettings, NodeVisual } from "../../src/core/types";
-import { DEFAULT_NODE_GRAPH_SETTINGS } from "../../src/shared/settings";
+import { DEFAULT_NODE_GRAPH_SETTINGS, DEFAULT_SETTINGS } from "../../src/shared/settings";
 import { FakeObsidian } from "../helpers/fake-obsidian";
 
 const FALLBACK_VISUAL: NodeVisual = {
@@ -20,6 +22,30 @@ const FALLBACK_VISUAL: NodeVisual = {
 };
 
 describe("Node Graph index", () => {
+  it("looks up the canonical note of a wide parent a bounded number of times per graph read", () => {
+    const fake = new FakeObsidian("Vault");
+    fake.addFile("Vault.md");
+    const parent = fake.addFolder("Wide");
+    fake.addFile("Wide/Wide.md");
+    for (let index = 0; index < 128; index += 1) {
+      const name = `N${index}`;
+      fake.addFolder(`Wide/${name}`);
+      fake.addFile(`Wide/${name}/${name}.md`);
+    }
+    const service = new NodeService(fake.app, () => DEFAULT_SETTINGS);
+    const graph = new NodeGraphIndex(fake.app, service, new VisualService(fake.app, service, () => true), {
+      targetsForSource: () => [],
+    });
+    const scans = vi.spyOn(parent.children, "filter");
+    expect(graph.snapshot(DEFAULT_NODE_GRAPH_SETTINGS).records.size).toBe(130);
+    expect(scans.mock.calls.length).toBeLessThan(6);
+
+    fake.addFile("Wide/wide.MD");
+    graph.invalidatePaths(new Set(["Wide"]));
+    expect(graph.snapshot(DEFAULT_NODE_GRAPH_SETTINGS).records.has("Wide")).toBe(false);
+    expect(service.getCanonicalFile("Wide")).toBeNull();
+  });
+
   it("builds once and reuses the same catalog for scope, search, and expansion", () => {
     const fixture = graphIndexFixture();
     const first = fixture.index.snapshot(fixture.settings);
@@ -414,6 +440,7 @@ function graphIndexFixture() {
   };
   let revealHidden = false;
   const service = {
+    withCanonicalFileCache: <T>(read: () => T) => read(),
     children,
     folderForFile: (file: TFile | null) => file?.parent ?? null,
     getCanonicalFile: (path: string) => notes.get(path) ?? null,

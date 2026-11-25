@@ -150,6 +150,7 @@ function graphIndexFixture(size: number): {
     },
   } as unknown as App;
   const service = {
+    withCanonicalFileCache: <T>(read: () => T) => read(),
     children: (path: string) => path === "" ? children : [],
     folderForFile: (file: TFile | null) => file?.parent ?? null,
     getCanonicalFile: (path: string) => notes.get(path) ?? null,

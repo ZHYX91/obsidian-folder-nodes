@@ -1305,8 +1305,7 @@ export default class FolderNodesPlugin extends Plugin {
 
   private applyRefresh(batch: RefreshBatch): void {
     const explorerAffected = batch.full || [...batch.paths].some((path) =>
-      normalizeVaultPath(path) === normalizeVaultPath(this.service.rootNotePath()) ||
-      isCanonicalNodeNote(path) || this.service.getFolder(path) !== null);
+      isCanonicalNodeNote(path, this.service.rootNotePath()) || this.service.getFolder(path) !== null);
     if (explorerAffected) this.explorer.refresh();
     else if (batch.reasons.has("active-leaf")) this.explorer.refreshActiveState();
     for (const leaf of this.app.workspace.getLeavesOfType(CONTENTS_VIEW_TYPE)) {

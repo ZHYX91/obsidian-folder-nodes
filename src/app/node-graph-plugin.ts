@@ -3,7 +3,7 @@ import { Notice, setIcon, TFile, TFolder } from "obsidian";
 import FolderNodesPlugin from "./plugin";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
 import { FolderNodeGraphView, NODE_GRAPH_VIEW_TYPE } from "../ui/node-graph-view";
-import { isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
+import { dirname, isCanonicalNodeNote, normalizeVaultPath } from "../core/paths";
 import type { NodeGraphScope } from "../core/node-graph-scope";
 import { t } from "../ui/i18n";
 import type { RefreshBatch } from "./refresh-scheduler";
@@ -55,8 +55,8 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
         this.invalidateNodeGraphStructure();
         return;
       }
-      if (entry instanceof TFile && this.service.isCanonicalFile(entry)) {
-        this.invalidateNodeGraphPaths([entry.path]);
+      if (entry instanceof TFile && this.nodeGraphCanonicalNotePath(entry.path)) {
+        this.invalidateNodeGraphPaths([dirname(entry.path)]);
       }
     }));
     this.registerEvent(this.app.vault.on("rename", (entry, oldPath) => {
@@ -69,21 +69,23 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
       }
       if (!(entry instanceof TFile)) return;
       const wasCanonical = this.nodeGraphCanonicalNotePath(oldPath);
-      const isCanonical = this.service.isCanonicalFile(entry);
+      const isCanonical = this.nodeGraphCanonicalNotePath(entry.path);
       if (!wasCanonical && !isCanonical) return;
-      this.invalidateNodeGraphPaths([oldPath, entry.path]);
+      const folders = [];
+      if (wasCanonical) folders.push(dirname(oldPath));
+      if (isCanonical) folders.push(dirname(entry.path));
+      this.invalidateNodeGraphPaths(folders);
     }));
     this.registerEvent(this.app.vault.on("delete", (entry) => {
       if (entry instanceof TFolder) {
-        for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
-          if (leaf.view instanceof FolderNodeGraphView) leaf.view.removePathState(entry.path);
-        }
+        this.removeNodeGraphPathState(entry.path);
         this.invalidateNodeGraphStructure();
         return;
       }
       if (!(entry instanceof TFile) || !this.nodeGraphCanonicalNotePath(entry.path)) return;
-      this.removeNodeGraphPathState(this.nodeGraphFolderPathForNote(entry.path));
-      this.invalidateNodeGraphPaths([entry.path]);
+      const folder = dirname(entry.path);
+      if (folder !== "" && this.service.nodeNoteCandidates(folder).length === 0) this.removeNodeGraphPathState(folder);
+      this.invalidateNodeGraphPaths([folder]);
     }));
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.nodeGraphIndex.invalidateLinks()));
     this.decorateContentsViews();
@@ -126,8 +128,8 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   protected override refreshExtensionViews(batch: RefreshBatch): void {
     const structuralPaths = new Set([...batch.pathReasons]
       .filter(([, reasons]) => reasons.has("path"))
-      .map(([path]) => path)
-      .filter((path) => this.nodeGraphPathAffectsIndex(path)));
+      .map(([path]) => this.nodeGraphStructuralPath(path))
+      .filter((path): path is string => path !== null));
     const metadataFolderPaths = new Set([...batch.pathReasons]
       .filter(([, reasons]) => reasons.has("metadata"))
       .map(([path]) => this.nodeGraphMetadataFolderPath(path))
@@ -135,7 +137,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     const referencePaths = new Set([...batch.pathReasons]
       .filter(([, reasons]) => reasons.has("reference"))
       .map(([path]) => path)
-      .filter((path) => this.nodeGraphPathAffectsIndex(path)));
+      .filter((path) => this.nodeGraphStructuralPath(path) !== null));
     if (structuralPaths.size === 0 && metadataFolderPaths.size === 0
       && referencePaths.size === 0 && !batch.reasons.has("full")) return;
     if (!this.settings.nodeGraph.enabled) {
@@ -179,14 +181,14 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
   }
 
   private nodeGraphCanonicalNotePath(path: string): boolean {
-    return normalizeVaultPath(path) === normalizeVaultPath(this.service.rootNotePath()) || isCanonicalNodeNote(path);
+    return isCanonicalNodeNote(path, this.service.rootNotePath());
   }
 
-  private nodeGraphPathAffectsIndex(path: string): boolean {
+  private nodeGraphStructuralPath(path: string): string | null {
     const entry = this.app.vault.getAbstractFileByPath(path);
-    if (entry instanceof TFile) return this.service.isCanonicalFile(entry);
-    if (entry instanceof TFolder) return true;
-    return this.nodeGraphCanonicalNotePath(path) || !path.toLocaleLowerCase().endsWith(".md");
+    if (entry instanceof TFolder) return path;
+    if (this.nodeGraphCanonicalNotePath(path)) return dirname(path);
+    return entry === null && !path.toLocaleLowerCase().endsWith(".md") ? path : null;
   }
 
   private nodeGraphMetadataFolderPath(path: string): string | null {
@@ -196,15 +198,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     return folder === null ? null : normalizeVaultPath(folder.path);
   }
 
-  private nodeGraphFolderPathForNote(path: string): string {
-    const normalized = normalizeVaultPath(path);
-    if (normalized === normalizeVaultPath(this.service.rootNotePath())) return "";
-    const slash = normalized.lastIndexOf("/");
-    return slash < 0 ? "" : normalized.slice(0, slash);
-  }
-
   private removeNodeGraphPathState(path: string): void {
-    if (path === "") return;
     for (const leaf of this.app.workspace.getLeavesOfType(NODE_GRAPH_VIEW_TYPE)) {
       if (leaf.view instanceof FolderNodeGraphView) leaf.view.removePathState(path);
     }

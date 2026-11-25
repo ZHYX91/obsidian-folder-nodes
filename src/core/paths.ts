@@ -33,11 +33,11 @@ export function nodeNotePath(folderPath: string): string {
   return normalized.length === 0 ? "" : `${normalized}/${name}.md`;
 }
 
-export function isCanonicalNodeNote(notePath: string): boolean {
+export function isCanonicalNodeNote(notePath: string, rootNotePath?: string): boolean {
   const normalized = normalizeVaultPath(notePath);
   if (!normalized.toLocaleLowerCase().endsWith(".md")) return false;
   const folder = dirname(normalized);
-  if (folder.length === 0) return false;
+  if (folder.length === 0) return rootNotePath !== undefined && isSameVaultName(normalized, rootNotePath);
   return isSameVaultName(basename(folder), basename(normalized).slice(0, -3));
 }
 
