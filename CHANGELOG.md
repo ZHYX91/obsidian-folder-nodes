@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.4 - 2026-11-25
+
+- Keep selected settings tabs visible at narrow widths, preserve focus when changing tabs or detecting emoji fonts, and let translated controls wrap.
+- Keep rename, move, and merge actions bound to their original files and folders. Refuse stale actions and reconcile unrelated renames during folder moves.
+- Keep generated names portable after truncation, including Windows device names with superscript digits and names containing ASCII controls.
+- Refresh graph nodes after canonical-note conflicts and reconcile attachment reference counts after folder moves and deletions. Reuse folder lookups within a graph update.
+- Keep drafts and restore controls after a write fails. Make icon editing usable on narrow touch screens and give graph actions accessible names that match their captions.
+- Align node terminology, graph counts and settings labels with the user guides in all twelve interface languages.
+
+[Compare 0.13.3 and 0.13.4](https://github.com/ZHYX91/obsidian-folder-nodes/compare/0.13.3...0.13.4)
+
 ## 0.13.3 - 2026-11-22
 
 - Preserve managed node metadata and comments when changing visibility or rank. Keep the original line endings of untouched properties and note text, including mixed or CR-only files.
