@@ -237,7 +237,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       attr: { id: this.tabId(id), role: "tab", "aria-selected": String(isActive), "aria-controls": PANEL_ID, tabindex: isActive ? "0" : "-1" },
     });
     button.type = "button";
-    button.addEventListener("click", () => this.selectTab(id, false));
+    button.addEventListener("click", () => this.selectTab(id, button.ownerDocument.activeElement === button));
     button.addEventListener("keydown", (event) => {
       const currentIndex = TABS.indexOf(id);
       let targetIndex: number | null = null;

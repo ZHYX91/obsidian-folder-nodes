@@ -72,6 +72,19 @@ it("connects each editable field to its translated row and preserves same-tab co
   } finally { tab.containerEl.remove(); }
 });
 
+it("keeps focus on the activated tab when the settings panel is rebuilt", () => {
+  const { tab } = fixture();
+  try {
+    tab.display();
+    const management = tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-management")!;
+    management.focus();
+    management.click();
+    const selected = tab.containerEl.querySelector('[role="tab"][aria-selected="true"]');
+    expect(selected?.id).toBe(management.id);
+    expect(document.activeElement).toBe(selected);
+  } finally { tab.hide(); tab.containerEl.remove(); }
+});
+
 it("prevents read-only management rule removal through the host icon action", () => {
   const { tab, plugin } = fixture();
   plugin.getSettingsCompatibility = () => ({
