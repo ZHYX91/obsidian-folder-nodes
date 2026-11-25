@@ -2,6 +2,9 @@ const WINDOWS_FORBIDDEN = /[<>:"/\\|?*#[\]^]/gu;
 const TRAILING_DOTS_OR_SPACES = /[. ]+$/u;
 const MULTIPLE_SPACES = /\s+/gu;
 const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
+const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|conin\$|conout\$|(?:com|lpt)[1-9¹²³]) *(?:\.|$)/iu;
+// eslint-disable-next-line no-control-regex -- Win32 forbids each ASCII control in a filename.
+const WINDOWS_CONTROL = /[\u0000-\u001f]/gu;
 const NON_ASCII = /[\u0080-\u{10FFFF}]/u;
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const UTF8 = new TextEncoder();
@@ -57,22 +60,28 @@ export function isSameVaultPath(left: string, right: string): boolean {
 }
 
 export function sanitizeNodeName(input: string): string {
-  return sanitizeName(input, Number.POSITIVE_INFINITY);
+  const name = cleanName(input);
+  return limitName(WINDOWS_RESERVED.test(name) ? `_${name}` : name, Number.POSITIVE_INFINITY);
 }
 
 export function sanitizeNewNodeName(input: string): string {
-  return sanitizeName(input, NODE_NAME_BYTE_LIMIT);
+  const name = limitName(cleanName(input).replace(WINDOWS_CONTROL, "-"), NODE_NAME_BYTE_LIMIT);
+  // Truncating a long grapheme can expose a device name at the end of the component.
+  return WINDOWS_DEVICE_NAME.test(name)
+    ? limitName(`_${name}`, NODE_NAME_BYTE_LIMIT)
+    : name;
 }
 
-function sanitizeName(input: string, byteLimit: number): string {
-  let value = input
+function cleanName(input: string): string {
+  return input
     .normalize("NFC")
     .replace(WINDOWS_FORBIDDEN, "-")
     .replace(MULTIPLE_SPACES, " ")
     .replace(TRAILING_DOTS_OR_SPACES, "")
-    .trim();
-  if (value === "") value = "Untitled";
-  if (WINDOWS_RESERVED.test(value)) value = `_${value}`;
+    .trim() || "Untitled";
+}
+
+function limitName(value: string, byteLimit: number): string {
   let length = 0;
   let bytes = 0;
   let truncated = "";
@@ -90,4 +99,13 @@ export function isDescendantPath(candidate: string, ancestor: string): boolean {
   const child = normalizeVaultPath(candidate);
   const parent = normalizeVaultPath(ancestor);
   return child !== parent && child.startsWith(`${parent}/`);
+}
+
+export function validateFileName(rawName: string): string {
+  const name = rawName.trim();
+  if (name === "" || name === "." || name === ".." || /[<>:"/\\|?*]/u.test(name)
+    || /[. ]$/u.test(name) || name.search(WINDOWS_CONTROL) >= 0 || WINDOWS_DEVICE_NAME.test(name)) {
+    throw new Error(`Invalid file name: ${rawName}`);
+  }
+  return name;
 }

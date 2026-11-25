@@ -18,7 +18,7 @@ import { analyzeFolderNodesSource, createNodeDocument, patchFolderNodesFrontmatt
 import { resolveLeafTarget } from "../core/leaf-target";
 import { scanMigrationAsync, type VaultInventory } from "../core/migration";
 import { compareChildren, materializeManualOrder, naturalOrder, planInsert } from "../core/ordering";
-import { basename, childVaultPath, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName } from "../core/paths";
+import { basename, childVaultPath, dirname, isCanonicalNodeNote, isDescendantPath, isSameVaultName, isSameVaultPath, nodeNotePath, normalizeVaultPath, sanitizeNewNodeName, sanitizeNodeName, validateFileName } from "../core/paths";
 import { insertionIndex, type PlacementIntent, type PlacementPreview } from "../core/placement";
 import {
   FOLDER_NODES_PROPERTY,
@@ -1681,12 +1681,4 @@ function sourceFingerprint(source: string): string {
 
 function comparePaths<T extends { readonly path: string }>(left: T, right: T): number {
   return left.path.localeCompare(right.path, "en");
-}
-
-function validateFileName(rawName: string): string {
-  const name = rawName.trim();
-  if (name === "" || name === "." || name === ".." || /[<>:"/\\|?*]/u.test(name) || /[. ]$/u.test(name)) throw new Error(`Invalid file name: ${rawName}`);
-  const stem = name.split(".")[0] ?? name;
-  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(stem)) throw new Error(`Invalid file name: ${rawName}`);
-  return name;
 }

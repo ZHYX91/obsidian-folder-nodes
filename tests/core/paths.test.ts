@@ -63,6 +63,19 @@ describe("folder node paths", () => {
       expect(sanitizeNewNodeName(result)).toBe(result);
     }
   });
+  it("makes final new names portable without changing printable neighboring names", () => {
+    for (const name of ["COM¹", "Com².backup", "com³", "lpt¹", "LPT².txt", "LPT³", "CONIN$", "conout$.log", "nul .md", "Com1 .log"]) {
+      expect(sanitizeNewNodeName(name)).toBe(`_${name}`);
+    }
+    expect(sanitizeNewNodeName("COM⁴")).toBe("COM⁴");
+    expect(sanitizeNewNodeName("a\u0000b\u001fc\td")).toBe("a-b-c d");
+    // The oversized final grapheme is dropped, leaving a reserved stem.
+    expect(sanitizeNewNodeName("NUL" + "👩‍".repeat(80) + "👩")).toBe("_NUL");
+    const bounded = sanitizeNewNodeName("lpt²." + "汉".repeat(100));
+    expect(bounded.startsWith("_lpt².")).toBe(true);
+    expect(new TextEncoder().encode(bounded + ".md").length).toBeLessThanOrEqual(255);
+    expect(sanitizeNewNodeName(bounded)).toBe(bounded);
+  });
   it("retains the legacy name interpretation when reading existing paths", () => {
     expect(sanitizeNodeName("汉".repeat(100))).toBe("汉".repeat(100));
   });

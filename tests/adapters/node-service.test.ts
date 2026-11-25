@@ -945,6 +945,35 @@ describe("NodeService structural safety", () => {
     expect(fake.contents.get(rootNote.path)).toBe("root body");
   });
 
+  it("keeps existing superscript device spellings and prefixes newly chosen node names", async () => {
+    const fake = new FakeObsidian("COM¹");
+    const rootNote = fake.addFile("COM¹.md", "root body");
+    const legacy = fake.addFolder("LPT²");
+    const note = fake.addFile("LPT²/LPT².md", "existing body");
+    const nodes = service(fake);
+    expect(nodes.getCanonicalFile("")).toBe(rootNote);
+    await nodes.renameNode(legacy, "LPT²");
+    expect(nodes.getCanonicalFile("LPT²")).toBe(note);
+    expect(fake.renames).toEqual([]);
+    expect((await nodes.createNode("", "LPT³.notes")).path).toBe("_LPT³.notes/_LPT³.notes.md");
+    await nodes.renameNode(legacy, "COM²");
+    expect(note.path).toBe("_COM²/_COM².md");
+    expect(fake.contents.get(note.path)).toBe("existing body");
+  });
+
+  it("rejects reserved destination names before renaming an ordinary file", async () => {
+    const fake = new FakeObsidian();
+    const file = fake.addFile("report.pdf", "original data");
+    const nodes = service(fake);
+    for (const name of ["CoM².preview.pdf", "bad\u0001name.pdf", "NUL .log", "CONIN$.log", "CONOUT$"]) {
+      await expect(nodes.renameFile(file, name)).rejects.toThrow("Invalid file name");
+    }
+    expect(fake.renames).toEqual([]);
+    expect(fake.contents.get(file.path)).toBe("original data");
+    await nodes.renameFile(file, "COM⁴.pdf");
+    expect(file.path).toBe("COM⁴.pdf");
+  });
+
   it("keeps a deleted Root Node Note deleted", async () => {
     const fake = new FakeObsidian();
     fake.addFile("Vault.md", "root body");
