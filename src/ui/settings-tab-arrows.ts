@@ -85,8 +85,13 @@ export function addSettingsTabArrows(
   }
 
   let followSelectedTab = true;
+  let automaticScrollPosition: number | null = null;
   function onScroll(): void {
+    const automatic = automaticScrollPosition !== null && Math.abs(tabs.scrollLeft - automaticScrollPosition) <= 1;
+    automaticScrollPosition = null;
     update();
+    // Panel content can narrow the strip before the earlier reveal event arrives.
+    if (automatic) return;
     const viewport = tabs.getBoundingClientRect();
     const selected = labels.find(tab => tab.getAttribute("aria-selected") === "true")?.getBoundingClientRect();
     if (!selected || !viewport.width) return;
@@ -97,20 +102,21 @@ export function addSettingsTabArrows(
   }
 
   function measure(): void {
+    const positionBeforeMeasure = tabs.scrollLeft;
     update();
     if (!tabs.clientWidth) return;
     if (!frame.classList.contains("has-overflow")) {
       followSelectedTab = true;
-      return;
+    } else if (followSelectedTab) {
+      const active = labels.find(tab => tab.getAttribute("aria-selected") === "true");
+      if (!active) return;
+      const viewport = tabs.getBoundingClientRect();
+      const selected = active.getBoundingClientRect();
+      if (selected.left < viewport.left && selected.right < viewport.right) tabs.scrollLeft += selected.left - viewport.left;
+      else if (selected.right > viewport.right && selected.left > viewport.left) tabs.scrollLeft += selected.right - viewport.right;
+      update();
     }
-    if (!followSelectedTab) return;
-    const active = labels.find(tab => tab.getAttribute("aria-selected") === "true");
-    if (!active) return;
-    const viewport = tabs.getBoundingClientRect();
-    const selected = active.getBoundingClientRect();
-    if (selected.left < viewport.left && selected.right < viewport.right) tabs.scrollLeft += selected.left - viewport.left;
-    else if (selected.right > viewport.right && selected.left > viewport.left) tabs.scrollLeft += selected.right - viewport.right;
-    update();
+    if (tabs.scrollLeft !== positionBeforeMeasure) automaticScrollPosition = tabs.scrollLeft;
   }
 
   const view = doc.defaultView;
