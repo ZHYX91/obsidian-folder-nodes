@@ -7,6 +7,7 @@
 - Keep generated names portable after truncation, including Windows device names with superscript digits and names containing ASCII controls.
 - Refresh graph nodes after canonical-note conflicts and reconcile attachment reference counts after folder moves and deletions. Reuse folder lookups within a graph update.
 - Keep drafts and restore controls after a write fails. Make icon editing usable on narrow touch screens, give graph actions accessible names that match their captions, and keep the graph link status readable on narrow screens.
+- Keep focus on a reorder button when an icon candidate reaches either end of the list.
 - Align node terminology, graph counts and settings labels with the user guides in all twelve interface languages.
 
 [Compare 0.13.3 and 0.13.4](https://github.com/ZHYX91/obsidian-folder-nodes/compare/0.13.3...0.13.4)

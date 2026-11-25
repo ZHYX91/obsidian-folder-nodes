@@ -39,10 +39,14 @@ describe("Visual Picker ownership and keyboard continuation", () => {
     f.buttons(t("moveCandidateUp"))[2]!.click();
     expect(document.activeElement).toBe(f.buttons(t("moveCandidateUp"))[1]);
     f.buttons(t("moveCandidateUp"))[1]!.click();
-    expect(document.activeElement).toBe(f.modal.contentEl.querySelector("input"));
-    expect((document.activeElement as HTMLInputElement).value).toBe("🧠");
-    f.buttons(t("removeCandidate"))[0]!.click();
-    expect((document.activeElement as HTMLInputElement).value).toBe("📁");
+    expect(document.activeElement).toBe(f.buttons(t("moveCandidateDown"))[0]);
+    expect(f.modal.contentEl.querySelector("input")?.value).toBe("🧠");
+    f.buttons(t("moveCandidateDown"))[0]!.click();
+    expect(document.activeElement).toBe(f.buttons(t("moveCandidateDown"))[1]);
+    f.buttons(t("moveCandidateDown"))[1]!.click();
+    expect(document.activeElement).toBe(f.buttons(t("moveCandidateUp"))[2]);
+    f.buttons(t("removeCandidate"))[2]!.click();
+    expect((document.activeElement as HTMLInputElement).value).toBe("⭐");
   });
 
   it("allows only the dispatched save when invalidated while pending", async () => {

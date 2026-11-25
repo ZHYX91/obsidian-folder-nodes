@@ -91,8 +91,9 @@ export class VisualPickerModal extends SubmittingModal {
         this.renderEditor({ index: Math.min(index, this.values.length - 1) });
       });
       if (focus?.index === index) {
-        const button = focus.button === "up" ? up : focus.button === "down" ? down : null;
-        (button !== null && !button.disabled ? button : input).focus();
+        if (focus.button === "up") (up.disabled ? down : up).focus();
+        else if (focus.button === "down") (down.disabled ? up : down).focus();
+        else input.focus();
       }
     }
     this.renderPreview();
