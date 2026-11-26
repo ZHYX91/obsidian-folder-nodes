@@ -406,6 +406,18 @@ body {
   background: var(--background-secondary);
 }
 
+.folder-nodes-migration-more { inline-size: 100%; min-height: 36px; margin-block-start: var(--size-4-2); }
+
+.folder-nodes-migration-paths code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.folder-nodes-migration-paths li:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
 .folder-nodes-preview-grid {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -1291,6 +1303,7 @@ button.folder-nodes-current:focus-visible {
   .folder-nodes-album-card,
   .folder-nodes-file-row,
   .folder-nodes-more,
+  .folder-nodes-migration-more,
   .folder-nodes-action { min-height: 44px; }
 
   .folder-nodes-explorer-root { min-block-size: 52px; }

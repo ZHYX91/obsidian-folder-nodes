@@ -139,7 +139,6 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "沒有需要遷移或報告的 Folder Nodes 屬性。",
   "applyPropertyMigration": "應用屬性遷移",
   "propertyMigrationComplete": "Folder Nodes 屬性遷移已完成並驗證。",
-  "showingFirstItems": "僅顯示前 {count} 項。",
   "structureMaintenance": "結構維護",
   "structureMaintenanceDesc": "批量整理會先顯示準確路徑；健康檢查始終只讀。",
   "maintenanceDesc": "先預覽將建立、移動、跳過和阻止的具體路徑；確認前不會修改 Vault。",

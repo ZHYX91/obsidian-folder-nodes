@@ -13,7 +13,7 @@
     "lint": "eslint main.ts src tests benchmarks scripts esbuild.config.mjs eslint.config.mjs vitest.config.mts vitest.coverage-inventory.config.mts vitest.performance.config.mts --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:browser": "node scripts/test-tooltip-browser.mjs && node scripts/test-settings-tabs-browser.mjs",
+    "test:browser": "node scripts/test-tooltip-browser.mjs && node scripts/test-settings-tabs-browser.mjs && node scripts/test-migration-preview-browser.mjs",
     "test:browser:keys": "node scripts/test-graph-keyboard-browser.mjs",
     "test:browser:drag": "node scripts/test-contents-drag-browser.mjs",
     "test:coverage": "vitest run --coverage",
