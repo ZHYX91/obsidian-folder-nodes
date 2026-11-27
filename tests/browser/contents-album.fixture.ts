@@ -1,5 +1,5 @@
 import "../setup/obsidian-dom";
-import { Menu } from "obsidian";
+import { Menu } from "../mocks/obsidian";
 import { FakeObsidian } from "../helpers/fake-obsidian";
 import { NodeService } from "../../src/adapters/node-service";
 import { ReferenceIndex } from "../../src/core/reference-index";
