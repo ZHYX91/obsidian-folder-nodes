@@ -809,3 +809,12 @@
     bottom: -22px;
   }
 }
+
+.folder-nodes-node-graph-rearrange.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.folder-nodes-node-graph-node-body[draggable="true"] { cursor: grab; }
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node.folder-nodes-drop-before { box-shadow: inset 2px 0 var(--interactive-accent); }
+.folder-nodes-node-graph-view.is-top-to-bottom .folder-nodes-node-graph-node.folder-nodes-drop-after { box-shadow: inset -2px 0 var(--interactive-accent); }

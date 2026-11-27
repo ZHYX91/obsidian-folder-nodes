@@ -9,6 +9,7 @@ export type NodeGraphLayoutDirection = "left-to-right" | "top-to-bottom";
 
 export interface NodeGraphSettings {
   enabled: boolean;
+  allowNodeReparenting: boolean;
   defaultDimension: NodeGraphDimension;
   layoutDirection: NodeGraphLayoutDirection;
   largeGraphThreshold: number;

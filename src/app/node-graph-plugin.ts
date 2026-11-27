@@ -1,4 +1,4 @@
-import { Notice, setIcon, TFile, TFolder } from "obsidian";
+import { Notice, Platform, setIcon, TFile, TFolder } from "obsidian";
 
 import FolderNodesPlugin from "./plugin";
 import { FolderNodeContentsView, CONTENTS_VIEW_TYPE } from "../ui/contents-view";
@@ -21,6 +21,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     this.registerView(NODE_GRAPH_VIEW_TYPE, (leaf) => {
       const view = new FolderNodeGraphView(leaf, this.service, {
         getSettings: () => this.settings.nodeGraph,
+        placement: Platform.isDesktopApp ? this.service : undefined,
         getIndexSnapshot: () => this.nodeGraphIndex.snapshot(this.settings.nodeGraph),
         onNodeMenu: (event, path, contribute) => {
           const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
