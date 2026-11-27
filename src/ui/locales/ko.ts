@@ -157,7 +157,6 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "이전하거나 보고할 Folder Nodes 속성이 없습니다.",
   "applyPropertyMigration": "속성 이전 적용",
   "propertyMigrationComplete": "Folder Nodes 속성 이전이 완료되고 검증되었습니다.",
-  "showingFirstItems": "처음 {count}개 항목만 표시합니다.",
   "structureMaintenance": "구조 유지 관리",
   "structureMaintenanceDesc": "일괄 정리는 변경할 경로를 먼저 보여 줍니다. 상태 검사는 읽기 전용입니다.",
   "maintenanceDesc": "만들거나 이동할 경로, 건너뛸 항목 및 충돌을 미리 확인합니다. 승인 전에는 Vault를 변경하지 않습니다.",

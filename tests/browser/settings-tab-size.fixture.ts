@@ -34,8 +34,10 @@ function measureTabs(width: number, direction: "ltr" | "rtl") {
     return {
       coarse: matchMedia("(pointer: coarse)").matches,
       heights: Array.from(tabs.children, (tab) => tab.getBoundingClientRect().height),
-      arrows: Array.from(root.querySelectorAll(".folder-nodes-tab-arrow"), (arrow) => arrow.getBoundingClientRect().width)
-        .filter((visibleWidth) => visibleWidth > 0),
+      arrows: Array.from(root.querySelectorAll(".folder-nodes-tab-arrow"), (arrow) => {
+        const rect = arrow.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      }).filter((rect) => rect.width > 0),
     };
   } finally {
     remove();
