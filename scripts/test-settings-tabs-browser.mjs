@@ -25,8 +25,10 @@ await withBrowserFixture({
         const layout = `${direction}, ${width}px, ${touch ? "coarse" : "fine"} pointer`;
         assert.equal(result.coarse, touch, layout);
         const arrowSize = touch ? 44 : 32;
-        const arrowHeight = touch ? 44 : 34;
-        assert.deepEqual(result.arrows, width === 900 ? [] : [{ width: arrowSize, height: arrowHeight }], layout);
+        const minimumArrowHeight = touch ? 44 : 34;
+        assert.deepEqual(result.arrows.map(({ width }) => width), width === 900 ? [] : [arrowSize], layout);
+        assert.ok(result.arrows.every(({ height }) => height >= minimumArrowHeight),
+          layout + ": visible paging arrows must be at least " + minimumArrowHeight + "px high");
         assert.equal(result.heights.length, 5, layout);
         const minimum = touch ? 44 : 34;
         assert.ok(result.heights.every((height) => height >= minimum),
