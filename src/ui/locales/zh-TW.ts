@@ -20,6 +20,8 @@ export const zhTW: Readonly<Record<TranslationKey, string>> = {
   "icons": "圖示與外觀",
   "naming": "選取範圍與命名",
   "nodeGraph": "節點圖譜",
+  "allowNodeReparenting": "允許拖曳變更節點層級",
+  "allowNodeReparentingDesc": "開啟後，可在圖譜重組模式中將節點拖曳到其他節點下。預設關閉；選單中的移動操作仍可使用。",
   "openNodeGraph": "開啟節點圖譜",
   "openInNodeGraph": "在節點圖譜中開啟",
   "openSubtreeNodeGraph": "開啟此節點的子樹圖譜",
