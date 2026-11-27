@@ -20,6 +20,8 @@ export const es: Readonly<Record<TranslationKey, string>> = {
   "icons": "Iconos y apariencia",
   "naming": "Selección y nombres",
   "nodeGraph": "Gráfico de nodos",
+  "allowNodeReparenting": "Permitir arrastrar para cambiar la jerarquía de nodos",
+  "allowNodeReparentingDesc": "Al activarlo, se pueden arrastrar nodos dentro de otros en el modo de reorganización. Desactivado de forma predeterminada; las acciones de mover del menú siguen disponibles.",
   "openNodeGraph": "Abrir el gráfico de nodos",
   "openInNodeGraph": "Abrir en el gráfico de nodos",
   "openSubtreeNodeGraph": "Abrir el gráfico del subárbol",
