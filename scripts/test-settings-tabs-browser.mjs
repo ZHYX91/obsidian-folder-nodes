@@ -24,7 +24,9 @@ await withBrowserFixture({
         const result = await evaluate(`window.measureTabs(${width}, "${direction}")`);
         const layout = `${direction}, ${width}px, ${touch ? "coarse" : "fine"} pointer`;
         assert.equal(result.coarse, touch, layout);
-        assert.deepEqual(result.arrows, width === 900 ? [] : [touch ? 44 : 32], layout);
+        const arrowSize = touch ? 44 : 32;
+        const arrowHeight = touch ? 44 : 34;
+        assert.deepEqual(result.arrows, width === 900 ? [] : [{ width: arrowSize, height: arrowHeight }], layout);
         assert.equal(result.heights.length, 5, layout);
         const minimum = touch ? 44 : 34;
         assert.ok(result.heights.every((height) => height >= minimum),
