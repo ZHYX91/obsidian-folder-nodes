@@ -37,6 +37,16 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
       callback: () => this.createFixture().catch((error) => new Notice(String(error))),
     });
     this.addCommand({
+      id: "prepare-migration-preview",
+      name: "Create 501 legacy migration rows (disposable Vault only)",
+      callback: () => this.prepareMigrationPreview().catch((error) => new Notice(String(error))),
+    });
+    for (const moment of ["cancelled", "confirmed"]) this.addCommand({
+      id: `save-migration-${moment}-sources`,
+      name: `Save ${moment} migration source observations (disposable Vault only)`,
+      callback: () => this.saveMigrationPreviewSources(moment).catch((error) => new Notice(String(error))),
+    });
+    this.addCommand({
       id: "prepare-merge-safety",
       name: "Prepare merge safety fixture (disposable Vault only)",
       callback: () => this.prepareMergeSafety().catch((error) => new Notice(String(error))),
@@ -66,6 +76,59 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
       name: "Save merge and content ownership observations (disposable Vault only)",
       callback: () => this.saveOwnershipSafety().catch((error) => new Notice(String(error))),
     });
+  }
+
+  migrationPreviewFixtures() {
+    return Array.from({ length: 501 }, (_, index) => {
+      const name = `Node ${String(index + 1).padStart(3, "0")}`;
+      const folder = `Migration preview acceptance/${name}`;
+      const leading = "---\nowner: QA\n";
+      const body = `---\n# ${name}\n\nSynthetic legacy migration row.\n`;
+      const rank = (index + 1) * 1024;
+      return {
+        folder,
+        path: `${folder}/${name}.md`,
+        legacy: `${leading}folderNodeSiblingRank: ${rank}\n${body}`,
+        canonical: `${leading}folder-nodes:\n  - rank=${rank}\n${body}`,
+      };
+    });
+  }
+
+  async prepareMigrationPreview() {
+    const vault = this.app.vault;
+    const root = "Migration preview acceptance";
+    if (!vault.getAbstractFileByPath("Existing/Existing.md") || !vault.getAbstractFileByPath("Loose.md")) {
+      throw new Error("The product's disposable acceptance fixture is required.");
+    }
+    if (this.creating || vault.getAbstractFileByPath(root)) {
+      throw new Error("Migration fixtures already exist or are being created. Use a fresh disposable Vault.");
+    }
+    this.creating = true;
+    try {
+      await vault.createFolder(root);
+      for (const entry of this.migrationPreviewFixtures()) {
+        await vault.createFolder(entry.folder);
+        await vault.create(entry.path, entry.legacy);
+      }
+      new Notice("Prepared 501 legacy property rows. Open the product migration preview from the command palette.");
+    } finally {
+      this.creating = false;
+    }
+  }
+
+  async saveMigrationPreviewSources(moment) {
+    const vault = this.app.vault;
+    const observations = [];
+    for (const entry of this.migrationPreviewFixtures()) {
+      const file = vault.getFileByPath(entry.path);
+      if (!file) throw new Error(`Missing migration fixture: ${entry.path}`);
+      const actual = await vault.read(file);
+      observations.push({ path: entry.path, legacy: actual === entry.legacy, canonical: actual === entry.canonical });
+    }
+    const destination = `_migration-preview-${moment}-sources.json`;
+    if (await vault.adapter.exists(destination)) throw new Error(`Migration observations already exist: ${destination}`);
+    await vault.adapter.write(destination, JSON.stringify(observations, null, 2));
+    new Notice(`Saved ${observations.length} migration source observations. No verdict is assigned.`);
   }
 
   async preparePortableNameFixture() {

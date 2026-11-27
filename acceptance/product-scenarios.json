@@ -158,6 +158,28 @@
       ]
     },
     {
+      "id": "migration-preview-pagination",
+      "title": "Large property migration preview and exact source readback",
+      "surfaces": [
+        "desktop",
+        "android-emulator"
+      ],
+      "requiredCapabilities": {
+        "desktop": [],
+        "android-emulator": []
+      },
+      "steps": [
+        "In a fresh disposable Vault run Create 501 legacy migration rows. Open Migrate Folder Nodes properties and expand the last row of the plan with Show 1 more.",
+        "On desktop activate Show 1 more with the keyboard and check that the final row receives focus. On Android reach it with touch in a narrow pane and read the complete path.",
+        "Cancel the preview and run Save cancelled migration source observations.",
+        "Reopen the migration preview, explicitly confirm and wait for completion. Run Save confirmed migration source observations. Retain both observation files."
+      ],
+      "expected": [
+        "The final fixture path is visible and the paging button disappears after the final row. Desktop focus moves to that row, and Android can scroll to the dialog actions.",
+        "After cancellation all 501 fixture files are byte-for-byte legacy sources. After confirmation all 501 match the canonical rank list with unrelated YAML and Markdown preserved."
+      ]
+    },
+    {
       "id": "navigation-affordances",
       "title": "Leaf affordance, compact Contents header, and stable graph focus",
       "surfaces": [
