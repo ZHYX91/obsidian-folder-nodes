@@ -105,12 +105,25 @@ module.exports = class FolderNodesAcceptanceProvider extends Plugin {
     }
     this.creating = true;
     try {
+      const fixtures = this.migrationPreviewFixtures();
       await vault.createFolder(root);
-      for (const entry of this.migrationPreviewFixtures()) {
+      for (const entry of fixtures) {
         await vault.createFolder(entry.folder);
         await vault.create(entry.path, entry.legacy);
       }
-      new Notice("Prepared 501 legacy property rows. Open the product migration preview from the command palette.");
+
+      // Confirm the actual fixture bytes after all creates finish. Some Android
+      // writes can resolve without retaining the requested initial content.
+      for (const entry of fixtures) {
+        const file = vault.getFileByPath(entry.path);
+        if (!file) throw new Error(`Missing migration fixture: ${entry.path}`);
+        if (await vault.read(file) === entry.legacy) continue;
+        await vault.modify(file, entry.legacy);
+        if (await vault.read(file) !== entry.legacy) {
+          throw new Error(`Could not prepare exact migration fixture bytes: ${entry.path}`);
+        }
+      }
+      new Notice("Verified 501 legacy property rows. Open the product migration preview from the command palette.");
     } finally {
       this.creating = false;
     }

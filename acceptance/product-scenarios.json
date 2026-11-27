@@ -169,7 +169,7 @@
         "android-emulator": []
       },
       "steps": [
-        "In a fresh disposable Vault run Create 501 legacy migration rows. Open Migrate Folder Nodes properties and expand the remaining rows with Show more. The Vault also contains legacy rows from other acceptance scenarios.",
+        "In a fresh disposable Vault run Create 501 legacy migration rows and wait for the notice that all 501 sources were verified. Open Migrate Folder Nodes properties and expand the remaining rows with Show more. The Vault also contains legacy rows from other acceptance scenarios.",
         "On desktop activate Show more with the keyboard and check that the first newly visible row receives focus. On Android reach the control with touch in a narrow pane. In both cases read the complete path of Node 501.",
         "Cancel the preview and run Save cancelled migration source observations.",
         "In the disposable Vault only, resolve the two pre-seeded conflicts. In Conflict/Conflict.md align the legacy hidden flag with the canonical hidden=true token. In SafetyQuoted/SafetyQuoted.md replace the quoted key with folder-nodes while preserving both list tokens. Reopen the preview and confirm that no conflicts remain. Explicitly confirm and wait for completion. Run Save confirmed migration source observations. Retain both observation files."
