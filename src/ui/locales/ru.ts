@@ -20,6 +20,8 @@ export const ru: Readonly<Record<TranslationKey, string>> = {
   "icons": "Значки и оформление",
   "naming": "Выделение и имена",
   "nodeGraph": "Граф узлов",
+  "allowNodeReparenting": "Разрешить изменение иерархии узлов перетаскиванием",
+  "allowNodeReparentingDesc": "Если включено, узлы можно перетаскивать внутрь других узлов в режиме реорганизации. По умолчанию выключено; перемещение через меню остаётся доступным.",
   "openNodeGraph": "Открыть граф узлов",
   "openInNodeGraph": "Открыть в графе узлов",
   "openSubtreeNodeGraph": "Открыть граф поддерева",
