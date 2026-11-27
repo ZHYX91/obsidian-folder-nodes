@@ -139,7 +139,6 @@ export const ru: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "Нет свойств Folder Nodes для переноса или отчёта.",
   "applyPropertyMigration": "Применить миграцию свойств",
   "propertyMigrationComplete": "Миграция свойств Folder Nodes завершена и проверена.",
-  "showingFirstItems": "Показаны только первые {count} элементов.",
   "structureMaintenance": "Обслуживание структуры",
   "structureMaintenanceDesc": "При групповой организации сначала показываются точные пути. Проверка состояния всегда доступна только для чтения.",
   "maintenanceDesc": "Сначала просмотрите пути, которые будут созданы, перемещены, пропущены или заблокированы. До подтверждения ничего не меняется.",

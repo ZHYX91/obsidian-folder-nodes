@@ -2,6 +2,7 @@ import { App, Notice, Setting } from "obsidian";
 
 import type { MigrationScan, PropertyHealthFinding, PropertyMigrationScan } from "../core/types";
 import { t } from "./i18n";
+import { renderMigrationPreviewSection } from "./migration-preview-section";
 import { SubmittingModal } from "./submitting-modal";
 
 export class PropertyMigrationModal extends SubmittingModal {
@@ -32,14 +33,14 @@ export class PropertyMigrationModal extends SubmittingModal {
 
     const summary = this.contentEl.createDiv({ cls: "folder-nodes-migration-summary" });
     if (this.structureScan !== null) {
-      this.pathSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"), this.structureScan.leafMoves.map(({ sourcePath }) => sourcePath));
-      this.pathSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
+      renderMigrationPreviewSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"), this.structureScan.leafMoves.map(({ sourcePath }) => sourcePath));
+      renderMigrationPreviewSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
         this.structureScan.missingNodeNotes.map((path) => path || "/"));
-      this.pathSection(summary, t("skippedLeafNotes"), this.structureScan.exemptLeafMarkdown);
-      this.pathSection(summary, t("skippedFolders"), this.structureScan.ignoredFolders);
-      this.pathSection(summary, t("conflicts"), this.structureScan.conflicts.map(({ path, reason }) => `${path}: ${reason}`), true);
+      renderMigrationPreviewSection(summary, t("skippedLeafNotes"), this.structureScan.exemptLeafMarkdown);
+      renderMigrationPreviewSection(summary, t("skippedFolders"), this.structureScan.ignoredFolders);
+      renderMigrationPreviewSection(summary, t("conflicts"), this.structureScan.conflicts.map(({ path, reason }) => `${path}: ${reason}`), true);
     }
-    this.pathSection(summary, t("propertyChanges"), this.scan.changes.map(({ path, summary: detail }) => `${path}: ${detail}`));
+    renderMigrationPreviewSection(summary, t("propertyChanges"), this.scan.changes.map(({ path, summary: detail }) => `${path}: ${detail}`));
     this.findingSection(summary, t("propertyConflicts"), this.scan.conflicts, true);
     this.findingSection(summary, t("nonCanonicalProperties"), this.scan.nonCanonical);
     this.findingSection(summary, t("invalidIcons"), this.scan.invalidIcons);
@@ -87,15 +88,6 @@ export class PropertyMigrationModal extends SubmittingModal {
   }
 
   private findingSection(container: HTMLElement, label: string, findings: readonly PropertyHealthFinding[], blocking = false): void {
-    this.pathSection(container, label, findings.map(({ path, messages }) => `${path}: ${messages.join("; ")}`), blocking);
-  }
-
-  private pathSection(container: HTMLElement, label: string, paths: readonly string[], blocking = false): void {
-    const details = container.createEl("details", { cls: blocking && paths.length > 0 ? "is-blocking" : "" });
-    details.open = paths.length > 0;
-    details.createEl("summary", { text: `${label} (${paths.length})` });
-    const list = details.createEl("ul");
-    for (const path of paths.slice(0, 500)) list.createEl("li").createEl("code", { text: path });
-    if (paths.length > 500) details.createEl("p", { cls: "setting-item-description", text: t("showingFirstItems", { count: 500 }) });
+    renderMigrationPreviewSection(container, label, findings.map(({ path, messages }) => `${path}: ${messages.join("; ")}`), blocking);
   }
 }

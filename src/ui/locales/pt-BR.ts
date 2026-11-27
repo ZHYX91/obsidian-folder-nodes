@@ -139,7 +139,6 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "Nenhuma propriedade do Folder Nodes precisa ser migrada ou relatada.",
   "applyPropertyMigration": "Aplicar migração de propriedades",
   "propertyMigrationComplete": "Migração de propriedades do Folder Nodes concluída e verificada.",
-  "showingFirstItems": "Limite de itens exibidos: {count}.",
   "structureMaintenance": "Manutenção da estrutura",
   "structureMaintenanceDesc": "A organização em lote mostra os caminhos exatos primeiro; as verificações de integridade são somente leitura.",
   "maintenanceDesc": "Veja os caminhos que serão criados, movidos, ignorados ou bloqueados. Nada muda antes da confirmação.",
