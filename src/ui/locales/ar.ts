@@ -143,7 +143,6 @@ export const ar: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "لا توجد خصائص تحتاج إلى النقل أو الإبلاغ.",
   "applyPropertyMigration": "تنفيذ ترحيل الخصائص",
   "propertyMigrationComplete": "اكتمل ترحيل الخصائص والتحقق من النتائج.",
-  "showingFirstItems": "عرض أول {count} عناصر فقط.",
   "structureMaintenance": "صيانة البنية",
   "structureMaintenanceDesc": "ستظهر معاينة للمسارات قبل التنظيم الجماعي؛ فحص الحالة لا يغيّر الملفات.",
   "maintenanceDesc": "راجع المسارات التي ستُنشأ أو تُنقل أو تُتجاوز أو يُمنع تغييرها. لا يحدث شيء قبل الموافقة.",

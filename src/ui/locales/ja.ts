@@ -143,7 +143,6 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "移行または報告が必要な Folder Nodes のプロパティはありません。",
   "applyPropertyMigration": "プロパティの移行を実行",
   "propertyMigrationComplete": "Folder Nodes のプロパティ移行が完了し、確認されました。",
-  "showingFirstItems": "最初の {count} 件のみ表示しています。",
   "structureMaintenance": "構造のメンテナンス",
   "structureMaintenanceDesc": "一括整理では変更するパスを先に表示します。状態チェックは読み取り専用です。",
   "maintenanceDesc": "作成、移動、スキップ、競合するパスを確認できます。承認するまで Vault は変更しません。",

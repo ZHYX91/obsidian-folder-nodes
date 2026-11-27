@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
-export async function withBrowserFixture({ entry, stylesheet, ready }, run) {
+export async function withBrowserFixture({ entry, stylesheet, fixtureStyles = "", ready }, run) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const choices = [process.env.CHROME_BIN, process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, "Google/Chrome/Application/chrome.exe"),
     process.env["PROGRAMFILES(X86)"] && path.join(process.env["PROGRAMFILES(X86)"], "Microsoft/Edge/Application/msedge.exe"),
@@ -17,8 +17,14 @@ export async function withBrowserFixture({ entry, stylesheet, ready }, run) {
   const bundle = await build({ entryPoints: [path.join(root, entry)], bundle: true, write: false,
     platform: "browser", format: "iife", alias: { obsidian: path.join(root, "tests/mocks/obsidian.ts") } });
   const css = readFileSync(path.join(root, stylesheet), "utf8");
-  const server = createServer((_request, response) => { response.setHeader("Content-Type", "text/html; charset=utf-8");
-    response.end(`<!doctype html><meta charset="utf-8"><style>[hidden]{display:none!important}body{margin:0}${css}</style><script>${bundle.outputFiles[0].text}</script>`); });
+  const server = createServer((_request, response) => {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(`<!doctype html><meta charset="utf-8"><style>[hidden]{display:none!important}body{margin:0}${fixtureStyles}${css}</style>
+<body><script>
+  window.addEventListener("error", (event) => { window.folderNodesFixtureError ??= String(event.error ?? event.message); });
+  window.addEventListener("unhandledrejection", (event) => { window.folderNodesFixtureError ??= String(event.reason); });
+</script><script>${bundle.outputFiles[0].text}</script>`);
+  });
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let profile;
   let child;
@@ -26,6 +32,7 @@ export async function withBrowserFixture({ entry, stylesheet, ready }, run) {
   let socket;
   let closed = true;
   let launchError;
+  let stderr = "";
   const pending = new Map();
   let nextId = 0;
   function send(method, params = {}) {
@@ -52,11 +59,12 @@ export async function withBrowserFixture({ entry, stylesheet, ready }, run) {
     closed = false;
     childClosed = new Promise((resolve) => { child.once("close", () => { closed = true; resolve(); }); });
     child.once("error", (error) => { launchError = error; });
-    child.stdout.resume(); child.stderr.resume();
+    child.stdout.resume();
+    child.stderr.on("data", (chunk) => { stderr = (stderr + String(chunk)).slice(-8_192); });
     const deadline = Date.now() + 15_000;
     const portFile = path.join(profile, "DevToolsActivePort");
     while (!existsSync(portFile) && Date.now() < deadline && !closed && !launchError) await pause(50);
-    assert.ok(existsSync(portFile), `Owned Chromium debugging endpoint did not become ready: ${String(launchError ?? "timeout")}`);
+    assert.ok(existsSync(portFile), `Owned Chromium debugging endpoint did not become ready: ${String(launchError ?? (closed ? "process exited" : "timeout"))}\n${stderr.trim()}`);
     const port = Number(readFileSync(portFile, "utf8").split("\n")[0]);
     const tabs = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(5_000) })).json();
     const tab = tabs.find((entry) => entry.type === "page" && entry.url === `http://127.0.0.1:${endpoint.port}/`);
@@ -74,8 +82,14 @@ export async function withBrowserFixture({ entry, stylesheet, ready }, run) {
       clearTimeout(request.timeout); request.reject(new Error("Owned Chromium connection closed"));
     } pending.clear(); });
     await send("Page.bringToFront");
-    while (!(await evaluate(ready)) && Date.now() < deadline) await pause(50);
-    assert.ok(await evaluate(ready), "Browser fixture did not initialize");
+    const fixtureDeadline = Date.now() + 15_000;
+    for (;;) {
+      const failure = await evaluate("window.folderNodesFixtureError ?? null");
+      assert.equal(failure, null, `Browser fixture startup failed: ${entry}: ${failure}`);
+      if (await evaluate(ready)) break;
+      assert.ok(Date.now() < fixtureDeadline, `Browser fixture did not finish: ${entry}\n${stderr.trim()}`);
+      await pause(50);
+    }
     await run({ send, evaluate, pause });
   } finally {
     if (socket?.readyState === WebSocket.OPEN) { try { await send("Browser.close"); } catch { /* process close may win its response */ } }

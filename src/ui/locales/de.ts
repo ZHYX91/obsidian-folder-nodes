@@ -143,7 +143,6 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "Keine Folder-Nodes-Eigenschaften müssen migriert oder gemeldet werden.",
   "applyPropertyMigration": "Eigenschaftsmigration anwenden",
   "propertyMigrationComplete": "Die Migration der Folder-Nodes-Eigenschaften wurde abgeschlossen und geprüft.",
-  "showingFirstItems": "Nur die ersten {count} Elemente werden angezeigt.",
   "structureMaintenance": "Strukturwartung",
   "structureMaintenanceDesc": "Bei der Sammelorganisation werden die betroffenen Pfade zuerst angezeigt. Die Zustandsprüfung ist immer schreibgeschützt.",
   "maintenanceDesc": "Vorab prüfen, welche Pfade erstellt, verschoben, übersprungen oder blockiert werden. Vor der Bestätigung wird nichts verändert.",

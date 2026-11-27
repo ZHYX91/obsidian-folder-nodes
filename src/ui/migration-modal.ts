@@ -1,6 +1,7 @@
 import { App, Notice, Setting } from "obsidian";
 
 import { t } from "./i18n";
+import { renderMigrationPreviewSection } from "./migration-preview-section";
 import { SubmittingModal } from "./submitting-modal";
 import { nodeNotePath, sanitizeNodeName } from "../core/paths";
 import type { MigrationScan } from "../core/types";
@@ -17,13 +18,13 @@ export class MigrationModal extends SubmittingModal {
     this.setTitle(this.healthMode ? t("healthSummary") : t("batchOrganize"));
     if (this.healthMode) this.contentEl.createEl("p", { cls: "setting-item-description", text: t("readOnlyHealth") });
     const summary = this.contentEl.createDiv({ cls: "folder-nodes-migration-summary" });
-    this.pathSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"),
+    renderMigrationPreviewSection(summary, this.healthMode ? t("leafMarkdown") : t("moveLeafNotes"),
       this.scan.leafMoves.map(({ sourcePath, targetPath }) => this.healthMode ? sourcePath : `${sourcePath} → ${targetPath}`));
-    this.pathSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
+    renderMigrationPreviewSection(summary, this.healthMode ? t("foldersMissingNodeNotes") : t("createNodeNotes"),
       this.scan.missingNodeNotes.map((path) => this.healthMode ? path || "/" : this.notePath(path)));
-    this.pathSection(summary, t("skippedLeafNotes"), this.scan.exemptLeafMarkdown);
-    this.pathSection(summary, t("skippedFolders"), this.scan.ignoredFolders);
-    this.pathSection(summary, t("conflicts"), this.scan.conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`), true);
+    renderMigrationPreviewSection(summary, t("skippedLeafNotes"), this.scan.exemptLeafMarkdown);
+    renderMigrationPreviewSection(summary, t("skippedFolders"), this.scan.ignoredFolders);
+    renderMigrationPreviewSection(summary, t("conflicts"), this.scan.conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`), true);
     if (this.total() === 0 && this.scan.conflicts.length === 0) summary.createEl("p", { text: t("noChanges") });
 
     const progress = this.contentEl.createEl("progress", { attr: { "aria-label": t("batchOrganize") } });
@@ -44,35 +45,6 @@ export class MigrationModal extends SubmittingModal {
         });
         new Notice(`${t("batchOrganize")}: ${t("confirm")}`);
       })));
-  }
-
-  private pathSection(container: HTMLElement, label: string, paths: readonly string[], blocking = false): void {
-    const details = container.createEl("details", { cls: blocking && paths.length > 0 ? "is-blocking" : "" });
-    details.open = paths.length > 0;
-    details.createEl("summary", { text: `${label} (${paths.length})` });
-    if (paths.length === 0) return;
-    const list = details.createEl("ul");
-    let rendered = 0;
-    const append = (count: number): void => {
-      const next = Math.min(paths.length, rendered + count);
-      for (const path of paths.slice(rendered, next)) list.createEl("li").createEl("code", { text: path });
-      rendered = next;
-    };
-    append(500);
-    if (rendered < paths.length) {
-      const more = details.createEl("button");
-      more.type = "button";
-      const update = (): void => {
-        const count = Math.min(500, paths.length - rendered);
-        more.setText(t("showMore", { count }));
-      };
-      update();
-      more.addEventListener("click", () => {
-        append(500);
-        if (rendered === paths.length) more.remove();
-        else update();
-      });
-    }
   }
 
   private notePath(folderPath: string): string {

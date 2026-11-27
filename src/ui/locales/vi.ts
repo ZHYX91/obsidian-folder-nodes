@@ -143,7 +143,6 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "noPropertyChanges": "Không có thuộc tính Folder Nodes nào cần chuyển đổi hoặc báo cáo.",
   "applyPropertyMigration": "Áp dụng chuyển đổi thuộc tính",
   "propertyMigrationComplete": "Đã chuyển đổi và xác minh thuộc tính Folder Nodes.",
-  "showingFirstItems": "Chỉ hiện {count} mục đầu tiên.",
   "structureMaintenance": "Bảo trì cấu trúc",
   "structureMaintenanceDesc": "Sắp xếp hàng loạt sẽ hiện đường dẫn cụ thể trước; kiểm tra trạng thái luôn ở chế độ chỉ đọc.",
   "maintenanceDesc": "Xem trước đường dẫn sẽ được tạo, di chuyển, bỏ qua hoặc bị chặn. Không thay đổi gì trước khi xác nhận.",
