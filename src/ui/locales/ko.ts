@@ -20,6 +20,8 @@ export const ko: Readonly<Record<TranslationKey, string>> = {
   "icons": "아이콘과 모양",
   "naming": "선택 영역과 이름",
   "nodeGraph": "노드 그래프",
+  "allowNodeReparenting": "드래그로 노드 계층 변경 허용",
+  "allowNodeReparentingDesc": "켜면 그래프 재구성 모드에서 노드를 다른 노드 안으로 드래그할 수 있습니다. 기본값은 꺼짐이며 메뉴의 이동 작업은 계속 사용할 수 있습니다.",
   "openNodeGraph": "노드 그래프 열기",
   "openInNodeGraph": "노드 그래프에서 열기",
   "openSubtreeNodeGraph": "하위 트리 노드 그래프 열기",
