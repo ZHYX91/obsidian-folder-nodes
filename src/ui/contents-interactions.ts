@@ -99,6 +99,13 @@ export function formatContentLinks(items: readonly ContentLinkItem[], allAsLinks
   return items.map(({ kind, link }) => kind === "media" && !allAsLinks && !link.startsWith("!") ? `!${link}` : link).join(separator);
 }
 
+export function vaultImageLink(path: string, name: string): string {
+  const target = path.split("/").map((segment) => encodeURIComponent(segment)
+    .replace(/[()]/gu, (character) => character === "(" ? "%28" : "%29")).join("/");
+  const label = name.replace(/[\\[\]]/gu, "\\$&");
+  return `[${label}](${target})`;
+}
+
 export function contentDragPolicy(itemCount: number): { effectAllowed: "copy" | "copyMove"; internalMove: boolean } {
   return itemCount === 1 ? { effectAllowed: "copyMove", internalMove: true } : { effectAllowed: "copy", internalMove: false };
 }

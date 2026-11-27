@@ -870,13 +870,17 @@ button.folder-nodes-current:focus-visible {
 }
 
 .folder-nodes-header-actions { flex: 0 0 auto; }
-.folder-nodes-section { margin-block: var(--size-4-3); position: relative; }
-.folder-nodes-section.has-album-toolbar > summary { padding-inline-end: 76px; }
-.folder-nodes-album-toolbar { position: absolute; inset-block-start: 0; inset-inline-end: 0; display: flex; align-items: center; gap: var(--size-2-1); z-index: 1; }
+.folder-nodes-section { margin-block: var(--size-4-3); }
+.folder-nodes-album-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--size-2-1);
+  margin-block: var(--size-2-1);
+}
 .folder-nodes-album-toolbar .clickable-icon { width: 30px; height: 30px; }
 @media (pointer: coarse) {
   .folder-nodes-album-toolbar .clickable-icon { width: 44px; height: 44px; }
-  .folder-nodes-section.has-album-toolbar > summary { padding-inline-end: 96px; }
 }
 .folder-nodes-section > summary {
   display: flex;
