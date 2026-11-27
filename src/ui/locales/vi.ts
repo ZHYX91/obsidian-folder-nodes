@@ -20,6 +20,8 @@ export const vi: Readonly<Record<TranslationKey, string>> = {
   "icons": "Biểu tượng và giao diện",
   "naming": "Vùng chọn và tên",
   "nodeGraph": "Đồ thị nút",
+  "allowNodeReparenting": "Cho phép kéo để thay đổi phân cấp nút",
+  "allowNodeReparentingDesc": "Khi bật, có thể kéo nút vào trong nút khác ở chế độ sắp xếp lại sơ đồ. Mặc định tắt; thao tác Di chuyển trong menu vẫn khả dụng.",
   "openNodeGraph": "Mở đồ thị nút",
   "openInNodeGraph": "Mở trong đồ thị nút",
   "openSubtreeNodeGraph": "Mở đồ thị cây con",
