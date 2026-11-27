@@ -4,6 +4,7 @@ import { runInNewContext } from "node:vm";
 import esbuild from "esbuild";
 import { expect, it } from "vitest";
 
+// @ts-expect-error The executable build helper is plain ESM.
 import { packInterfaceLocales } from "../../scripts/pack-interface-locales.mjs";
 import { LANGUAGE_OVERRIDES } from "../../src/ui/locale-overrides";
 

@@ -21,7 +21,7 @@ export default class FolderNodesWithNodeGraphPlugin extends FolderNodesPlugin {
     this.registerView(NODE_GRAPH_VIEW_TYPE, (leaf) => {
       const view = new FolderNodeGraphView(leaf, this.service, {
         getSettings: () => this.settings.nodeGraph,
-        placement: Platform.isDesktopApp ? this.service : undefined,
+        ...(Platform.isDesktopApp ? { placement: this.service } : {}),
         getIndexSnapshot: () => this.nodeGraphIndex.snapshot(this.settings.nodeGraph),
         onNodeMenu: (event, path, contribute) => {
           const folder = path === "" ? this.app.vault.getRoot() : this.service.getFolder(path);
