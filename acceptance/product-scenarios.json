@@ -169,13 +169,13 @@
         "android-emulator": []
       },
       "steps": [
-        "In a fresh disposable Vault run Create 501 legacy migration rows. Open Migrate Folder Nodes properties and expand the last row of the plan with Show 1 more.",
-        "On desktop activate Show 1 more with the keyboard and check that the final row receives focus. On Android reach it with touch in a narrow pane and read the complete path.",
+        "In a fresh disposable Vault run Create 501 legacy migration rows. Open Migrate Folder Nodes properties and expand the remaining rows with Show more. The Vault also contains legacy rows from other acceptance scenarios.",
+        "On desktop activate Show more with the keyboard and check that the first newly visible row receives focus. On Android reach the control with touch in a narrow pane. In both cases read the complete path of Node 501.",
         "Cancel the preview and run Save cancelled migration source observations.",
-        "Reopen the migration preview, explicitly confirm and wait for completion. Run Save confirmed migration source observations. Retain both observation files."
+        "In the disposable Vault only, resolve the two pre-seeded conflicts. In Conflict/Conflict.md align the legacy hidden flag with the canonical hidden=true token. In SafetyQuoted/SafetyQuoted.md replace the quoted key with folder-nodes while preserving both list tokens. Reopen the preview and confirm that no conflicts remain. Explicitly confirm and wait for completion. Run Save confirmed migration source observations. Retain both observation files."
       ],
       "expected": [
-        "The final fixture path is visible and the paging button disappears after the final row. Desktop focus moves to that row, and Android can scroll to the dialog actions.",
+        "The final fixture path is visible and Show more disappears. Desktop focus moves to the first newly revealed row, and Android can scroll to the dialog actions.",
         "After cancellation all 501 fixture files are byte-for-byte legacy sources. After confirmation all 501 match the canonical rank list with unrelated YAML and Markdown preserved."
       ]
     },
