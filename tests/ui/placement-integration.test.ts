@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { NodeService } from "../../src/adapters/node-service";
 import { ExplorerAdapter } from "../../src/adapters/explorer-adapter";
+import { FolderNodeGraphView } from "../../src/ui/node-graph-view";
+import type { NodeGraphIndexRecord } from "../../src/core/node-graph-index-snapshot";
 import { FolderNodeContentsView } from "../../src/ui/contents-view";
 import { formatError, setLanguage, t } from "../../src/ui/i18n";
 import { DEFAULT_SETTINGS } from "../../src/shared/settings";
@@ -403,5 +405,105 @@ describe("Placement and identity integration", () => {
       expect(view.contentEl.querySelector(".folder-nodes-current-title .is-conflict")).not.toBeNull();
       expect(view.contentEl.querySelector("[aria-label='Create missing Node Note']")).toBeNull();
     } finally { await view.onClose(); }
+  });
+});
+
+describe("Node Graph rearrangement", () => {
+  async function graphPlacement() {
+    const fake = new FakeObsidian();
+    fake.addFile("Vault.md", "---\nfolder-nodes:\n  - order=manual\n---\n", { "folder-nodes": ["order=manual"] });
+    addNode(fake, "A", ["rank=1024"]);
+    const b = addNode(fake, "B", ["rank=2048"]);
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    const nodes = new NodeService(fake.app, () => settings);
+    const entry = (path: string, label: string, parentPath: string | null, notePath: string): NodeGraphIndexRecord =>
+      ({ path, label, parentPath, notePath, visual: visual.resolve() });
+    const records = [
+      entry("", "Vault", null, "Vault.md"), entry("A", "A", "", "A/A.md"),
+      entry("B", "B", "", "B/B.md"),
+    ];
+    const view = new FolderNodeGraphView({ app: fake.app } as never, nodes, {
+      getSettings: () => settings.nodeGraph,
+      getIndexSnapshot: () => ({ records: new Map(records.map((record) => [record.path, record])), links: new Map(), revision: 1 }),
+      placement: nodes,
+    });
+    await view.onOpen();
+    const mode = view.contentEl.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-rearrange")!;
+    const card = (path: string) => view.contentEl.querySelector<HTMLElement>(`[data-node-path="${path}"]`)!;
+    const handle = (path: string) => card(path).querySelector<HTMLButtonElement>(".folder-nodes-node-graph-node-body")!;
+    const drop = (sourcePath: string, targetPath: string, y: number) => {
+      const target = card(targetPath);
+      target.getBoundingClientRect = () => ({ top: 0, height: 100 } as DOMRect);
+      handle(sourcePath).dispatchEvent(dragEvent("dragstart"));
+      const preview = dragEvent("dragover", y);
+      target.dispatchEvent(preview);
+      target.dispatchEvent(dragEvent("drop", y));
+      return preview.dataTransfer?.dropEffect;
+    };
+    return { view, nodes, fake, settings, b, mode, handle, drop };
+  }
+
+  it("keeps default browsing write-free, blocks reparenting and allows manual sibling sorting", async () => {
+    const g = await graphPlacement();
+    try {
+      expect(g.handle("A").hasAttribute("draggable")).toBe(false);
+      expect(g.drop("B", "A", 15)).toBe("none");
+      expect(g.nodes.children("").map(({ childPath }) => childPath)).toEqual(["A", "B"]);
+      g.mode.click();
+      expect(g.mode.getAttribute("aria-pressed")).toBe("true");
+      expect(g.drop("B", "A", 50)).toBe("none");
+      expect(g.fake.renames).toEqual([]);
+      expect(g.drop("B", "A", 15)).toBe("move");
+      await vi.waitFor(() => expect(g.nodes.children("").map(({ childPath }) => childPath)).toEqual(["B", "A"]));
+      expect(g.fake.renames).toEqual([]);
+    } finally { await g.view.onClose(); }
+  });
+
+  it("previews a new parent, cancels without writing, and moves the complete folder only after confirmation", async () => {
+    const g = await graphPlacement();
+    try {
+      g.mode.click();
+      g.settings.nodeGraph.allowNodeReparenting = true;
+      expect(g.drop("B", "A", 50)).toBe("move");
+      expect(document.body.textContent).toContain("Move B to A/B?");
+      expect(g.fake.renames).toEqual([]);
+      const modalButton = (text: string) => [...document.body.querySelectorAll("button")].find((button) => button.textContent === text)!;
+      modalButton("Cancel").click();
+      expect(g.fake.renames).toEqual([]);
+      expect(g.drop("B", "A", 50)).toBe("move");
+      modalButton("Confirm").click();
+      await vi.waitFor(() => expect(g.fake.files.get("A/B")).toBe(g.b));
+      expect(g.fake.contents.has("A/B/B.md")).toBe(true);
+      expect(g.fake.renames).toEqual([{ from: "B", to: "A/B" }]);
+    } finally { await g.view.onClose(); }
+  });
+
+  it("rejects an object replaced at the previewed destination path", async () => {
+    const g = await graphPlacement();
+    try {
+      g.mode.click();
+      g.settings.nodeGraph.allowNodeReparenting = true;
+      expect(g.drop("B", "A", 50)).toBe("move");
+      g.fake.remove("A");
+      addNode(g.fake, "A");
+      const confirm = [...document.body.querySelectorAll("button")].find((button) => button.textContent === "Confirm")!;
+      confirm.click();
+      await vi.waitFor(() => expect(confirm.disabled).toBe(false));
+      expect(g.fake.renames).toEqual([]);
+    } finally { await g.view.onClose(); }
+  });
+
+  it("rejects a previously previewed new parent when opt-in is disabled before confirmation", async () => {
+    const g = await graphPlacement();
+    try {
+      g.mode.click();
+      g.settings.nodeGraph.allowNodeReparenting = true;
+      expect(g.drop("B", "A", 50)).toBe("move");
+      g.settings.nodeGraph.allowNodeReparenting = false;
+      const confirm = [...document.body.querySelectorAll("button")].find((button) => button.textContent === "Confirm")!;
+      confirm.click();
+      await vi.waitFor(() => expect(confirm.disabled).toBe(false));
+      expect(g.fake.renames).toEqual([]);
+    } finally { await g.view.onClose(); }
   });
 });

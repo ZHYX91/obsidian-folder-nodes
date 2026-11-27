@@ -73,6 +73,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       confirmSelectionCreation: settings.confirmSelectionCreation,
       nodeGraphEnabled: settings.nodeGraph.enabled,
       nodeGraphDefaultDimension: settings.nodeGraph.defaultDimension,
+      allowNodeReparenting: settings.nodeGraph.allowNodeReparenting,
       nodeGraphLayoutDirection: settings.nodeGraph.layoutDirection,
       prefixEnabled: settings.prefix.enabled,
       prefixSource: settings.prefix.source,
@@ -124,6 +125,10 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       case "createNodesFromLinks": settings.createNodesFromLinks = Boolean(value); break;
       case "confirmSelectionCreation": settings.confirmSelectionCreation = Boolean(value); break;
       case "nodeGraphEnabled": settings.nodeGraph.enabled = Boolean(value); reconcileNodeGraph = true; break;
+      case "allowNodeReparenting":
+        if (typeof value !== "boolean") throw new Error("Expected a boolean for Node Graph reparenting");
+        settings.nodeGraph.allowNodeReparenting = value;
+        break;
       case "nodeGraphDefaultDimension":
         if (value !== "2d" && value !== "3d") throw new Error("Unsupported Node Graph dimension");
         settings.nodeGraph.defaultDimension = value;
@@ -336,6 +341,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private nodeGraphDefinitions(): SettingDefinitionItem[] {
     return [
       { name: t("enableNodeGraph"), desc: t("enableNodeGraphDesc"), control: { type: "toggle", key: "nodeGraphEnabled", defaultValue: true } },
+      { name: t("allowNodeReparenting"), desc: t("allowNodeReparentingDesc"), control: { type: "toggle", key: "allowNodeReparenting", defaultValue: false } },
       { name: t("nodeGraphDefaultDimension"), control: { type: "dropdown", key: "nodeGraphDefaultDimension", defaultValue: "2d", options: { "2d": "2D", "3d": "3D" } } },
       { name: t("nodeGraphLayoutDirection"), desc: t("nodeGraphLayoutDirectionDesc"), control: { type: "dropdown", key: "nodeGraphLayoutDirection", defaultValue: "left-to-right", options: { "left-to-right": t("nodeGraphLeftToRight"), "top-to-bottom": t("nodeGraphTopToBottom") } } },
     ];
@@ -623,6 +629,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
         settings.layoutDirection = value;
         await this.saveNodeGraphSettings(true);
       }));
+    new LabeledSetting(panel)
+      .setFocusKey("allowNodeReparenting")
+      .setName(t("allowNodeReparenting"))
+      .setDesc(t("allowNodeReparentingDesc"))
+      .addSwitch(settings.allowNodeReparenting, (value) => this.setControlValue("allowNodeReparenting", value));
     new LabeledSetting(panel).setName(t("nodeGraphPerformance")).setDesc(t("nodeGraphPerformanceDesc")).setHeading();
     this.renderGraphNumberSetting(panel, "largeGraphThreshold", t("nodeGraphCanvasThreshold"), t("nodeGraphCanvasThresholdDesc"), 50, 10_000);
     this.renderGraphNumberSetting(panel, "overviewEdgeLimit", t("nodeGraphEdgeLimit"), t("nodeGraphEdgeLimitDesc"), 100, 100_000);

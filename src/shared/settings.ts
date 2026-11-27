@@ -41,6 +41,7 @@ export class SettingsSchemaIncompatibleError extends Error {
 
 export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = deepFreeze({
   enabled: true,
+  allowNodeReparenting: false,
   defaultDimension: "2d",
   layoutDirection: "left-to-right",
   largeGraphThreshold: 500,
@@ -180,6 +181,7 @@ function normalizeNodeGraphSettings(value: unknown): NodeGraphSettings {
   const input = typeof value === "object" && value !== null ? value as Partial<NodeGraphSettings> : {};
   return {
     enabled: input.enabled !== false,
+    allowNodeReparenting: input.allowNodeReparenting === true,
     defaultDimension: input.defaultDimension === "3d" ? "3d" : "2d",
     layoutDirection: input.layoutDirection === "top-to-bottom" ? "top-to-bottom" : "left-to-right",
     largeGraphThreshold: normalizeInteger(input.largeGraphThreshold, 50, 10_000, DEFAULT_NODE_GRAPH_SETTINGS.largeGraphThreshold),

@@ -36,6 +36,8 @@ export class TFolder extends TAbstractFile {
   public isRoot(): boolean { return this.parent === null; }
 }
 
+export const Platform = { isDesktopApp: true };
+
 export class App {}
 export class Component { public onunload(): void {} }
 export class WorkspaceLeaf {}

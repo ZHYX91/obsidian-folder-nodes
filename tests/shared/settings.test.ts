@@ -111,6 +111,7 @@ describe("settings", () => {
     });
     expect(settings.nodeGraph).toEqual({
       enabled: false,
+      allowNodeReparenting: false,
       defaultDimension: "3d",
       layoutDirection: "top-to-bottom",
       largeGraphThreshold: 50,
@@ -121,6 +122,12 @@ describe("settings", () => {
     expect(settings.nodeGraph).not.toHaveProperty("showBoundaryNodes");
     expect(normalizeSettings({ nodeGraph: "broken" }).nodeGraph).toEqual(DEFAULT_SETTINGS.nodeGraph);
     expect(normalizeSettings({ nodeGraph: { layoutDirection: "broken" } }).nodeGraph.layoutDirection).toBe("left-to-right");
+  });
+
+  it("persists only explicit boolean opt-in to Node Graph reparenting", () => {
+    expect(normalizeSettings({ nodeGraph: { allowNodeReparenting: "true" } }).nodeGraph.allowNodeReparenting).toBe(false);
+    const settings = normalizeSettings({ nodeGraph: { allowNodeReparenting: true } });
+    expect(normalizeSettings(createSettingsSnapshot(settings)).nodeGraph.allowNodeReparenting).toBe(true);
   });
 
   it("migrates unversioned settings once into the current schema", () => {

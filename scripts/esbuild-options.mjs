@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { interfaceLocalePacking } from "./pack-interface-locales.mjs";
 
 const notices = readFileSync(new URL("../THIRD_PARTY_NOTICES.txt", import.meta.url), "utf8").trimEnd();
 
@@ -19,6 +20,7 @@ export function createEsbuildOptions({
     target: "es2020",
     logLevel: "info",
     minify: production,
+    plugins: production ? [interfaceLocalePacking] : [],
     sourcemap: production ? false : "inline",
     treeShaking: true,
     outfile: path.join(projectRoot, "dist", "main.js"),

@@ -459,7 +459,7 @@ export class NodeService {
     }
   }
 
-  public placeNode(folder: TFolder, intent: PlacementIntent): Promise<TFolder> {
+  public placeNode(folder: TFolder, intent: PlacementIntent, stillAllowed?: () => boolean): Promise<TFolder> {
     const sourcePath = folder.path;
     const targetPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
     const target = this.getFolder(targetPath);
@@ -467,7 +467,7 @@ export class NodeService {
       this.assertEntryIdentity(folder, sourcePath, TFolder);
       if (target === null) throw new FolderNodesError("target_folder_unknown", { path: targetPath }, `Unknown target folder: ${targetPath}`);
       this.assertEntryIdentity(target, targetPath, TFolder);
-      return this.placeNodeUnlocked(folder, intent);
+      return this.placeNodeUnlocked(folder, intent, stillAllowed);
     });
   }
 
@@ -889,7 +889,7 @@ export class NodeService {
     return { intent: { kind: "insert", gap }, parentPath, targetIndex, siblings };
   }
 
-  private async placeNodeUnlocked(folder: TFolder, intent: PlacementIntent): Promise<TFolder> {
+  private async placeNodeUnlocked(folder: TFolder, intent: PlacementIntent, stillAllowed?: () => boolean): Promise<TFolder> {
     const parentPath = normalizeVaultPath(intent.kind === "move-into" ? intent.parentPath : intent.gap.parentPath);
     const sourcePath = folder.path;
     const note = this.requireCanonicalNote(folder);
@@ -899,12 +899,12 @@ export class NodeService {
       return await this.withCurrentOrder(parentPath, [note], (state) => {
         this.assertEntryIdentity(folder, sourcePath, TFolder);
         this.assertEntryIdentity(note, sourceNotePath, TFile);
-        return this.placeNodeWithOrder(folder, intent, state, undos);
+        return this.placeNodeWithOrder(folder, intent, state, undos, stillAllowed);
       });
     } catch (error) { return this.rollback(undos, error); }
   }
 
-  private async placeNodeWithOrder(folder: TFolder, intent: PlacementIntent, state: CurrentOrderState, undos: Undo[]): Promise<TFolder> {
+  private async placeNodeWithOrder(folder: TFolder, intent: PlacementIntent, state: CurrentOrderState, undos: Undo[], stillAllowed?: () => boolean): Promise<TFolder> {
     const resolved = this.resolvePlacement(folder, intent, state);
     if (resolved === null) return folder;
     const { parentPath, siblings, targetIndex } = resolved;
@@ -921,6 +921,7 @@ export class NodeService {
     if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
     if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
     await this.assertCurrentOrderState(state);
+    if (stillAllowed?.() === false) throw new Error("The insertion position is stale; retry the drag");
 
     if (state.mode === "manual") {
       this.assertActive();
@@ -936,6 +937,7 @@ export class NodeService {
     if (sourceNote.parent !== folder) throw new Error(`Node Note source changed during operation: ${sourceNotePath}`);
     if (targetParent !== null) this.assertEntryIdentity(targetParent, parentPath, TFolder);
     if (oldParentPath === parentPath) return folder;
+    if (stillAllowed?.() === false) throw new Error("The insertion position is stale; retry the drag");
     this.assertActive();
     this.expectEvent("rename", nextPath, sourcePath, true);
     await this.app.fileManager.renameFile(folder, nextPath);

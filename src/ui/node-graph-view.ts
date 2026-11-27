@@ -1,10 +1,13 @@
 import {
   ItemView,
   Menu,
+  Notice,
   Scope,
   setIcon,
   setTooltip,
   WorkspaceLeaf,
+  type TFile,
+  type TFolder,
   type ViewStateResult,
 } from "obsidian";
 
@@ -56,7 +59,9 @@ import {
   normalizeNodeGraphScope,
   type NodeGraphScope,
 } from "../core/node-graph-scope";
-import { normalizeVaultPath } from "../core/paths";
+import { childVaultPath, normalizeVaultPath } from "../core/paths";
+import { gapAfter, gapBefore, insertionMarker, isGapVisible, type PlacementIntent, type PlacementPreview } from "../core/placement";
+import { PlacementSession } from "../core/placement-session";
 import { summarizeNodeGraphSearch, type NodeGraphSearchSummary } from "../core/node-graph-search";
 import {
   captureNodeGraphSearchSnapshot,
@@ -79,10 +84,11 @@ import {
 } from "../core/node-graph-state";
 import { createNodeGraphTopology, type NodeGraphTopology } from "../core/node-graph-topology";
 import { buildNodeGraphVisibleScene, estimateNodeGraphRangeNodeCount } from "../core/node-graph-visible";
-import type { NodeGraphDimension, NodeGraphSettings } from "../core/types";
+import type { ChildOrderRecord, NodeGraphDimension, NodeGraphSettings } from "../core/types";
 import { renderVisual } from "../presentation/render-visual";
 import { DEFAULT_NODE_GRAPH_SETTINGS } from "../shared/settings";
-import { interfaceTextDirection, resolvedLanguage, t } from "./i18n";
+import { formatError, interfaceTextDirection, resolvedLanguage, t } from "./i18n";
+import { ConfirmModal } from "./prompt-modal";
 import { observeNodeGraphDomViewport } from "./node-graph-dom-viewport";
 import { describeGraphButton, renderNodeGraphToolbar, updateNodeGraphToolbar, type NodeGraphToolbarLabels, type NodeGraphToolbarModel } from "./node-graph-toolbar";
 import {
@@ -128,8 +134,26 @@ interface NodeGraphViewportState {
 export interface NodeGraphViewOptions {
   readonly getIndexSnapshot: () => NodeGraphIndexSnapshot;
   readonly getSettings?: () => NodeGraphSettings;
+  readonly placement?: NodeGraphPlacementService;
   readonly onNodeMenu?: (event: MouseEvent, path: string, contribute?: (menu: Menu) => void) => void;
 }
+
+interface NodeGraphPlacementService {
+  children(path: string): readonly ChildOrderRecord[];
+  getCanonicalFile(path: string): TFile | null;
+  getFolder(path: string): TFolder | null;
+  isNodeVisible(path: string): boolean;
+  placeNode(folder: TFolder, intent: PlacementIntent, stillAllowed: () => boolean): Promise<unknown>;
+  previewPlacement(sourcePath: string, intent: PlacementIntent): PlacementPreview;
+}
+
+type GraphPlacementDrag = {
+  readonly source: TFolder;
+  readonly sourcePath: string;
+  readonly parent: TFolder;
+  readonly session: PlacementSession<TFolder>;
+};
+type GraphDropZone = "before" | "into" | "after";
 
 type GraphDrag = {
   readonly pointerId: number;
@@ -163,6 +187,10 @@ export class FolderNodeGraphView extends ItemView {
   private graphScope: NodeGraphScope = GLOBAL_NODE_GRAPH_SCOPE;
   private camera: NodeGraphCamera = defaultNodeGraphCamera();
   private drag: GraphDrag | null = null;
+  private rearranging = false;
+  private placementDrag: GraphPlacementDrag | null = null;
+  private placementMarker: HTMLElement | null = null;
+  private placementModal: ConfirmModal | null = null;
   private readonly pointers = new Map<number, GraphPointer>();
   private readonly nodeElements = new Map<string, HTMLElement>();
   private projected3D = new Map<string, NodeGraphProjectedPoint>();
@@ -252,6 +280,7 @@ export class FolderNodeGraphView extends ItemView {
   }
   public override async onClose(): Promise<void> {
     this.keyScopeActive = false;
+    this.stopRearranging();
     this.disconnectDomViewport?.();
     this.disconnectDomViewport = null;
     this.disconnectViewportButtons?.();
@@ -306,8 +335,14 @@ export class FolderNodeGraphView extends ItemView {
   }
 
   private handleScopeKey(event: KeyboardEvent): false | undefined {
-    if (!this.keyScopeActive || !this.contentEl.isConnected || event.defaultPrevented ||
-        event.key !== "Enter") return;
+    if (!this.keyScopeActive || !this.contentEl.isConnected || event.defaultPrevented) return;
+    if (event.key === "Escape" && this.rearranging && this.contentEl.contains(this.contentEl.ownerDocument.activeElement)) {
+      this.stopRearranging();
+      this.render();
+      this.contentEl.querySelector<HTMLElement>(".folder-nodes-node-graph-rearrange")?.focus();
+      return false;
+    }
+    if (event.key !== "Enter") return;
     const chord = graphActivationChord(event);
     if (chord === "branch") {
       if (this.canvasRenderer?.handleScopeToggle(event)) return false;
@@ -440,6 +475,7 @@ export class FolderNodeGraphView extends ItemView {
       : null;
     this.disconnectViewportButtons?.();
     this.disconnectViewportButtons = null;
+    this.clearPlacementDrag();
     this.cardHandleWidth = this.currentCardHandleWidth();
     this.contentEl.style.setProperty("--folder-nodes-node-graph-handle-width", `${this.cardHandleWidth}px`);
     this.canvasRenderer?.destroy();
@@ -466,6 +502,7 @@ export class FolderNodeGraphView extends ItemView {
     this.contentEl.toggleClass("is-top-to-bottom", this.settings().layoutDirection === "top-to-bottom");
 
     if (!this.settings().enabled) {
+      this.stopRearranging();
       this.contentEl.createDiv({ cls: "folder-nodes-node-graph-disabled", text: label("disabledGraph"), attr: { dir: interfaceTextDirection(), role: "status" } });
       return;
     }
@@ -484,7 +521,11 @@ export class FolderNodeGraphView extends ItemView {
     }
     const surface = this.contentEl.createDiv({ cls: "folder-nodes-node-graph-scroll" });
     const visibleEdgeCount = edgesForShowLinks(data.model, this.showLinks).length;
-    if (shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold)) {
+    const usesCanvas = shouldUseNodeGraphCanvas(data.model.nodes.length, visibleEdgeCount, this.settings().largeGraphThreshold);
+    const canRearrange = this.dimension === "2d" && !usesCanvas && this.options.placement !== undefined;
+    if (!canRearrange) this.stopRearranging();
+    this.updateRearrangeButton(toolbar, canRearrange);
+    if (usesCanvas) {
       this.renderCanvas(surface, data);
     }
     else if (this.dimension === "2d") this.render2D(surface, data);
@@ -493,6 +534,152 @@ export class FolderNodeGraphView extends ItemView {
     this.highlightSearch(this.searchQuery);
     this.applyNeighborhood();
     if (this.searchQuery.trim() !== "") this.centerSearchPreview();
+  }
+
+  private updateRearrangeButton(toolbar: HTMLElement, available: boolean): void {
+    let button = toolbar.querySelector<HTMLButtonElement>(".folder-nodes-node-graph-rearrange");
+    if (!available) {
+      button?.remove();
+      return;
+    }
+    if (button === null) {
+      const controls = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-toolbar-primary") ?? toolbar;
+      button = controls.createEl("button", { cls: "folder-nodes-node-graph-rearrange", attr: { type: "button" } });
+      button.addEventListener("click", () => {
+        const viewport = this.captureViewportState();
+        if (this.rearranging) this.stopRearranging();
+        else this.rearranging = true;
+        this.render();
+        this.restoreViewportState(viewport);
+      });
+    }
+    button.setText(t("nodeGraphRearrange"));
+    button.setAttribute("aria-pressed", String(this.rearranging));
+    button.toggleClass("is-active", this.rearranging);
+  }
+
+  private stopRearranging(): void {
+    this.rearranging = false;
+    this.clearPlacementDrag();
+    this.placementModal?.close();
+    this.placementModal = null;
+  }
+
+  private clearPlacementMarker(): void {
+    this.placementMarker?.removeClass("folder-nodes-drop-before", "folder-nodes-drop-into", "folder-nodes-drop-after");
+    this.placementMarker = null;
+  }
+
+  private clearPlacementDrag(): void {
+    this.clearPlacementMarker();
+    this.placementDrag = null;
+  }
+
+  private bindNodePlacement(node: HTMLElement, body: HTMLButtonElement, record: GraphRecord): void {
+    const service = this.options.placement;
+    if (!this.rearranging || service === undefined || record.boundary) return;
+
+    const sourceEligible = record.path !== "" && record.notePath !== null;
+    if (sourceEligible) body.setAttribute("draggable", "true");
+    body.addEventListener("dragstart", (event) => {
+      const source = service.getFolder(record.path);
+      if (!this.rearranging || !sourceEligible || source?.parent == null
+        || service.getCanonicalFile(record.path) === null) {
+        event.preventDefault();
+        return;
+      }
+      const session = new PlacementSession((path) => service.getFolder(path));
+      session.start(source);
+      this.placementDrag = { source, sourcePath: source.path, parent: source.parent, session };
+      event.dataTransfer?.setData("application/x-folder-nodes-graph", record.path);
+      if (event.dataTransfer != null) event.dataTransfer.effectAllowed = "move";
+    });
+    body.addEventListener("dragend", () => this.clearPlacementDrag());
+    node.addEventListener("dragleave", (event) => {
+      if (node.contains(event.relatedTarget as Node | null)) return;
+      this.clearPlacementMarker();
+    });
+    node.addEventListener("dragover", (event) => {
+      const drag = this.placementDrag;
+      if (drag === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.clearPlacementMarker();
+      const candidate = this.graphPlacementCandidate(drag, node, record.path, event);
+      const ready = candidate !== null && drag.session.continuePreview(candidate.intent);
+      if (event.dataTransfer != null) event.dataTransfer.dropEffect = ready ? "move" : "none";
+      if (!ready || candidate === null) return;
+      this.placementMarker = candidate.marker;
+      candidate.marker.addClass(`folder-nodes-drop-${candidate.zone}`);
+    });
+    node.addEventListener("drop", (event) => {
+      const drag = this.placementDrag;
+      if (drag === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const candidate = this.graphPlacementCandidate(drag, node, record.path, event);
+      const wasPreviewed = this.placementMarker === candidate?.marker;
+      this.clearPlacementDrag();
+      if (candidate === null || !wasPreviewed || drag.session.commit(candidate.intent) === null) return;
+      const stillAllowed = (): boolean => this.keyScopeActive && this.rearranging
+        && this.settings().enabled
+        && drag.source.parent === drag.parent
+        && (!candidate.changesParent || this.settings().allowNodeReparenting)
+        && drag.session.commit(candidate.intent) !== null;
+      const commit = async (): Promise<void> => {
+        if (!stillAllowed()) throw new Error("The insertion position is stale; retry the drag");
+        await service.placeNode(drag.source, candidate.intent, stillAllowed);
+      };
+      if (!candidate.changesParent) {
+        void commit().catch((error: unknown) => new Notice(formatError(error)));
+        return;
+      }
+      const destination = childVaultPath(candidate.parentPath, drag.source.name);
+      this.placementModal?.close();
+      this.placementModal = new ConfirmModal(this.app, t("nodeGraphRearrange"), t("nodeGraphReparentPreview", {
+        source: drag.sourcePath, destination,
+      }), t("confirm"), false, commit);
+      this.placementModal.open();
+    });
+  }
+
+  private graphPlacementCandidate(drag: GraphPlacementDrag, node: HTMLElement, path: string, event: DragEvent): {
+    readonly intent: PlacementIntent;
+    readonly marker: HTMLElement;
+    readonly zone: GraphDropZone;
+    readonly changesParent: boolean;
+    readonly parentPath: string;
+  } | null {
+    const service = this.options.placement;
+    if (service === undefined || !this.rearranging || drag.source.parent !== drag.parent || path === drag.sourcePath) return null;
+    const target = service.getFolder(path);
+    if (target === null) return null;
+    const bounds = node.getBoundingClientRect();
+    const ratio = this.settings().layoutDirection === "top-to-bottom"
+      ? (event.clientX - bounds.left) / bounds.width
+      : (event.clientY - bounds.top) / bounds.height;
+    const zone = ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "into";
+    const parent = zone === "into" ? target : target.parent;
+    if (parent === null) return null;
+    const changesParent = parent !== drag.parent;
+    if (changesParent && !this.settings().allowNodeReparenting) return null;
+    const parentPath = normalizeVaultPath(parent.path);
+    let intent: PlacementIntent;
+    if (zone === "into") intent = { kind: "move-into", parentPath };
+    else {
+      if (path === "") return null;
+      const paths = service.children(parentPath).map(({ childPath }) => childPath).filter((childPath) => childPath !== drag.sourcePath);
+      if (!paths.includes(path)) return null;
+      intent = { kind: "insert", gap: (zone === "before" ? gapBefore : gapAfter)(paths, path, parentPath) };
+    }
+    const preview = service.previewPlacement(drag.sourcePath, intent);
+    if (preview.kind !== "ready") return null;
+    if (preview.intent.kind === "move-into") return { intent: preview.intent, marker: node, zone: "into", changesParent, parentPath };
+    if (!isGapVisible(preview.intent.gap, (path) => this.nodeElements.has(path) && service.isNodeVisible(path))) return null;
+    const insertion = insertionMarker(preview.intent.gap);
+    const marker = insertion === null ? undefined : this.nodeElements.get(insertion.path);
+    if (insertion === null || marker === undefined) return null;
+    return { intent: preview.intent, marker, zone: insertion.edge, changesParent, parentPath };
   }
 
   private graphSearchRecords(): readonly { readonly label: string; readonly path: string }[] {
@@ -1238,6 +1425,7 @@ export class FolderNodeGraphView extends ItemView {
       attr: { "aria-label": hiddenTitle, type: "button" },
     });
     body.createSpan({ cls: "folder-nodes-node-graph-label", text: record.label });
+    this.bindNodePlacement(node, body, record);
     if (record.hiddenExplicit) {
       body.createSpan({ cls: "folder-nodes-hidden-status folder-nodes-status-badge is-hidden", text: t("hiddenNode"), attr: { "aria-hidden": "true" } });
     } else if (record.hiddenSourcePath !== null && record.hiddenSourcePath !== undefined) node.addClass("folder-nodes-hidden-inherited");
