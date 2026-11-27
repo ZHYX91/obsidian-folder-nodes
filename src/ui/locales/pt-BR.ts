@@ -20,6 +20,8 @@ export const ptBR: Readonly<Record<TranslationKey, string>> = {
   "icons": "Ícones e aparência",
   "naming": "Seleção e nomes",
   "nodeGraph": "Grafo de nós",
+  "allowNodeReparenting": "Permitir arrastar para alterar a hierarquia dos nós",
+  "allowNodeReparentingDesc": "Quando ativado, os nós podem ser arrastados para dentro de outros nós no modo de reorganização. Desativado por padrão; as ações de mover pelo menu continuam disponíveis.",
   "openNodeGraph": "Abrir o grafo de nós",
   "openInNodeGraph": "Abrir no grafo de nós",
   "openSubtreeNodeGraph": "Abrir o grafo da subárvore",
