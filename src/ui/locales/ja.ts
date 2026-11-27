@@ -20,6 +20,8 @@ export const ja: Readonly<Record<TranslationKey, string>> = {
   "icons": "アイコンと外観",
   "naming": "選択範囲と名前",
   "nodeGraph": "ノードグラフ",
+  "allowNodeReparenting": "ドラッグによるノード階層の変更を許可",
+  "allowNodeReparentingDesc": "有効にすると、グラフの再編成モードでノードを別のノード内にドラッグできます。既定ではオフです。メニューからの移動操作は引き続き使用できます。",
   "openNodeGraph": "Node Graph を開く",
   "openInNodeGraph": "Node Graph で開く",
   "openSubtreeNodeGraph": "下位ツリーの Node Graph を開く",
