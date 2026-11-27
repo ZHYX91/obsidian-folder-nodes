@@ -24,7 +24,11 @@ export interface NamingPart {
   timestampFormat: string;
 }
 
+export type AlbumCopyFormat = "embed" | "link";
+
 export interface FolderNodesSettings {
+  albumCopyFormat: AlbumCopyFormat;
+  albumCopyBlankLines: boolean;
   language: InterfaceLanguage;
   homepageEnabled: boolean;
   openHomepageOnStartup: boolean;

@@ -43,6 +43,8 @@ Keep `Vault/.obsidian/plugins/folder-nodes/data.json` when it exists. Replace on
 5. Native Move/Delete operates on the selected file or folder; a native rename of a complete node's folder or Node Note also synchronizes the other half when unambiguous. Commands labelled **containing node** explicitly act on the whole Folder Node. Check the target before moving or deleting.
 6. **Organize incomplete nodes** and **Migrate Folder Nodes properties** always preview the paths before confirmation; **Check Folder Nodes health** is read-only. Cancel if the proposed scope differs from your intention.
 
+In the **Album**, sort by name, creation time, or modification time. **Copy all image links** copies every image in that order, including images on later pages. The Markdown links use full vault paths so you can paste them into a note in another folder of the same vault. In **Settings → Folder Nodes → Content view**, choose embeds or regular links and whether to leave blank lines.
+
 Node Contents shows the current path and explains empty, hidden, unmanaged, or incomplete states. Use the available buttons to open a valid parent, review management rules, run read-only Health, or reveal hidden nodes for this session. In Canvas graphs, arrow keys move toward the nearest node in that screen direction; Home and End select the first and last visible nodes.
 
 If creation fails after a note was created, cleanup removes only files it can still prove are unchanged and owned by that operation. An opened or edited note is kept. The error lists the remaining paths and reason: save and review those files before removing anything manually.

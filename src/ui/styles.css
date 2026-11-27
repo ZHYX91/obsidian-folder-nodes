@@ -883,6 +883,17 @@ button.folder-nodes-current:focus-visible {
 
 .folder-nodes-header-actions { flex: 0 0 auto; }
 .folder-nodes-section { margin-block: var(--size-4-3); }
+.folder-nodes-album-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--size-2-1);
+  margin-block: var(--size-2-1);
+}
+.folder-nodes-album-toolbar .clickable-icon { width: 30px; height: 30px; }
+@media (pointer: coarse) {
+  .folder-nodes-album-toolbar .clickable-icon { width: 44px; height: 44px; }
+}
 .folder-nodes-section > summary {
   display: flex;
   align-items: center;

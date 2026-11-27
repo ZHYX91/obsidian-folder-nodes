@@ -94,8 +94,16 @@ export interface ContentLinkItem {
   link: string;
 }
 
-export function formatContentLinks(items: readonly ContentLinkItem[], allAsLinks = false): string {
-  return items.map(({ kind, link }) => kind === "media" && !allAsLinks && !link.startsWith("!") ? `!${link}` : link).join("\n");
+export function formatContentLinks(items: readonly ContentLinkItem[], allAsLinks = false, blankLines = false): string {
+  const separator = blankLines ? "\n\n" : "\n";
+  return items.map(({ kind, link }) => kind === "media" && !allAsLinks && !link.startsWith("!") ? `!${link}` : link).join(separator);
+}
+
+export function vaultImageLink(path: string, name: string): string {
+  const target = path.split("/").map((segment) => encodeURIComponent(segment)
+    .replace(/[()]/gu, (character) => character === "(" ? "%28" : "%29")).join("/");
+  const label = name.replace(/[\\[\]]/gu, "\\$&");
+  return `[${label}](${target})`;
 }
 
 export function contentDragPolicy(itemCount: number): { effectAllowed: "copy" | "copyMove"; internalMove: boolean } {

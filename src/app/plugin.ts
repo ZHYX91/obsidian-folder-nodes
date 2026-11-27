@@ -168,7 +168,7 @@ export default class FolderNodesPlugin extends Plugin {
       },
       showHealth: () => this.showHealth(),
       showHidden: () => this.runAction(this.toggleHiddenNodesThisSession()),
-    }, Platform.isDesktopApp));
+    }, Platform.isDesktopApp, () => ({ format: this.settings.albumCopyFormat, blankLines: this.settings.albumCopyBlankLines })));
     this.settingsTab = new FolderNodesSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
     this.ribbonElement = this.addRibbonIcon("layout-grid", ribbonRegistrationTitle(this.app.workspace, this.manifest.id), () => this.runAction(this.openContents()));
