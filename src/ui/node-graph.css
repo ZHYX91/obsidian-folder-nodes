@@ -810,6 +810,8 @@
   }
 }
 
+.folder-nodes-node-graph-rearrange { min-height: 36px; max-width: 100%; white-space: normal; }
+
 .folder-nodes-node-graph-rearrange.is-active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);

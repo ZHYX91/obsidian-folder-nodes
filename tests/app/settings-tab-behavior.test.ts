@@ -72,6 +72,21 @@ it("connects each editable field to its translated row and preserves same-tab co
   } finally { tab.containerEl.remove(); }
 });
 
+it("saves the Node Graph reparenting preference through its labeled switch", async () => {
+  const { tab, plugin } = fixture();
+  try {
+    tab.display();
+    tab.containerEl.querySelector<HTMLButtonElement>("#folder-nodes-settings-tab-nodeGraph")!.click();
+    const toggle = tab.containerEl.querySelector<HTMLInputElement>('[data-folder-nodes-setting-key="allowNodeReparenting"] input')!;
+    expect(toggle.checked).toBe(false);
+    expect(tab.getControlValue("allowNodeReparenting")).toBe(false);
+    toggle.click();
+    await vi.waitFor(() => expect(plugin.saveSettings).toHaveBeenCalledOnce());
+    expect(tab.getControlValue("allowNodeReparenting")).toBe(true);
+    await expect(tab.setControlValue("allowNodeReparenting", "true")).rejects.toThrow();
+  } finally { tab.hide(); tab.containerEl.remove(); }
+});
+
 it("keeps focus on the activated tab when the settings panel is rebuilt", () => {
   const { tab } = fixture();
   try {

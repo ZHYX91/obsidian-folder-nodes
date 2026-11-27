@@ -543,7 +543,7 @@ export class FolderNodeGraphView extends ItemView {
       return;
     }
     if (button === null) {
-      const controls = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-toolbar-secondary") ?? toolbar;
+      const controls = toolbar.querySelector<HTMLElement>(".folder-nodes-node-graph-toolbar-primary") ?? toolbar;
       button = controls.createEl("button", { cls: "folder-nodes-node-graph-rearrange", attr: { type: "button" } });
       button.addEventListener("click", () => {
         const viewport = this.captureViewportState();
