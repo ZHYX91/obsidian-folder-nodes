@@ -48,6 +48,8 @@ export const DEFAULT_NODE_GRAPH_SETTINGS: NodeGraphSettings = deepFreeze({
 });
 
 export const DEFAULT_SETTINGS: FolderNodesSettings = deepFreeze({
+  albumCopyFormat: "embed",
+  albumCopyBlankLines: false,
   language: "auto",
   homepageEnabled: false,
   openHomepageOnStartup: false,
@@ -87,6 +89,8 @@ export function normalizeSettings(value: unknown): FolderNodesSettings {
     ? input.explorerIconPosition
     : "before";
   return {
+    albumCopyFormat: input.albumCopyFormat === "link" ? "link" : "embed",
+    albumCopyBlankLines: input.albumCopyBlankLines === true,
     language,
     homepageEnabled: input.homepageEnabled === true,
     openHomepageOnStartup: input.openHomepageOnStartup === true,

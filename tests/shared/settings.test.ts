@@ -8,6 +8,12 @@ import {
 } from "../../src/shared/settings";
 
 describe("settings", () => {
+  it("defaults album copying to embedded links without blank lines and normalizes preferences", () => {
+    expect(DEFAULT_SETTINGS.albumCopyFormat).toBe("embed");
+    expect(DEFAULT_SETTINGS.albumCopyBlankLines).toBe(false);
+    expect(normalizeSettings({ albumCopyFormat: "link", albumCopyBlankLines: true })).toMatchObject({ albumCopyFormat: "link", albumCopyBlankLines: true });
+    expect(normalizeSettings({ albumCopyFormat: "invalid", albumCopyBlankLines: "yes" })).toMatchObject({ albumCopyFormat: "embed", albumCopyBlankLines: false });
+  });
   it("keeps selection confirmation on for missing or invalid data and persists an explicit off switch", () => {
     expect(DEFAULT_SETTINGS.confirmSelectionCreation).toBe(true);
     for (const value of [undefined, null, 0, "false", {}, true]) {

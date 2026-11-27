@@ -1,4 +1,4 @@
-import { type Editor, ItemView, MarkdownView, Notice, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
+import { Menu, type Editor, ItemView, MarkdownView, Notice, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
 import {
   breadcrumbItems,
@@ -55,6 +55,8 @@ interface ContentsService {
 }
 
 interface ContentsVisuals { resolve(folder: TFolder): NodeVisual; }
+interface AlbumCopyPreferences { readonly format: "embed" | "link"; readonly blankLines: boolean; }
+type AlbumSortMode = "vault" | "name" | "created" | "modified";
 
 export type ContentsMenuAnchor = MouseEvent | HTMLElement;
 
@@ -101,6 +103,8 @@ export class FolderNodeContentsView extends ItemView {
   private contentDropTarget: HTMLElement | null = null;
   private readonly pendingImages = new Set<HTMLImageElement>();
   private renderedFolderPath: string | null = null;
+  private albumSortMode: AlbumSortMode = "vault";
+  private albumSortDescending = false;
   private readonly placementSession = new PlacementSession((path) => this.service.getFolder(path));
 
   public constructor(
@@ -110,6 +114,7 @@ export class FolderNodeContentsView extends ItemView {
     private readonly references: ReferenceIndex,
     private readonly actions: ContentsActions,
     private readonly dragEnabled = true,
+    private readonly getAlbumCopyPreferences: () => AlbumCopyPreferences = () => ({ format: "embed", blankLines: false }),
   ) {
     super(leaf);
     this.registerDomEvent(this.containerEl.ownerDocument, "keydown", (event) => {
@@ -419,9 +424,12 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderAlbum(container: HTMLElement, entries: readonly TFile[]): void {
+    const orderedEntries = this.sortAlbumEntries(entries);
     const section = this.section(container, "album", t("album"), entries.length);
+    section.addClass("has-album-toolbar");
+    this.renderAlbumToolbar(section);
     const grid = section.createDiv({ cls: "folder-nodes-album-grid" });
-    for (const entry of entries.slice(0, this.visibleLimits.album)) {
+    for (const entry of orderedEntries.slice(0, this.visibleLimits.album)) {
       const extension = entry.extension.toLocaleLowerCase();
       const shell = grid.createDiv({ cls: "folder-nodes-entry-shell folder-nodes-album-shell" });
       const selected = this.selectedContent.has(entry.path);
@@ -458,6 +466,58 @@ export class FolderNodeContentsView extends ItemView {
       if (this.dragEnabled) this.bindContentDragSource(card, entry, "media");
     }
     this.more(section, entries.length, "album");
+  }
+
+  private sortAlbumEntries(entries: readonly TFile[]): TFile[] {
+    if (this.albumSortMode === "vault") return [...entries];
+    const sorted = [...entries].sort((left, right) => {
+      const comparison = this.albumSortMode === "name"
+        ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" })
+        : this.albumSortMode === "created" ? left.stat.ctime - right.stat.ctime : left.stat.mtime - right.stat.mtime;
+      return comparison === 0 ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" }) : comparison;
+    });
+    return this.albumSortDescending ? sorted.reverse() : sorted;
+  }
+
+  private renderAlbumToolbar(section: HTMLElement): void {
+    const toolbar = section.createDiv({ cls: "folder-nodes-album-toolbar" });
+    const sortLabel = this.albumSortMode === "vault" ? t("albumSortVault") : this.albumSortMode === "name" ? t("albumSortName") : this.albumSortMode === "created" ? t("albumSortCreated") : t("albumSortModified");
+    const sort = toolbar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": `${t("albumSort")}: ${sortLabel}`, title: `${t("albumSort")}: ${sortLabel}` } });
+    setIcon(sort, "arrow-down-wide-narrow");
+    sort.dataset.folderNodesFocusKey = "album:sort";
+    sort.addEventListener("click", (event) => {
+      const menu = new Menu();
+      const options: Array<[AlbumSortMode, string]> = [["vault", t("albumSortVault")], ["name", t("albumSortName")], ["created", t("albumSortCreated")], ["modified", t("albumSortModified")]];
+      for (const [mode, label] of options) menu.addItem((item) => item.setTitle(label).setChecked(this.albumSortMode === mode).onClick(() => {
+        this.albumSortMode = mode;
+        this.albumSortDescending = mode === "created" || mode === "modified";
+        this.render();
+      }));
+      if (this.albumSortMode !== "vault") {
+        menu.addSeparator();
+        menu.addItem((item) => item.setTitle(t("albumSortAscending")).setChecked(!this.albumSortDescending).onClick(() => { this.albumSortDescending = false; this.render(); }));
+        menu.addItem((item) => item.setTitle(t("albumSortDescending")).setChecked(this.albumSortDescending).onClick(() => { this.albumSortDescending = true; this.render(); }));
+      }
+      menu.showAtMouseEvent(event);
+    });
+    const copy = toolbar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("copyAlbumImageLinks"), title: t("copyAlbumImageLinks") } });
+    setIcon(copy, "copy");
+    copy.dataset.folderNodesFocusKey = "album:copy";
+    copy.addEventListener("click", () => void this.copyAlbumImageLinks());
+  }
+
+  private async copyAlbumImageLinks(): Promise<void> {
+    const folder = this.service.getFolder(this.folderPath) ?? (this.folderPath === "" ? this.app.vault.getRoot() : null);
+    if (folder === null) return;
+    const images = this.sortAlbumEntries(folder.children.filter((entry): entry is TFile => entry instanceof TFile && IMAGE_EXTENSIONS.has(entry.extension.toLocaleLowerCase())));
+    if (images.length === 0) { new Notice(t("noAlbumImagesToCopy")); return; }
+    const preferences = this.getAlbumCopyPreferences();
+    const sourcePath = this.service.notePathForFolder(this.folderPath);
+    const text = formatContentLinks(images.map((file) => ({ kind: "media" as const, link: this.app.fileManager.generateMarkdownLink(file, sourcePath) })), preferences.format === "link", preferences.blankLines);
+    try {
+      await navigator.clipboard.writeText(text);
+      new Notice(t("albumImageLinksCopied", { count: images.length }));
+    } catch (error) { this.actions.reportError(error); }
   }
 
   private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[]): void {

@@ -94,8 +94,9 @@ export interface ContentLinkItem {
   link: string;
 }
 
-export function formatContentLinks(items: readonly ContentLinkItem[], allAsLinks = false): string {
-  return items.map(({ kind, link }) => kind === "media" && !allAsLinks && !link.startsWith("!") ? `!${link}` : link).join("\n");
+export function formatContentLinks(items: readonly ContentLinkItem[], allAsLinks = false, blankLines = false): string {
+  const separator = blankLines ? "\n\n" : "\n";
+  return items.map(({ kind, link }) => kind === "media" && !allAsLinks && !link.startsWith("!") ? `!${link}` : link).join(separator);
 }
 
 export function contentDragPolicy(itemCount: number): { effectAllowed: "copy" | "copyMove"; internalMove: boolean } {
