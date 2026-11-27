@@ -188,11 +188,13 @@ export class Notice {
   public constructor(message: string, _timeout?: number) { Notice.messages.push(message); }
 }
 export class MenuItem {
+  public checked = false;
   public disabled = false;
   public icon = "";
   public title = "";
   public warning = false;
   public click: (() => void) | null = null;
+  public setChecked(value: boolean): this { this.checked = value; return this; }
   public setDisabled(value: boolean): this { this.disabled = value; return this; }
   public setIcon(value: string): this { this.icon = value; return this; }
   public setTitle(value: string): this { this.title = value; return this; }

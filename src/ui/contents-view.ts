@@ -205,7 +205,8 @@ export class FolderNodeContentsView extends ItemView {
       const targetFolder = this.service.getFolder(targetPath);
       return { kind: targetFolder === null ? "missing-folder" : "conflict", entry };
     }));
-    const album = directFiles.filter((entry) => this.isAlbumEntry(entry));
+    // Shift ranges and rendered cards must share the same order, including beyond the visible page.
+    const album = this.sortAlbumEntries(directFiles.filter((entry) => this.isAlbumEntry(entry)));
     const pendingPaths = new Set(pendingNotes.map((entry) => entry.path));
     const ordinaryFiles: (TFile | TFolder)[] = [
       ...childFolders.filter((entry) => currentIgnored || this.service.isIgnoredPath(entry.path)),
@@ -424,12 +425,11 @@ export class FolderNodeContentsView extends ItemView {
   }
 
   private renderAlbum(container: HTMLElement, entries: readonly TFile[]): void {
-    const orderedEntries = this.sortAlbumEntries(entries);
     const section = this.section(container, "album", t("album"), entries.length);
     section.addClass("has-album-toolbar");
     this.renderAlbumToolbar(section);
     const grid = section.createDiv({ cls: "folder-nodes-album-grid" });
-    for (const entry of orderedEntries.slice(0, this.visibleLimits.album)) {
+    for (const entry of entries.slice(0, this.visibleLimits.album)) {
       const extension = entry.extension.toLocaleLowerCase();
       const shell = grid.createDiv({ cls: "folder-nodes-entry-shell folder-nodes-album-shell" });
       const selected = this.selectedContent.has(entry.path);
