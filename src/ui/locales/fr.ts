@@ -20,6 +20,8 @@ export const fr: Readonly<Record<TranslationKey, string>> = {
   "icons": "Icônes et apparence",
   "naming": "Sélection et nommage",
   "nodeGraph": "Graphe des nœuds",
+  "allowNodeReparenting": "Autoriser le glisser-déposer pour modifier la hiérarchie des nœuds",
+  "allowNodeReparentingDesc": "Une fois activé, les nœuds peuvent être déplacés dans d’autres nœuds en mode réorganisation. Désactivé par défaut ; les commandes de déplacement du menu restent disponibles.",
   "openNodeGraph": "Ouvrir le graphe des nœuds",
   "openInNodeGraph": "Ouvrir dans le graphe des nœuds",
   "openSubtreeNodeGraph": "Ouvrir le graphe du sous-arbre",
