@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0 - 2026-11-27
+
+- Rearrange nodes in the desktop 2D card graph. Reorder siblings under a parent that uses Manual child order. To move a node under a different parent, enable the separate setting in Node Graph and review the proposed path before confirming. The setting defaults to off.
+- Sort the Album by name, creation time, or modification time in either direction. Shift selection follows the displayed order, and the keyboard opens the image menu next to its thumbnail.
+- Copy links for all album images in the current order, including images on later pages. Choose image embeds or regular links and whether to leave blank lines in Content view settings. The copied links use full vault paths for pasting into notes in other folders of the same vault.
+- Review every path in the bulk-organization and property-migration previews. Load additional rows in batches of up to 500. Blocking conflicts must still be resolved before applying a property migration.
+- Reduce the download size by sharing message keys across the translated interface catalogs.
+
+[Compare 0.13.4 and 0.14.0](https://github.com/ZHYX91/obsidian-folder-nodes/compare/0.13.4...0.14.0)
+
 ## 0.13.4 - 2026-11-25
 
 - Keep selected settings tabs visible at narrow widths, preserve focus when changing tabs or detecting emoji fonts, and let translated controls wrap.
