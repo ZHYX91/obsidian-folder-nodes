@@ -98,6 +98,8 @@ describe("Node Contents interactions", () => {
     ];
     expect(formatContentLinks(items)).toBe("![[photo.jpg]]\n![[clip.mp4]]\n[[document.pdf]]\n[[audio.mp3]]");
     expect(formatContentLinks(items, true)).toBe("[[photo.jpg]]\n[[clip.mp4]]\n[[document.pdf]]\n[[audio.mp3]]");
+    expect(formatContentLinks(items.slice(0, 2), false, true)).toBe("![[photo.jpg]]\n\n![[clip.mp4]]");
+    expect(formatContentLinks(items.slice(0, 2), true, true)).toBe("[[photo.jpg]]\n\n[[clip.mp4]]");
   });
 
   it("allows an internal move only for exactly one dragged content item", () => {

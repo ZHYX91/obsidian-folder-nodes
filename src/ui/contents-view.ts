@@ -1,4 +1,4 @@
-import { type Editor, ItemView, MarkdownView, Notice, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
+import { Menu, type Editor, ItemView, MarkdownView, Notice, setIcon, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
 import {
   breadcrumbItems,
@@ -9,6 +9,7 @@ import {
   isContextMenuKey,
   nodeEntryVisual,
   selectionRange,
+  vaultImageLink,
   siblingDropAxis,
   siblingDropZone,
   type SiblingDropAxis,
@@ -55,6 +56,8 @@ interface ContentsService {
 }
 
 interface ContentsVisuals { resolve(folder: TFolder): NodeVisual; }
+interface AlbumCopyPreferences { readonly format: "embed" | "link"; readonly blankLines: boolean; }
+type AlbumSortMode = "vault" | "name" | "created" | "modified";
 
 export type ContentsMenuAnchor = MouseEvent | HTMLElement;
 
@@ -90,7 +93,6 @@ export class FolderNodeContentsView extends ItemView {
   private selectionMode = false;
   private selectedContent = new Map<string, "file" | "media">();
   private selectionAnchor: string | null = null;
-  private selectableOrder: string[] = [];
   private selectableKinds = new Map<string, "file" | "media">();
   private selectionPositions = new Map<string, number>();
   private lastEditor: { editor: Editor; file: TFile } | null = null;
@@ -101,6 +103,8 @@ export class FolderNodeContentsView extends ItemView {
   private contentDropTarget: HTMLElement | null = null;
   private readonly pendingImages = new Set<HTMLImageElement>();
   private renderedFolderPath: string | null = null;
+  private albumSortMode: AlbumSortMode = "vault";
+  private albumSortDescending = false;
   private readonly placementSession = new PlacementSession((path) => this.service.getFolder(path));
 
   public constructor(
@@ -110,6 +114,7 @@ export class FolderNodeContentsView extends ItemView {
     private readonly references: ReferenceIndex,
     private readonly actions: ContentsActions,
     private readonly dragEnabled = true,
+    private readonly getAlbumCopyPreferences: () => AlbumCopyPreferences = () => ({ format: "embed", blankLines: false }),
   ) {
     super(leaf);
     this.registerDomEvent(this.containerEl.ownerDocument, "keydown", (event) => {
@@ -200,7 +205,7 @@ export class FolderNodeContentsView extends ItemView {
       const targetFolder = this.service.getFolder(targetPath);
       return { kind: targetFolder === null ? "missing-folder" : "conflict", entry };
     }));
-    const album = directFiles.filter((entry) => this.isAlbumEntry(entry));
+    const album = this.sortAlbumEntries(directFiles.filter((entry) => this.isAlbumEntry(entry)));
     const pendingPaths = new Set(pendingNotes.map((entry) => entry.path));
     const ordinaryFiles: (TFile | TFolder)[] = [
       ...childFolders.filter((entry) => currentIgnored || this.service.isIgnoredPath(entry.path)),
@@ -210,12 +215,10 @@ export class FolderNodeContentsView extends ItemView {
       ...album.map((entry): [string, "media"] => [entry.path, "media"]),
       ...ordinaryFiles.filter((entry): entry is TFile => entry instanceof TFile).map((entry): [string, "file"] => [entry.path, "file"]),
     ]);
-    this.selectableOrder = [...this.selectableKinds.keys()];
-    const selectable = new Set(this.selectableOrder);
-    for (const path of this.selectedContent.keys()) if (!selectable.has(path)) this.selectedContent.delete(path);
+    for (const path of this.selectedContent.keys()) if (!this.selectableKinds.has(path)) this.selectedContent.delete(path);
     this.selectionPositions = new Map([...this.selectedContent.keys()].map((path, index) => [path, index]));
     this.renderBreadcrumb(container, folder);
-    this.renderHeader(container, folder, this.selectableOrder.length > 0);
+    this.renderHeader(container, folder, this.selectableKinds.size > 0);
     const currentIdentity = this.service.folderIdentity(folderPath);
     if (currentIdentity === "unmanaged") this.renderStatus(container, folderPath, t("managementGuideBoundary"));
     else if (currentIdentity === "incomplete") this.renderStatus(container, folderPath,
@@ -420,6 +423,7 @@ export class FolderNodeContentsView extends ItemView {
 
   private renderAlbum(container: HTMLElement, entries: readonly TFile[]): void {
     const section = this.section(container, "album", t("album"), entries.length);
+    this.renderAlbumToolbar(section);
     const grid = section.createDiv({ cls: "folder-nodes-album-grid" });
     for (const entry of entries.slice(0, this.visibleLimits.album)) {
       const extension = entry.extension.toLocaleLowerCase();
@@ -430,7 +434,10 @@ export class FolderNodeContentsView extends ItemView {
         attr: { "aria-label": entry.name },
       });
       card.dataset.folderNodesFocusKey = `media:${entry.path}`;
-      if (this.selectionMode) card.setAttr("aria-pressed", String(selected));
+      if (this.selectionMode) {
+        card.setAttr("aria-pressed", String(selected));
+        card.dataset.folderNodesSelectionPath = entry.path;
+      }
       const preview = card.createSpan({ cls: "folder-nodes-album-preview" });
       if (IMAGE_EXTENSIONS.has(extension)) {
         this.renderStaticImage(entry, preview);
@@ -457,7 +464,61 @@ export class FolderNodeContentsView extends ItemView {
       this.bindMenu(shell, card, entry, (anchor) => this.actions.entryMenu(anchor, entry, sourceFolder));
       if (this.dragEnabled) this.bindContentDragSource(card, entry, "media");
     }
-    this.more(section, entries.length, "album");
+    const nextEntry = entries[this.visibleLimits.album];
+    this.more(section, entries.length, "album", nextEntry === undefined ? undefined : `media:${nextEntry.path}`);
+  }
+
+  private sortAlbumEntries(entries: readonly TFile[]): TFile[] {
+    if (this.albumSortMode === "vault") return [...entries];
+    const sorted = [...entries].sort((left, right) => {
+      const comparison = this.albumSortMode === "name"
+        ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" })
+        : this.albumSortMode === "created" ? left.stat.ctime - right.stat.ctime : left.stat.mtime - right.stat.mtime;
+      return comparison === 0 ? left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" }) : comparison;
+    });
+    return this.albumSortDescending ? sorted.reverse() : sorted;
+  }
+
+  private renderAlbumToolbar(section: HTMLElement): void {
+    const toolbar = section.createDiv({ cls: "folder-nodes-album-toolbar" });
+    const sortLabel = this.albumSortMode === "vault" ? t("albumSortVault") : this.albumSortMode === "name" ? t("albumSortName") : this.albumSortMode === "created" ? t("albumSortCreated") : t("albumSortModified");
+    const sort = toolbar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": `${t("albumSort")}: ${sortLabel}`, title: `${t("albumSort")}: ${sortLabel}`, "aria-haspopup": "menu" } });
+    setIcon(sort, "arrow-down-wide-narrow");
+    sort.dataset.folderNodesFocusKey = "album:sort";
+    sort.addEventListener("click", () => {
+      const menu = new Menu();
+      const options: Array<[AlbumSortMode, string]> = [["vault", t("albumSortVault")], ["name", t("albumSortName")], ["created", t("albumSortCreated")], ["modified", t("albumSortModified")]];
+      for (const [mode, label] of options) menu.addItem((item) => item.setTitle(label).setChecked(this.albumSortMode === mode).onClick(() => {
+        this.albumSortMode = mode;
+        this.albumSortDescending = mode === "created" || mode === "modified";
+        this.render();
+      }));
+      if (this.albumSortMode !== "vault") {
+        menu.addSeparator();
+        menu.addItem((item) => item.setTitle(t("albumSortAscending")).setChecked(!this.albumSortDescending).onClick(() => { this.albumSortDescending = false; this.render(); }));
+        menu.addItem((item) => item.setTitle(t("albumSortDescending")).setChecked(this.albumSortDescending).onClick(() => { this.albumSortDescending = true; this.render(); }));
+      }
+      const rect = sort.getBoundingClientRect();
+      menu.showAtPosition({ x: rect.left, y: rect.bottom, width: rect.width }, sort.ownerDocument);
+    });
+    const copy = toolbar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("copyAlbumImageLinks"), title: t("copyAlbumImageLinks") } });
+    setIcon(copy, "copy");
+    copy.dataset.folderNodesFocusKey = "album:copy";
+    copy.addEventListener("click", () => void this.copyAlbumImageLinks());
+  }
+
+  private async copyAlbumImageLinks(): Promise<void> {
+    const folder = this.service.getFolder(this.folderPath) ?? (this.folderPath === "" ? this.app.vault.getRoot() : null);
+    if (folder === null) return;
+    const images = this.sortAlbumEntries(folder.children.filter((entry): entry is TFile => entry instanceof TFile && IMAGE_EXTENSIONS.has(entry.extension.toLocaleLowerCase())));
+    if (images.length === 0) { new Notice(t("noAlbumImagesToCopy")); return; }
+    const preferences = this.getAlbumCopyPreferences();
+    const items: ContentLinkItem[] = images.map((file) => ({ kind: "media", link: vaultImageLink(file.path, file.name) }));
+    const text = formatContentLinks(items, preferences.format === "link", preferences.blankLines);
+    try {
+      await navigator.clipboard.writeText(text);
+      new Notice(t("albumImageLinksCopied", { count: images.length }));
+    } catch (error) { this.actions.reportError(error); }
   }
 
   private renderFiles(container: HTMLElement, entries: readonly (TFile | TFolder)[]): void {
@@ -471,7 +532,10 @@ export class FolderNodeContentsView extends ItemView {
         cls: `folder-nodes-file-row${selected ? " is-selected" : ""}`,
       });
       row.dataset.folderNodesFocusKey = `${entry instanceof TFolder ? "folder" : "file"}:${entry.path}`;
-      if (this.selectionMode && entry instanceof TFile) row.setAttr("aria-pressed", String(selected));
+      if (this.selectionMode && entry instanceof TFile) {
+        row.setAttr("aria-pressed", String(selected));
+        row.dataset.folderNodesSelectionPath = entry.path;
+      }
       if (this.selectionMode && entry instanceof TFile) this.renderSelectionIndicator(row, entry.path);
       const icon = row.createSpan({ cls: "folder-nodes-file-icon" });
       if (entry instanceof TFolder) setIcon(icon, "folder");
@@ -586,7 +650,9 @@ export class FolderNodeContentsView extends ItemView {
 
   private toggleSelection(path: string, kind: "file" | "media", extend: boolean): void {
     if (extend && this.selectionAnchor !== null) {
-      const range = selectionRange(this.selectableOrder, this.selectionAnchor, path);
+      const entries = this.containerEl.querySelectorAll<HTMLElement>(".folder-nodes-section[open] [data-folder-nodes-selection-path]");
+      const order = Array.from(entries, (entry) => entry.dataset.folderNodesSelectionPath!);
+      const range = selectionRange(order, this.selectionAnchor, path);
       if (range.length > 0) {
         for (const selectedPath of range) {
           const selectedKind = this.selectableKinds.get(selectedPath);
@@ -933,7 +999,7 @@ export class FolderNodeContentsView extends ItemView {
     return details;
   }
 
-  private more(container: HTMLElement, total: number, section: ContentsSection): void {
+  private more(container: HTMLElement, total: number, section: ContentsSection, nextFocusKey?: string): void {
     const limit = this.visibleLimits[section];
     if (total <= limit) return;
     const count = Math.min(200, total - limit);
@@ -942,6 +1008,10 @@ export class FolderNodeContentsView extends ItemView {
     more.addEventListener("click", () => {
       this.visibleLimits[section] += 200;
       this.render();
+      if (nextFocusKey !== undefined) {
+        const entries = this.containerEl.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]");
+        Array.from(entries).find((entry) => entry.dataset.folderNodesFocusKey === nextFocusKey)?.focus();
+      }
     });
   }
 }

@@ -58,6 +58,8 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   public override getControlValue(key: string): unknown {
     const settings = this.plugin.settings;
     const values: Record<string, unknown> = {
+      albumCopyFormat: settings.albumCopyFormat,
+      albumCopyBlankLines: settings.albumCopyBlankLines,
       language: settings.language,
       homepageEnabled: settings.homepageEnabled,
       openHomepageOnStartup: settings.openHomepageOnStartup,
@@ -92,6 +94,11 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     let reconcileNodeGraph = false;
     let languageChanged = false;
     switch (key) {
+      case "albumCopyFormat":
+        if (value !== "embed" && value !== "link") throw new Error("Unsupported album copy format");
+        settings.albumCopyFormat = value;
+        break;
+      case "albumCopyBlankLines": settings.albumCopyBlankLines = Boolean(value); break;
       case "language":
         if (!isInterfaceLanguage(value)) throw new Error("Unsupported language");
         settings.language = value;
@@ -269,6 +276,9 @@ export class FolderNodesSettingTab extends PluginSettingTab {
   private generalDefinitions(): SettingDefinitionItem[] {
     return [
       { name: t("language"), desc: t("languageDesc"), control: { type: "dropdown", key: "language", defaultValue: "auto", options: languageOptions(t("auto")) } },
+      { name: t("contentView"), desc: t("contentViewDesc"), searchable: false },
+      { name: t("albumCopyFormat"), desc: t("albumCopyFormatDesc"), control: { type: "dropdown", key: "albumCopyFormat", defaultValue: "embed", options: { embed: t("albumCopyEmbed"), link: t("albumCopyLink") } } },
+      { name: t("albumCopyBlankLines"), desc: t("albumCopyBlankLinesDesc"), control: { type: "toggle", key: "albumCopyBlankLines", defaultValue: false } },
       { name: t("applyHiddenNodes"), desc: t("applyHiddenNodesDesc"), control: { type: "toggle", key: "hiddenNodesEnabled", defaultValue: true } },
       { name: t("enableHomepage"), desc: t("enableHomepageDesc"), control: { type: "toggle", key: "homepageEnabled", defaultValue: false } },
       { name: t("openHomepageOnStartup"), desc: t("openHomepageOnStartupDesc"), visible: this.plugin.settings.homepageEnabled, control: { type: "toggle", key: "openHomepageOnStartup", defaultValue: false } },
@@ -390,6 +400,16 @@ export class FolderNodesSettingTab extends PluginSettingTab {
       this.plugin.settings.openHomepageOnStartup = value; await this.plugin.saveSettings();
     });
     new LabeledSetting(panel).setName(t("openHomepage")).setDesc(t("openHomepageDesc")).addButton((button) => button.setButtonText(t("openHomepage")).setDisabled(!this.plugin.settings.homepageEnabled).onClick(() => void this.plugin.openHomepage()));
+    new LabeledSetting(panel).setName(t("contentView")).setDesc(t("contentViewDesc")).setHeading();
+    new LabeledSetting(panel).setFocusKey("albumCopyFormat").setName(t("albumCopyFormat")).setDesc(t("albumCopyFormatDesc")).addDropdown((dropdown) => dropdown.addOptions({ embed: t("albumCopyEmbed"), link: t("albumCopyLink") }).setValue(this.plugin.settings.albumCopyFormat).onChange(async (value) => {
+      if (value !== "embed" && value !== "link") return;
+      this.plugin.settings.albumCopyFormat = value;
+      await this.plugin.saveSettings();
+    }));
+    new LabeledSetting(panel).setFocusKey("albumCopyBlankLines").setName(t("albumCopyBlankLines")).setDesc(t("albumCopyBlankLinesDesc")).addSwitch(this.plugin.settings.albumCopyBlankLines, async (value) => {
+      this.plugin.settings.albumCopyBlankLines = value;
+      await this.plugin.saveSettings();
+    });
     const support = new LabeledSetting(panel).setName(t("helpAndSupport")).setClass("folder-nodes-settings-support");
     const locale = resolvedLanguage();
     const guide = locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`;
