@@ -20,6 +20,8 @@ export const de: Readonly<Record<TranslationKey, string>> = {
   "icons": "Symbole und Darstellung",
   "naming": "Auswahl und Benennung",
   "nodeGraph": "Knotengraf",
+  "allowNodeReparenting": "Ziehen zum Ändern der Knotenebene erlauben",
+  "allowNodeReparentingDesc": "Wenn aktiviert, können Knoten im Neuordnungsmodus in andere Knoten gezogen werden. Standardmäßig deaktiviert; Verschieben über das Menü bleibt möglich.",
   "openNodeGraph": "Knotengraph öffnen",
   "openInNodeGraph": "Im Knotengraph öffnen",
   "openSubtreeNodeGraph": "Knotengraph des Unterbaums öffnen",
