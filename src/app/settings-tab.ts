@@ -409,7 +409,7 @@ export class FolderNodesSettingTab extends PluginSettingTab {
     new LabeledSetting(panel).setFocusKey("albumCopyBlankLines").setName(t("albumCopyBlankLines")).setDesc(t("albumCopyBlankLinesDesc")).addSwitch(this.plugin.settings.albumCopyBlankLines, async (value) => {
       this.plugin.settings.albumCopyBlankLines = value;
       await this.plugin.saveSettings();
-    }));
+    });
     const support = new LabeledSetting(panel).setName(t("helpAndSupport")).setClass("folder-nodes-settings-support");
     const locale = resolvedLanguage();
     const guide = locale === "en" ? "README.md" : `docs/i18n/README.${locale}.md`;
