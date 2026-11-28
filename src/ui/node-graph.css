@@ -1,10 +1,13 @@
+.workspace-leaf-content[data-type="folder-nodes-node-graph"] > .view-content.folder-nodes-node-graph-view {
+  padding: 0;
+}
+
 .folder-nodes-node-graph-view {
   --folder-nodes-node-graph-handle-background: color-mix(in srgb, var(--background-modifier-border) 40%, var(--background-primary));
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 !important;
   overflow: hidden;
 }
 
