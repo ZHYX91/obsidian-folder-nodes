@@ -37,7 +37,7 @@ File Explorer 顶部固定显示 Root 卡片行：没有 disclosure control、�
 
 ## Node Contents View
 
-侧栏 breadcrumb 只显示祖先，深路径以中间省略保持单行；当前 Node 只在下一行显示一次，其卡片本身可打开 Node Note，不再保留重复的 file-text 打开按钮。Node Graph、选择内容与新建子节点进入同一个 header action 区；设置图标等低频动作进入 More。Nodes、Album 与 Files 只在非空时显示，计数弱化并靠右；三者全空时显示统一空态。Sections 可折叠并在当前 Contents view 会话记住状态，每批最多渲染 200 项，不写入 `data.json`。
+侧栏 breadcrumb 只显示祖先，深路径以中间省略保持单行；当前 Node 只在下一行显示一次，其卡片本身可打开 Node Note，不再保留重复的 file-text 打开按钮。Node Graph、选择内容与新建子节点进入同一个 header action 区；设置图标等低频动作进入 More。Nodes、Album 与 Files 只在非空时显示，计数弱化并靠右；三者全空时显示统一空态。Sections 可折叠并在当前 Contents view 会话记住状态，每批最多渲染 200 项，不写入 `data.json`。在同一文件夹内切换文件时保留已展开的批次，进入其他文件夹时各区从首批开始显示。
 
 相册工具栏位于缩略图上方，键盘、鼠标和触控打开的排序菜单都以按钮为锚点。开启内容选择后，按住 Shift 按照显示顺序扩展选区，跳过未展开的分页或已折叠段落。显示更多相册条目后，焦点移到第一张新增缩略图。复制操作包含当前文件夹中的全部图片，按相册当前顺序生成带完整库内路径的 Markdown 链接。
 

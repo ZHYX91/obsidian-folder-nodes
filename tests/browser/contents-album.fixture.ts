@@ -9,6 +9,7 @@ import { FolderNodeContentsView } from "../../src/ui/contents-view";
 let anchor: { x: number; y: number; width?: number; mainDocument: boolean } | null = null;
 const copies: string[] = [];
 let plainLinks = false;
+let view: FolderNodeContentsView;
 Menu.prototype.showAtPosition = (position, documentOwner) => {
   anchor = { ...position, mainDocument: documentOwner === document };
 };
@@ -35,7 +36,7 @@ Object.assign(window, { contentsAlbum: {
     });
     const service = new NodeService(fake.app, () => DEFAULT_SETTINGS);
     const noop = () => {};
-    const view = new FolderNodeContentsView({ app: fake.app } as never, service,
+    view = new FolderNodeContentsView({ app: fake.app } as never, service,
       { resolve: () => ({ kind: "fallback", value: "folder", accent: null, inheritedFrom: null }) },
       new ReferenceIndex(), {
         homepageEnabled: () => false, refresh: noop, reportError: (error) => { throw error; },
@@ -54,6 +55,7 @@ Object.assign(window, { contentsAlbum: {
     await view.onOpen();
     view.setFolder("Album");
   },
+  setFolder(path: string) { view.setFolder(path); },
   menuAnchor() { return anchor; },
   chooseSort(title: string) {
     const item = Menu.lastCreated?.items.find((candidate) => candidate.title === title);

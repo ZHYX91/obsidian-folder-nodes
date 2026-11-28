@@ -132,10 +132,12 @@ export class FolderNodeContentsView extends ItemView {
 
   public setFolder(path: string): void {
     const normalized = normalizeVaultPath(path);
-    if (normalizeVaultPath(this.folderPath) !== normalized) this.finishSelection(false);
+    if (normalizeVaultPath(this.folderPath) !== normalized) {
+      this.finishSelection(false);
+      this.visibleLimits = { album: 200, files: 200, nodes: 200 };
+    }
     this.clearAllDrag();
     this.folderPath = normalized;
-    this.visibleLimits = { album: 200, files: 200, nodes: 200 };
     this.render();
   }
 
@@ -257,8 +259,9 @@ export class FolderNodeContentsView extends ItemView {
     const focusKey = active !== null && container.contains(active)
       ? active.getAttribute("data-folder-nodes-focus-key")
       : null;
+    if (focusKey === null) return { focusKey, neighbors: [], scrollTop: container.scrollTop };
     const keys = [...container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]")].map((element) => element.dataset.folderNodesFocusKey!);
-    const index = focusKey === null ? -1 : keys.indexOf(focusKey);
+    const index = keys.indexOf(focusKey);
     const neighbors = index < 0 ? [] : [...keys.slice(index + 1), ...keys.slice(0, index).reverse()];
     return { focusKey, neighbors, scrollTop: container.scrollTop };
   }
@@ -269,10 +272,13 @@ export class FolderNodeContentsView extends ItemView {
   ): void {
     if (state === null) return;
     if (state.focusKey !== null) {
-      const targets = [...container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]")];
-      const target = [state.focusKey, ...state.neighbors]
-        .map((key) => targets.find((element) => element.dataset.folderNodesFocusKey === key && !element.hasAttribute("disabled")))
-        .find((element) => element !== undefined);
+      const targets = new Map<string, HTMLElement>();
+      for (const element of container.querySelectorAll<HTMLElement>("[data-folder-nodes-focus-key]:not([disabled])")) {
+        const key = element.dataset.folderNodesFocusKey!;
+        if (!targets.has(key)) targets.set(key, element);
+      }
+      const key = targets.has(state.focusKey) ? state.focusKey : state.neighbors.find((neighbor) => targets.has(neighbor));
+      const target = key === undefined ? undefined : targets.get(key);
       container.tabIndex = -1;
       (target ?? container).focus({ preventScroll: true });
     }
