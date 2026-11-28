@@ -77,5 +77,19 @@ await withBrowserFixture({
   await call("setFolder", "Notes");
   await call("setFolder", "Album");
   assert.equal((await call("state")).shown.length, 200);
+  // The view can be moved to a second document after the plugin loaded in the first.
+  const restoredInSecondWindow = await evaluate(`(async () => {
+    const frame = document.createElement("iframe");
+    frame.src = location.href;
+    const loaded = new Promise(resolve => frame.addEventListener("load", resolve, { once: true }));
+    document.body.append(frame);
+    await loaded;
+    const owner = frame.contentDocument;
+    window.contentsAlbum.moveToDocument(owner);
+    owner.querySelector(".folder-nodes-current").focus();
+    window.contentsAlbum.refresh();
+    return owner.activeElement?.dataset.folderNodesFocusKey;
+  })()`);
+  assert.equal(restoredInSecondWindow, "current:Album");
   console.log("Chromium Album keyboard anchor, sort/Shift range, paging, and narrow touch clipboard passed.");
 });

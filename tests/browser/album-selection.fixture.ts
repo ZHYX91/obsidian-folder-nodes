@@ -9,6 +9,12 @@ import { FolderNodeContentsView } from "../../src/ui/contents-view";
 
 let view: FolderNodeContentsView | null = null;
 let copied = "";
+// Let the browser test deliver a thumbnail failure between native pointer events.
+const pendingThumbnails: EventTarget[] = [];
+Object.defineProperty(window, "Image", { value: class extends EventTarget {
+  src = "";
+  constructor() { super(); pendingThumbnails.push(this); }
+} });
 Object.defineProperty(navigator, "clipboard", {
   configurable: true,
   value: { writeText: (value: string) => { copied = value; return Promise.resolve(); } },
@@ -35,6 +41,9 @@ Object.assign(window, { albumFixture: {
     view.containerEl.createEl("style", { text: ".clickable-icon > svg { width: 18px; height: 18px; }" });
     document.body.append(view.containerEl);
     await view.onOpen();
+  },
+  failThumbnails() {
+    for (const image of pendingThumbnails.splice(0)) image.dispatchEvent(new Event("error"));
   },
   sort(index: number) {
     document.querySelector<HTMLButtonElement>("[data-folder-nodes-focus-key='album:sort']")!.click();

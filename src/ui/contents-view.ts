@@ -316,7 +316,7 @@ export class FolderNodeContentsView extends ItemView {
     const identity = managedNode
       ? header.createEl("button", { cls: "folder-nodes-current", attr: { "aria-label": t("openCurrentNodeNote") } })
       : header.createDiv({ cls: "folder-nodes-current" });
-    if (identity instanceof HTMLButtonElement) identity.dataset.folderNodesFocusKey = `current:${folderPath}`;
+    if (managedNode) identity.dataset.folderNodesFocusKey = `current:${folderPath}`;
     if (this.dragEnabled) this.bindContentDropTarget(identity, folderPath);
     const resolved = managedNode ? this.visuals.resolve(folder) : null;
     if (resolved !== null && resolved.kind !== "fallback") {

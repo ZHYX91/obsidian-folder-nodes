@@ -56,6 +56,11 @@ Object.assign(window, { contentsAlbum: {
     view.setFolder("Album");
   },
   setFolder(path: string) { view.setFolder(path); },
+  moveToDocument(owner: Document) {
+    owner.body.append(view.containerEl);
+    view.refresh();
+  },
+  refresh() { view.refresh(); },
   menuAnchor() { return anchor; },
   chooseSort(title: string) {
     const item = Menu.lastCreated?.items.find((candidate) => candidate.title === title);
