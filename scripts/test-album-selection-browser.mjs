@@ -6,11 +6,11 @@ await withBrowserFixture({
   stylesheet: "src/ui/styles.css",
   ready: "Boolean(window.albumFixture)",
 }, async ({ send, evaluate }) => {
-  const click = async (key, modifiers = 0) => {
+  const click = async (key, modifiers = 0, failThumbnail = false) => {
     const { x, y, hit } = await evaluate(`(() => {
       const button = document.querySelector('[data-folder-nodes-focus-key="' + ${JSON.stringify(key)} + '"]');
       button.scrollIntoView({ block: "center" });
-      const rect = button.getBoundingClientRect();
+      const rect = (${failThumbnail} ? button.querySelector("canvas") : button).getBoundingClientRect();
       for (const row of [0.5, 0.75, 0.25]) for (const column of [0.5, 0.25, 0.75]) {
         const x = rect.x + rect.width * column;
         const y = rect.y + rect.height * row;
@@ -21,6 +21,7 @@ await withBrowserFixture({
     assert.equal(hit, key, JSON.stringify({key,x,y,hit}));
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, modifiers });
     await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1, modifiers });
+    if (failThumbnail) await evaluate("window.albumFixture.failThumbnails()");
     await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1, modifiers });
   };
   for (const [mode, order] of [
@@ -32,7 +33,7 @@ await withBrowserFixture({
     if (mode !== 0) await evaluate(`window.albumFixture.sort(${mode})`);
     assert.deepEqual((await evaluate("window.albumFixture.state()")).shown, order);
     await click("header:selection");
-    await click(`media:${order[0]}`);
+    await click(`media:${order[0]}`, 0, true);
     await click(`media:${order[1]}`, 8); // Chromium Shift modifier.
     await click("selection:copy");
     const state = await evaluate("window.albumFixture.state()");

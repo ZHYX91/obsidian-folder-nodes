@@ -45,6 +45,11 @@ await withBrowserFixture({
   assert.equal(state.active, "media:Album/" + state.shown[200]);
   assert.deepEqual(state.selected, ["A.jpg", "B.jpg", state.shown[199]]);
 
+  // Active-leaf changes send the current folder back to an open Contents view.
+  await call("setFolder", "Album");
+  assert.equal((await call("state")).shown.length, 203);
+  assert.equal((await call("state")).active, state.active);
+
   await enter("album:copy");
   const [embed] = (await call("state")).copies;
   assert.equal(embed.split("\n").length, 202);
@@ -69,5 +74,22 @@ await withBrowserFixture({
   await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   const [, links] = (await call("state")).copies;
   assert.equal(links, embed.split("\n").map((line) => line.slice(1)).join("\n\n"));
+  await call("setFolder", "Notes");
+  await call("setFolder", "Album");
+  assert.equal((await call("state")).shown.length, 200);
+  // The view can be moved to a second document after the plugin loaded in the first.
+  const restoredInSecondWindow = await evaluate(`(async () => {
+    const frame = document.createElement("iframe");
+    frame.src = location.href;
+    const loaded = new Promise(resolve => frame.addEventListener("load", resolve, { once: true }));
+    document.body.append(frame);
+    await loaded;
+    const owner = frame.contentDocument;
+    window.contentsAlbum.moveToDocument(owner);
+    owner.querySelector(".folder-nodes-current").focus();
+    window.contentsAlbum.refresh();
+    return owner.activeElement?.dataset.folderNodesFocusKey;
+  })()`);
+  assert.equal(restoredInSecondWindow, "current:Album");
   console.log("Chromium Album keyboard anchor, sort/Shift range, paging, and narrow touch clipboard passed.");
 });
