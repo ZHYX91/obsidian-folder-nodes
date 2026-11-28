@@ -30,11 +30,11 @@ describe("settings tab compatibility contract", () => {
 
     expect(styles).toContain("container-type: inline-size");
     expect(styles).toContain("margin-block-start: var(--size-4-5)");
-    expect(styles).toContain(".folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab");
-    expect(styles).toContain("appearance: none !important");
+    expect(styles).toContain(".folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab");
+    expect(styles).toContain("appearance: none;");
     expect(styles).toContain("min-block-size: 34px");
-    expect(styles).toContain("background: transparent !important");
-    expect(styles).toContain("font-weight: var(--font-semibold) !important");
+    expect(styles).toContain("background: transparent;");
+    expect(styles).toContain("font-weight: var(--font-semibold);");
     expect(styles).toContain("min-block-size: 44px");
     expect(styles).not.toMatch(/\n\s+height: 34px/);
   });

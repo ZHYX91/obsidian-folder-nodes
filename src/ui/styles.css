@@ -86,25 +86,25 @@ body {
   scrollbar-width: thin;
 }
 
-.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  background: transparent !important;
-  border: 0 !important;
-  border-block-end: 2px solid transparent !important;
-  border-radius: 0 !important;
+.folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  border-radius: 0;
   box-sizing: border-box;
-  box-shadow: none !important;
-  color: var(--text-muted) !important;
+  box-shadow: none;
+  color: var(--text-muted);
   cursor: var(--cursor, default);
   flex: 0 0 auto;
-  font-family: inherit !important;
-  font-size: var(--font-ui-small) !important;
+  font-family: inherit;
+  font-size: var(--font-ui-small);
   font-weight: inherit;
   block-size: auto;
   min-block-size: 34px;
-  margin: 0 !important;
-  padding: 7px 12px !important;
+  margin: 0;
+  padding: 7px 12px;
   white-space: nowrap;
 }
 
@@ -113,32 +113,32 @@ body {
     --interactive-accent: Highlight;
   }
 
-  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab[aria-selected="false"] {
-    border-block-end-color: Canvas !important;
+  .folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab[aria-selected="false"] {
+    border-block-end-color: Canvas;
   }
 }
 
 @media (pointer: coarse) {
-  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { min-inline-size: 44px; min-block-size: 44px; }
+  .folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab { min-inline-size: 44px; min-block-size: 44px; }
   .folder-nodes-tab-frame > button.folder-nodes-tab-arrow { flex-basis: 44px; min-block-size: 44px; }
 }
 
-.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab:focus-visible {
+.folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: -2px;
 }
 
-.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab:hover {
-  background: transparent !important;
-  color: var(--text-normal) !important;
+.folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab:hover {
+  background: transparent;
+  color: var(--text-normal);
 }
 
-.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab.is-active,
-.folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab.is-active:hover {
-  background: transparent !important;
-  border-block-end-color: var(--interactive-accent) !important;
-  color: var(--text-normal) !important;
-  font-weight: var(--font-semibold) !important;
+.folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab.is-active,
+.folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab.is-active:hover {
+  background: transparent;
+  border-block-end-color: var(--interactive-accent);
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
 }
 
 .folder-nodes-tab-panel {
@@ -1340,7 +1340,7 @@ button.folder-nodes-current:focus-visible {
 }
 
 @container folder-nodes-tab-frame (max-width: 600px) {
-  .folder-nodes-settings .folder-nodes-tabs > button.folder-nodes-tab { padding-inline: 8px !important; }
+  .folder-nodes-settings .folder-nodes-tab-frame > .folder-nodes-tabs > button.folder-nodes-tab { padding-inline: 8px; }
 }
 
 /* Keep Obsidian's intrinsic-width probe out of the panel's scroll area. */
